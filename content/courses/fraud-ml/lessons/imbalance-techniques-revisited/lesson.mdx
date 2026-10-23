@@ -1,0 +1,530 @@
+Every rebalancing technique in the handbook raises ROC-AUC on the transaction data and lowers average precision, and the undersampled model's probabilities are wrong by a factor that has a closed form. The claim holds for the four techniques applied to a single tree; the balanced ensembles are the exception, and the lesson locates their gain.
+
+<Ref lesson="alert-budget-metrics">The metrics lesson</Ref> replaced accuracy and ROC-AUC by average precision and card precision at $k$, the numbers that see the few hundred alerts an investigator team can open, and <Ref lesson="delayed-labels-prequential">the validation lesson</Ref> built the forward folds with a delay block that estimate those numbers honestly. What stands open is the toolkit every imbalanced problem reaches for first: class weights, oversampling, undersampling and the balanced ensembles built from them. This lesson derives what undersampling does to a model's probabilities and the exact inverse that repairs them, then runs each technique through the prequential harness on the handbook's simulator and on real Worldline transactions. For the single-model techniques the finding is uniform: rebalancing buys ROC-AUC and balanced accuracy, costs average precision, and leaves card precision at 100 unchanged or lower. The balanced ensembles do gain on real data, most at the mildest ratio and less with every step towards balance, which places the gain in diversity rather than in the class proportion.
+
+## Undersampling is selection on the label: the β form
+
+The undersampling correction was met once already, as the last exercise of <Ref lesson="delayed-labels-prequential">the validation lesson</Ref>. This section states it as a theorem with its hypothesis exposed, because the hypothesis is what the later sections test.
+
+<Task>
+Answer from memory before reading on, then open the fold. (1) From the classical-ml course's lesson *Class imbalance and data leakage*: resampling keeps each positive at rate $s_+$ and each negative at rate $s_-$; what happens to the posterior odds, and which parameter of a logistic regression absorbs it? (2) From <Ref lesson="alert-budget-metrics">the metrics lesson</Ref>: does average precision depend on the score values or only on their order? (3) From the same lesson: at a budget of 100 alerts among about 8,300 transactions a day, what is the largest false-positive rate the investigators can reach?
+</Task>
+
+<Aside>
+**Answers.** (1) Every posterior odds is multiplied by $s_+/s_-$, so every log-odds shifts by $\log(s_+/s_-)$; a well-specified logistic regression moves its intercept by that constant and nothing else. (2) Only on the order: AP is a sum over the ranked list of precision at each fraud's rank, weighted by the recall step, and any strictly increasing transformation of the scores leaves it unchanged. (3) About 1%: 100 alerts over roughly 8,200 genuine transactions is at most $100/8{,}200 \approx 0.012$, and fewer once some alerts are fraud.
+</Aside>
+
+### Counting what survives
+
+Take 10,000 transactions of which 1,000 are fraud, the setting Dal Pozzolo and co-authors use to introduce the technique. Undersampling keeps every fraud and keeps each genuine transaction independently with probability $\beta$. To balance the classes it must keep 1,000 of the 9,000 genuine rows, so $\beta = 1{,}000/9{,}000 \approx 0.11$ and 88.9% of the genuine rows are discarded. A milder $\beta = 0.5$ keeps 4,500 genuine rows, a sample of 5,500 that is still 81.8% genuine.
+
+| $\beta$ | genuine kept | sample size | genuine share | sample prior $\pi_s^+$ |
+|---|---|---|---|---|
+| 1 | 9,000 | 10,000 | 90.0% | 0.10 |
+| 0.5 | 4,500 | 5,500 | 81.8% | 0.18 |
+| 0.3 | 2,700 | 3,700 | 73.0% | 0.27 |
+| 1/9 | 1,000 | 2,000 | 50.0% | 0.50 |
+
+In general, with $N^+$ frauds and $N^-$ genuine rows, the sample has $N^+$ frauds and about $\beta N^-$ genuine rows, so its fraud prior is $\pi_s^+ = N^+/(N^+ + \beta N^-)$. The balancing value is $\beta = N^+/N^-$. On the 2013 ULB card data of <Ref lesson="canonical-datasets">the datasets lesson</Ref>, 492 frauds among 284,807 transactions, that value is 0.0017: a balanced sample discards 99.8% of the genuine transactions.
+
+### The posterior of the sample
+
+<Definition title="class-dependent selection">
+Let $s \in \{0, 1\}$ indicate that a row of the training data is kept. Selection is *class-dependent* if $P(s = 1 \mid y, x) = P(s = 1 \mid y)$ for every $x$. Undersampling of the majority class is the case $P(s = 1 \mid \text{fraud}) = 1$ and $P(s = 1 \mid \text{genuine}) = \beta$, with $0 < \beta \le 1$.
+</Definition>
+
+The hypothesis says the coin that decides whether a genuine row survives does not look at the row. Its consequence is that $p(x \mid y, s = 1) = p(x \mid y)$: the kept genuine rows are distributed exactly as all genuine rows were, and only their count changes. Write $p(x) = P(\text{fraud} \mid x)$ for the posterior on the full data and $p_s(x) = P(\text{fraud} \mid x, s = 1)$ for the posterior of the sample, which is what a classifier trained on the sample estimates.
+
+<Theorem title="the undersampled posterior (Dal Pozzolo et al. 2015, Eq. 3)">
+Under class-dependent selection with negative-keep rate $\beta$,
+$$
+p_s = \frac{p}{p + \beta(1 - p)}.
+$$
+Equivalently, the posterior odds of the sample are the odds of the full data divided by $\beta$.
+
+<Proof>
+Bayes' rule conditioned on $x$, with $s = 1$ as the event:
+$$
+P(\text{fraud} \mid x, s{=}1) = \frac{P(s{=}1 \mid \text{fraud}, x)\,p}{P(s{=}1 \mid \text{fraud}, x)\,p + P(s{=}1 \mid \text{genuine}, x)\,(1 - p)}.
+$$
+Class-dependent selection replaces $P(s{=}1 \mid \text{fraud}, x)$ by 1 and $P(s{=}1 \mid \text{genuine}, x)$ by $\beta$, which gives the formula. Dividing $p_s$ by $1 - p_s = \beta(1-p)/(p + \beta(1-p))$ gives $p_s/(1-p_s) = p/(\beta(1-p))$. This is the classical-ml odds-shift theorem with $s_+ = 1$, $s_- = \beta$: a log-odds shift of $\log(1/\beta)$.
+</Proof>
+</Theorem>
+
+The step that uses the hypothesis is the replacement of $P(s{=}1 \mid \text{genuine}, x)$ by a constant. A sampler that looks at $x$, such as edited nearest neighbours or NearMiss, which discard genuine rows near the frauds, breaks it, and so does SMOTE, which manufactures new $x$ values. For those the formula is an approximation of unknown quality.
+
+### The inverse map
+
+Solving the theorem for $p$ gives the correction.
+
+<Definition title="undersampling correction">
+For a posterior $p_s$ learned on a sample with negative-keep rate $\beta$, the *corrected posterior* is
+$$
+p' = \frac{\beta\,p_s}{\beta\,p_s - p_s + 1}.
+$$
+If the classifier estimates $p_s$ exactly, $p' = p$.
+</Definition>
+
+<Example title="a coin flip that is the base rate">
+Balanced undersampling of the 1,000-in-10,000 data: $\beta = 1/9$. A transaction whose full-data posterior equals the prior, $p = 0.1$, is scored on the sample as
+$$
+p_s = \frac{0.1}{0.1 + \tfrac19 \times 0.9} = \frac{0.1}{0.2} = 0.5.
+$$
+The base rate of the data maps to the base rate of the sample. In general $p_s(\pi^+) = \pi^+/(\pi^+ + \beta\pi^-) = N^+/(N^+ + \beta N^-) = \pi_s^+$.
+
+In the other direction, a balanced model outputs $p_s = 0.9$ for some transaction. The correction gives
+$$
+p' = \frac{\tfrac19 \times 0.9}{\tfrac19 \times 0.9 - 0.9 + 1} = \frac{0.1}{0.2} = 0.5.
+$$
+A "90% fraud" score from a balanced model is a coin flip, and its "50%" is the 10% base rate.
+</Example>
+
+<FigureSequence
+  name="sel"
+  alt="Four frames over one x axis from −10 to 15. Top panel: counts of 9,000 genuine transactions (blue Gaussian centred at 0) and 1,000 frauds (amber Gaussian centred at 3), prior 0.10. Frame 2 thins the genuine curve to 1,000 rows, leaving the old curve dashed, and the prior becomes 0.50. Bottom panel: the posterior p(x) in black; frame 3 adds the undersampled posterior ps(x) in amber, shifted left; frame 4 marks x = 1.5, where ps = 0.50, and a green arrow maps it down to p′ = 0.10 on the black curve"
+  caption="Undersampling changes only the genuine count; the learned posterior rises everywhere, and the inverse map brings it back point by point."
+/>
+
+<Task>
+Step through the four frames. At frame 2, check that the amber fraud curve did not move and that the new genuine curve has the same shape as the dashed one. At frame 4, verify the arrow by hand: $p_s = 0.5$, $\beta = 1/9$, and $p' = 0.1$. Then read off the posterior gap at $x = 5$, where $p \approx 0.27$, and compute $p_s$ from the theorem: it should land near 0.77.
+</Task>
+
+<Exercise>
+Two models are trained on the 1,000-in-10,000 data, one on a balanced undersample ($\beta = 1/9$) and one on a milder one ($\beta = 0.5$), and neither is corrected. An investigator team is told to open every transaction that either model scores above 0.5. Decide which model's alerts reach further into the genuine transactions, by stating for each model the smallest full-data posterior $p$ that it alerts, and say what single change makes "above 0.5" mean the same thing for both.
+
+<Solution>
+**What 0.5 means.** A score of $p_s = 0.5$ corrects to $p' = \beta \times 0.5/(\beta \times 0.5 + 0.5) = \beta/(1 + \beta)$. For $\beta = 1/9$ that is $0.1$, for $\beta = 0.5$ it is $1/3$. Because $g$ is increasing, each model alerts exactly the transactions whose full-data posterior is at least that value.
+
+**Decision.** The balanced model alerts everything at or above the 10% base rate: its borderline alerts are genuine nine times in ten. The milder model alerts from $p = 1/3$ up, so its borderline alerts are genuine two times in three, and it alerts a subset of the balanced model's transactions. The balanced model reaches further into the genuine transactions.
+
+**The change.** Correct both models' scores with their own $\beta$ and apply one threshold to $p'$. After correction both scores estimate the same $p$, so "above 0.5" selects the same transactions from either model, up to estimation error. The uncorrected rule was two different cost settings under one number, which the matched-threshold theorem below makes exact.
+</Solution>
+</Exercise>
+
+<KeyFact>
+The correction needs one number the trainer always knows, the keep rate $\beta$, and nothing about the model: it applies to the output of a tree, a forest or a network as long as the sampler ignored $x$.
+</KeyFact>
+
+## The correction repairs calibration and moves no rank
+
+The correction changes every score, and from that one would expect every metric to move. The ranking metrics do not, the decisions do not either once the threshold is moved with the scores, and the one quantity that does change is calibration.
+
+### Monotone, so every ranking metric is unchanged
+
+Write $p' = g(p_s)$ with $g(u) = \beta u/(1 - (1 - \beta)u)$. Its derivative is
+$$
+g'(u) = \frac{\beta\,(1 - (1-\beta)u) + \beta u\,(1 - \beta)}{(1 - (1-\beta)u)^2} = \frac{\beta}{(1 - (1-\beta)u)^2} > 0,
+$$
+so $g$ is strictly increasing on $[0, 1]$. Two transactions keep their order under $g$, so the ranked list, every precision at every rank, ROC-AUC, average precision and card precision at $k$ are identical for $p_s$ and $p'$. Dal Pozzolo and co-authors report identical AUC rank sums for $\hat p_s$ and $\hat p'$ on every dataset and classifier for this reason.
+
+The derivative also fixes how the correction treats errors. At $u = 0$ it is $\beta$, so the map shrinks: a score error near zero is divided by $1/\beta$. At $u = 1$ it is $1/\beta$, so the map stretches: a small error in a high $\hat p_s$ becomes a large error in $p'$. The boundary-probe exercise at the end of the lesson, which sends $\beta$ to zero, follows this to its limit.
+
+### The matched threshold
+
+A fixed threshold on the scores is where the correction would change something. A rule such as "alert above 0.5" applied to $p_s$ and to $p'$ alerts on different sets, because $g$ moved every score below it. The Bayes-minimum-risk rule fixes the threshold from costs. Let $l_{ij}$ be the cost of deciding $i$ when the truth is $j$, with 1 for fraud. Alerting is the cheaper decision exactly when $(1-p)\,l_{10} + p\,l_{11} \le (1-p)\,l_{00} + p\,l_{01}$, that is when
+$$
+p \ge \tau = \frac{l_{10} - l_{00}}{(l_{10} - l_{00}) + (l_{01} - l_{11})}.
+$$
+With correct decisions free and the error costs set to the priors, $l_{10} = \pi^+$ and $l_{01} = \pi^-$, the threshold is $\tau = \pi^+$. On the sample the same convention gives $\tau_s = \pi_s^+$, which is 0.5 for a balanced sample.
+
+<Theorem title="the matched threshold (Dal Pozzolo et al. 2015, Eq. 12)">
+Thresholding $p_s$ at $\tau_s$ and thresholding $p'$ at
+$$
+\tau' = \frac{\beta\,\tau_s}{(\beta - 1)\,\tau_s + 1}
+$$
+make the same decision on every transaction. If $\tau_s = \pi_s^+$, then $\tau' = \pi^+$: the threshold for the corrected posterior is the one the full data would have used.
+
+<Proof>
+$\tau' = g(\tau_s)$ by definition, and $g$ is strictly increasing, so $p_s \ge \tau_s \iff g(p_s) \ge g(\tau_s) \iff p' \ge \tau'$. For the second claim substitute $\tau_s = N^+/(N^+ + \beta N^-)$:
+$$
+\tau' = \frac{\beta N^+/(N^+ + \beta N^-)}{(\beta - 1)N^+/(N^+ + \beta N^-) + 1} = \frac{\beta N^+}{\beta N^+ + \beta N^-} = \frac{N^+}{N^+ + N^-} = \pi^+.
+$$
+</Proof>
+</Theorem>
+
+<Example title="the threshold on the β = 0.5 sample">
+With $\beta = 0.5$ on the 1,000-in-10,000 data, $\tau_s = \pi_s^+ = 1{,}000/5{,}500 = 0.182$. The matched threshold is
+$$
+\tau' = \frac{0.5 \times 0.182}{-0.5 \times 0.182 + 1} = \frac{0.0909}{0.909} = 0.100 = \pi^+.
+$$
+A transaction with $p_s = 0.25$ is alerted under $\tau_s$; its corrected score $p' = 0.125/0.875 = 0.143$ is alerted under $\tau'$. One with $p_s = 0.15$ is below $\tau_s$, and $p' = 0.075/0.925 = 0.081$ is below $\tau'$.
+</Example>
+
+The correction therefore costs no accuracy at a cost-derived threshold: it relabels the scores and the threshold together. Undersampling itself is a different matter. Thresholding the *uncorrected* $p_s$ at the full-data cost threshold is the same as alerting under costs in which a false positive costs $\beta$ times what it should; a choice of $\beta$ is a choice of cost ratio, made implicitly.
+
+### What the correction buys: the Brier score
+
+The quantity that differs between $p_s$ and $p'$ is how close the scores are to probabilities. The Brier score, the mean of $(y - \hat p)^2$ over the test rows, measures it: lower is better calibrated. On the paper's two overlapping Gaussians (genuine centred at 0, fraud at 3, both with standard deviation 3, 10% fraud) a logistic regression is the correct model, so the experiment isolates the sampling.
+
+<Figure
+  src="./figures/brier.svg"
+  alt="Brier score against β from 1/9 to 1 for a logistic fit on two Gaussians with 10% fraud. The uncorrected undersampled posterior ps (amber) starts at 0.199 at β = 1/9 and falls to 0.0807 at β = 1. The corrected posterior p′ (green) and the posterior trained on all rows (grey band) lie flat at 0.0807 to 0.0808 across all β; the Bayes optimum is 0.08072"
+  caption="Uncorrected scores lose calibration as β falls; the corrected ones sit on the full-data line."
+/>
+
+At $\beta = 1/9$ the uncorrected scores have a Brier score of 0.199, two and a half times the 0.081 of the model trained on all rows; the corrected scores have 0.0808. The ordering is the paper's on its UCI datasets and the ULB card data: the full-data posterior best, the corrected one second and not significantly different, the uncorrected one worst by a wide margin. On the ULB data undersampling raised AUC for all three classifiers the paper tests and worsened the Brier score, increasingly so as $\beta$ fell; the correction removed the loss without touching the AUC.
+
+<KeyFact>
+Report $p'$, never $p_s$: the two rank identically, so nothing is lost, and every later use of the number as a probability, from the expected loss on a transaction to the PSD2 fraud rate in <Ref lesson="psd2-sca-tra">the TRA lesson</Ref>, reads the calibrated one.
+</KeyFact>
+
+## Where the bias lands: overlap and variance
+
+The bias $p_s - p$ is not a constant, and where it is large decides how much an uncorrected undersampled model misstates real transactions. Two facts settle it: its shape as a function of $p$, and where the data sit on that shape.
+
+### The bias as a function of p
+
+Subtracting $p$ from the theorem's formula and simplifying,
+$$
+p_s - p = \frac{(1 - \beta)\,p\,(1 - p)}{\beta + (1 - \beta)\,p}.
+$$
+It vanishes at $p = 0$ and $p = 1$ and is positive between: a transaction that is certainly genuine or certainly fraud is scored correctly by the undersampled model, and every uncertain one is overstated.
+
+<Theorem title="the peak of the bias">
+For $0 < \beta < 1$ the bias $p_s - p$ is maximal at
+$$
+p^* = \frac{\sqrt\beta}{1 + \sqrt\beta}, \qquad\text{where } p_s - p = \frac{1 - \sqrt\beta}{1 + \sqrt\beta}.
+$$
+
+<Proof>
+Differentiate $p_s(p) = p/(\beta + (1-\beta)p)$: $\dfrac{dp_s}{dp} = \dfrac{\beta}{(\beta + (1-\beta)p)^2}$. The bias is maximal where this derivative equals 1, so $\beta + (1-\beta)p = \sqrt\beta$ and $p^* = (\sqrt\beta - \beta)/(1 - \beta) = \sqrt\beta(1 - \sqrt\beta)/((1 - \sqrt\beta)(1 + \sqrt\beta)) = \sqrt\beta/(1 + \sqrt\beta)$. The second derivative of $p_s$ is negative, so this is a maximum. At $p^*$, $p_s = p^*/\sqrt\beta = 1/(1 + \sqrt\beta)$, and the difference is $(1 - \sqrt\beta)/(1 + \sqrt\beta)$.
+</Proof>
+</Theorem>
+
+<Figure
+  src="./figures/bias.svg"
+  alt="The bias ps − p against the true posterior p on a log axis from 0.0001 to 1, for β = 1 (flat at zero), 0.5 (green, peak 0.17 at p = 0.414), 0.1 (blue, peak 0.52 at p = 0.240) and 0.01 (amber, peak 0.82 at p = 0.091). All curves are zero at p = 1"
+  caption="The stronger the undersampling, the larger the bias and the smaller the true probability at which it peaks."
+/>
+
+For balanced undersampling at fraud rates near 1%, $\beta \approx 0.01$, the bias peaks at $p^* = 0.091$, where the model reports 0.91: a transaction with one chance in eleven of being fraud is reported as nine in ten. At $p = 0.01$, the base rate, the bias is still 0.49.
+
+<Exercise>
+A colleague trains an uncorrected model on an undersample with $\beta = 0.25$ and checks its calibration on two slices of a labelled week: the transactions whose true posterior is below 0.01, which are most of the stream, and those above 0.95, which are the clear frauds. The largest error found is under 0.04, and the colleague concludes that undersampling at this rate is harmless without a correction. Say what the check could not see, where the largest error sits and how large it is, and which transactions an investigator would meet there.
+
+<Solution>
+**What the slices measure.** The bias $(1-\beta)p(1-p)/(\beta + (1-\beta)p)$ vanishes at both ends of the scale. At $p = 0.01$ it is $0.75 \times 0.01 \times 0.99/(0.25 + 0.0075) = 0.029$; at $p = 0.95$ it is $0.75 \times 0.95 \times 0.05/(0.25 + 0.7125) = 0.037$. The colleague's numbers are correct and describe the two places where the bias is forced towards zero.
+
+**Where it peaks.** $\sqrt\beta = 0.5$, so the bias is largest at $p^* = 0.5/1.5 = 1/3$, where the model reports $1/(1 + 0.5) = 2/3$: an error of $1/3$, about nine times the largest error the check found. A transaction with one chance in three of fraud is reported at two in three.
+
+**Who sits there.** Rows near $p = 1/3$ are those whose features are compatible with both classes once the prior is counted: the overlap region, where the investigators' hardest calls are and where an alert threshold is usually placed. A calibration check has to include the middle of the scale; the tails certify nothing.
+</Solution>
+</Exercise>
+
+### Overlapping versus separated classes
+
+Whether many transactions sit at intermediate $p$ depends on how much the two classes overlap. Dal Pozzolo and co-authors compare two problems with 10% fraud and standard deviation 3: fraud centred at 3, heavily overlapping the genuine class at 0, and fraud centred at 15, nearly separated.
+
+<Figure
+  src="./figures/overlap.svg"
+  alt="Two panels, each showing the data density in grey, the true posterior p(x) in black and the undersampled posterior ps(x) in amber with the gap shaded, for β = 1/9. Left, fraud centred at 3: the curves are 6.6 units of x apart and the gap exceeds 0.1 for 94% of transactions. Right, fraud centred at 15: both curves rise steeply near x = 8 to 9, 1.3 units apart, in a region with almost no data, and the gap exceeds 0.1 for 2% of transactions"
+  caption="With overlapping classes the bias covers the bulk of the data; with separated classes it lives in a gap almost no transaction occupies."
+/>
+
+For two Gaussians with equal variance $\sigma^2$ and means 0 and $\mu$, the log-odds is linear in $x$ with slope $\mu/\sigma^2$. Undersampling adds the constant $\log(1/\beta)$ to it, which slides the posterior curve left by $\sigma^2 \log(1/\beta)/\mu$ units of $x$. With $\beta = 1/9$ that is 6.6 units for $\mu = 3$ and 1.3 for $\mu = 15$. In the overlapping problem the shift lands on the bulk of the data and $p_s - p$ exceeds 0.1 for 94% of transactions; in the separated one it lands in the gap between the classes and exceeds 0.1 for 2%. Card fraud is the overlapping case: on the Worldline transactions the best model in this lesson reaches an average precision under 0.1, which a separated problem would not produce.
+
+### What the formula does not fix
+
+The correction removes one error and leaves two.
+
+**The prior must not change.** The derivation assumes the test data have the training data's prior. If the fraud rate of the deployment week differs from that of the training window, $p'$ is calibrated to the wrong base rate, and the general prior-shift correction of the starred section below is needed with an estimate of the new rate. On a stream whose fraud rate drifts by week, as on the simulator, this is the normal case.
+
+**Variance is not repaired.** $\hat p_s$ is estimated from the sample, a fraction of the data, and $\hat p'$ inherits its estimation error. In the Brier experiment the corrected model's excess over the Bayes optimum (0.08072) is 0.00007 at $\beta = 1/9$, five times the 0.00001 of the model trained on all 10,000 rows. The absolute gap is small because a two-parameter logistic model needs few rows; a deep tree on the 1,196 rows of a balanced handbook training week has far more to lose. The paper names averaging over several undersamples as the remedy and leaves it aside; the ensembles section takes it up.
+
+## Class weights move the threshold metric, not the ranking
+
+The cheapest move in the playbook does not touch the data. It reweights the loss, and its effect depends on whether the model's ranking can respond to the weights.
+
+### The imbalance ratio as a cost
+
+<Definition title="imbalance ratio">
+For a training set with $N^+$ minority and $N^-$ majority rows, the *imbalance ratio* is $\mathrm{IR} = N^+/N^-$. The IR heuristic sets the cost of a false negative to 1 and of a false positive to $\mathrm{IR}$, which makes the two classes' total weights equal: $\mathrm{IR} \times N^- = N^+$.
+</Definition>
+
+In scikit-learn the weights are the `class_weight` argument: `None` for equal weights, `"balanced"` for the IR heuristic, or an explicit dictionary such as `{0: 0.053, 1: 1}`. The handbook's toy problem is two features, 5,000 points, 95% genuine, generated by `make_classification` with `class_sep=0.5` so that the classes overlap; its IR is $5/95 = 0.053$. A sampler's target uses the same scale: imbalanced-learn's `RandomUnderSampler(sampling_strategy=r)` removes genuine rows until $N^+/N^-_{\text{kept}} = r$, which is the undersampling of the first section with $\beta = \mathrm{IR}/r$.
+
+### The toy: balanced accuracy up, ranking flat or down
+
+Five-fold cross-validation on the toy, depth-5 tree and logistic regression, with and without the IR weights:
+
+| model | weights | ROC-AUC | AP | balanced accuracy |
+|---|---|---|---|---|
+| decision tree | equal | 0.906 | 0.528 | 0.786 |
+| decision tree | IR | 0.887 | 0.471 | 0.898 |
+| logistic regression | equal | 0.937 | 0.535 | 0.641 |
+| logistic regression | IR | 0.937 | 0.536 | 0.899 |
+
+The logistic regression's balanced accuracy rises from 0.641 to 0.899 while its ROC-AUC and AP are unchanged to the third decimal. Balanced accuracy, the mean of the true-positive and true-negative rates, is computed at the fixed threshold 0.5. The weights shift the intercept of a logistic fit by about $\log(1/\mathrm{IR})$, the classical-ml result, which raises every score by the same amount on the log-odds scale. That moves which side of 0.5 each row falls on and moves no row's rank. The gain is a threshold change executed as a retraining.
+
+<Figure
+  src="./figures/surfaces.svg"
+  alt="Three square panels of the same two-feature toy data, test fold dots in blue (genuine) and amber (fraud) running along a diagonal band. Left, the unweighted depth-5 tree flags a narrow staircase along the fraud band (BA 0.786, AUC 0.906, AP 0.528). Middle, the class-weighted tree adds green regions around the band (BA 0.898, AUC 0.887, AP 0.471). Right, the tree trained on a 1:1 random undersample adds a large green region covering the lower right corner (BA 0.896, AUC 0.913, AP 0.408)"
+  caption="Both rebalanced trees flag much more of the overlap; the undersampled one also claims a corner where its sample happened to keep no genuine row."
+/>
+
+The tree is different. Its weights enter the impurity of every candidate split, so a weighted tree is a different tree: it cuts the overlap region into leaves that a fraud-heavy loss prefers, and its leaf scores order the test rows differently. ROC-AUC falls from 0.906 to 0.887 and AP from 0.528 to 0.471. The undersampled tree in the third panel is the same story with a smaller training set: 216 rows per class in each fold, AP 0.408.
+
+<Task>
+Compare the left and right panels. Find the lower-right corner the undersampled tree flags, and count the amber test dots in it: there are none. Then explain from the sampler why the corner is flagged: random undersampling kept 216 of about 3,780 genuine training rows, and none of the kept ones fell in that corner.
+</Task>
+
+### The transaction data: weight 0.01 against weight 1
+
+On the simulator, with the prequential folds of <Ref lesson="delayed-labels-prequential">the validation lesson</Ref> (one-week training, delay and test blocks, test weeks from 2018-08-08), the handbook sweeps the genuine-class weight over 0.01, 0.05, 0.1, 0.5 and 1 for a depth-5 tree. At weight 1 the tree scores ROC-AUC 0.810, AP 0.600 and CP@100 0.284 on the test weeks; at weight 0.01, close to the IR of about 0.009, it scores 0.826, 0.537 and 0.289. ROC-AUC and card precision rise slightly and AP falls by six points. The logistic regression shows the same direction at a smaller scale: AP 0.623 at weight 1 against 0.571 at 0.01, CP@100 flat between 0.294 and 0.298.
+
+The weight that maximises each metric on the prequential validation folds is 0.01 for ROC-AUC, 0.1 for AP and 0.01 for CP@100; the weight that maximises test AP is 1. The IR heuristic is therefore a starting value, not a setting: the cost ratio is a hyperparameter, selected on the metric that matters by the folds that estimate it.
+
+<KeyFact>
+A threshold-based metric such as balanced accuracy can rise by 0.26 from class weights alone while the ranking does not change at all; a gain reported in such a metric says nothing about precision at a budget, which depends only on the ranking.
+</KeyFact>
+
+## Resampling on the stream: AUC up in every case, AP down in every case
+
+Resampling changes the training rows rather than their weights. On the toy it behaves like weighting; on a stream it adds an implementation hazard, and on both of the handbook's transaction datasets it produces the same reversal.
+
+### Samplers inside the prequential fold
+
+Random oversampling duplicates frauds; SMOTE, from the classical-ml course, places synthetic frauds on segments between a fraud and one of its fraud nearest neighbours; random undersampling (RUS) is the $\beta$-sampler of the first section. SMOTE ignores the labels of the points around those segments, so where the classes overlap, as they do on card data, its synthetic frauds land among genuine transactions (the defect that ADASYN and Borderline-SMOTE try to repair).
+
+Every sampler is fitted on data, so it belongs inside the fold, after the split, applied to the training block only. The [imbalanced-learn](https://imbalanced-learn.org) `Pipeline` does this: its samplers run during `fit` and are skipped during `predict`, so each prequential fold resamples its own training week and scores its validation week untouched.
+
+```python
+from imblearn.pipeline import Pipeline
+from imblearn.under_sampling import RandomUnderSampler
+
+pipe = Pipeline([("sampler", RandomUnderSampler(random_state=0)),
+                 ("clf", DecisionTreeClassifier(max_depth=5, random_state=0))])
+grid = GridSearchCV(pipe, {"sampler__sampling_strategy": [0.01, 0.05, 0.1, 0.5, 1]},
+                    scoring=scoring, cv=prequential_folds, refit=False)
+```
+
+`prequential_folds` and `scoring` are the index pairs and the AUC/AP/CP@100 scorers built in <Ref lesson="delayed-labels-prequential">the validation lesson</Ref>. Calling the sampler on the whole frame first and splitting afterwards is the leakage of the classical-ml lesson in its stream form; the closing exercise on samplers outside the fold counts what it touches.
+
+### Four techniques, two datasets
+
+For each technique the handbook selects its parameter (class weight or target ratio) on the prequential validation folds, separately for each metric, and reports the test score of the selected value. The baseline is the same tree without the technique: depth 5 on the simulator, depth 6 on the real Worldline transactions, whose fraud rate is about 0.25%.
+
+| | simulator ROC-AUC | AP | CP@100 | Worldline ROC-AUC | AP | CP@100 |
+|---|---|---|---|---|---|---|
+| no rebalancing | 0.810 | 0.600 | 0.284 | 0.869 | 0.068 | 0.232 |
+| class weight | 0.825 | 0.556 | 0.289 | 0.881 | 0.066 | 0.183 |
+| SMOTE | 0.845 | 0.573 | 0.289 | 0.882 | 0.056 | 0.168 |
+| RUS | 0.830 | 0.594 | 0.277 | 0.892 | 0.066 | 0.201 |
+| SMOTE + RUS | 0.847 | 0.544 | 0.288 | 0.883 | 0.045 | 0.119 |
+
+<Figure
+  src="./figures/techniques.svg"
+  alt="Three panels of horizontal lollipops, one row per technique (class weight, SMOTE, RUS, SMOTE + RUS), amber for the simulator and blue for Worldline data, showing the change against the unrebalanced tree in percent. ROC-AUC: all eight dots slightly right of zero, between +1% and +5%. Average precision: all eight left of zero, from −1% to −34% (SMOTE + RUS on Worldline). Card precision at 100: simulator dots within ±3% of zero, Worldline dots between −13% and −49%"
+  caption="Every technique applied to the single tree moves ROC-AUC up on both datasets and AP down on both; on real data card precision at 100 falls by up to half."
+/>
+
+ROC-AUC rises in all eight cells, by 1.2 to 3.7 points. AP falls in all eight. On the simulator CP@100 moves by less than one card a day in either direction, within the 0.01 to 0.02 spread of the test weeks. On the real data it falls in every case, and SMOTE followed by RUS halves it: 0.119 against 0.232, eleven fewer compromised cards found per hundred inspected, from a model whose ROC-AUC went up.
+
+### Why the area rises while the top of the ranking degrades
+
+ROC-AUC weights a ranking error equally wherever it falls: confusing the 50th and 5,000th most suspicious transactions costs the same as confusing the 5,000th and 6,000th. A rebalanced training set gives the overlap region far more fraud weight, so the model learns to push the mass of moderately suspicious frauds above the mass of ordinary genuine rows, which is most of the area. AP and CP@100 read the top of the list, the region below the 1% false-positive rate that <Ref lesson="alert-budget-metrics">the metrics lesson</Ref> showed is all an investigator can reach. There the rebalanced model has traded its sharpest distinctions, among the few transactions that look most like fraud, for a broader separation lower down. The same effect produced the depth-50 tree that ROC-AUC selected in <Ref lesson="delayed-labels-prequential">the validation lesson</Ref>.
+
+## Balanced ensembles: the gain is diversity, not balance
+
+Ensembles are the strongest models in the handbook, and imbalanced-learn offers a balanced version of each. The results separate two effects that every single-model experiment above confounded: the change of class proportion, and the change of which rows each model sees.
+
+### Balanced bagging and balanced random forest
+
+Bagging trains each base learner on a bootstrap replica, $n$ rows drawn with replacement from $n$, so each replica contains about $1 - 1/e = 63.2\%$ of the distinct rows. A random forest also restricts each split to a random subset of the features.
+
+<Definition title="balanced bagging">
+*Balanced bagging* draws each bootstrap replica and then undersamples it at random to a target imbalance ratio before fitting its base learner; predictions are averaged as in bagging. A *balanced random forest* does the same with random-forest trees.
+</Definition>
+
+On the toy, balanced bagging raises balanced accuracy from 0.748 to 0.920 against plain bagging. Its ROC-AUC and AP move by about a hundredth, AUC up and AP down, so the threshold metric moves and the ranking does not. Balanced random forest behaves the same way: balanced accuracy rises from 0.672 to 0.916 and AP falls by about a hundredth.
+
+### The imbalance ratio sweep
+
+On the simulator, with 100 trees of depth 20, plain bagging scores ROC-AUC 0.856, AP 0.678 and CP@100 0.293 on the test weeks. Balanced bagging, swept over target ratios from 0.02 to 1:
+
+<Figure
+  src="./figures/ir-curves.svg"
+  alt="Three panels against the bootstrap's imbalance ratio on a log axis from 0.02 to 1, with plain bagging as a dashed blue line. ROC-AUC rises from 0.869 at 0.02 to a best 0.879 at 0.5, all above plain bagging at 0.856. Average precision is 0.680 at 0.02, 0.679 at 0.05, 0.677 at 0.1, then falls to 0.652 at 0.5 and 0.631 at 1, crossing below plain bagging at 0.678. Card precision at 100 stays between 0.299 and 0.305, best at 0.5, all above plain bagging at 0.293"
+  caption="Already at the mildest ratio balanced bagging beats plain bagging on every metric; balancing further helps ROC-AUC and hurts AP."
+/>
+
+The gain over plain bagging is largest where the rebalancing is smallest. At the lowest ratio tested, 0.02, about twice the training weeks' natural 0.009, balanced bagging is already above plain bagging on all three metrics. Pushing the ratio towards balance adds about one point of ROC-AUC and removes about five points of AP, from 0.680 to 0.631. The part of the method that helps on every metric is therefore present before any meaningful rebalancing: each tree sees a different random subset of genuine rows, the trees are less alike, and their average overfits less. A random forest already decorrelates its trees through feature subsampling, and balancing it changes none of the three metrics on the simulator by more than 0.003.
+
+### On real data the gain shrinks with every step towards balance
+
+On the Worldline transactions the ensembles are tuned separately (100 trees of depth 10; XGBoost with 100 trees of depth 6), each parameter selected on the validation folds for each metric.
+
+| | ROC-AUC | AP | CP@100 |
+|---|---|---|---|
+| bagging | 0.912 | 0.072 | 0.209 |
+| balanced bagging | 0.919 | 0.086 | 0.248 |
+| random forest | 0.912 | 0.080 | 0.227 |
+| balanced random forest | 0.925 | 0.093 | 0.254 |
+| XGBoost | 0.928 | 0.095 | 0.235 |
+| weighted XGBoost | 0.928 | 0.097 | 0.249 |
+
+Here both balanced ensembles improve on their plain versions on all three metrics: balanced random forest finds 2.7 more compromised cards per hundred inspected than the plain forest, balanced bagging 3.9 more than plain bagging. The sweep over the target ratio shows which part of the method does it.
+
+| test score | ratio 0.01 | 0.05 | 0.1 | 0.5 | 1 | plain |
+|---|---|---|---|---|---|---|
+| balanced bagging, ROC-AUC | 0.917 | 0.919 | 0.919 | 0.922 | 0.921 | 0.912 |
+| balanced bagging, AP | 0.086 | 0.090 | 0.087 | 0.077 | 0.069 | 0.072 |
+| balanced bagging, CP@100 | 0.248 | 0.248 | 0.240 | 0.210 | 0.189 | 0.209 |
+| balanced RF, ROC-AUC | 0.919 | 0.922 | 0.925 | 0.926 | 0.924 | 0.912 |
+| balanced RF, AP | 0.093 | 0.092 | 0.089 | 0.075 | 0.069 | 0.080 |
+| balanced RF, CP@100 | 0.254 | 0.245 | 0.239 | 0.201 | 0.177 | 0.227 |
+
+Both ensembles reach their best AP and CP@100 at the two mildest ratios, 0.01 and 0.05, four to twenty times the natural 0.0025. Every further step towards balance costs both metrics. At full balance, ratio 1, both fall below their plain versions: balanced random forest's CP@100 is 0.177 against the plain forest's 0.227, five fewer cards per hundred. ROC-AUC alone peaks at 0.5, about one point above the mildest ratio. The pattern is the simulator's: the gain over the plain ensemble is largest where the rebalancing is least, and it shrinks as the rebalancing grows. One practical gain is real: undersampled bootstraps are smaller, and the handbook measures training up to 20% faster.
+
+### XGBoost: residuals reweight the minority already
+
+XGBoost has one imbalance control, `scale_pos_weight`, which multiplies the loss of every fraud. On the simulator the best value is 1, no weighting, on all three metrics, and AP falls steadily from 0.687 at 1 to 0.630 at 100. On real data raising it from 1 to 5 moves AP from 0.095 to 0.097 and CP@100 from 0.235 to 0.249, inside a CP@100 spread of 0.06 across test weeks, and higher values lose again.
+
+<Remark title="why boosting needs no weights">
+Gradient boosting fits each new tree to the gradient of the logistic loss, $g_i = \hat p_i - y_i$. Start from the base rate, $\hat p_i = \pi^+$ for every row. A genuine row has gradient $\pi^+$ and a fraud $-(1 - \pi^+)$, so on the handbook's training week, with $\pi^+ = 0.0089$, each fraud carries about 110 times the gradient of each genuine transaction. Summed over the classes, $N^-\pi^+ = N^- N^+/N = N^+(1 - \pi^+)$: the two classes carry exactly equal total gradient, which is what the IR heuristic imposes on a loss by hand. Every tree's split search therefore already treats the classes as balanced, while the Newton step on the leaf values keeps the scores on the full-data scale. Adding `scale_pos_weight` doubles that emphasis and distorts the scores. The handbook's summary names this mechanism, residuals that give more weight to the minority, for XGBoost's robustness.
+</Remark>
+
+## ★ Prior shift in general, and averaging over undersamples
+
+The $\beta$ form assumes the deployment has the training prior. The general correction drops that assumption, and the undersampling ensembles answer the variance problem that the correction leaves.
+
+### Saerens' adjustment
+
+Let a classifier be trained with class priors $\pi_s^\pm$ and deployed where the priors are $\pi_t^\pm$, with the class-conditional densities $p(x \mid y)$ unchanged. Saerens, Latinne and Decaestecker give
+$$
+p_t = \frac{\dfrac{\pi_t^+}{\pi_s^+}\,p_s}{\dfrac{\pi_t^+}{\pi_s^+}\,p_s + \dfrac{\pi_t^-}{\pi_s^-}\,(1 - p_s)}.
+$$
+With $\pi_t^\pm = \pi^\pm$, the ratios are $\pi^+/\pi_s^+ = (N^+ + \beta N^-)/(N^+ + N^-)$ and $\pi^-/\pi_s^- = (N^+ + \beta N^-)/(\beta(N^+ + N^-))$; their common factor cancels and the formula becomes $p_t = \beta p_s/(\beta p_s + 1 - p_s)$, the $\beta$ correction. When $\pi_t$ is unknown, the same paper estimates it by expectation-maximisation on the unlabelled deployment scores, alternating the adjustment with the mean of the adjusted posteriors.
+
+Baesens and co-authors illustrate the formula for a credit-risk sample trained at 20% and deployed at 1%. A resampled score of 0.5 becomes
+$$
+\frac{0.05 \times 0.5}{0.05 \times 0.5 + 1.2375 \times 0.5} = 0.039,
+$$
+and 0.9 becomes 0.267. The same book records the scorecard tradition that predates the debate: avoid fully balanced samples, move the class proportion five points at a time from the natural one (95/5, 90/10, 85/15) until validation AUC stops improving, and expect to stop near 80/20, which it calls common industry practice. Under the evidence of this lesson the search is sound and its stopping criterion is not: run with validation AP or CP@100, it usually stops at the natural proportion.
+
+### Averaging over undersamples
+
+At a fraud rate of 0.4%, balancing a daily chunk of Worldline transactions by undersampling discards 99.6% of its genuine transactions. EasyEnsemble, due to Liu, Wu and Zhou, draws several independent balanced undersamples, trains a model on each and averages them, so that every genuine row has a chance of being seen. In Dal Pozzolo and co-authors' study of streaming strategies on Worldline data, EasyEnsemble with five sub-models per chunk and SMOTE both outperformed plain undersampling on AP, ROC-AUC and precision among the top-ranked transactions. The better balancer depended on how the model was renewed: EasyEnsemble did best with the forgetting-genuine strategy, which trains each new model on all past frauds and only recent genuine transactions, SMOTE with the update strategy, which averages the models of the most recent chunks. <Ref lesson="drift-strategies-on-worldline">The drift-strategy lesson</Ref> runs that interaction on the full replay.
+
+## The verdict: under AP and CP@k only the first move always helps
+
+The classical-ml playbook orders four moves: fix the metric, weight the loss, resample, move the threshold. Under the metrics this course uses, the evidence of the last four sections decides each.
+
+### The claim the literature makes, and why it fails here
+
+The correct claim first: on card-fraud data, under average precision and card precision at a budget, a single tree trained at the natural class proportion is as good as or better than the same tree with any of the four techniques tested (class weight, SMOTE, RUS, SMOTE followed by RUS). Balanced ensembles do improve on their plain versions, but the improvement is largest at the mildest ratio on the grid and shrinks with each step towards balance, and XGBoost does best with no weighting at all on the simulator. The contrary belief is widespread: that class imbalance is a defect of the data and rebalancing improves detection. The handbook observes that the literature motivating these techniques for card fraud reports ROC-AUC, balanced accuracy and training time, and on those three the belief is true.
+
+It fails under the operational metrics because those metrics read a different part of the ranking. Balanced accuracy is evaluated at one threshold, and rebalancing moves the threshold. ROC-AUC averages over every false-positive rate, and rebalancing improves the separation where most of the area is, in the overlap. AP and CP@k are fixed by the first few hundred alerts a day, and there rebalancing removes information (undersampling), adds synthetic points among genuine rows (SMOTE), or spends the loss on the bulk of the frauds rather than the sharpest ones (weights).
+
+### What replaces it
+
+The replacement procedure: choose the metric first; train at the natural proportion; treat any class weight or sampling ratio as a hyperparameter selected by prequential AP or CP@k, starting from no rebalancing; undersample, if at all, for compute, inside the fold, and correct the scores by $\beta$; prefer ensembles whose diversity does not depend on rebalancing.
+
+The discriminating case is the real-data decision tree with SMOTE followed by undersampling: ROC-AUC 0.883 against 0.869, so a reader of AUC adopts it, and CP@100 0.119 against 0.232, so the investigators find half as many compromised cards.
+
+<KeyFact>
+The verdict covers ranking metrics with a constant cost per alert. Once a missed fraud costs its amount, resampling also changes the distribution of the amounts the costs are made of, and Correa Bahnsen and co-authors found that neither undersampling nor oversampling improved financial savings.
+</KeyFact>
+
+This lesson has established that undersampling with keep rate $\beta$ multiplies the posterior odds by $1/\beta$, that the inverse $p' = \beta p_s/(\beta p_s - p_s + 1)$ restores calibration without moving any rank, that the matched threshold $\tau'$ reproduces every decision and equals $\pi^+$ for prior-based costs, and that the bias peaks at $p^* = \sqrt\beta/(1+\sqrt\beta)$, which places it on the overlapping transactions. It has shown on simulated and real transaction streams that class weights, SMOTE, RUS and their combination raise a single tree's ROC-AUC and lower its AP, that the balanced ensembles gain most at the mildest ratio and less with every step towards balance, and that XGBoost needs no weights because its residuals already balance the classes. <Ref lesson="example-dependent-cost">The next lesson</Ref> replaces the constant costs of the matched-threshold theorem by the transaction amount, which makes the decision depend on each transaction's own stake and makes a calibrated $p'$ indispensable.
+
+## Exercises
+
+<Exercise>
+A vendor trains a classifier on a balanced undersample of the 2013 ULB card data, 492 frauds among 284,807 transactions, and ships it uncorrected with the dashboard rule "a score of 0.9 or more means likely fraud". (a) Judge the rule: is a transaction scored $p_s = 0.9$ more likely fraud than genuine, and from which $p_s$ on is it? (b) Near the top of the scale the vendor's scores carry an estimation error of about $\pm 0.005$. Judge whether the corrected posterior of a transaction scored $p_s = 0.99$ can be reported to investigators as a probability. (c) Recommend what the vendor should change, and say why the correction alone does not suffice.
+
+<Solution>
+**(a)** $N^- = 284{,}315$ and $\beta = 492/284{,}315 = 0.00173$, so $1/\beta = 578$. In odds form, $p'/(1 - p') = \beta\,p_s/(1 - p_s)$. At $p_s = 0.9$ the odds are $9 \times 0.00173 = 0.0156$, so $p' = 0.015$: the transaction is genuine about 64 times in 65. It becomes more likely fraud than genuine when the corrected odds pass 1, that is when $p_s/(1 - p_s) > 578$, or $p_s > 578/579 = 0.998$. The rule is wrong by two orders of magnitude in odds; on this model "likely fraud" lives in the top 0.2% of the score scale.
+
+**(b)** At $p_s = 0.99$ the corrected odds are $99 \times 0.00173 = 0.171$, so $p' = 0.146$. At $p_s = 0.985$ they are $65.7 \times 0.00173 = 0.114$, $p' = 0.102$; at $p_s = 0.995$ they are $199 \times 0.00173 = 0.344$, $p' = 0.256$. An error of $\pm 0.005$ in the score spans 0.10 to 0.26 in the probability, which the derivative predicts: $g'(0.99) = \beta/(1 - (1-\beta) \times 0.99)^2 = 0.00173/0.0117^2 = 12.6$. The number can be reported as a rank, not as a probability: it does not distinguish one chance in ten from one in four.
+
+**(c)** Correct the scores, because the dashboard rule reads them as probabilities. But the correction is exact only for the true $p_s$; the transactions that are likely fraud sit above $p_s = 0.99$, where $g$ stretches every estimation error by a factor of more than ten, and $\hat p_s$ was estimated from only 492 genuine rows. Train on far more genuine rows: at 284,807 rows the full data set is small enough to use whole, and a milder $\beta$ or an average over several undersamples are the alternatives when it is not.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the matched threshold from the odds relation, and extend it to arbitrary costs. (a) Using $p'/(1 - p') = \beta\,p_s/(1 - p_s)$, show that $p_s \ge \tau_s \iff p' \ge \tau'$ with $\tau' = \beta\tau_s/((\beta - 1)\tau_s + 1)$. (b) For costs $l_{ij}$ with $l_{10} > l_{00}$ and $l_{01} > l_{11}$, let $c = (l_{10} - l_{00})/(l_{01} - l_{11})$. Show that the Bayes-minimum-risk rule applied to $p'$ alerts exactly when $p_s/(1 - p_s) \ge c/\beta$. (c) Conclude what cost ratio a practitioner is implicitly using who applies the cost-derived threshold to the uncorrected $p_s$.
+
+<Solution>
+**(a)** The odds map $o(u) = u/(1-u)$ is strictly increasing, and $o(p') = \beta\,o(p_s)$. So $p_s \ge \tau_s \iff o(p_s) \ge o(\tau_s) \iff \beta o(p_s) \ge \beta o(\tau_s) \iff o(p') \ge \beta o(\tau_s)$. Define $\tau'$ by $o(\tau') = \beta o(\tau_s)$: $\tau'/(1 - \tau') = \beta\tau_s/(1 - \tau_s)$, so $\tau'(1 - \tau_s) = \beta\tau_s(1 - \tau')$, $\tau'(1 - \tau_s + \beta\tau_s) = \beta\tau_s$, and $\tau' = \beta\tau_s/((\beta - 1)\tau_s + 1)$.
+
+**(b)** The rule alerts when $p' \ge \tau = (l_{10} - l_{00})/((l_{10} - l_{00}) + (l_{01} - l_{11}))$, and $o(\tau) = c$. So it alerts when $o(p') \ge c$, that is $\beta\,o(p_s) \ge c$, that is $o(p_s) \ge c/\beta$. In probability form: $p_s \ge (c/\beta)/(1 + c/\beta) = c/(c + \beta)$.
+
+**(c)** Applying the cost threshold to $p_s$ alerts when $o(p_s) \ge c$, which by (b) is the correct rule for a cost ratio $c\beta$ in place of $c$: false positives priced at $\beta$ times their true cost. Balanced undersampling at a 0.2% fraud rate makes a false alarm about 580 times cheaper than it is. The transferable move: a monotone recalibration composes with a threshold rule by moving the threshold through the same map.
+</Solution>
+</Exercise>
+
+<Exercise>
+Push the keep rate to its limit, $\beta \to 0$, with $N^+$ fixed. (a) What does $p_s$ tend to for a transaction with $0 < p < 1$, and what does the sample contain in the limit? (b) What does the correction formula return for $\hat p_s = 1$, for any $\beta$? (c) Explain why the correction formula, which is exact for every $\beta > 0$, does not save the model as $\beta \to 0$, and name the quantity that breaks. (d) Say why $\beta = N^+/N^-$ is the usual lower end in practice, although the theorem holds below it.
+
+<Solution>
+**(a)** $p_s = p/(p + \beta(1-p)) \to 1$ for every $p > 0$. The sample tends to the $N^+$ frauds with fewer and fewer genuine rows, and in the limit none: there is nothing to learn the genuine class from.
+
+**(b)** $g(1) = \beta/(\beta - 1 + 1) = 1$. A score of exactly 1 is mapped to 1 whatever $\beta$ is.
+
+**(c)** The formula maps the true $p_s$ to the true $p$; it is applied to an estimate $\hat p_s$. Near $u = 1$ its derivative is $1/\beta$, so an estimation error $\varepsilon$ in $\hat p_s$ becomes an error of about $\varepsilon/\beta$ in $p'$, while $\hat p_s$ itself is estimated from about $\beta N^-$ genuine rows, so $\varepsilon$ grows as $\beta$ falls. Both effects compound: the bias of $p_s$ is removed exactly, the variance of $\hat p'$ diverges. The breaking quantity is the variance, which the paper explicitly sets aside.
+
+**(d)** Below $N^+/N^-$ the sample has more frauds than genuine rows: the minority has become the majority, the variance cost keeps rising, and no metric in the paper's experiments improved there. The formula remains valid, and the variance argument says it becomes useless.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "Rebalancing improved ROC-AUC from 0.81 to 0.85 on the transaction data, so the rebalanced model will catch more fraud at the investigator's budget." Use the tables of this lesson. Give the CP@100 and AP of the rebalanced simulator models next to their ROC-AUC, translate the CP@100 differences into cards a day at $k = 100$, repeat for the real data, and name the region of the ROC curve the AUC gain must have come from.
+
+<Solution>
+**Simulator.** SMOTE: ROC-AUC 0.845, AP 0.573, CP@100 0.289. SMOTE + RUS: 0.847, 0.544, 0.288. Baseline: 0.810, 0.600, 0.284. CP@100 rises by 0.005 and 0.004, half a card a day, well inside the test weeks' spread of 0.01 to 0.02; AP falls by 0.027 and 0.056. RUS gains 0.020 of AUC and loses 0.007 of CP@100.
+
+**Real data.** All four techniques raise ROC-AUC (0.881 to 0.892 against 0.869) and lower CP@100: by 4.9 cards a day for class weights, 6.4 for SMOTE, 3.1 for RUS, 11.3 for SMOTE + RUS, against 23.2 found by the baseline.
+
+**Where the gain is.** A budget of 100 alerts in about 8,300 transactions a day caps the false-positive rate near 1%, and the metrics lesson showed that the region below it is about 1% of the ROC curve's width. A gain of 0.035 in total area with no gain in precision at 100 must come almost entirely from false-positive rates the investigators never reach. The step that fails is "AUC up, so detection up at the budget": AUC is an average over operating points, and the budget uses one end of the curve.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce the toy experiment. Generate the data with `make_classification(n_samples=5000, n_features=2, n_informative=2, n_redundant=0, n_repeated=0, n_classes=2, n_clusters_per_class=1, weights=[0.95, 0.05], class_sep=0.5, random_state=0)`, and score a depth-5 decision tree with stratified 5-fold cross-validation (shuffled, `random_state=0`) under three treatments: no rebalancing, `class_weight={0: 0.05/0.95, 1: 1}`, and an imbalanced-learn pipeline with `RandomUnderSampler(sampling_strategy=1)`. Report ROC-AUC, AP and balanced accuracy, compare with the handbook's 0.906/0.528/0.786, 0.887/0.471/0.898 and 0.913/0.408/0.896, and state what would count as agreement. Then rerun with five other data seeds and report the range of AP for each treatment.
+
+<Solution>
+**Expected result.** With the stated seeds the three rows reproduce exactly: 0.906/0.528/0.786, 0.887/0.471/0.898 and 0.913/0.408/0.896, on scikit-learn 1.9 and imbalanced-learn 0.14. The data set has 270 frauds, so each test fold holds 54.
+
+**What counts as agreement.** The handbook reports a fold standard deviation of 0.072 for the baseline's AP. Exact agreement with the same seeds checks the code; with other seeds, agreement means each metric within about one fold standard deviation of the published value, and above all the same ordering: balanced accuracy rises by about 0.1 under both treatments, AP falls under both, and RUS has the lowest AP.
+
+**Other seeds.** Expect AP to move by several hundredths across data seeds, with RUS lowest in most of them; a seed where RUS's AP exceeds the baseline's is possible at this sample size, which is why the transaction-data results, averaged over four test weeks, carry the argument and the toy only illustrates it.
+</Solution>
+</Exercise>
+
+<Exercise>
+A model was trained on a balanced undersample with $\beta = 0.01$ of a training window with a 1% fraud rate. Five test transactions have scores and amounts: A $p_s = 0.95$, EUR 20; B $p_s = 0.30$, EUR 2,000; C $p_s = 0.80$, EUR 150; D $p_s = 0.10$, EUR 600; E $p_s = 0.60$, EUR 40. (a) Compute $p'$ for each. (b) With prior-based constant costs, apply the Bayes-minimum-risk rule to $p_s$ with $\tau_s = \pi_s^+$ and to $p'$ with $\tau'$, and confirm the alert sets agree. (c) Now let a missed fraud cost its amount and an alert cost EUR 5, so that a transaction is worth alerting when $5 \le \text{Amt} \times P(\text{fraud})$. Apply this rule with $p_s$ and with $p'$ in place of $P(\text{fraud})$, list the two alert sets, and say why no threshold on $p_s$ alone reproduces the second.
+
+<Solution>
+**(a)** $p' = 0.01 p_s/(1 - 0.99 p_s)$. A: $0.0095/0.0595 = 0.160$. B: $0.003/0.703 = 0.0043$. C: $0.008/0.208 = 0.038$. D: $0.001/0.901 = 0.0011$. E: $0.006/0.406 = 0.015$.
+
+**(b)** $\pi_s^+ = 0.01/(0.01 + 0.01 \times 0.99) = 0.503$, so on $p_s$ the rule alerts A, C and E. $\tau' = g(0.503) = 0.00503/(1 - 0.99 \times 0.503) = 0.0101 = \pi^+$. On $p'$: A (0.160), C (0.038) and E (0.015) exceed 0.0101; B (0.0043) and D (0.0011) do not. Same set.
+
+**(c)** With $p_s$: A $20 \times 0.95 = 19$, B 600, C 120, D 60, E 24; all exceed 5, so all five are alerted. With $p'$: A $3.2$, B $8.5$, C $5.8$, D $0.7$, E $0.6$; only B and C are alerted. B, the transaction with the second-lowest score, is alerted, and A, with the highest, is not. The decision depends on the product of amount and probability, so it is not a threshold on any single score, and the uncorrected score overstates every expected loss by a factor that differs per transaction. That rule, its cost matrix and the savings it produces are the subject of <Ref lesson="example-dependent-cost">the example-dependent cost lesson</Ref>, which needs exactly the calibrated $p'$ computed here.
+</Solution>
+</Exercise>
+
+<Exercise>
+A pipeline applies `RandomUnderSampler(sampling_strategy=1)` and SMOTE to the whole simulator frame, 2018-06-11 to 2018-09-14, and only then calls the prequential split of <Ref lesson="delayed-labels-prequential">the validation lesson</Ref>, with one-week training, delay and validation blocks and known-card removal. (a) Name the rows of fold 1's validation block that the undersampler changes, and say what that does to AP and to CP@100 measured there. (b) Name the rows of the delay block that SMOTE can draw on, and explain the leak this creates into fold 1's training block. (c) State the correct order of operations.
+
+<Solution>
+**(a)** The undersampler removes about 99% of the genuine transactions of every block, the validation block included. The validation week then has a fraud rate near 50% instead of under 1%. AP on it measures ranking against a few hundred genuine rows instead of tens of thousands, and rises towards the fraud share; CP@100 becomes trivially high, because 100 cards a day now covers a large share of the remaining cards. Neither number describes the deployment, which scores every transaction.
+
+**(b)** SMOTE interpolates between each fraud and its fraud neighbours anywhere in the frame, including the frauds of the delay block, whose labels did not exist when fold 1's model would have been trained, and of the validation block itself. A synthetic fraud placed in the training data on a segment between a training fraud and a delay-block or validation fraud carries the position of a label from the future. Synthetic rows also have no date or card, so the split cannot even assign them to a block, and known-card removal cannot see them.
+
+**(c)** Split first; then fit the sampler on each fold's training block only, inside the pipeline, so that it never sees the delay or validation rows; score the validation block untouched, with known-card removal applied to the real transactions only. The imbalanced-learn `Pipeline` with `cv=prequential_folds` does exactly this.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Dal Pozzolo, O. Caelen, R. A. Johnson, G. Bontempi, "Calibrating Probability with Undersampling for Unbalanced Classification," *IEEE Symposium Series on Computational Intelligence (SSCI)*, 2015. Sec. III-A: class-dependent selection, Eqs. 3–4 and Table I; Sec. III-B: bias and class overlap (Fig. 1); Sec. III-D: the two-Gaussian experiments (Figs. 2–4); Sec. IV: the Bayes-minimum-risk threshold and its adjustment, Eqs. 10–12; Sec. VI: Table V and the credit-card AUC and Brier results (Figs. 5–6); Appendix: equivalence with Saerens and Elkan.
+2. Y. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection: Practical Handbook*, Université Libre de Bruxelles / Worldline, 2022. Chapter 6, "Imbalanced learning": 6.2 cost-sensitive learning (IR cost matrix, toy and transaction-data class-weight sweeps), 6.3 resampling (toy, prequential pipeline with samplers, SMOTE/RUS/combined summary table), 6.4 ensembles (balanced bagging, balanced random forest, weighted XGBoost, imbalance-ratio sweeps), 6.5 real-world data, and the chapter summary on AUC versus AP. https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+3. A. Dal Pozzolo, O. Caelen, Y. Le Borgne, S. Waterschoot, G. Bontempi, "Learned Lessons in Credit Card Fraud Detection from a Practitioner Perspective," *Expert Systems with Applications* 41(10), 2014, pp. 4915–4928. Sec. 3.2: undersampling, SMOTE and EasyEnsemble; Sec. 7.2.4: 99.6% of genuine transactions discarded per chunk, EasyEnsemble with five sub-models, interaction of balancer and update strategy.
+4. M. Saerens, P. Latinne, C. Decaestecker, "Adjusting the Outputs of a Classifier to New a Priori Probabilities: A Simple Procedure," *Neural Computation* 14(1), 2002, pp. 21–41. The prior-shift adjustment and its EM estimate of unknown deployment priors.
+5. C. Elkan, "The Foundations of Cost-Sensitive Learning," *Proceedings of IJCAI*, 2001, pp. 973–978. The threshold for a cost matrix and its change under a change of base rate.
+6. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015. Chapter 4, pp. 190–198: under- and oversampling, the stepwise search for the class proportion and the 80/20 practice, and posterior adjustment with Table 4.13.
+7. A. Correa Bahnsen, D. Aouada, A. Stojanovic, B. Ottersten, "Feature Engineering Strategies for Credit Card Fraud Detection," *Expert Systems with Applications* 51, 2016. End of Sec. 4: sampling did not improve financial savings because it alters the distribution of example-dependent costs.
+8. Y. Lucas, J. Jurgovsky, "Credit Card Fraud Detection Using Machine Learning: A Survey," arXiv:2010.06479, 2020. Sec. 2: data-level and model-level methods for imbalance (SMOTE, ADASYN, Borderline-SMOTE, EasyEnsemble, UnderBagging, SMOTEBoost). https://arxiv.org/abs/2010.06479
+9. X.-Y. Liu, J. Wu, Z.-H. Zhou, "Exploratory Undersampling for Class-Imbalance Learning," *IEEE Transactions on Systems, Man, and Cybernetics, Part B* 39(2), 2009. EasyEnsemble and BalanceCascade.
+10. N. V. Chawla, K. W. Bowyer, L. O. Hall, W. P. Kegelmeyer, "SMOTE: Synthetic Minority Over-sampling Technique," *Journal of Artificial Intelligence Research* 16, 2002, pp. 321–357. https://doi.org/10.1613/jair.953
+</References>

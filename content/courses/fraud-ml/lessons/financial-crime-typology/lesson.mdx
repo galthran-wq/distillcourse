@@ -1,0 +1,413 @@
+Fraud is uncommon, well considered, concealed, time-evolving and organised, and each of those five traits names a difficulty the detector inherits: scarce labels, camouflage, drift, and relational structure.
+
+<Ref lesson="fraud-detection-system">The first lesson</Ref> fixed the system around the detector: five layers, an alert set cut at a budget of about a hundred cards a day, and two label streams, fast feedbacks chosen by the model and slow delayed samples in which silence counts as genuine. It built that diagram on card payments and left open how its rows change for other crimes. This lesson reads each major type of financial crime (card fraud, account takeover, money laundering, mule networks, sanctions evasion) as a learning problem: what unit is decided, who produces the label and how late, how complete the labels are, and where the signal lives. The output is a table that the rest of the course works from, row by row.
+
+## Five traits, four difficulties
+
+The running question of the lesson is what a given crime does to the data a detector learns from. A definition of fraud that is built for detection rather than for law answers it trait by trait.
+
+### The definition read as a list of data properties
+
+<Quote source="Van Vlasselaer et al. 2015, quoted in Baesens, Van Vlasselaer & Verbeke 2015, p. 3">
+Fraud is an uncommon, well-considered, imperceptibly concealed, time-evolving and often carefully organized crime which appears in many types of forms.
+</Quote>
+
+Each clause is a statement about the training table.
+
+- **Uncommon.** Only a minority of cases are fraud, and of those, "only a limited number will be known to concern fraud". These are two facts: positives are rare, and *known* positives are rarer still. The first is class imbalance; the second is the label mechanics of the first lesson, where most frauds wait for a dispute and some never get one.
+- **Well considered and imperceptibly concealed.** Fraudsters plan, and the plan is to look like everyone else. On any feature computed from a single row, fraudulent rows sit inside the cloud of genuine ones. This is *camouflage*: the two classes overlap where the detector looks, so separating them needs features that compare a row with its context (module 3) and a model of how the fraudster responds to detection (module 8).
+- **Time-evolving.** Techniques change "along with, or better ahead of" the detection mechanisms. A pattern learned from last month's labels describes last month's fraud: the data drift, partly in response to the model itself (module 7).
+- **Carefully organised.** Fraudsters have allies and copycats, and some crimes, laundering above all, require structures of several parties. A fraudulent case is then not an independent draw: its signal sits partly in the entities it is connected to (module 6).
+
+<Figure
+  src="./figures/traits.svg"
+  alt="Five trait boxes on the left (uncommon, well considered, imperceptibly concealed, time-evolving, carefully organised) joined by thin lines to four amber difficulty boxes (scarce positives and scarcer labels; camouflage; drift; relational structure), with the course modules that treat each on the right; a muted footer row maps 'appears in many forms' to this lesson's table"
+  caption="The two concealment traits share one difficulty; the sixth clause, many forms, is the reason for this lesson's table."
+/>
+
+The criminology of why people commit fraud (the *fraud triangle* of pressure, opportunity and rationalisation) explains motive and has no bearing on any of these four properties; the course does not use it.
+
+### The sixth clause sets the agenda
+
+The last clause, "appears in many types of forms", is not a difficulty of one detector but the reason no single detector exists. The four traits are present in every financial crime, at very different strengths. Card fraud is rare and adapts within weeks, yet its labels are nearly complete. Laundering is organised by construction and its labels are the weakest of any type. A method that fits one profile can be the wrong method for the other, so the useful classification of crimes is by the profile, not by the legal category.
+
+<KeyFact>
+A method's measured performance transfers between crimes only as far as their profiles match: a score earned on card labels, which are nearly complete, says little about the same method on laundering labels, which the bank's old rules selected.
+</KeyFact>
+
+## Card fraud: most losses are remote, and the victim supplies the label
+
+Card fraud is the case the first lesson's diagram was drawn for. Its subtypes differ in what the fraudster holds, and that decides what evidence a single authorization request can carry.
+
+### Card-present and card-not-present
+
+A *card-present* (CP) transaction needs the physical card, at a shop's terminal (a point of sale, POS) or at a cash machine (ATM). Its fraud scenarios are three:
+
+- **Lost or stolen card.** The most common CP scenario. The fraudster spends as much as possible as fast as possible, before the holder notices and blocks the card.
+- **Counterfeit card.** A copy made from details *skimmed* off the real card without the holder noticing. The holder still has the original, so nobody raises the alarm, and the copy can wait a long time before use. Chip-and-PIN cards (the EMV standard) have cut this scenario sharply.
+- **Card not received.** A new card intercepted in the post; rare.
+
+A *card-not-present* (CNP) transaction is remote: internet, phone or mail order. It needs only the credentials (number, expiry date, security code, billing details), which are stolen in data breaches or by phishing, sold on underground markets and used by a different group from the one that stole them.
+
+<Figure src="./figures/sepa-fraud-by-channel.png" float="right" width="m" alt="Stacked bar chart, one bar per year 2014 to 2018, of the total value of card fraud on cards issued within SEPA, in EUR millions on the left axis (about 1,500 in 2014, about 1,800 in 2015, 2016 and 2018, about 1,600 in 2017). Each bar is split into a blue POS base, a large yellow CNP middle and a thin orange ATM top; the CNP share printed in the yellow segment rises 69%, 71%, 73%, 76%, 79%, while POS falls from 19-20% to 15% and ATM from 12% to 6%. A green line on the right axis gives fraud as a share of transaction value: 0.038%, 0.042%, 0.041%, 0.035%, 0.037%, nearly flat." caption="Value of card fraud on SEPA-issued cards by channel, 2014–2018 (bars, EUR millions, left scale), and fraud as a share of the value of all card transactions (line, right scale). Card-not-present grows from 69% to 79% of fraud value while the overall fraud rate stays near 0.04%." />
+
+The two channels are not equally exposed. Worldwide in 2018, CNP payments carried **54% of card fraud losses on under 15% of purchase volume** (Nilson Report 2019): per euro spent, a remote payment loses several times as much to fraud as a payment with the card in hand. In the Single Euro Payments Area (SEPA, the euro payment zone of the EU and its neighbours), CNP reached 79% of card fraud value by 2018. The ECB series shows the shift happening while the overall fraud rate stayed flat at about four cents per hundred euros: fraud did not grow, it moved to the channel where the chip gives no protection.
+
+The learning consequence follows from what the fraudster holds. A CNP fraudster holds the same credentials as the holder, so the fields of the request cannot tell them apart; whatever separates them must come from how the request fits the card's history. The CP fraudster at least faces a chip and a PIN at the terminal, the first lesson's layer 1.
+
+### Application fraud and behavioural fraud
+
+A second cut runs across the first. In *application fraud*, a card is obtained from the issuer with false personal information; every transaction on it is fraudulent, and because the account is the fraudster's own, there is no urgency: it may not be suspected until statements go unpaid. In *behavioural fraud*, the details of a legitimate card are used without the holder's consent; it accounts for most card fraud, and CNP fraud is its main form.
+
+One boundary case shows that the label itself is a convention. In *bankruptcy fraud* a holder buys with no intention of paying and then files for personal bankruptcy. Card issuers generally book the loss as a credit charge-off, not as fraud, so the same behaviour enters the training data as a credit default or as nothing, depending on an accounting rule.
+
+### What a card model learns: shapes in one card's sequence
+
+Because a single CNP request looks like a genuine one, the patterns a card model learns are shapes in the card's own sequence of transactions. Four are standard:
+
+1. a small purchase followed by a big one;
+2. many online purchases in a short period;
+3. spending as much as possible as quickly as possible;
+4. smaller amounts spread across time, the variant built to avoid the first three.
+
+The first has a known mechanism: card thieves buy a small amount of petrol at an unattended pump to verify that a card is active before using or selling it.
+
+<FigureSequence
+  name="probe"
+  alt="Four frames on one card's timeline of grey genuine purchases of 20 to 80 euros: frame 1 adds an amber 1-euro test charge, frame 2 a 900-euro purchase, frame 3 a burst of six online purchases within an hour, frame 4 a blue line where the card is blocked and an arrow to day +40 where the dispute is filed and the label arrives"
+  caption="Probe, spend, burst, block: the pattern lives in the order of the transactions; the label arrives forty days after the block."
+/>
+
+<Task>
+Step through the four frames. At frame 3, state which of the amber transactions a classifier reading one row at a time would flag, and what it would need to see to flag the others. At frame 4, state on which day the training row of the €1 probe is labelled fraud, and what it reads as before that day.
+</Task>
+
+Read one row at a time, only the €900 purchase stands out from the population, and only if €900 is rare for cards in general. The €1 charge is the smallest of ordinary amounts, and each purchase of the burst is an unremarkable online payment; they become evidence only through features over the card's sequence, such as the time since the previous charge or the count of online purchases in the last hour. The card is blocked on day 0, but the probe's row is labelled fraud only on day +40, when the holder's dispute is filed; a model trained before that day learns from it as genuine.
+
+### The card label is nearly complete
+
+The victim of card fraud is the cardholder, who sees the transaction on a statement and has every reason to dispute it. Under the EU payment services directive ([PSD2](https://eur-lex.europa.eu/eli/dir/2015/2366/oj), Art. 71) the holder may notify an unauthorised transaction up to 13 months after the debit date. The label therefore arrives the same day for alerted cards, within days to weeks for most disputes, and within 13 months at the latest; and most fraud is eventually reported. The customer's complaint about a purchase never made is what gives card fraud a close ground truth; none of the other crimes in this lesson except account takeover has an equivalent route. The remaining error is the one the first lesson derived: frauds never disputed enter training as genuine, so the noise is one-sided.
+
+<KeyFact>
+A card fraud has a victim who reports it, and that single fact makes card labels nearly complete; of the crimes in this lesson only account takeover shares it.
+</KeyFact>
+
+## Superimposition: account takeover hides inside a legitimate stream
+
+The card subtypes above differ in a way that the application/behavioural split names only loosely: whether the account belongs to the fraudster or to a victim whose own activity continues. Telecommunications fraud gave that distinction its sharpest form.
+
+### Subscription and superimposition
+
+In mobile telephony, *subscription fraud* is a subscription taken out with false identity details and no intention to pay: every call on the number is fraudulent. *Superimposed fraud* is use of a service without authority, by cloning a handset or stealing calling-card details: the fraudulent calls are mixed in with the legitimate subscriber's own, are usually noticed as "phantom calls" on a bill, and can remain undetected for a long time. Fawcett and Provost coined *superimposition fraud* to unify wireless, calling-card and credit-card fraud and some computer intrusions under one heading.
+
+<Definition title="subscription and superimposition fraud">
+Let an account produce events $e_1, e_2, \dots, e_n$ in time order with labels $y_i \in \{0, 1\}$. The account is a case of **subscription fraud** if $y_i = 1$ for every $i$: the account exists for the fraud. It is a case of **superimposition fraud** if there is a takeover index $\tau > 1$ with $y_i = 0$ for all $i < \tau$ and $y_i = 1$ for some $i \ge \tau$: legitimate events precede the fraud and may continue among the fraudulent ones.
+</Definition>
+
+Three cases fix the definition. Application fraud on a card is subscription fraud. Lost-or-stolen and CNP behavioural fraud are superimposition on the card. **Account takeover** (a fraudster logging into a customer's online banking with stolen credentials and moving money out) is superimposition on the account, and its unit is the session: the login, the device, the change of phone number or payee, the transfer.
+
+<Figure
+  src="./figures/superimposition.svg"
+  alt="Two event timelines of twelve squares: in the subscription row every square is amber; in the superimposition row the first six are grey, a dashed amber line marks the takeover, and four of the remaining six are amber; blue notes under each row name the baseline: the population of new accounts, or the account's own past"
+  caption="The only change between the rows is who acts; it decides what a detector can compare an event with."
+/>
+
+### What the history looks like from inside one account
+
+The case that defined the term shows the signal. A subscriber's call records, from Fawcett and Provost's study, read like this:
+
+| date | time | duration | origin | fraud |
+|---|---|---|---|---|
+| 1/08 | 09:42 | 3 min | Bronx, NY | |
+| 1/09 | 15:06 | 5 min | Manhattan, NY | |
+| 1/10 | 01:45 | 35 s | Boston, MA | bandit |
+| 1/10 | 01:46 | 34 s | Boston, MA | bandit |
+| 1/10 | 11:23 | 24 s | White Plains, NY | |
+| 1/11 | 22:00 | 37 s | Boston, MA | bandit |
+
+A 35-second call from Boston at night is unremarkable among all calls on the network. It is anomalous against *this* subscriber's daytime calls of several minutes from New York, and the legitimate 11:23 call between the bandit calls shows the two streams interleaved.
+
+### The baseline decides the features
+
+The definition settles what a detector can compare an event with. For subscription fraud there are no legitimate events before the fraud, so the only reference is the population: an application whose age and income combination is far from other applicants', a new account that spends faster than new accounts do. For superimposition there is a reference inside the account, the events before $\tau$, and the signal is the distance from it. This is the reason the course spends module 3 on features computed over the entity's own history (<Ref lesson="behavioural-profiles">behavioural profiles</Ref> builds them) and module 7 on <Ref lesson="sequence-models-for-transactions">sequence models</Ref>: both exist for the superimposition case.
+
+<Aside>
+**Tumbling: superimposition spread thin.** In "tumbling", a cloned handset rolls through fake serial numbers so that successive calls are billed to different legitimate phones. Each victim's stream receives perhaps one phantom call, too little to move a per-account profile, and the phone operates until every assumed identity has been spotted. The per-account baseline fails exactly when the fraudster keeps their share of any one account small; what remains is the cross-account view, the same handset pattern appearing on many accounts, which is a graph question for module 6.
+</Aside>
+
+<KeyFact>
+The own-past baseline of superimposition holds only while the fraudster's share of an account is large enough to move its profile; spread one event per account, as in tumbling, the fraud is visible only across accounts, and the problem moves from module 3's profiles to module 6's graph.
+</KeyFact>
+
+## Laundering: the unit of suspicion is a pattern, not a row
+
+From card fraud one would expect money laundering to be the same problem with larger amounts: a table of transactions, a rare positive class, a classifier. Every column of the card case changes: the unit, the victim, the label, its delay, and the adversary.
+
+### Placement, layering, integration
+
+*Money laundering* is the process of obscuring the source, ownership or use of funds that are the proceeds of crime. It runs in three stages:
+
+1. **Placement**: the illicit money enters the financial system or a legitimate business.
+2. **Layering**: it moves through many transactions across accounts with different owners at different institutions, so that its origin is lost.
+3. **Integration**: it is merged with legitimately earned money and spent.
+
+Placement can hide inside trade. An analysis of US trade data found the antibiotic erythromycin imported at **\$1,694 a gram** and exported at **\$0.08 a gram**: inflated import invoices move money abroad as payment for goods. Each invoice is a well-formed, authorised payment; the anomaly exists only against the price of the same good elsewhere.
+
+There is no victim in the customer's seat. The account holder is the offender, so nobody disputes anything, and the dispute route that labels most card fraud does not exist.
+
+### Four levels of analysis
+
+The decisive change is the unit. An individual laundering transaction is very difficult or impossible to characterise as such; patterns are what is suspicious. A single deposit just under the reporting threshold is not suspicious, but several are; a large deposit is not suspicious, but a large deposit withdrawn at once is. Analysis can target four levels:
+
+- **transaction**: one transfer;
+- **account**: all the flows of one account;
+- **business**: an owner who may hold several accounts;
+- **ring**: the linked businesses that act together.
+
+<Figure
+  src="./figures/laundering.svg"
+  alt="Illicit cash flows by an amber edge into account A; A splits to B and C, which both pay D; D buys property; columns mark placement, layering and integration; the amber edge is labelled transaction, an amber circle around D account, a blue dashed box around B and C business, and a grey dashed box around A to D ring"
+  caption="Each edge is an ordinary payment; the laundering is the shape the four levels expose in turn."
+/>
+
+The link analysis that connects these levels "plays a key role in most money laundering detection strategies", and its graph is the subject of <Ref lesson="fraud-as-a-graph">module 6's first lesson</Ref>.
+
+### Structuring: an adversary's answer to a threshold
+
+The clearest laundering pattern was created by a detection rule. The US Bank Secrecy Act of 1970 required banks to report every cash transaction over \$10,000. Launderers answered by splitting sums into deposits under \$10,000 spread over several banks, a practice called *structuring* or *smurfing*, since made a crime in itself. The reporting stream grew to over 10 million reports in 1994, worth about \$500 billion, and about 0.5% of them were flagged as suspicious. The way launderers adapt to the prevailing rules supports a pessimistic reading: that "only the incompetent money launderers are detected".
+
+<Example title="structuring €47,000 against a €10,000 threshold">
+A threshold rule reports any cash deposit above $T = €10{,}000$. Account Y must place $A = €47{,}000$ without a report.
+
+**Fewest deposits.** Each deposit must satisfy $a_i \le T$, so $n$ deposits carry at most $nT$. The fewest that suffice is the smallest $n$ with $nT \ge A$: $n = \lceil 47{,}000 / 10{,}000 \rceil = 5$.
+
+**Their size.** Split evenly, each deposit is $47{,}000 / 5 = €9{,}400$, or $0.94\,T$.
+
+**Where they land.** With four deposits the maximum would have been $40{,}000 < A$, so the five deposits must average more than $40{,}000/5 = €8{,}000$. Every way of placing the sum in five deposits puts their average in the band $(0.8\,T,\ T]$.
+
+**What the rule sees.** Five deposits, none reported. The detector that sees them is a cumulative statistic: the sum of amounts entering the account over a short window, such as a day, reaches €47,000.
+</Example>
+
+<Figure
+  src="./figures/structuring.svg"
+  alt="A deposit-amount axis from 0 to 12k euros with a vertical line at T = 10k marked report if above T and an amber band from 8k to 10k; account X shows eight grey deposits between 300 and 3,900 euros; account Y shows five amber deposits stacked at 9,400 euros inside the band"
+  caption="The structurer's amounts are forced into the band just under T; the rule that was evaded produces the signal."
+/>
+
+The same arithmetic explains a recent legal choice. The EU's transfer-of-funds regulation requires full payer and payee information on crypto-asset transfers with no amount threshold at all, because, in its Recital 30, structuring a large transfer into smaller amounts over "one-time use" addresses is cheap and fast; <Ref lesson="transfer-of-funds-crypto">the travel-rule lesson</Ref> reads it.
+
+### Labels: late, incomplete and chosen by the old system
+
+The card label comes from a victim within months. The laundering label comes from nobody in particular, years later, and mostly never.
+
+- **Late.** It may be years before transfers or accounts are "definitively and legally identified" as laundering, and even then not all the relevant transactions are traced back.
+- **Incomplete.** Most laundering goes undetected. *AMLworld*, a simulator of a whole financial system (banks, companies, individuals) into which laundering is injected so that every illicit payment is known, labels laundering *transitively*: if A pays B \$100 of illicit funds, B pays \$50 of it to C, and C pays \$25 to D, all three payments are laundering. With real-world data that complete labelling is nearly impossible, because nobody traces the downstream payments.
+- **Chosen.** What a bank holds is its analysts' decision to file a *suspicious transaction report* (STR) with the national financial intelligence unit. The report is a label of suspicion, raised on alerts that the bank's existing monitoring produced. Industry false-positive rates of [upwards of 90%](https://arxiv.org/abs/1908.02591) mean that **more than nine alerts in ten** are closed as not suspicious.
+
+The common reading of such a table is that STR labels are ground truth for laundering and a classifier trained on them detects laundering. That reading fails for a mechanical reason: an STR exists only where the old rules raised an alert and an analyst agreed, so a model fitted to STRs learns to reproduce the old rules, including their blind spots; the patterns it finds are those "characteristic of fraud in the past, but which may no longer be so". The replacement model is that an STR label means *reported by this bank*, a sample selected by its previous detector, like the first lesson's feedbacks but with no delayed stream behind it to complete the picture. A transaction three hops downstream of a reported one is, in AMLworld, laundering; in the bank's table it is an unlabelled row read as clean.
+
+The adversary is different too. Launderers handle large sums, are professional, and "often have contacts in the banks who can feed back details of the detection strategies being applied". The card fraudster adapts in weeks by trial; the launderer can adapt by reading the rulebook.
+
+<KeyFact>
+In laundering the decision unit is a pattern over accounts, the label is a report of suspicion selected by the existing rules, and silence never turns into a label: none of the card case's three label mechanisms survives.
+</KeyFact>
+
+## Mules and rings: the organised trait made visible
+
+Layering needs accounts to pass through. The organised trait, which in card fraud shows up as stolen numbers traded between groups, becomes in laundering the main source of signal.
+
+### The mule account
+
+A *money mule* is an account, often a real person's, that receives funds and forwards them, providing one hop of layering. Seen alone, a mule account shows the rule-book shape "a large deposit followed immediately by a similar-sized withdrawal", or many small inflows from unrelated senders followed by one outflow. Many legitimate accounts produce one of these shapes on some day, so the account level gives weak evidence. The ring level gives stronger evidence: several accounts that fan money in to one collector (*fan-in*), one sender that fans it out to many (*fan-out*), the two combined, and cycles that return money to its origin. AMLworld generates eight such named patterns and labels them, together with the integration payments disguised as payroll or supplier invoices.
+
+### Homophily is a hypothesis, not a law
+
+Organisation suggests that the neighbours of a fraudster are fraudsters. In telecommunications that holds: fraudsters "seldom change their calling habits, but are often closely linked to other fraudsters", and *communities of interest* in the call graph expose them. In online auctions it fails. Fraudsters there create *accomplice* accounts that trade honestly with ordinary users to build reputation, and the fraudsters trade mostly with their accomplices, so fraud nodes connect to accomplices and accomplices to honest users: neighbouring labels tend to differ (*heterophily*). A propagation rule that spreads suspicion to neighbours works on the first graph and is misled on the second. Module 6 tests the hypothesis before using it.
+
+<KeyFact>
+Every method in module 6 that spreads suspicion along edges assumes homophily, so <Ref lesson="fraud-as-a-graph">its first lesson</Ref> counts the edges joining differently labelled nodes against the number chance predicts before any score is propagated; a graph that fails that test needs features that keep a node's own evidence apart from its neighbours'.
+</KeyFact>
+
+## Sanctions evasion: a lookup, not a learned score
+
+Sanctions sit in the same compliance department as laundering and are often mentioned with it. As a detection problem they are of a different kind, and saying so keeps the table honest.
+
+### The positive class is a published list
+
+*Targeted financial sanctions* freeze the assets of designated persons and entities and forbid making funds available to them. The EU's anti-money-laundering regulation ([AMLR](https://eur-lex.europa.eu/eli/reg/2024/1624/oj)) requires an obliged entity, as part of customer due diligence, to verify whether the customer or its beneficial owners are designated, and for a legal entity whether designated persons control it or hold more than 50% of it (Art. 20(1)(d)); banks must repeat the check upon any new designation (Art. 26(4)).
+
+The positive class is therefore defined by a list that anyone can read. A customer's label is known the moment the list is consulted: no delay, and no incompleteness in the definition. Nothing is learned from past cases, because the decision rule is given. What is hard is matching: names transliterated from other alphabets and spelled several ways, and ownership that runs through chains of companies, where the 50% test is a traversal of an ownership graph.
+
+### Evasion turns it back into laundering
+
+Evasion means routing money through a person or company that is not on the list. Once the front is not designated, the lookup returns nothing, and finding the designated party behind it is the ring-level problem of the previous section: ownership links, shared directors, flows that converge. Sanctions screening contributes a row to the table with a clean label and no learning problem; sanctions evasion contributes nothing new beyond the laundering row.
+
+## The typology table
+
+The sections above give one row per crime. Of the first lesson's four questions, two carry over as columns: where the label comes from and how late it arrives. The other two, which layer sees the event first and what the human budget is, are set by the institution and its systems rather than by the crime, and stay out of the table. To the label columns the lesson adds the unit decided, the completeness of the labels, and three that the traits add: how rare the positives are, where the signal's structure lies, and how fast the adversary moves.
+
+### Placing a case: the cues that decide
+
+<Example title="three cases placed in the table">
+**Case 1.** A card is charged €1 at an unattended fuel pump at 02:10, €900 at an online electronics shop at 02:40, and six times online in the following hour. The holder's history is daytime purchases of €20–€80.
+
+*Cues:* remote purchases, a legitimate history before the first odd event, the probe-then-spend order. *Row:* card fraud, CNP, superimposition. *Unit:* the transaction, decided in the card's sequence. *Label:* the holder's dispute, days to weeks away; near-complete.
+
+**Case 2.** A student's account receives twelve transfers of €700–€900 from unrelated senders over two days and forwards 95% of the total to one account abroad within hours of each arrival.
+
+*Cues:* fan-in followed by a single outflow, the account as a pass-through, no victim reporting anything. *Row:* money mule within a laundering ring. *Unit:* the account, with the ring as the stronger level. *Label:* an STR if an analyst files one; incomplete, confirmation months to years away or never.
+
+**Case 3.** A trading company pays invoices for an imported chemical at a thousand times the price at which the same chemical is exported.
+
+*Cues:* each payment is authorised and well formed; the anomaly is the price against trade data. *Row:* laundering, placement through trade. *Unit:* the business. *Label:* an STR at best; the detector needs a reference outside the bank's own transactions.
+</Example>
+
+### The table
+
+| crime | unit decided | positive rate | label source | label delay | completeness | where the signal lies | adversary |
+|---|---|---|---|---|---|---|---|
+| **card, CNP and CP** | transaction, then card | about 0.1–0.3% of transactions | investigator call; holder dispute | same day to 13 months | near-complete; undisputed frauds read as genuine | the card's own sequence | fast, adapts within weeks |
+| **account takeover** | session | rare; no public figure | customer report; investigator | hours to days | partial | the session's sequence against the account's past | fast; money leaves in minutes |
+| **application fraud** | application, account | rare; no public figure | non-payment, investigation | months, at statements | confounded with credit loss | the population of applicants | patient; may pay early bills |
+| **laundering** | pattern over accounts | unknown; estimates near 0.05–0.1% of wires | STR filed by the bank | months to years, or never | radically incomplete, selected by old rules | the graph: account, business, ring | slow, professional, reads the rules |
+| **mule ring** | account within a subgraph | unknown | STR; police | months to years, or never | radically incomplete | the graph: fan-in, fan-out, cycles | recruits replaced |
+| **sanctions screening** | customer and owners | very rare | the published list | none | complete by definition | matching names and ownership | evades through fronts |
+
+Each row is a profile of the four difficulties. Card fraud is the row with the weakest label problem, which is why it carries most of the public datasets and most of the methods in this course. Laundering and mule rings are the rows where labels are least trustworthy and structure is strongest, which is why the course's graph methods and its synthetic AML data serve them. Sanctions screening is the row with no learning problem at all.
+
+The positive rates are given only to the precision the sources support: the card figure from the handbook's real-world data and older published estimates, the wire-transfer figure from a 1995 US government estimate. What a rate of one in a thousand does to an alert queue is the next lesson's subject.
+
+<KeyFact>
+Down the table the three label columns vary most: from complete and instant (a sanctions list) through near-complete within 13 months (cards) to selected, years late and mostly absent (laundering); those columns, more than the model, decide which evaluation can be trusted.
+</KeyFact>
+
+The lesson has established the five traits as data properties, the card family split by channel and by whose account it is, superimposition as the case where an account's own past is the baseline, laundering as a pattern-level problem whose labels are late, incomplete and selected, the mule ring as the organised trait made into a graph, and sanctions screening as a lookup. <Ref lesson="economics-of-detection">The next lesson</Ref> takes the table's positive-rate column and computes what it does to the precision, cost and value of an alert queue under the investigator budget.
+
+## Exercises
+
+<Exercise>
+Use the Nilson figures: in 2018 CNP payments carried 54% of card fraud losses and less than 15% of purchase volume. Compute the ratio of fraud loss per euro of volume between CNP and card-present payments, treating 15% as the volume share, and state in which direction the true ratio differs given "less than".
+
+<Solution>
+**Loss per unit of volume.** CNP: $0.54 / 0.15 = 3.6$. Card-present carries the remaining $46\%$ of losses on $85\%$ of volume: $0.46 / 0.85 \approx 0.541$.
+
+**Ratio.** $3.6 / 0.541 \approx 6.7$. A euro of CNP spending lost about 6.7 times as much to fraud as a euro of card-present spending.
+
+**Direction.** If the CNP volume share $v$ is below $0.15$, then the ratio $\frac{0.54/v}{0.46/(1-v)}$ grows as $v$ falls, because the numerator increases and the denominator decreases. So 6.7 is a lower bound: the true ratio is at least that.
+</Solution>
+</Exercise>
+
+<Exercise>
+Place each case in a row of the typology table and name the cue that decides it. State the unit of decision and where the label will come from.
+
+(a) A card is used at an ATM in another country while the holder's chip card is used at a supermarket at home on the same afternoon.
+(b) A customer's online banking sees a login from a new device, a change of the registered phone number, and a transfer of the whole balance to a new payee, within ten minutes.
+(c) Three accounts pass €9,900 among themselves repeatedly over a month.
+(d) Hundreds of cardholders who have never met dispute charges from the same small online merchant.
+(e) A first-time card applicant whose stated age and income are far from every other applicant's spends the full limit in the first week.
+(f) A corporate customer appoints a director whose name appears on an EU designation list.
+
+<Solution>
+(a) **Card-present counterfeit, superimposition.** Cue: two physical uses of the same card in different countries at once; one of them must be a copy. Unit: the transaction against the card's own history. Label: the holder's dispute, near-complete.
+
+(b) **Account takeover.** Cue: the order of session events (new device, change of the contact channel that would receive an alert, then the transfer). Unit: the session, decided before the transfer leaves. Label: the customer's report, hours to days.
+
+(c) **Laundering, layering in a cycle, with structuring.** Cue: amounts just under a €10,000 threshold and money returning to its origin. Unit: the ring of three accounts; no single transfer is suspicious. Label: an STR if filed; incomplete.
+
+(d) **Card fraud, CNP, with an organised component.** Cue: many independent disputes converging on one merchant, which points to a compromised or fraudster-run merchant. Unit: the transaction for each card, but the evidence is at the merchant node of the card-merchant graph. Label: the disputes, near-complete for the cards.
+
+(e) **Application (subscription) fraud.** Cue: no legitimate history, and an outlier against the population of applicants. Unit: the application or new account. Label: non-payment and investigation, months later, and possibly booked as credit loss rather than fraud.
+
+(f) **Sanctions screening.** Cue: a name on a published list. Unit: the customer and its controlling persons, re-checked on the change of director. Label: the list itself, immediate; the work is matching the name, not learning.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "Money laundering is card fraud with larger amounts, so a per-transaction classifier trained on a bank's STR labels will detect it." Name the column of the table on which each part of the claim fails and the trait responsible.
+
+<Solution>
+**Unit (organised).** A laundering transfer is an ordinary payment; the suspicion lies in the pattern across transactions and accounts. A per-transaction classifier sees one edge of the account graph. The four levels exist because "it is very difficult or impossible to characterize an individual transaction as fraudulent".
+
+**Label source and completeness (uncommon, concealed).** An STR is a report of suspicion, filed only where the existing monitoring alerted and an analyst agreed. Most laundering is never detected, and transactions downstream of a reported one stay unlabelled and are read as clean. A classifier trained on STRs learns to reproduce the existing rules; it cannot learn patterns those rules never alerted on.
+
+**Label delay.** Confirmation that a report concerned actual laundering arrives months to years later, if ever. The card case has a delayed stream that completes most labels after the verification latency $\delta$, the wait after which <Ref lesson="fraud-detection-system">the first lesson</Ref> reads silence as genuine; laundering has none, so even waiting does not fix the labels.
+
+**Adversary (time-evolving, well considered).** Launderers adapt to the rules in force and may learn them from inside the bank, so past patterns may "no longer be so".
+
+**Amounts.** The premise fails too: structuring makes laundering amounts deliberately small, just under thresholds. The correct model is a pattern-level, graph-structured problem with selected, incomplete labels.
+</Solution>
+</Exercise>
+
+<Exercise>
+Consider a hypothetical crime with complete labels that arrive instantly, and an offender who never adapts to the detector. State which of the four difficulties disappear, which remains, and which tools from classical machine learning then suffice. Then argue why no financial crime in the table is this case.
+
+<Solution>
+**What disappears.** Label scarcity beyond class rarity: every positive is known. Camouflage as a moving target: the offender does not respond to the model, so the class overlap is fixed and a better feature set reduces it for good. Drift caused by adaptation: only natural drift in genuine behaviour remains. Validation needs no delay block, since the verification latency $\delta$, the wait before a label is treated as final (<Ref lesson="fraud-detection-system">the first lesson</Ref>), is zero.
+
+**What remains.** Rarity: positives are still one in a thousand, so accuracy and the full ROC curve still mislead, and the alert budget still turns the score into a top-$k$. If the crime is organised, the relational structure remains as well, since it is a property of the data rather than of the labels.
+
+**What suffices.** The classical-ml pipeline: a gradient-boosted classifier on a random or stratified split, calibrated, judged by precision and recall at the budget.
+
+**Why no real crime fits.** Complete instant labels require the offender to be identified at the moment of the act, which is exactly what concealment prevents; a crime with that property would not need a detector. The nearest rows show this. Sanctions screening has complete instant labels because the positive class is published, and it is not a learning problem; evasion of it is adaptive. Card fraud has the most complete labels, but they arrive through disputes over days to 13 months and the fraudster adapts within weeks.
+</Solution>
+</Exercise>
+
+<Exercise>
+A reporting rule flags any deposit above a threshold $T$. A launderer must place an amount $A > T$ through deposits $a_1, \dots, a_n$, each with $a_i \le T$.
+
+(a) Prove that the minimum number of deposits is $n^* = \lceil A/T \rceil$.
+(b) Prove that with exactly $n^*$ deposits the average deposit lies in $\left(T(1 - 1/n^*),\ T\right]$, and that at least one deposit lies in that band.
+(c) Propose a per-account statistic that detects this behaviour, and state what the launderer can do to evade it and what that evasion costs.
+
+<Solution>
+**(a)** Since $a_i \le T$, $n$ deposits carry at most $nT$, so placing $A$ needs $nT \ge A$, that is $n \ge A/T$; as $n$ is an integer, $n \ge \lceil A/T \rceil$. The value is reached: take $n^* - 1$ deposits of $T$ and one of $A - (n^*-1)T$, which lies in $(0, T]$ because $(n^*-1) < A/T \le n^*$.
+
+**(b)** By minimality, $n^* - 1$ deposits are not enough: $(n^* - 1)T < A$. Dividing by $n^*$, the average satisfies $A/n^* > T(n^*-1)/n^* = T(1 - 1/n^*)$. Also $A/n^* \le T$, since $A \le n^* T$. The maximum of a set is at least its average, so at least one deposit lies above $T(1-1/n^*)$, and all deposits are $\le T$. For $A = 47{,}000$, $T = 10{,}000$: $n^* = 5$ and the band is $(8{,}000,\ 10{,}000]$.
+
+**(c)** Two statistics, one for each evasion. The count of deposits per account per window whose amount lies in $(\beta T, T]$ for a fixed $\beta$ such as $0.8$, compared with the account's past and its peers, catches launderers who minimise the number of deposits. The launderer's answer is to use more, smaller deposits: with $n > n^*$ the amounts can sit well below the band. The cost is more transactions (each a placement event that needs a cash source and a branch) and, against the cumulative-sum-per-window statistic from the structuring Example, nothing: the cumulative sum entering the account over a window still reaches $A$. Spreading the deposits over several accounts or banks evades the per-account sum, and the evidence then sits at the business or ring level, where the accounts must be linked first.
+</Solution>
+</Exercise>
+
+<Exercise>
+Use the label sets of <Ref lesson="fraud-detection-system">the first lesson</Ref>: feedbacks $F_t$ for alerted cards, and delayed samples $D_{t-\delta}$ in which an undisputed transaction is read as genuine.
+
+(a) For a card transaction made on day $s$, list the times at which a label can become known and from which source.
+(b) A training set is built today, on day $t$, from all transactions of days $s \le t - \delta$, each labelled as known today. Show that it contains wrongly labelled frauds for every finite $\delta$ below 13 months, and state what choosing $\delta$ trades off.
+(c) Repeat (a) and (b) for an account under AML monitoring, where the bank's label is an STR.
+
+<Solution>
+**(a) Card.** Day $s$: an investigator's label, if the card was alerted ($F_s$). Days to weeks after $s$: the holder's dispute, for most frauds. Up to 13 months after the debit (PSD2 Art. 71): late disputes. Never: frauds no one disputes, read as genuine.
+
+**(b)** A fraud from day $s$ that will be disputed at $s + d$ with $d > t - s$ is, today, undisputed and labelled genuine. For a row of the newest included day, $t - s = \delta$, so every fraud whose dispute takes longer than $\delta$ is wrong. Only if $\delta$ exceeds the longest possible dispute time, 13 months, is no included fraud still awaiting its dispute; never-disputed frauds stay wrong for any $\delta$. Choosing $\delta$ trades label noise (short $\delta$: more late-disputed frauds read as genuine) against staleness (long $\delta$: the newest complete day is far in the past, and the fraud patterns have moved on). The practical $\delta$ of about a week accepts a small, one-sided noise in exchange for recent data.
+
+**(c) AML.** The bank's label is the STR, filed days to weeks after an alert, and only for alerted activity. Confirmation would come from the FIU or a prosecution, months to years later, and rarely reaches the bank. No $\delta$ makes silence informative, because nobody is positioned to report: a training window ending at $t - \delta$ is as incomplete for any $\delta$ as for $\delta = 0$.
+
+The gap between "trained on labels known at $t$" and "tested on transactions whose labels arrive later" is what <Ref lesson="delayed-labels-prequential">the temporal-validation lesson</Ref> builds into the split as a delay block between training and test, and <Ref lesson="label-maturation">the label-maturation lesson</Ref> replaces the single $\delta$ by the clocks of each label source.
+</Solution>
+</Exercise>
+
+<Exercise>
+In AMLworld's dataset LI-Large (Altman et al. 2023, Table 8), 19,461 transactions are laundering that follows one of the eight standard patterns, and 81,143 are laundering of other kinds (mostly integration payments disguised as ordinary activity), out of 100,604 laundering transactions in total among about 176 million. Estimate the highest recall, over laundering transactions, that a rule set matching only the eight patterns could reach, and state what the result implies for the organised trait and for evaluating a pattern-matching detector on real bank data.
+
+<Solution>
+**Ceiling.** A rule set that matches only the eight patterns can flag at most the 19,461 pattern transactions, even with perfect matching. Its recall over laundering transactions is at most $19{,}461 / 100{,}604 \approx 0.19$: about one laundering transaction in five.
+
+**Base rates.** Laundering overall is $100{,}604 / 176 \times 10^6 \approx$ 1 in 1,750 transactions; the pattern transactions alone are about 1 in 9,000.
+
+**For the organised trait.** Organisation is real, but the shapes with names are a minority of the laundering. Four in five laundering transactions are integration payments that look like payroll or supplier invoices; they are connected to the laundering only through the flow of money upstream, which AMLworld's transitive labelling records and a motif rule does not see.
+
+**For evaluation on real data.** A real bank's labels come from STRs raised largely by rules of exactly this kind. Measured against those labels, a pattern matcher can look far better than 19% recall, because the labels contain mostly what such rules find. Only data with complete labels, which in practice means synthetic data, exposes the ceiling.
+</Solution>
+</Exercise>
+
+<References>
+1. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015. Chapter 1: the five-trait definition and its challenges (pp. 3–4); Table 1.1, fraud categories including application and behavioural card fraud and telecom superimposition; the fraud triangle (pp. 7–8); Table 1.2, the call records with bandit calls, after Fawcett and Provost (pp. 20–21); card fraud patterns a model learns (pp. 25–26).
+2. R. J. Bolton, D. J. Hand, "Statistical Fraud Detection: A Review," *Statistical Science* 17(3), 2002, pp. 235–255. Sec. 3: stolen, application, bankruptcy and cardholder-not-present fraud; Sec. 4: money laundering, placement/layering/integration, the erythromycin prices, the \$10,000 rule and structuring, the four levels of analysis, late and incomplete labels, professional launderers; Sec. 5: subscription versus superimposed fraud, tumbling, communities of interest. F. Provost's comment, pp. 249–252: the petrol-pump probe, criminals who pay early bills, superimposition fraud as a class. https://doi.org/10.1214/ss/1042727940
+3. Y. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection: Practical Handbook*, Université Libre de Bruxelles / Worldline, 2022. Chapter 2.2, "Credit card fraud scenarios": card-present and card-not-present scenarios, the Nilson 2019 and ECB 2020 figures, the SEPA chart. https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+4. E. Altman et al., "Realistic Synthetic Financial Transactions for Anti-Money Laundering Models," NeurIPS 2023 Datasets and Benchmarks. Sec. 1: incomplete real labels; Sec. 3.2: the eight laundering patterns; Sec. 3.3–3.4: the laundering cycle and transitive labels; Sec. 7: card fraud's ground truth versus laundering's; Appendix Tables 7–8: pattern and laundering counts in LI-Large. https://arxiv.org/abs/2306.16424
+5. M. Weber et al., "Anti-Money Laundering in Bitcoin: Experimenting with Graph Convolutional Networks for Financial Forensics," KDD Workshop on Anomaly Detection in Finance, 2019. Sec. 1.1: know-your-customer obligations; Sec. 3: industry false-positive rates above 90%. https://arxiv.org/abs/1908.02591
+6. L. Akoglu, H. Tong, D. Koutra, "Graph-Based Anomaly Detection and Description: A Survey," *Data Mining and Knowledge Discovery* 29(3), 2015. Sec. 5.2: auction fraud roles (fraudster, accomplice, honest) and heterophily. https://arxiv.org/abs/1404.4679
+7. Regulation (EU) 2024/1624 (AMLR), OJ L, 19.6.2024. Art. 20(1)(d): verification against targeted financial sanctions, including control and 50% ownership; Art. 26(4): re-verification on new designations. https://eur-lex.europa.eu/eli/reg/2024/1624/oj
+8. Directive (EU) 2015/2366 (PSD2). Art. 71: notification of unauthorised transactions no later than 13 months after the debit date. https://eur-lex.europa.eu/eli/dir/2015/2366/oj
+9. Regulation (EU) 2023/1113 on information accompanying transfers of funds and certain crypto-assets. Recital 30: structuring over one-time addresses and the absence of a threshold for crypto-asset transfers. https://eur-lex.europa.eu/eli/reg/2023/1113/oj
+</References>

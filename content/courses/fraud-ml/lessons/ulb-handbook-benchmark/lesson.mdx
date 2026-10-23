@@ -1,0 +1,338 @@
+On the simulator an unlimited-depth tree beats a depth-2 tree on ROC-AUC (0.788 vs 0.763) and loses on average precision (0.309 vs 0.496); on 400,000 real transactions a day the precision of every model falls below 0.1 and card precision at 100 is the only number investigators can use.
+
+This module has replaced accuracy and ROC-AUC by average precision and card precision at the budget (<Ref lesson="alert-budget-metrics">the metrics lesson</Ref>), built validation that runs forward in time with a delay block and known-card removal (<Ref lesson="delayed-labels-prequential">the validation lesson</Ref>), shown that rebalancing raises ROC-AUC while lowering AP (<Ref lesson="imbalance-techniques-revisited">the imbalance lesson</Ref>), and priced decisions by the amount (<Ref lesson="example-dependent-cost">the cost lesson</Ref>). Each result was established on its own example. What stands open is whether they hold together on one complete benchmark, and whether a ranking measured on a simulator says anything about a real stream. This lesson reads the handbook's baseline benchmark as an artifact: five default models run through one pipeline on the simulator and on Worldline's 2018 Belgian e-commerce data, with every ranking reversal attributed to the metric or to the data regime.
+
+## The artifact: one notebook, one split, five default models
+
+The benchmark is Chapter 3 of the ULB–Worldline handbook [*Reproducible Machine Learning for Credit Card Fraud Detection*](https://fraud-detection-handbook.github.io/fraud-detection-handbook/), extended with curves in Chapter 4. Its value as an application is that every choice is fixed in code, so a disagreement between metrics cannot be blamed on a difference in setup.
+
+### What is fixed
+
+**Data.** The simulator of <Ref lesson="canonical-datasets">the datasets lesson</Ref>, whose three scripted scenarios label the frauds, already transformed into the baseline features: amount, a weekend flag, a night flag, the card's transaction count and mean amount over 1, 7 and 30 days, and the terminal's transaction count and fraud rate over 1, 7 and 30 days shifted back by a 7-day delay. Fifteen inputs, the last six built as <Ref lesson="transaction-aggregates">the aggregates lesson</Ref> will build them.
+
+**Geometry.** The split of <Ref lesson="delayed-labels-prequential">the validation lesson</Ref>: train on 2018-07-25 to 07-31 (67,240 transactions, 598 frauds), skip a one-week delay block, test on 08-08 to 08-14 after known-card removal (58,264 transactions, 385 frauds, 0.66%).
+
+**Models.** Logistic regression (LR), a decision tree of depth 2 (DT2), a decision tree grown without a depth limit (DT∞), a random forest (RF) and XGBoost (XGB), each with library defaults and `random_state=0`. No hyperparameter is tuned and nothing is rebalanced.
+
+**Metrics.** ROC-AUC, AP as the step sum, and CP@100 per day with detected cards removed, as defined in <Ref lesson="alert-budget-metrics">the metrics lesson</Ref>.
+
+The real half repeats the same code on Worldline transactions that cannot be shared. Its results exist only as the handbook's published tables and plots, so the simulator half of this lesson is recomputed and the Worldline half is read.
+
+| model | sim ROC-AUC | sim AP | sim CP@100 | Worldline ROC-AUC | Worldline AP | Worldline CP@100 |
+|---|---|---|---|---|---|---|
+| LR | 0.871 | 0.606 | 0.291 | 0.788 | 0.035 | 0.150 |
+| DT2 | 0.763 | 0.496 | 0.241 | 0.626 | 0.024 | 0.077 |
+| DT∞ | 0.788 | 0.309 | 0.243 | 0.545 | 0.003 | 0.017 |
+| RF | 0.867 | 0.658 | 0.287 | 0.780 | 0.015 | 0.104 |
+| XGB | 0.862 | 0.639 | 0.273 | 0.899 | 0.035 | 0.090 |
+| random | 0.5 | 0.007 | 0.017 | 0.5 | 0.002 | ≈ 0.0025 |
+
+<Figure
+  src="./figures/bench-ranks.svg"
+  alt="Two bump charts side by side joined by an arrow labelled same code, same features. Each has three columns, ROC-AUC, AP and CP@100, and five rank rows. Simulator: LR ranks 1, 3, 1; RF 2, 1, 2; XGBoost 3, 2, 3; DT∞ 4, 5, 4; DT2 5, 4, 5. Worldline: XGBoost ranks 1, 2, 3; LR 2, 1, 1; RF 3, 4, 2; DT2 4, 3, 4; DT∞ 5, 5, 5. XGBoost is amber, LR green, DT∞ blue, RF and DT2 grey."
+  caption="The same five models ranked by three metrics on two streams: every line that crosses another is a reversal this lesson attributes."
+/>
+
+On the simulator no model wins all three columns. On Worldline data the model with the best ROC-AUC by a margin of 0.11 is third at the budget.
+
+<KeyFact>
+Each crossing has one cause, and the cause decides whether it can be trusted. DT∞ against DT2 comes from the tie structure of the scores; XGBoost against LR on Worldline data comes from where their curves cross relative to the budget; LR, RF and XGBoost on the simulator are ordered by week-to-week noise. The first two are properties of the scores and the metric and recur on another week; the third does not.
+</KeyFact>
+
+## The depth-2 tree reads the simulator's script
+
+A depth-2 tree is the one model of the five whose fitted rules can be printed and compared with how the data were made. On the simulator that comparison is exact, because the fraud was written as three rules before any transaction existed.
+
+### Three splits against three scenarios
+
+<Figure
+  src="./figures/sim-tree.svg"
+  alt="A depth-2 decision tree. Root: terminal risk over 7 days at most 0.55. Yes branch: amount at most 218.67, with leaves 66,498 genuine and 236 fraud (p = 0.0035) and 2 genuine and 127 fraud (p = 0.98). No branch: terminal risk over 30 days at most 0.66, with leaves 11 genuine and 222 fraud (p = 0.95) and 131 genuine and 13 fraud (p = 0.09). Beside it the simulator's script: scenario 1, amount above 220 is fraud, in amber; scenario 2, two terminals a day compromised for 28 days, in blue; scenario 3, three cards a day with a third of their amounts multiplied by 5 for 14 days, not read at depth 2."
+  caption="Each split reads one line of the script: amount for scenario 1, the delayed terminal risk and the 28-day expiry for scenario 2; scenario 3 is left in the large leaf."
+/>
+
+The root splits on the terminal's fraud rate over the window $[t-14, t-7]$, the week before the delay. Above 0.55, most of that window's transactions on the terminal were fraud, which is how a scenario-2 terminal looks once its compromise is more than about ten days old. The split is the scenario-2 rule seen through a feature that only knows labels a week late.
+
+Below the root's threshold the tree splits on amount at **218.67**. Scenario 1 labels every transaction above 220 as fraud. The tree does not know the number 220; it places its threshold between two adjacent training amounts, and the 2 genuine rows in the leaf above 218.67 lie between the fitted threshold and the scripted one. A model that finds this rule has shown that the pipeline from generator to features to labels is wired correctly, and nothing more: the handbook built scenario 1 as an obvious pattern that any detector should find. It is a unit test.
+
+Above the root's threshold the tree splits on the 30-day terminal risk at 0.66, and the leaf above that threshold is mostly genuine: 131 genuine rows and 13 frauds. The number is about 20/30. During a 28-day compromise, a 30-day window shifted back seven days can contain at most 20 compromised days while the compromise is still running; a higher rate means the compromise has ended and the terminal's recent transactions are genuine again. The tree has read off the scenario's duration.
+
+### What the large leaf keeps
+
+Scenario 3, a third of a card's amounts multiplied by five for 14 days, needs the card's amount relative to its own history, and no depth-2 split on these features isolates it. Its frauds stay in the leaf of 66,734 training rows, 236 of them fraud, which the tree scores $236/66{,}734 = 0.0035$. On the test week that leaf holds 182 of the 385 frauds. Recomputed from the published transformed data, 57 of them are scenario-3 frauds and 125 are scenario-2 frauds on terminals compromised too recently for a fraud rate computed a week late to show it. The delay that makes the terminal feature honest (<Ref lesson="point-in-time-features">the point-in-time lesson</Ref> builds it) also blinds it to the first week or more of every compromise.
+
+<Figure
+  src="./figures/roc-kinks.svg"
+  alt="ROC square with false-positive rate on x and recall on y. A narrow green band at FPR at most 0.012 is labelled reachable at k = 100. The blue DT2 curve rises almost vertically to recall 0.527 at FPR 0.0016 and then runs straight to (1, 1). The amber DT∞ curve rises to recall 0.579 at FPR 0.0034 and runs straight to (1, 1). Text: DT∞ AUC = (1 + 0.579 − 0.0034)/2 = 0.788; DT2 AUC ≈ (1 + 0.527 − 0.0016)/2 = 0.763."
+  caption="Both trees' ROC-AUC is set by the recall at their last kink: everything to the right of the green band is one straight line across a block of tied rows."
+/>
+
+<KeyFact>
+On the simulator, the depth-2 tree's best leaves are the script's rules played back: precision 0.98 and 0.95. A real stream has no script, and the fourth section shows the same tree finding a leaf of precision 0.64 instead.
+</KeyFact>
+
+## The simulator's reversals, attributed
+
+<Ref lesson="alert-budget-metrics">The metrics lesson</Ref> named the mechanism behind the first reversal: a tree with pure leaves outputs two scores, and the trapezoidal ROC area credits it with a ranking it does not have. With the leaves in hand, the claim can be checked to the third decimal.
+
+### DT∞ against DT2: recall at the last kink against precision at the top
+
+Leaf scores are constant, so a tree's ranking of the test week is a sequence of tied blocks ordered by training-leaf probability. Both metrics can be computed from the block counts alone.
+
+<Example title="DT2's average precision from its four leaves">
+Order the leaves by training probability and count the test rows that fall into each:
+
+| leaf (training $p$) | test rows | test frauds | cumulative frauds | cumulative rows | recall $R_j$ | precision $P_j$ |
+|---|---|---|---|---|---|---|
+| amount > 218.67 (0.98) | 50 | 47 | 47 | 50 | 0.122 | 0.940 |
+| risky terminal (0.95) | 140 | 137 | 184 | 190 | 0.478 | 0.968 |
+| expired terminal (0.09) | 106 | 19 | 203 | 296 | 0.527 | 0.686 |
+| large leaf (0.0035) | 57,968 | 182 | 385 | 58,264 | 1 | 0.0066 |
+
+AP is the step sum $\sum_j (R_j - R_{j-1}) P_j$ with $R_0 = 0$:
+$$
+0.122(0.940) + 0.356(0.968) + 0.049(0.686) + 0.473(0.0066) = 0.115 + 0.345 + 0.034 + 0.003 = 0.496.
+$$
+The first two blocks, 190 rows, contribute 0.459 of the 0.496. The large leaf adds 0.003 because its precision is the prevalence.
+
+ROC-AUC from the same blocks: the false-positive rates at the three interior points are $3/57{,}879$, $6/57{,}879$ and $93/57{,}879 = 0.0016$. The trapezoid between the last interior point and $(1, 1)$ has area $(1 - 0.0016)(0.527 + 1)/2 = 0.762$, and the three segments to its left add 0.001: total 0.763. Ninety-nine point nine percent of the area is the straight line across the large leaf.
+</Example>
+
+<Exercise>
+DT∞ splits the training week into 412 pure leaves and scores the test week with only two values: 422 rows at score 1, of which 223 are fraud, and 57,842 rows at score 0, of which 162 are fraud. Compute its recall and false-positive rate at the single interior ROC point, its ROC-AUC, and its AP, and state which of the two metrics prefers it to DT2 and why.
+
+<Solution>
+Recall at the interior point: $223/385 = 0.579$. False positives: $422 - 223 = 199$ of $57{,}879$ genuine rows, so FPR $= 0.0034$.
+
+ROC-AUC: the curve is $(0,0) \to (0.0034, 0.579) \to (1,1)$. The first triangle has area $0.0034 \times 0.579/2 = 0.001$; the trapezoid has area $(1 - 0.0034)(0.579 + 1)/2 = 0.787$. Total $0.788$, which is $\tfrac{1}{2}(1 + 0.579 - 0.0034)$.
+
+AP: two steps. The block at score 1 contributes $0.579 \times 223/422 = 0.579 \times 0.528 = 0.306$; the block at 0 contributes $(1 - 0.579) \times 385/58{,}264 = 0.421 \times 0.0066 = 0.003$. Total $0.309$, the handbook's figure.
+
+ROC-AUC prefers DT∞ because its last kink sits at recall 0.579 against DT2's 0.527: the half-credit the trapezoid gives the tied bottom block is proportional to the recall already reached. AP prefers DT2 because DT∞ reaches that recall at precision 0.528, while DT2's first 190 rows run at 0.94 to 0.97. The transferable move: for a tree, read ROC-AUC off the last interior point and AP off the precision of the top blocks.
+</Solution>
+</Exercise>
+
+The two metrics answer different questions about the same counts. DT∞'s top block catches 20 more test frauds than DT2's top three blocks together, at the cost of 106 more false alerts. At $k = 100$ cards a day the two are equal: 0.243 against 0.241. Neither tree fills 100 slots a day from its top blocks alone (DT∞'s 422 score-1 rows are about 60 a day), so the rest of each day's 100 cards come from the tied bottom block, in an order the scores do not determine.
+
+### Overfitting that ROC-AUC hides and AP shows
+
+<Figure
+  src="./figures/train-test.svg"
+  alt="Paired bars of average precision, training week in blue and test week in amber, for five models. LR 0.663 and 0.606, gap 0.06. DT2 0.586 and 0.496, gap 0.09. DT∞ 1 and 0.309, gap 0.69. RF 1 and 0.658, gap 0.34. XGB 0.995 and 0.639, gap 0.36. The three large gaps are labelled in amber."
+  caption="Three models fit the training week perfectly; only the one whose scores are a single tree's two values collapses on the test week."
+/>
+
+DT∞, RF and XGB all score training AP of 1.000 or 0.995. On the test week DT∞ loses 0.69 of AP and the two ensembles about 0.35. The difference is not the degree of overfitting, since every tree in the forest is grown to purity as DT∞ is. It is what averaging does to the scores: a forest of 100 overfit trees outputs the fraction of trees voting fraud, a graded score with 101 possible values, and the test rows that only a few trees flag sink below the rows that most trees flag. DT∞ has no such gradation, so its 199 false positives at score 1 sit level with its 223 true ones.
+
+ROC-AUC registers the collapse weakly: DT∞'s test ROC-AUC is 0.788, above DT2's. A reader comparing training and test ROC-AUC would see a gap of 0.21; a reader comparing AP sees 0.69. <Ref lesson="delayed-labels-prequential">The validation lesson</Ref> found the same pull at depth 50 of the depth sweep, where ROC-AUC rose while CP@100 stayed flat.
+
+### LR, RF and XGBoost: a reversal at the noise level
+
+Among the three strong models, LR leads on ROC-AUC and CP@100 and RF on AP, and XGBoost is below RF on all three metrics. The CP@100 gaps are 0.004 between LR and RF and 0.018 between LR and XGBoost: 0.4 and 1.8 compromised cards a day out of 100 alerts. <Ref lesson="imbalance-techniques-revisited">The imbalance lesson</Ref> measured the week-to-week spread of the simulator's test CP@100 at 0.01 to 0.02. A difference of that size from one test week does not rank two models.
+
+Rerunning the same notebook with the training week moved one week earlier and one week later (our recomputation on the published transformed data) confirms which reversals are structural:
+
+| reversal | 07-18 start | 07-25 (handbook) | 08-01 start |
+|---|---|---|---|
+| DT2 AP above DT∞ AP | 0.552 vs 0.385 | 0.496 vs 0.309 | 0.581 vs 0.319 |
+| DT∞ ROC-AUC above DT2 ROC-AUC | 0.811 vs 0.786 | 0.788 vs 0.763 | **0.800 vs 0.806** |
+| RF best AP | yes | yes | yes |
+| LR best CP@100 | **no** (RF 0.324) | yes | yes (0.289 vs 0.286) |
+
+The AP gap between the two trees is between 0.17 and 0.26 in every week: it follows from the scores' structure. The ROC-AUC order of the trees flips in the third week, because it depends on where each tree's last kink happens to fall. XGBoost's place below RF holds in every week here, and with default parameters that is a statement about one library version's defaults. XGBoost 3.4 with default parameters scores 0.844, 0.572 and 0.254 on the handbook's week against the published 0.862, 0.639 and 0.273: its defaults and its tree construction have changed since the handbook ran, and setting `tree_method="exact"` recovers only part of the gap (AP 0.599). The version moves XGBoost by more than the gaps that separate it from LR and RF, so the library's defaults are part of the experiment. <Ref lesson="gbm-model-selection">The model-selection lesson</Ref> tunes both ensembles.
+
+<KeyFact>
+A reversal that follows from the form of the scores, two tied blocks against four, survives a change of test week; a reversal measured as a difference of a few hundredths between well-built models does not, and one benchmark week cannot tell the two kinds apart without a second week.
+</KeyFact>
+
+## Worldline: the same five models at 0.25% fraud
+
+On the simulator the three strong models sit within 0.009 of each other on ROC-AUC and 0.018 on CP@100, so the same code on a real stream would be expected to rank them alike, or at least to keep them close. It does neither: on Worldline data ROC-AUC prefers XGBoost by 0.11 and CP@100 prefers LR by 0.06. The stream is card-not-present transactions processed in Belgium during 2018, about 400,000 a day with about 1,000 frauds (0.25%) on slightly over 300 compromised cards, so each compromised card carries about three frauds a day. The split, the features and the defaults are those of the simulator. The data are confidential, which is why every number in this section is quoted.
+
+### The real tree finds a burst on a risky terminal
+
+<Figure
+  src="./figures/worldline-depth2-tree.png"
+  alt="Depth-2 decision tree on one week of Worldline data. Root: TERMINAL_ID_RISK_30DAY_WINDOW <= 0.075, 2,858,663 samples, value [2,852,058, 6,605]. True branch: TERMINAL_ID_RISK_30DAY_WINDOW <= 0.035 with two orange leaves of 2,841,713 and 9,230 samples. False branch: CUSTOMER_ID_NB_TX_1DAY_WINDOW <= 13.5, 7,720 samples, value [6,409, 1,311], splitting into an orange leaf of 7,323 samples [6,268, 1,055] and a blue leaf of 397 samples [141, 256] predicting fraud."
+  caption="The depth-2 tree on one week of real transactions. Of the 2.86 million, only the 7,720 on terminals with a 30-day fraud rate above 0.075 reach the right branch; among those, cards with more than 13 transactions in the past day form the one fraud leaf: 256 frauds in 397 transactions."
+/>
+
+The training week holds 2,858,663 transactions and 6,605 frauds, 0.23%. The root again splits on terminal risk, here the 30-day rate at 0.075; on the risky side the tree splits on the card's number of transactions in the last 24 hours at 13.5. The leaf with both conditions holds 397 transactions, 256 of them fraud: precision 0.645, against a training prevalence of 0.0023, a lift of 280. Fraudsters who obtain a card try to use it as many times as they can before it is blocked; the burst feature measures exactly that.
+
+The leaf also shows the limit of the tree. It holds 256 of 6,605 training frauds, 3.9%, and about 57 transactions a day. Every other leaf has precision below 0.15, so after the first few dozen cards each day the tree has no ranking left: its next leaf holds about 1,000 transactions a day at one tied score. Its CP@100 is 0.077.
+
+### Three leaderboards from one table
+
+The Worldline column of the first table carries three reversals.
+
+- **XGBoost** has the best ROC-AUC, 0.899 against 0.788 for LR, ties LR on AP at 0.035, and is third on CP@100 at 0.090 against LR's 0.150.
+- **The random forest** has AP 0.015, below the depth-2 tree's 0.024, and CP@100 0.104, above the tree's 0.077 and above XGBoost's.
+- **DT∞** is close to random on every metric: ROC-AUC 0.545, AP 0.003 against a random 0.002, CP@100 0.017.
+
+<Figure
+  src="./figures/worldline-pr-floor.png"
+  float="right"
+  width="m"
+  alt="Precision-recall plot on Worldline test data. All five model curves lie pressed against the x-axis: precision rises above 0.2 only at recall below about 0.03, and beyond recall 0.2 every curve is below about 0.1, tapering to near zero at recall 1. A dashed random baseline runs along the floor at 0.002. The legend gives average precision: random 0.002, logistic regression 0.035, depth-2 tree 0.024, unlimited-depth tree 0.003, random forest 0.015, XGBoost 0.035."
+  caption="PR curves of the five baselines on the Worldline test week. Logistic regression is highest at recall below about 0.25 and XGBoost above it; their areas tie at AP 0.035. Past recall 0.2 no model's precision reaches 0.1."
+/>
+
+The PR curves locate each reversal. LR's curve is the highest at recall below about 0.25, with precision near 0.2 at the very top and about 0.12 at recall 0.1. XGBoost's curve is lower there and higher from recall 0.25 to the end. The two areas come out equal, which is the AP tie; ROC-AUC weights the long middle of the ranking, where XGBoost is better, and so prefers it by 0.11.
+
+The budget sits at the far left of that plot. With about 250 compromised cards left to find each day and 100 slots, LR's CP@100 of 0.15 is 15 cards a day: a card-level recall of about 6%. In that region LR's curve is the highest, and CP@100 ranks it first. The random forest's curve is low through the middle, which costs it AP, while its top-ranked cards are good enough to beat XGBoost's at $k = 100$; CP@100 also scores cards rather than transactions, and a card with three fraudulent transactions counts once.
+
+Precision on this stream is below 0.1 for every model once recall passes about 0.2. Two causes compound: the prevalence after known-card removal is about a third of the simulator's, which lowers the precision of a ranking of equal quality; and the real frauds overlap the genuine traffic more than scripted ones do, so a given recall costs more false positives. The first cause is arithmetic, the second is the data.
+
+### Counted in cards
+
+<FigureSequence
+  name="cards"
+  alt="Three frames of one Worldline test day. Frame 1: a grid of 300 blue squares, about 300 compromised cards carrying about 1,000 frauds. Frame 2: 50 squares become outlines, cards already known and removed, leaving about 250. Frame 3: a 10 by 10 grid of alert slots appears with 15 amber slots, and 15 cards in the main grid turn amber: logistic regression's 15 detected cards, CP@100 0.15 against a random 0.0025; about 235 compromised cards go unfound, and the ceiling is 100 of about 250."
+  caption="Frame by frame: the day's compromised cards, those left after known cards are removed, and the 100 slots in which the best default model finds 15."
+/>
+
+<Task>
+Step through the three frames and write down, for frame 3, the CP@100 of a random ranking, of LR, and of a perfect ranking on this day. Then compute LR's lift over random, and say what limits the perfect ranking. Check below.
+</Task>
+
+<Aside title="Answers">
+Random 0.0025, LR 0.15, perfect 1; LR's lift over random is 60. A perfect ranker is limited by $k$, not by the fraud: about 250 compromised cards remain for 100 slots, so it fills every slot.
+</Aside>
+
+On the simulator the day's ceiling is the fraud count: 41 to 60 frauds remain each test day once known cards are removed, on fewer cards than there are slots. On Worldline data the ceiling is the budget, $\min(1, \gamma_d/k) = 1$, as <Ref lesson="alert-budget-metrics">the metrics lesson</Ref> showed with the daily counts. The consequence for reading the numbers: LR's 0.15 means 15 compromised cards found per 100 calls, one alert in seven, against a quarter of a card for random selection. An AP of 0.035 reports the same ranking averaged over every recall up to 1, most of which no investigator reaches.
+
+<KeyFact>
+A team with 100 calls a day deploys the CP@100 winner, and neither area metric names it: ROC-AUC picks XGBoost, AP ties XGBoost with LR, and at the budget LR finds 15 compromised cards a day to XGBoost's 9. On the simulator the same two models were within 0.018 of each other on ROC-AUC and CP@100.
+</KeyFact>
+
+The cost frame of <Ref lesson="example-dependent-cost">the cost lesson</Ref> reads the same numbers in money. One hundred calls at an alert cost of €25 cost €2,500 a day; LR's 15 detected cards pay for them if blocking each prevents more than about €170 of further fraud. Whether it does depends on the amounts, which the published tables do not report, so from those tables the benchmark can be read in cards and not in euros.
+
+## Where the replay departs from deployment
+
+A benchmark that fixes every choice also fixes the choices that differ from a deployed detector. Each departure below is a simplification the handbook states or that its code makes visible, and each is taken up later in the course.
+
+### Six simplifications
+
+1. **A constant one-week delay.** Every label is assumed known exactly seven days after the transaction. Disputes arrive over days to months; the handbook calls the constant simplistic and a first approximation. <Ref lesson="label-maturation">The label-maturation lesson</Ref> replaces it by an arrival distribution.
+2. **Complete labels.** After the delay every transaction carries its true label, including frauds no investigator looked at. A deployed system learns mostly about what it alerted on; <Ref lesson="alert-feedback-selection-bias">the feedback lesson</Ref> measures that bias.
+3. **Defaults, one week of training.** No hyperparameter is selected. Under prequential selection on the same Worldline source, a depth-6 tree scores CP@100 0.232 (<Ref lesson="imbalance-techniques-revisited">the imbalance lesson</Ref>'s baseline row), against the best default model's 0.150 here.
+4. **Fifteen features on real data.** The real stream gets the simulator's feature set, designed for three scripted scenarios. That the depth-2 tree still finds a burst rule says the features carry real signal, not that they are sufficient.
+5. **Scripted fraud.** On the simulator a depth-2 tree reads two of the three generating rules off the data, and no fraudster changes behaviour in response to a detector.
+6. **A real half that cannot be rerun.** The Worldline results are figures and tables. A reader can check them against each other but not against the data.
+
+<Aside title="Rerunning the simulator half">
+**Running it.** The transformed simulator data are published as daily pickles in the handbook's `simulated-data-transformed` repository; the split and the five models take a few seconds on a laptop. The numbers quoted above as recomputed come from that repository with `random_state=0` throughout, the handbook's `get_train_test_set` logic, and `StandardScaler` fitted on the training week. The leaf-by-scenario counts use the `TX_FRAUD_SCENARIO` column, which records the last scenario that labelled a transaction, so a scenario-3 fraud whose multiplied amount exceeds 220 is counted under 3; this is why the amount leaf holds 47 test frauds of which only 20 are labelled scenario 1.
+
+**What a rerun in 2026 finds.** With scikit-learn 1.9 and pandas 3.1, LR, DT2 and RF reproduce the published test metrics to the third decimal, and the two trees reproduce their leaf counts exactly. DT∞'s CP@100 comes out 0.241, not 0.243: at least 40 of each day's 100 slots are filled from 57,842 rows tied at score 0, and their order is whatever the sort implementation leaves. The notebook collects results with `DataFrame.append`, which pandas 2.0 removed, and the later chapters pass `needs_proba=True` to `make_scorer`, which scikit-learn 1.6 removed. The prose and the code disagree in small places: the depth-2 tree's ROC-AUC is 0.764 in the text and 0.763 in the table, the night flag is described as midnight to 6 a.m. while the code tests `hour <= 6`, and Chapter 4 recalls the real-data depth-2 tree's CP@100 as 0.1 where Chapter 3's table gives 0.077.
+
+**Missing values in the real data.** The shared loader ends with `df_final.replace([-1], 0)` and the comment that −1 marks missing values in the real data. Zero is a legal value for every count and rate in the feature set, so a Worldline transaction with a missing terminal risk is scored as if its terminal were clean; any fraud among those rows sits in the genuine traffic, one possible contributor to the overlap that holds precision below 0.1. The handbook does not report how many rows were affected.
+</Aside>
+
+This lesson has established that on the handbook's simulator the depth-2 tree reads the generator's amount rule as 218.67 and the 28-day terminal compromise as a 30-day risk of 0.66; that the reversal between the two trees is the difference between recall at the last ROC kink and precision of the top blocks, and survives a change of test week, while the order of LR, RF and XGBoost does not; and that on Worldline data, at 0.25% fraud and about 250 cards to find for 100 slots, ROC-AUC prefers XGBoost by 0.11 while CP@100 prefers logistic regression at 0.15, sixty times random and one alert in seven. <Ref lesson="cost-aware-evaluation-lab">The evaluation lab</Ref> turns the module's metrics and split into a harness that reproduces these numbers and referees every later lab.
+
+## Exercises
+
+<Exercise>
+From the training counts, compute (a) the fraud probability of DT2's large leaf on the simulator (236 frauds, 66,498 genuine) and its lift over the training prevalence 598/67,240, and (b) the same two numbers for the Worldline tree's burst leaf (256 frauds, 141 genuine) against its training prevalence 6,605/2,858,663. State what each lift says about the leaf.
+
+<Solution>
+(a) $p = 236/66{,}734 = 0.00354$. Prevalence $598/67{,}240 = 0.00889$. Lift $= 0.00354/0.00889 = 0.40$. The leaf is depleted: it holds 99.2% of the training rows and 39% of the frauds, so it scores below the average. It is the tree's "nothing found" region, and its frauds (scenario 3 and young scenario-2 terminals) are the ones the depth-2 tree cannot reach.
+
+(b) $p = 256/397 = 0.645$. Prevalence $6{,}605/2{,}858{,}663 = 0.00231$. Lift $= 0.645/0.00231 = 279$. The leaf is the tree's one alert rule: almost two frauds in three, but only 256 of 6,605 frauds, 3.9% of the week's total. A high lift on a small leaf buys precision at the top of the list and nothing below it.
+</Solution>
+</Exercise>
+
+<Exercise>
+A model scores 1 on a set $S$ that contains 90% of the test week's frauds and 30% of its genuine transactions, and 0 elsewhere. On the simulator's test week ($N^+ = 385$, $N^- = 57{,}879$), compute its ROC-AUC and its AP, and compare them with DT2's 0.763 and 0.496. Then name the operation the ROC trapezoid performs on a tied block that the AP step sum does not, and give the ROC-AUC and AP of a model that outputs one constant score.
+
+<Solution>
+**ROC-AUC.** One interior point at FPR 0.3, recall 0.9. Area $= \tfrac{1}{2}(0.3)(0.9) + (0.7)\tfrac{0.9 + 1}{2} = 0.135 + 0.665 = 0.800$, or directly $\tfrac{1}{2}(1 + 0.9 - 0.3) = 0.8$. It beats DT2's 0.763.
+
+**AP.** $S$ holds $0.9 \times 385 = 346.5$ frauds and $0.3 \times 57{,}879 = 17{,}364$ genuine rows, so its precision is $346.5/17{,}710 = 0.0196$. AP $= 0.9 \times 0.0196 + 0.1 \times 0.0066 = 0.0176 + 0.0007 = 0.018$: below DT2 by a factor of 27, and less than three times the prevalence.
+
+**The operation.** The trapezoid joins consecutive ROC points by a straight line, which is linear interpolation inside a tied block: it counts every (fraud, genuine) pair inside the block as half correctly ordered, the expected result of breaking the ties at random. AP assigns the whole block's precision to every unit of recall the block adds, with no interpolation; a block of low precision contributes low precision however much recall it adds.
+
+**Degenerate case.** A constant score has no interior point: ROC-AUC $= 0.5$ and AP $= \pi = 0.0066$, the prevalence. The model $S$ sits at the boundary in a different sense: it is a useful screen (it clears 70% of genuine traffic while keeping 90% of fraud) and a useless alert list, and ROC-AUC reports the first while AP reports the second.
+</Solution>
+</Exercise>
+
+<Exercise>
+Break this claim: "On the Worldline data XGBoost's AP of 0.035 is barely above a random model's 0.002, so the model is not useful." Compute its lift in AP, the number of compromised cards it finds per day at $k = 100$, and its lift over random at the budget. Name the number an investigation team would use to decide.
+
+<Solution>
+The lift in AP is $0.035/0.002 = 17.5$: the ranking is seventeen times better than random averaged over all recall levels. That average is dominated by recall levels no team reaches: at 400,000 transactions a day, recall 0.5 lies thousands of alerts down the list.
+
+At the budget XGBoost's CP@100 is 0.090: 9 compromised cards found among each day's 100 calls. Random selection finds $100 \times 0.0025 = 0.25$ cards a day, one every four days. The lift at the budget is $0.090/0.0025 = 36$.
+
+The step that fails is reading AP as a fraction of a perfect score: its floor is the prevalence, so an absolute value near zero says only that the prevalence is small. The number the team uses is CP@100, the fraction of their calls that find a compromised card; on it XGBoost is useful and still behind logistic regression's 0.150 and the random forest's 0.104, which is a stronger objection than the claim made.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce the simulator benchmark. Clone the handbook's `simulated-data-transformed` repository, implement the split (7-day training, 7-day delay, 7-day test, known cards removed) and the five default models, and report the five-by-three test table for the training start 2018-07-25. Then repeat with the training start moved to 07-18 and to 08-01. State which of the four reversals in the third section's stability table survive all three weeks, and what would count as agreement with the handbook for the first week.
+
+<Solution>
+**Agreement for 07-25.** The split must give 67,240 training rows with 598 frauds and 58,264 test rows with 385 frauds; any difference is a bug in the split or in known-card removal, and should be fixed before any model is trained. LR, DT2 and RF should then match the handbook to the third decimal. DT∞ may differ by a few thousandths in CP@100 because of the tie order in the bottom block. XGBoost will differ by more if the installed version is 2.0 or later: our run with 3.4 gives 0.844, 0.572 and 0.254 against 0.862, 0.639 and 0.273, and that is agreement with the code, not with the number.
+
+**The other weeks** (scikit-learn 1.9, XGBoost 3.4):
+
+| model | 07-18 AUC / AP / CP@100 | 08-01 AUC / AP / CP@100 |
+|---|---|---|
+| LR | 0.864 / 0.612 / 0.311 | 0.845 / 0.650 / 0.289 |
+| DT2 | 0.786 / 0.552 / 0.280 | 0.806 / 0.581 / 0.256 |
+| DT∞ | 0.811 / 0.385 / 0.270 | 0.800 / 0.319 / 0.250 |
+| RF | 0.884 / 0.695 / 0.324 | 0.859 / 0.664 / 0.286 |
+| XGB | 0.870 / 0.632 / 0.304 | 0.855 / 0.595 / 0.271 |
+
+**Which survive.** DT2 above DT∞ on AP: all three weeks, by 0.17 to 0.26. RF best on AP: all three. DT∞ above DT2 on ROC-AUC: two of three, reversed on 08-01. LR best on CP@100: two of three, with RF ahead by 0.013 on 07-18. The surviving reversals are those with a structural cause, the scores' tie structure and averaging over trees; the others are differences of a few hundredths that one week of 385 frauds cannot resolve. The design that separates the two explanations is the one <Ref lesson="delayed-labels-prequential">the validation lesson</Ref> built: several forward folds and the spread across them.
+</Solution>
+</Exercise>
+
+<Exercise>
+Let a model's scores take $L$ distinct values $s_1 > s_2 > \dots > s_L$, with $n_j$ test rows and $f_j$ frauds at $s_j$, $N = \sum n_j$ and $N^+ = \sum f_j$. (a) Show that the step-sum AP, with tied rows entering together, is
+$$
+\mathrm{AP} = \sum_{j=1}^{L} \frac{f_j}{N^+} \cdot \frac{F_j}{M_j}, \qquad F_j = \sum_{i \le j} f_i,\ M_j = \sum_{i \le j} n_i.
+$$
+(b) Show that the trapezoidal ROC-AUC is $\frac{1}{N^+ N^-}\sum_j f_j\bigl(G_{>j} + \tfrac{1}{2} g_j\bigr)$, where $g_j = n_j - f_j$ and $G_{>j}$ counts the genuine rows with scores below $s_j$. (c) Apply both to DT∞ ($L = 2$) and explain why every genuine row at score 1 costs AP more than it costs ROC-AUC.
+
+<Solution>
+**(a)** Thresholding at $s_j$ flags the rows of blocks $1, \dots, j$: $M_j$ rows of which $F_j$ are fraud. Recall is $R_j = F_j/N^+$ and precision $P_j = F_j/M_j$. The step sum $\sum_j (R_j - R_{j-1}) P_j$ has $R_j - R_{j-1} = f_j/N^+$, which gives the formula. Each block contributes its share of the frauds times the precision of everything ranked at or above it.
+
+**(b)** The trapezoid between consecutive ROC points $(\mathrm{FPR}_{j-1}, R_{j-1})$ and $(\mathrm{FPR}_j, R_j)$ has area $\frac{g_j}{N^-}\cdot\frac{R_{j-1} + R_j}{2}$. Summing over $j$ and rewriting in pairs: a (fraud, genuine) pair contributes $1/(N^+N^-)$ if the fraud's block is above the genuine row's, $\tfrac{1}{2}$ of that if they share a block, and 0 otherwise. Grouping by the fraud's block gives $\sum_j f_j(G_{>j} + \tfrac{1}{2}g_j)$, normalised by $N^+N^-$. This is the Mann–Whitney count with ties at half credit.
+
+**(c)** DT∞: block 1 has $n_1 = 422$, $f_1 = 223$, $g_1 = 199$; block 2 has $n_2 = 57{,}842$, $f_2 = 162$, $g_2 = 57{,}680$. AP $= \frac{223}{385}\cdot\frac{223}{422} + \frac{162}{385}\cdot\frac{385}{58{,}264} = 0.306 + 0.003 = 0.309$. ROC-AUC $= \frac{223(57{,}680 + 99.5) + 162(28{,}840)}{385 \times 57{,}879} = \frac{12{,}884{,}829 + 4{,}672{,}080}{22{,}283{,}415} = 0.788$.
+
+Move one genuine row from score 0 to score 1. In ROC-AUC it stops being below the 223 top frauds (each loses half a pair) and stops being level with the 162 bottom frauds (each loses half a pair): the area falls by $385/(2N^+N^-) = 1/(2N^-) \approx 9 \times 10^{-6}$. In AP it lowers $P_1 = F_1/M_1$ from $223/422$ to $223/423$, a fall of $0.0012$, weighted by $R_1 = 0.579$: about $7 \times 10^{-4}$, eighty times larger. Every genuine row tied with the frauds at the top dilutes the precision that most of AP is made of; ROC-AUC spreads the same row's cost over all 57,879 genuine rows.
+</Solution>
+</Exercise>
+
+<Exercise>
+The handbook's default XGBoost scores CP@100 0.273 on the simulator's test week. <Ref lesson="delayed-labels-prequential">The validation lesson</Ref> swept a decision tree's maximum depth on the same split: test CP@100 peaked at 0.280 at depth 5, and the prequential folds selected depth 5 when CP@100 was the selection metric. (a) Say whether a tuned single tree beats default XGBoost at the budget, and by how many cards a day. (b) Compare the training costs from the handbook's timing table: DT2 trained in 0.08 s and DT∞ in 0.76 s, XGBoost in 6.96 s. (c) State what a fair comparison would have to change about XGBoost before concluding anything about model classes.
+
+<Solution>
+(a) Yes: 0.280 against 0.273, 0.7 compromised cards a day more out of 100 alerts, from a single tree of depth 5 chosen by validation. The default random forest (0.287) and LR (0.291) are still ahead on this week, by amounts within the week-to-week spread.
+
+(b) A depth-5 tree trains in a time between the depth-2 and unlimited trees, well under a second on this data, against about 7 seconds for XGBoost: an order of magnitude less compute for a better CP@100.
+
+(c) XGBoost was not tuned: its depth, learning rate and number of trees are defaults chosen for no particular dataset, while the tree's depth was chosen by CP@100 on prequential folds. A fair comparison tunes both with the same folds, the same metric and a recorded compute budget. That is the comparison <Ref lesson="gbm-model-selection">the model-selection lesson</Ref> runs on real card data, where a prequentially tuned tree matches tuned XGBoost on CP@100 at one to two orders of magnitude less training cost: the metric and the selection, not the model class, decide the ranking.
+</Solution>
+</Exercise>
+
+<Exercise>
+A logistic regression is trained on the simulator's training week after balanced undersampling: every fraud kept, each genuine row kept with probability $\beta = 598/66{,}642$. On the test week it outputs $p_s = 0.40$ for a €180 transaction and $p_s = 0.40$ for a €5,000 transaction. (a) Apply the correction of <Ref lesson="imbalance-techniques-revisited">the imbalance lesson</Ref> to both scores. (b) Decide each transaction under the Bayes-minimum-risk rule of <Ref lesson="example-dependent-cost">the cost lesson</Ref> with $C_a = €25$, before and after the correction. (c) Say whether the correction changes the model's AP, its CP@100, and its savings, and why.
+
+<Solution>
+(a) $\beta = 598/66{,}642 = 0.00897$. The inverse map $p' = \beta p_s/(\beta p_s - p_s + 1)$ gives $p' = 0.00359/(0.00359 - 0.40 + 1) = 0.00359/0.60359 = 0.0059$ for both transactions: the same score maps to the same probability.
+
+(b) The rule flags iff $C_a \le \mathrm{Amt}\cdot p$. Before the correction: $180 \times 0.40 = 72 \ge 25$, flag; $5{,}000 \times 0.40 = 2{,}000 \ge 25$, flag. After: $180 \times 0.0059 = 1.07 < 25$, pass; $5{,}000 \times 0.0059 = 29.7 \ge 25$, flag. The correction removes the €180 alert and keeps the €5,000 one.
+
+(c) AP and CP@100 are unchanged: the inverse map is strictly increasing, so the ranking of the test week, and with it every ranking metric, is identical. Savings change, because the minimum-risk rule compares the probability with $C_a/\mathrm{Amt}$, an absolute threshold. Uncorrected, the undersampled model's probabilities are inflated by a factor of about 68 here ($0.40/0.0059$), so the rule flags almost every transaction above a few euros and pays $C_a$ for each. A benchmark that reports only ROC-AUC, AP and CP@100, as the handbook's does, cannot see this error at all.
+</Solution>
+</Exercise>
+
+<References>
+1. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection: Practical Handbook*, Université Libre de Bruxelles, 2022. Foreword: licences (code GPL v3, prose CC BY-SA 4.0). §3.2 "Transaction data simulator": the three fraud scenarios. §3.3 "Baseline feature transformation": the 15 inputs, the 7-day delay in the terminal risk, the night flag. §3.4 "Baseline fraud detection system": the split (67,240/598, 58,264/385), the depth-2 tree and its 218.67 threshold, the five-model test and training tables, execution times. §3.5 "Real-world data": the Worldline statistics, the depth-2 tree on terminal risk and daily count, the five-model table. §4.5 "Real-world data": ROC and PR curves on Worldline data, daily detected cards. Reference chapter "Shared functions": `read_from_files` and the −1 missing-value line. https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+2. Fraud-Detection-Handbook, `simulated-data-transformed` (GitHub repository): the daily pickles of the transformed simulator data from which the recomputed numbers in this lesson come. https://github.com/Fraud-Detection-Handbook/simulated-data-transformed
+3. A. Dal Pozzolo, G. Boracchi, O. Caelen, C. Alippi, G. Bontempi, "Credit Card Fraud Detection: A Realistic Modeling and a Novel Learning Strategy," *IEEE Transactions on Neural Networks and Learning Systems* 29(8), 2018, pp. 3784–3797. Sec. III: the investigators' budget, card precision at $k$, and the feedback delay the benchmark's split encodes. https://doi.org/10.1109/TNNLS.2017.2736643
+4. A. Dal Pozzolo, O. Caelen, R. A. Johnson, G. Bontempi, "Calibrating Probability with Undersampling for Unbalanced Classification," *IEEE Symposium Series on Computational Intelligence*, 2015. Eq. 3 and the inverse map used in the exercise on the undersampled logistic regression. https://doi.org/10.1109/SSCI.2015.33
+</References>

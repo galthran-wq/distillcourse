@@ -1,0 +1,503 @@
+A missed fraud costs the transaction amount and a flagged transaction costs a fixed administrative sum, so the optimal decision depends on the amount: flag iff $C_a \le \mathrm{Amt}\cdot P(\text{fraud}\mid x)$. The rule is a curve in the plane of amount and probability, not a threshold on the score, and it is only as good as the probability it is fed.
+
+<Ref lesson="economics-of-detection">The economics lesson</Ref> priced an alert at $C_a$ and a missed fraud at $c_{FN}$, showed that a queue pays only if its precision clears $C_a/c_{FN}$, and noted that the amount is the one fraud cost a transaction table can supply. <Ref lesson="imbalance-techniques-revisited">The imbalance lesson</Ref> derived the correction $p'$ that turns an undersampled model's scores back into probabilities, and showed that for ranking metrics the correction changes nothing. What stands open is the decision itself once each transaction carries its own stake: which rule is optimal, how a detector is scored against the money it saves, and whether the costs belong in the decision or in the training. This lesson derives the Bayes-minimum-risk rule from the example-dependent cost matrix, defines savings against the do-nothing baseline and shows they can be negative, shows why the rule needs calibrated probabilities where a ranking metric does not, and separates learning with costs from deciding with costs on the published card-fraud results.
+
+## The amount enters the cost matrix
+
+The cost matrix of <Ref lesson="economics-of-detection">the economics lesson</Ref> had one number per outcome. The fraud costs that a bank actually pays vary from transaction to transaction, and this section writes a matrix that lets them.
+
+<Task>
+Answer from memory, then open the fold. (1) In the economics lesson's cost matrix, what does an alert cost when the transaction turns out to be fraud, and why is that cell not zero? (2) With $C_a = €5$ and $c_{FN} = €100$, what precision must an alert queue exceed to beat doing nothing? (3) From the imbalance lesson: a model trained with negative-keep rate $\beta = 0.1$ outputs $p_s = 0.5$. What is the corrected probability $p'$?
+</Task>
+
+<Aside>
+**Answers.** (1) $C_a$, the same as a false alert: the cardholder is contacted whether or not the alert is right, so the investigation is paid in both cases. (2) $C_a/c_{FN} = 5\%$, the break-even precision. (3) $p' = \beta p_s/(\beta p_s - p_s + 1) = 0.05/0.55 \approx 0.091$: a balanced-looking coin flip is about one chance in eleven.
+</Aside>
+
+### One price per fraud, or the fraud's own amount
+
+Hand and co-authors, in their [performance criteria for card fraud tools](https://doi.org/10.1057/palgrave.jors.2602418), charge an alert the administrative cost $C_a$ of analysing the transaction and contacting the cardholder, on a true and a false alert alike, and charge a missed fraud a constant one hundred times that: $C_{FN} = 100\,C_a$. Losses on real frauds range from a few euros to thousands. At $C_a = €25$ the constant matrix prices a missed €8 fraud and a missed €2,000 fraud at the same €2,500, overstating the first by a factor of 300 and understating the second.
+
+Correa Bahnsen and co-authors replace the constant by the transaction's own amount. In their notation a transaction $i$ has true label $y_i \in \{0, 1\}$ (1 for fraud) and receives the decision $c_i \in \{0, 1\}$ (1 for flag), and each of its four outcomes has its own cost.
+
+<Definition title="example-dependent cost matrix">
+An *example-dependent cost matrix* assigns to each transaction $i$ four costs $C_{TP_i}, C_{FP_i}, C_{FN_i}, C_{TN_i}$, the costs of flagging a fraud, flagging a genuine transaction, passing a fraud and passing a genuine transaction. The card-fraud matrix is
+$$
+C_{TP_i} = C_{FP_i} = C_a, \qquad C_{FN_i} = \mathrm{Amt}_i, \qquad C_{TN_i} = 0,
+$$
+with $C_a$ a fixed administrative cost per alert and $\mathrm{Amt}_i$ the transaction amount.
+</Definition>
+
+<Figure
+  src="./figures/matrix.svg"
+  alt="Two 2-by-2 cost matrices side by side, rows flag and pass, columns fraud and genuine. Left, Hand et al.: flag cells C_a, pass-fraud cell 100 C_a in blue, pass-genuine 0; a missed 2,000-euro fraud and a missed 8-euro fraud both cost 2,500 euros. Right, example-dependent: the same except the pass-fraud cell is Amt_i in amber; the two missed frauds cost 2,000 and 8 euros. An arrow joins the panels."
+  caption="Only the false-negative cell changes; with it, the price of a miss spans three orders of magnitude."
+/>
+
+The economics lesson wrote $c_{FN}$ for one number; from here on $C_{FN_i}$ carries the subscript of the transaction it belongs to. Four cases fix what the definition covers:
+
+- **Canonical.** $C_a = €25$, $C_{FN_i} = \mathrm{Amt}_i$: the matrix the rest of this lesson computes with.
+- **A different structure.** The cost of a missed fraud can be any per-row quantity. Correa Bahnsen and co-authors propose the available credit on the card, so that a small fraud on a card with a large open limit is priced at what the fraudster can still take. A problem set of the IIT Hyderabad fraud-analytics course gives each row a false-negative cost computed from a risk parameter, with $C_{TP} = C_{FP} = 6$ and $C_{TN} = 0$.
+- **Degenerate.** Every amount equal: $\mathrm{Amt}_i = A$ for all $i$. The matrix is the constant matrix of the economics lesson, and Hand's matrix is the case $A = 100\,C_a$.
+- **Near miss.** $C_{TP_i} = 0$, $C_{FN_i} = \mathrm{Amt}_i$. It violates the clause that a true alert pays for its investigation. The difference is small for large amounts and large for small ones, and an exercise at the end computes how large.
+
+### The cost of a set of decisions
+
+One transaction first. Transaction 2 of the running example below is a fraud of €2,000. Flagged, it costs the €25 call; passed, it costs €2,000. A genuine €900 transaction costs €25 flagged and nothing passed. Summing the cost of the realised outcome over a set $S$ of $N$ transactions gives the cost of a classifier $f$ that makes the decisions $c_i$:
+$$
+\mathrm{Cost}(f(S)) = \sum_{i=1}^{N} \Bigl[ y_i\bigl(c_i C_{TP_i} + (1 - c_i) C_{FN_i}\bigr) + (1 - y_i)\bigl(c_i C_{FP_i} + (1 - c_i) C_{TN_i}\bigr) \Bigr].
+$$
+Substituting the card matrix, the flag term is $C_a$ whatever the label, and only the passed frauds remain:
+$$
+\mathrm{Cost}(f(S)) = \sum_{i=1}^{N} \Bigl[ y_i (1 - c_i)\,\mathrm{Amt}_i + c_i\,C_a \Bigr].
+$$
+The cost is the calls made plus the frauds passed. It needs labels: it is the evaluation of decisions already taken, after the investigations and disputes have reported.
+
+## The Bayes-minimum-risk rule: compare two expected costs per transaction
+
+The cost above is computed after the labels arrive. At scoring time the label is unknown and only a probability $p_i = P(\text{fraud} \mid x_i)$ is available, so each decision is chosen by comparing two expected costs.
+
+### Flag when the expected loss exceeds the call
+
+Take the €2,000 transaction with $p = 0.05$. Flagging costs €25 for certain. Passing costs €2,000 with probability 0.05 and nothing otherwise, an expected €100. Flagging is cheaper by €75. Take a €15 transaction with $p = 0.6$: flagging costs €25, passing an expected $0.6 \times €15 = €9$. Passing is cheaper by €16, although the second transaction is twelve times as likely to be fraud.
+
+<Theorem title="Bayes-minimum-risk decision">
+Let transaction $i$ have fraud probability $p_i$ and costs with $C_{FN_i} > C_{TP_i}$ and $C_{FP_i} > C_{TN_i}$. Flagging has no higher expected cost than passing if and only if
+$$
+p_i \ge \tau_i = \frac{C_{FP_i} - C_{TN_i}}{(C_{FP_i} - C_{TN_i}) + (C_{FN_i} - C_{TP_i})}.
+$$
+For the card matrix this is
+$$
+C_a \le \mathrm{Amt}_i \cdot p_i, \qquad \text{equivalently} \qquad p_i \ge \frac{C_a}{\mathrm{Amt}_i}.
+$$
+
+<Proof>
+The expected cost of flagging is $R(\text{flag}) = p_i C_{TP_i} + (1 - p_i) C_{FP_i}$ and of passing $R(\text{pass}) = p_i C_{FN_i} + (1 - p_i) C_{TN_i}$. Flagging is no worse iff $R(\text{flag}) \le R(\text{pass})$, that is $(1 - p_i)(C_{FP_i} - C_{TN_i}) \le p_i (C_{FN_i} - C_{TP_i})$. Collecting the terms in $p_i$ gives $p_i\bigl[(C_{FP_i} - C_{TN_i}) + (C_{FN_i} - C_{TP_i})\bigr] \ge C_{FP_i} - C_{TN_i}$, and the bracket is positive by hypothesis, which gives $\tau_i$. For the card matrix $R(\text{flag}) = p_i C_a + (1 - p_i) C_a = C_a$ and $R(\text{pass}) = p_i \mathrm{Amt}_i$, so the condition is $C_a \le \mathrm{Amt}_i\, p_i$.
+</Proof>
+</Theorem>
+
+The card form is the paper's Eq. 15, $C_a P(f \mid x_i) + C_a P(l \mid x_i) \le \mathrm{Amt}_i P(f \mid x_i)$, with $f$ and $l$ for fraud and legitimate. The left side is the expected cost of an alert, which is $C_a$ whatever the label; the right side is the expected loss of letting the transaction through. The hypothesis $C_{FN_i} > C_{TP_i}$ fails for every transaction with $\mathrm{Amt}_i \le C_a$: such a transaction is never worth flagging, because even a certain fraud loses less than the call.
+
+### Optimal transaction by transaction
+
+The rule compares two numbers for one transaction. Its optimality for the whole stream follows because the expected total cost is a sum of per-transaction terms.
+
+<Theorem title="the rule minimises expected total cost">
+Among all decision rules $c_i = c(x_i, \mathrm{Amt}_i)$, the Bayes-minimum-risk rule applied with the true $p_i$ minimises the expected cost $\mathbb{E}[\mathrm{Cost}(f(S)) \mid x_1, \dots, x_N]$.
+
+<Proof>
+Conditional on the features, $\mathbb{E}[y_i] = p_i$, so the expected cost is $\sum_i \bigl[c_i C_a + (1 - c_i)\,p_i \mathrm{Amt}_i\bigr]$. Each term depends on $c_i$ alone, so the sum is minimised by minimising each term, which is choosing $c_i = 1$ exactly when $C_a \le p_i \mathrm{Amt}_i$.
+</Proof>
+</Theorem>
+
+Two hypotheses carry the theorem. The decisions are unconstrained: nothing limits how many transactions may be flagged, which the investigator budget of <Ref lesson="fraud-detection-system">the first lesson</Ref> contradicts. And the $p_i$ are the true probabilities: a model's score enters the rule as if it were one.
+
+### Constant costs are the special case
+
+With every amount equal to $A$, the threshold $C_a/A$ is one number for all transactions, and the rule is the threshold of the classical cost-sensitive literature. With correct decisions free, $C_{TP} = C_{TN} = 0$, the general theorem gives
+$$
+p > \frac{C_{FP}}{C_{FP} + C_{FN}} = \frac{1}{1 + C_{FN}/C_{FP}},
+$$
+the cut-off that Baesens and co-authors derive from the expected misclassification cost and that depends only on the cost ratio. Hand's matrix gives $p \ge C_a/(100\,C_a) = 0.01$ under the card convention and $p > 1/101$ with a free true alert. The threshold $\tau = \pi^+$ of <Ref lesson="imbalance-techniques-revisited">the imbalance lesson</Ref>, where the error costs were set to the class priors, is a third instance.
+
+<Figure
+  src="./figures/plane.svg"
+  alt="Plane with amount on a log axis from 5 to 5,000 euros and calibrated fraud probability from 0 to 1. The amber curve p = 25/Amt falls from p = 1 at 25 euros to 0.005 at 5,000 euros; the region above it is shaded and labelled flag. A dashed blue horizontal line marks the constant threshold 0.5. Ten numbered transactions: frauds 9 (8 euros, 0.9), 1 (15, 0.6), 3 (40, 0.85), 5 (120, 0.7), 7 (350, 0.12), 2 (2,000, 0.05); genuine 6 (25, 0.55), 8 (60, 0.2), 4 (900, 0.3), 10 (1,500, 0.01)."
+  caption="Above 0.5 and below the curve: small transactions not worth a call. Below 0.5 and above the curve: large ones worth a call at low probability."
+/>
+
+<KeyFact>
+Under example-dependent costs the decision boundary is the hyperbola $p = C_a/\mathrm{Amt}$, so no threshold on the score alone reproduces it: two transactions with the same score receive opposite decisions when their amounts straddle $C_a/p$.
+</KeyFact>
+
+### Ten transactions, two rules
+
+<Example title="threshold 0.5 against the Bayes-minimum-risk rule">
+A day of 1,000 transactions. A model's calibrated probabilities put ten of them in the table below; the other 990 are genuine, with $\mathrm{Amt}\cdot p$ below €1, and every rule in this lesson passes them at zero cost. The alert cost is $C_a = €25$.
+
+| # | amount | $p$ | $\mathrm{Amt}\cdot p$ | label |
+|---|---|---|---|---|
+| 1 | €15 | 0.60 | 9 | fraud |
+| 2 | €2,000 | 0.05 | 100 | fraud |
+| 3 | €40 | 0.85 | 34 | fraud |
+| 4 | €900 | 0.30 | 270 | genuine |
+| 5 | €120 | 0.70 | 84 | fraud |
+| 6 | €25 | 0.55 | 13.75 | genuine |
+| 7 | €350 | 0.12 | 42 | fraud |
+| 8 | €60 | 0.20 | 12 | genuine |
+| 9 | €8 | 0.90 | 7.2 | fraud |
+| 10 | €1,500 | 0.01 | 15 | genuine |
+
+**Doing nothing.** Every fraud is passed: $15 + 2{,}000 + 40 + 120 + 350 + 8 = €2{,}533$.
+
+**Threshold 0.5.** Flags 1, 3, 5, 6 and 9: five calls, $5 \times €25 = €125$. Passes the frauds 2 and 7: $€2{,}350$. Total $€2{,}475$, €58 below doing nothing.
+
+**Bayes minimum risk.** Flags the rows with $\mathrm{Amt}\cdot p \ge 25$: 2, 3, 4, 5 and 7. Five calls, €125. Passes the frauds 1 and 9: $€23$. Total $€148$.
+
+Both rules raise five alerts. The threshold spends three of them on transactions worth less than a call (the €15 and €8 frauds and the €25 genuine one) and misses €2,350; the minimum-risk rule spends one on a genuine €900 transaction and passes €23.
+</Example>
+
+<FigureSequence
+  name="tally"
+  alt="Three frames of the same ten-row table (amount, p, Amt·p, label, decision) with a cost box beside it. Frame 1, do nothing: no rows flagged, frauds passed 2,533 euros, total 2,533, savings 0%. Frame 2, threshold 0.5: rows 1, 3, 5, 6, 9 highlighted as flagged, 5 alerts cost 125, frauds passed 2,350, total 2,475, savings 2.3%. Frame 3, Bayes minimum risk: rows 2, 3, 4, 5, 7 flagged, 125 in alerts, frauds passed 23, total 148, savings 94.2%."
+  caption="Frames 2 and 3 use the same scores and raise the same number of alerts; only which five rows are flagged changes."
+/>
+
+<Task>
+Step through the three frames and watch the "frauds passed" line. In frame 3, check that the €148 is $5 \times 25 + 15 + 8$, then verify from the $\mathrm{Amt}\cdot p$ column that row 6, at 13.75, is the closest call the rule passes and row 3, at 34, the closest it flags.
+</Task>
+
+<Exercise>
+Raise the alert cost to $C_a = €50$ on the same ten transactions. Before opening the solution, list the rows the Bayes-minimum-risk rule now flags and compute its total cost; then compute the total cost of the threshold-0.5 rule at the same $C_a$, and say which of the two rules the higher alert cost hurts more.
+
+<Solution>
+**Minimum risk.** Flag iff $\mathrm{Amt}\cdot p \ge 50$: rows 2 (100), 4 (270) and 5 (84). Rows 3 (34) and 7 (42) drop out. Cost: $3 \times €50 = €150$ in calls, plus passed frauds $15 + 40 + 350 + 8 = €413$; total $€563$.
+
+**Threshold 0.5.** The flags do not depend on $C_a$: rows 1, 3, 5, 6, 9. Cost: $5 \times €50 = €250$ plus the passed frauds 2 and 7, $€2{,}350$; total $€2{,}600$, which is €67 more than doing nothing.
+
+**Which rule suffers.** The minimum-risk rule adapts: it drops the two alerts whose expected loss no longer covers the call, and its cost rises by €415. The threshold rule keeps its five alerts at double the price, and it now loses money against doing nothing. A rule that does not read $C_a$ cannot respond to it.
+</Solution>
+</Exercise>
+
+## Savings: the cost of a detector against the cost of doing nothing
+
+The example compared each rule with doing nothing by hand. The savings measure makes that comparison the definition, and its baseline has to be stated with care, because "doing nothing" is not always the cheapest trivial policy.
+
+### The baseline is the cheaper of two trivial policies
+
+Two classifiers need no model: $f_0$ passes everything and $f_1$ flags everything. Their costs are $\mathrm{Cost}(f_0(S)) = \sum_i y_i \mathrm{Amt}_i$, every fraud paid, and $\mathrm{Cost}(f_1(S)) = N\,C_a$, every transaction called. Correa Bahnsen and co-authors set the cost of using no algorithm to the smaller:
+$$
+\mathrm{Cost}_l(S) = \min\{\mathrm{Cost}(f_0(S)),\ \mathrm{Cost}(f_1(S))\}.
+$$
+Passing everything is the cheaper of the two exactly when $N C_a \ge \sum_i y_i \mathrm{Amt}_i$, that is when the alert cost exceeds the fraud loss per transaction. On the running day that loss is $€2{,}533/1{,}000 = €2.53$. On the subset of a European processor's card data that the paper evaluates on, 236,735 transactions with 1.50% fraud and €895,154 of fraud losses, it is €3.78. Any plausible call cost is above it, so on card data $\mathrm{Cost}_l$ is the total fraud amount.
+
+### From cost to savings
+
+<Definition title="savings">
+The *savings* of a classifier $f$ on a set $S$ are
+$$
+\mathrm{Savings}(f(S)) = \frac{\mathrm{Cost}_l(S) - \mathrm{Cost}(f(S))}{\mathrm{Cost}_l(S)}.
+$$
+</Definition>
+
+When $\mathrm{Cost}_l(S) = \sum_i y_i \mathrm{Amt}_i$, substituting the card cost gives a closed form. The numerator is $\sum_i y_i \mathrm{Amt}_i - \sum_i \bigl[y_i(1 - c_i)\mathrm{Amt}_i + c_i C_a\bigr] = \sum_i \bigl[y_i c_i \mathrm{Amt}_i - c_i C_a\bigr]$, so
+$$
+\mathrm{Savings}(f(S)) = \frac{\sum_{i=1}^{N} \bigl[y_i c_i \mathrm{Amt}_i - c_i C_a\bigr]}{\sum_{i=1}^{N} y_i \mathrm{Amt}_i}:
+$$
+the amounts of the frauds caught, minus the calls spent catching them and everything else flagged, as a share of all fraud. On the running day the threshold rule catches $15 + 40 + 120 + 8 = €183$ with €125 of calls, savings $58/2{,}533 = 2.3\%$; the minimum-risk rule catches $2{,}000 + 40 + 120 + 350 = €2{,}510$ with €125 of calls, savings $2{,}385/2{,}533 = 94.2\%$.
+
+### The perfect classifier is not the ceiling
+
+From a classification view one would expect the classifier that flags exactly the frauds to have the highest possible savings. It does not. Flagging all six frauds costs $6 \times €25 = €150$ and passes nothing: savings $94.1\%$, a tenth of a point below the minimum-risk rule, which was wrong on three of the ten rows. The best possible decisions flag the frauds worth more than a call, 2, 3, 5 and 7, and pass the €15 and €8 ones: cost $€100 + €23 = €123$, savings $95.1\%$. The ceiling on savings is $1 - \sum_i y_i \min(\mathrm{Amt}_i, C_a)/\sum_i y_i \mathrm{Amt}_i$, and the misclassification view of the problem cannot see it, because it counts a passed €8 fraud as an error.
+
+### Savings can be negative
+
+Savings are at most the ceiling and have no lower bound. Flagging all 1,000 transactions of the day costs €25,000, savings $(2{,}533 - 25{,}000)/2{,}533 = -887\%$. The threshold rule's savings are $(183 - 5 C_a)/2{,}533$, which is negative once $C_a > €36.60$.
+
+<Figure
+  src="./figures/savings-ca.svg"
+  alt="Savings on the ten-transaction day against the alert cost C_a from 5 to 200 euros. A dashed grey oracle line falls slowly from 99% to 77%. The amber Bayes-minimum-risk line steps down from 98% to 91% at 42 euros, 79% to 71% up to 100 euros, then drops to about −4% and drifts to −8%. The blue threshold-0.5 line falls linearly from 6% and crosses zero at 36.6 euros, reaching −32% at 200 euros."
+  caption="A fixed threshold loses money once a call costs more than €36.60; the minimum-risk rule adapts, until above €100 the one alert it still raises is a genuine transaction."
+/>
+
+The minimum-risk curve also goes below zero. Above $C_a = €100$ the only transaction whose expected loss exceeds the call is the genuine €900 one at $p = 0.3$, and the €2,000 fraud at $p = 0.05$ no longer clears the bar. The rule flags one transaction, it is genuine, and the realised savings are about $-4\%$. The theorem of the previous section is about expected cost, and its expected cost at $C_a = €120$ is still below doing nothing. Its realised cost on one day is a single draw, and a small day can land on the wrong side. Savings measured over the 71,226 transactions of the paper's test set average over many such draws; savings measured on ten do not.
+
+### Whitrow's normalised cost
+
+The total cost has no scale of its own. Whitrow and co-authors normalise it by the cost of misclassifying every example, flagging every genuine transaction and passing every fraud:
+$$
+\mathrm{Cost}_n(f(S)) = \frac{\sum_i \bigl[y_i(1 - c_i)\mathrm{Amt}_i + c_i C_a\bigr]}{|S_0|\,C_a + \sum_i y_i \mathrm{Amt}_i},
+$$
+with $S_0$ the genuine transactions. On the running day the denominator is $994 \times €25 + €2{,}533 = €27{,}383$, and the minimum-risk rule scores $148/27{,}383 = 0.005$, the threshold rule $0.090$, doing nothing $0.093$. The normalisation is against a policy nobody runs, so the number for doing nothing has to be computed before any other can be read. Correa Bahnsen and co-authors choose savings because, in their words, "companies do not use predictive models": the operational comparison is against running none, and savings place that comparison at zero by construction.
+
+<KeyFact>
+The savings ceiling $1 - \sum_i y_i \min(\mathrm{Amt}_i, C_a)/\sum_i y_i \mathrm{Amt}_i$ moves with the alert cost: on the running day it is 95.1% at $C_a = €25$ and 91.6% at €50. Two savings figures are comparable only at the same $C_a$ on the same set of transactions.
+</KeyFact>
+
+## The rule needs probabilities, not scores
+
+The minimum-risk rule multiplies $p_i$ by an amount, which is where it parts company with every metric of <Ref lesson="alert-budget-metrics">the metrics lesson</Ref>. Average precision and card precision at $k$ read only the order of the scores; this rule reads their values.
+
+### A monotone distortion that the ranking metrics forgive
+
+The imbalance lesson showed that undersampling with keep rate $\beta$ replaces the true posterior $p$ by $p_s = p/(p + \beta(1 - p))$, that the map is strictly increasing, and that every ranking metric is therefore unchanged. Applied to the minimum-risk rule, the uncorrected score flags transaction $i$ when $\mathrm{Amt}_i\, p_{s,i} \ge C_a$. At $\beta = 0.1$ the genuine €1,500 transaction of the running day, true $p = 0.01$, is scored $p_s = 0.092$, so its apparent expected loss is €138 instead of €15, and it is flagged.
+
+Under constant costs the damage is repairable by moving one threshold: <Ref lesson="imbalance-techniques-revisited">the imbalance lesson</Ref> showed that thresholding $p_s$ at the full-data cost threshold is the correct rule for a false-positive cost $\beta$ times too small. Under example-dependent costs no single repair of that kind exists.
+
+<Theorem title="no alert cost absorbs the bias">
+Let $o(u) = u/(1 - u)$ denote the odds. For $\mathrm{Amt} > C_a$, the uncorrected rule $\mathrm{Amt}\cdot p_s \ge C_a$ flags a transaction iff
+$$
+o(p) \ge \frac{\beta\,C_a}{\mathrm{Amt} - C_a},
+$$
+while the correct rule flags it iff $o(p) \ge C_a/(\mathrm{Amt} - C_a)$. For $0 < \beta < 1$ there is no alert cost $C'_a$ for which the correct rule with $C'_a$ coincides with the uncorrected rule at every amount.
+
+<Proof>
+The correct rule $p \ge C_a/\mathrm{Amt}$ is, in odds, $o(p) \ge o(C_a/\mathrm{Amt}) = C_a/(\mathrm{Amt} - C_a)$. Undersampling gives $o(p_s) = o(p)/\beta$, so $p_s \ge C_a/\mathrm{Amt}$ iff $o(p)/\beta \ge C_a/(\mathrm{Amt} - C_a)$, which is the displayed condition. The correct rule with $C'_a$ has the boundary $C'_a/(\mathrm{Amt} - C'_a)$. Equating it with $\beta C_a/(\mathrm{Amt} - C_a)$ for every $\mathrm{Amt}$ gives $C'_a(\mathrm{Amt} - C_a) = \beta C_a(\mathrm{Amt} - C'_a)$; the coefficients of $\mathrm{Amt}$ force $C'_a = \beta C_a$, and the constant terms then require $\beta C_a^2 = \beta^2 C_a^2$, so $\beta = 1$.
+</Proof>
+</Theorem>
+
+For amounts far above $C_a$ the uncorrected rule behaves as if every call cost $\beta C_a$; near $\mathrm{Amt} = C_a$ the two rules meet. The distortion is therefore largest on the expensive transactions, where an alert is most often raised.
+
+<Figure
+  src="./figures/calibration.svg"
+  alt="Log-log plane: amount from 25 to 10,000 euros, true fraud probability from 0.0001 to 1. The amber line p = 25/Amt is the calibrated boundary. A solid blue curve, uncorrected with β = 0.1, starts at p = 1 at 25 euros, bends down steeply and runs about one decade below the amber line at large amounts. A dashed blue curve for β = 0.01 runs about two decades below. Transactions above a curve are flagged."
+  caption="Uncorrected scores lower the bar by a factor near β at large amounts and not at all near €25: the error is not a change of cost."
+/>
+
+The correction $p' = \beta p_s/(\beta p_s - p_s + 1)$ of the imbalance lesson removes the distortion exactly when the sampler ignored $x$. The last exercise runs the running day through both versions.
+
+### What the measured results show
+
+Correa Bahnsen and co-authors apply the minimum-risk rule to three conventional classifiers, a decision tree, a logistic regression and a random forest, and compare each with the same classifier thresholded in the usual way. The model behind their rule comes from a companion paper titled "Improving credit card fraud detection with calibrated probabilities". Read from the bars of their Fig. 4, on the raw transaction features the rule lifts logistic regression from about 3% to about 13% savings and lowers the tree from about 19% to 16% and the forest from about 21% to 13%. With the full feature set of their Fig. 6 it lifts all three: the tree from about 52% to 60%, the forest from 57% to 64%, the logistic regression from 12% to 45%. A rule that multiplies a probability by an amount can only be as good as the probability: where the scores are poor estimates of $p$, the minimum-risk decisions inherit the error, and where they are good, the gain over a fixed threshold is large.
+
+<KeyFact>
+Ranking metrics are invariant to any monotone distortion of the scores; savings under the minimum-risk rule are not, so the model that wins on average precision can lose on savings, and every score that feeds the rule must be a calibrated probability.
+</KeyFact>
+
+## Learning with costs versus deciding with costs
+
+The minimum-risk rule puts the costs into the decision and leaves the model untouched. The costs can also enter the training, and the two choices are distinct: one changes what is learned, the other only what is done with it.
+
+### Three places a cost can enter
+
+1. **The decision.** Any model's calibrated probability, fed to $C_a \le \mathrm{Amt}\cdot p$. This is the BMR variant of each model in the paper.
+2. **The objective.** The training loss is replaced by the cost itself, so that the fitted model trades errors at their prices. Cost-sensitive logistic regression and the cost-sensitive decision tree below are of this kind.
+3. **The data.** Rows are reweighted or resampled before a standard model is fitted. Class weights and the samplers of <Ref lesson="imbalance-techniques-revisited">the imbalance lesson</Ref> work here.
+
+### Cost-sensitive logistic regression
+
+Correa Bahnsen and co-authors replace the log loss of a logistic regression $h_\theta(x) = 1/(1 + e^{-\theta^\top x})$ by the cost of Eq. 1 with $h_\theta$ in place of the hard decision:
+$$
+J^c(\theta) = \frac{1}{N} \sum_{i=1}^{N} \Bigl[ y_i\bigl(h_\theta(x_i) C_{TP_i} + (1 - h_\theta(x_i)) C_{FN_i}\bigr) + (1 - y_i)\bigl(h_\theta(x_i) C_{FP_i} + (1 - h_\theta(x_i)) C_{TN_i}\bigr) \Bigr].
+$$
+The objective is not convex in $\theta$, and the paper minimises it with a binary genetic algorithm. The starred section below shows what its minimiser is: a decision surface, not a probability.
+
+### Cost-sensitive trees split on cost
+
+A classification tree chooses each split by the decrease of an impurity such as Gini, which counts misclassified rows. The cost-sensitive tree replaces the impurity of a node by the cost of the node's cheaper constant decision, $\min\bigl(\sum_{i \in \text{node}} y_i \mathrm{Amt}_i,\ n_{\text{node}} C_a\bigr)$, the do-nothing baseline computed on the node, and chooses the split with the largest decrease of that cost, which is the largest increase of savings.
+
+<Figure
+  src="./figures/split.svg"
+  alt="Two panels of the same ten transactions, frauds as filled amber chips with amounts and genuine ones as blue outlined chips. Left, split Amt ≥ 100 euros: the yes child (2,000 fraud, 900, 120 fraud, 350 fraud, 1,500) is flagged for 125 euros, the no child (15 fraud, 40 fraud, 25, 60, 8 fraud) passed for 63 euros; weighted Gini 0.48 to 0.48, node cost 250 to 188 euros; the cost criterion picks it. Right, split card not present: yes child the four frauds 15, 40, 120 and 8, flagged for 100 euros; no child the other six, flagged for 150 euros; Gini 0.48 to 0.27, node cost 250 to 250; Gini picks it."
+  caption="Gini rewards the split that purifies the small frauds; the cost criterion rewards the split that separates rows worth a call from rows that are not."
+/>
+
+On the running ten rows the node costs €250, the price of flagging all ten. A split on whether the card was present, the distinction of <Ref lesson="financial-crime-typology">the typology lesson</Ref> between card-present and card-not-present payments, isolates the four small frauds in a pure child and nearly halves the Gini impurity; both children are still cheapest flagged, so the cost stays €250. A split at €100 leaves the Gini impurity unchanged and lowers the cost to €188, because its lower child holds three frauds worth €63 together, less than the five calls it would take to catch them.
+
+<Exercise>
+Evaluate the split $\mathrm{Amt} \ge €50$ on the same node with $C_a = €25$. Write the two children, compute the weighted Gini impurity and the node cost after the split, and say whether the cost criterion prefers it to the split at €100.
+
+<Solution>
+**Children.** $\mathrm{Amt} \ge 50$: rows 2, 4, 5, 7, 8, 10 (frauds €2,000, €120, €350; genuine €900, €60, €1,500). $\mathrm{Amt} < 50$: rows 1, 3, 6, 9 (frauds €15, €40, €8; genuine €25).
+
+**Gini.** Upper child: 3 frauds of 6, impurity $2 \times 0.5 \times 0.5 = 0.5$. Lower child: 3 of 4, $2 \times 0.75 \times 0.25 = 0.375$. Weighted: $(6 \times 0.5 + 4 \times 0.375)/10 = 0.45$, a decrease of 0.03 from 0.48.
+
+**Cost.** Upper child: passing loses $2{,}000 + 120 + 350 = €2{,}470$, flagging costs $6 \times 25 = €150$; cost €150. Lower child: passing loses $15 + 40 + 8 = €63$, flagging costs €100; cost €63. Total €213, a decrease of €37.
+
+**Comparison.** The split at €100 lowers the cost to €188, a decrease of €62, so the cost criterion prefers it: moving the €60 genuine row into the lower child saves one call, and the €120 fraud stays above the cut. Gini prefers the €50 split slightly, by 0.03, for the opposite reason: it counts rows, and the lower child at €50 is purer.
+</Solution>
+</Exercise>
+
+### Sampling and the measured ranking
+
+The data route is the cheapest to implement, and the two main sources disagree on it. Baesens and co-authors cite a comparison of sampling and cost-sensitive learning on imbalanced benchmarks that found the two equivalent, and recommend sampling in a fraud setting as the simpler choice; the costs they consider are, in their words, "typically also determined on an aggregated basis, rather than on an observation-by-observation basis". Correa Bahnsen and co-authors, with per-transaction costs, report that neither under- nor oversampling improved savings, because sampling modifies the distribution of the example-dependent costs. The mechanism is visible in the class weights themselves: a class-level reweighting multiplies every fraud by the same factor, so a €8 fraud gains exactly as much weight as a €2,000 one, and the amount never enters the objective.
+
+On the paper's test set, 71,226 transactions whose frauds total €262,167, the two cost-sensitive learners rank first with every feature set. With all features the cost-sensitive tree saves about 71% and cost-sensitive logistic regression about 67%, against 60 to 64% for the tree and the forest with the minimum-risk rule and 45% for logistic regression with it. Fitting with the costs adds eleven points over deciding with them for the tree (71% against 60%) and twenty-two for logistic regression (67% against 45%).
+
+## ★ What the cost-sensitive objectives learn
+
+The core path used cost-sensitive logistic regression and the cost-sensitive tree as black boxes with published scores. This section looks inside the logistic objective and at the meta-algorithm that makes any classifier cost-sensitive.
+
+### The objective is minimised by the oracle decision
+
+With the card matrix, the per-row term of $J^c$ is
+$$
+y_i\bigl(h_i C_a + (1 - h_i)\mathrm{Amt}_i\bigr) + (1 - y_i)\, h_i C_a = y_i \mathrm{Amt}_i + h_i\bigl(C_a - y_i \mathrm{Amt}_i\bigr),
+$$
+with $h_i = h_\theta(x_i)$. It is linear in $h_i$ with slope $C_a - y_i \mathrm{Amt}_i$. For a fraud worth more than $C_a$ the slope is negative and the term falls as $h_i \to 1$; for a genuine row, and for a fraud worth less than $C_a$, it is positive and the term falls as $h_i \to 0$. The objective rewards an output that is the oracle decision of the savings ceiling (flag exactly the frauds worth more than a call), pushed to 0 or 1; it contains no term that would make $h_\theta$ a probability. The model's output is therefore read as a decision at $h \ge 0.5$, never fed to the minimum-risk rule. A sum of sigmoids of linear functions has many local minima, which is why the paper uses a genetic search rather than gradient descent.
+
+The convex alternative keeps the log loss and weights each row by the regret of the wrong decision: a fraud by $\mathrm{Amt}_i - C_a$, a genuine row by $C_a$. The weighted posterior then flags at 0.5 exactly when $(\mathrm{Amt}_i - C_a)\,p_i \ge C_a(1 - p_i)$, which is $\mathrm{Amt}_i\, p_i \ge C_a$: the minimum-risk rule, learned into the model. The research exercise below compares the two routes on synthetic data.
+
+### MetaCost
+
+Domingos' MetaCost turns any classifier into a cost-sensitive one without touching its learning algorithm. It estimates each training row's class probabilities with an ensemble trained on resamples of the data, relabels each row with the class of minimal expected cost under those probabilities, and trains the final classifier on the relabelled data. With the card matrix the relabelling step is the minimum-risk rule applied to the training set: a €15 fraud at estimated $p = 0.6$ is relabelled genuine, a €2,000 genuine transaction at $p = 0.05$ is relabelled fraud. The final classifier learns the decision, as the cost-sensitive logistic regression does, and its outputs are not probabilities either.
+
+## What the amount leaves out
+
+The results above are the example-dependent framework run on real card data. They also show where the model of cost is thinner than the problem, and where the next lessons take over.
+
+### Features move savings more than the model
+
+<Figure
+  src="./figures/bahnsen-savings-by-featureset.png"
+  alt="Two stacked charts. Top: grouped bars of savings, 0 to 100 percent, for eight models — DT, LR, RF, DT-BMR, LR-BMR, RF-BMR, CSLR, CSDT — each with four bars for raw+agg1 (blue), raw+agg1+agg2 (green), raw+per (red) and raw+agg1+agg2+per (purple). Within every model the purple bar is highest, reaching from about 52 percent (DT) to 71 percent (CSDT), and the red bar is lowest at 5 to 34 percent; LR stays under 16 percent throughout. Bottom: box plots of the percent increase in savings over raw features alone for raw+agg1, raw+agg1+agg2 and raw+agg1+agg2+per, with medians near 205, 245 and 280 percent and whiskers spanning roughly 100 to 450 percent."
+  caption="Top: savings of each model under four feature sets. Within one model, changing the feature set moves savings by tens of points; with the full feature set, the six tree, forest and cost-sensitive models span about twenty points between them, and logistic regression trails throughout. Bottom: the increase in savings over raw features alone, across the models, as each family of features is added — card aggregates, then country and merchant aggregates, then time-of-day features."
+/>
+
+The paper's subject is the features. With all features, the six tree, forest and cost-sensitive models span about twenty points of savings, from 52% to 71%; moving from raw features to the full set moves each of them by thirty to fifty-five points. Averaged over the eight models, adding aggregates of each card's recent transactions (counts and sums over the previous hours, by card and by transaction type) raises savings by 201% over raw features alone; adding aggregates grouped by country and merchant as well raises it by 252%; adding features of the customer's usual time of day raises it by 287%. On raw features the best model saves under a quarter of the fraud, and the cost-sensitive learners are no better than a plain tree. The minimum-risk rule and the cost-sensitive objectives decide how well a probability is spent; the features decide how good the probability is.
+
+Two departures from the idealisation qualify every number. The evaluation subset was chosen as the segment where most fraud occurs, with a fraud rate of 1.50% against 0.025% in the full 120 million transactions. And the 50/25/25 partition into training, validation and test sets is not described as chronological, which is the validation <Ref lesson="delayed-labels-prequential">the validation lesson</Ref> showed overstates what a deployed model achieves.
+
+### The missed fraud is not only its amount
+
+The amount is the cost the transaction table can supply; it is not the whole cost, and there is no agreement on the right way to measure the cost of fraud.
+
+- **Probing.** Fraudsters usually test a card with a small amount and replicate with larger ones if it succeeds. A passed €8 test costs the frauds it licenses, and the minimum-risk rule, by construction, never flags a transaction worth less than $C_a$. Pricing the miss at the card's available credit, the variant Correa Bahnsen and co-authors propose, restores the weight of a small fraud on a card with a large open limit.
+- **Reaction time.** Once a fraud succeeds the fraudster tries to spend what is left on the card, so the loss grows with the time to detection, which <Ref lesson="economics-of-detection">the economics lesson</Ref> treated as a cost that depends on delay.
+- **Who pays.** Under the EU's second Payment Services Directive the payer's bank refunds an unauthorised transaction by the end of the following business day (Art. 73), and the payer can be made to bear at most €50 of losses from a lost or stolen instrument (Art. 74). The amount in $C_{FN_i}$ is therefore largely the bank's loss; <Ref lesson="psd2-sca-tra">the TRA lesson</Ref> reads the rest of that liability regime.
+
+### The rule has no budget
+
+The optimality theorem assumed that any number of transactions could be flagged. With investigators who open about a hundred alerts a day, the rule's alert set is a wish list: the decision becomes which $k$ transactions to work, and ranking by the expected net value $\mathrm{Amt}_i p_i - C_a$, the quantity the rule compares with zero, is the prioritisation Baesens and co-authors give for selecting cases to investigate. <Ref lesson="score-to-action">The score-to-action lesson</Ref> builds the queue and the decision table under that constraint, and <Ref lesson="adversarial-classification">the adversarial-classification lesson</Ref> gives the fraudster a cost matrix of their own, under which the amount is a choice made against the rule.
+
+This lesson has established the example-dependent cost matrix with $C_{FN_i} = \mathrm{Amt}_i$ and $C_{TP_i} = C_{FP_i} = C_a$, the Bayes-minimum-risk rule $C_a \le \mathrm{Amt}_i\, p_i$ as the per-transaction minimiser of expected cost with the constant-cost threshold $1/(1 + C_{FN}/C_{FP})$ as its special case, savings against the cheaper trivial policy with a ceiling below one and no floor, the dependence of the rule on calibrated probabilities that no change of $C_a$ can replace, and the published ranking in which cost-sensitive learners lead and features matter more than either. <Ref lesson="ulb-handbook-benchmark">The next lesson</Ref> returns to the ranking metrics and runs the handbook's five baseline models on simulated and real Worldline transactions; <Ref lesson="cost-aware-evaluation-lab">the evaluation lab</Ref> then implements savings and the minimum-risk decision as checkpoints of the harness every later lab is refereed by.
+
+## Exercises
+
+<Exercise>
+A day of 500 transactions; eight of them are listed below, and the other 492 are genuine with $\mathrm{Amt}\cdot p$ below €1. The alert cost is $C_a = €20$ and the probabilities are calibrated.
+
+| # | amount | $p$ | label |
+|---|---|---|---|
+| a | €30 | 0.75 | fraud |
+| b | €1,200 | 0.04 | fraud |
+| c | €18 | 0.95 | fraud |
+| d | €450 | 0.10 | genuine |
+| e | €75 | 0.55 | genuine |
+| f | €260 | 0.09 | fraud |
+| g | €5 | 0.80 | fraud |
+| h | €640 | 0.02 | genuine |
+
+Compute the cost and the savings of the threshold-0.5 rule and of the Bayes-minimum-risk rule. Check first which trivial policy is the baseline.
+
+<Solution>
+**Baseline.** Fraud total $30 + 1{,}200 + 18 + 260 + 5 = €1{,}513$; flagging all 500 costs $€10{,}000$. $\mathrm{Cost}_l = €1{,}513$.
+
+**Threshold 0.5.** Flags a, c, e, g: $4 \times €20 = €80$. Passes the frauds b and f: $€1{,}460$. Cost $€1{,}540$, savings $(1{,}513 - 1{,}540)/1{,}513 = -1.8\%$. The rule loses money: its four calls catch €53 of fraud.
+
+**Minimum risk.** $\mathrm{Amt}\cdot p$: a 22.5, b 48, c 17.1, d 45, e 41.25, f 23.4, g 4, h 12.8. Flags a, b, d, e, f: $5 \times €20 = €100$. Passes the frauds c and g: $€23$. Cost $€123$, savings $(1{,}513 - 123)/1{,}513 = 91.9\%$.
+
+The rule flags two genuine transactions (d and e) and passes two frauds (c and g) and still saves 92%: each of those four decisions was the cheaper one in expectation, and the €18 and €5 frauds were never worth a €20 call.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the constant-cost thresholds from the general rule. (a) Starting from the expected costs $R(\text{flag})$ and $R(\text{pass})$ with four constant costs and $C_{TP} = C_{TN} = 0$, show that flagging is optimal when $p > 1/(1 + C_{FN}/C_{FP})$. (b) In the convention $l_{ij}$ (cost of deciding $i$ when the truth is $j$, 1 for fraud) with $l_{00} = l_{11} = 0$, $l_{10} = \pi^+$ and $l_{01} = \pi^- = 1 - \pi^+$, show that the threshold is the prior $\pi^+$. (c) For the near-miss matrix $C_{TP_i} = 0$, $C_{FP_i} = C_a$, $C_{FN_i} = \mathrm{Amt}_i$, derive the threshold and compare it with $C_a/\mathrm{Amt}_i$ at $C_a = €25$ for amounts of €2,000 and €30. Say which transactions the choice between the two matrices matters for.
+
+<Solution>
+**(a)** $R(\text{flag}) = (1 - p)C_{FP}$ and $R(\text{pass}) = p\,C_{FN}$. Flag when $(1 - p)C_{FP} \lt p\,C_{FN}$, that is $C_{FP} \lt p(C_{FP} + C_{FN})$, so $p > C_{FP}/(C_{FP} + C_{FN})$. Dividing numerator and denominator by $C_{FP}$ gives $1/(1 + C_{FN}/C_{FP})$. The threshold depends only on the ratio of the two error costs.
+
+**(b)** The general threshold is $\tau = (l_{10} - l_{00})/((l_{10} - l_{00}) + (l_{01} - l_{11})) = \pi^+/(\pi^+ + \pi^-) = \pi^+$. Pricing each error by the prior of the class it is made on puts the threshold at the base rate.
+
+**(c)** $R(\text{flag}) = (1 - p_i)C_a$, $R(\text{pass}) = p_i \mathrm{Amt}_i$, so flag when $p_i \ge C_a/(C_a + \mathrm{Amt}_i)$. At €2,000: $25/2{,}025 = 0.0123$ against $25/2{,}000 = 0.0125$, a negligible difference. At €30: $25/55 = 0.455$ against $25/30 = 0.833$. The two matrices agree on large transactions and disagree on those within a small multiple of $C_a$; under the near-miss matrix even a €10 transaction is flagged at $p \ge 0.71$, because a true alert is free. The transferable move: write both expected costs, subtract, and solve for $p$; every threshold in the cost-sensitive literature is that computation with particular costs.
+</Solution>
+</Exercise>
+
+<Exercise>
+Probe the edges of the savings measure and of the rule on the running day of this lesson (1,000 transactions, the ten listed, frauds totalling €2,533). (a) Set $C_a = €2$. Which trivial policy is now the baseline? Compute the savings of the threshold-0.5 rule correctly, and then with the closed form $\sum_i (y_i c_i \mathrm{Amt}_i - c_i C_a)/\sum_i y_i \mathrm{Amt}_i$, and explain the discrepancy. (b) At $C_a = €25$, which transactions can the minimum-risk rule never flag, whatever their probability? Name the fraud pattern this blind spot serves and the change of cost matrix that removes it.
+
+<Solution>
+**(a)** Flagging all 1,000 costs $1{,}000 \times €2 = €2{,}000 \lt €2{,}533$, so $\mathrm{Cost}_l = €2{,}000$: at this alert cost, calling every cardholder is cheaper than paying every fraud. The threshold rule costs $5 \times €2 + €2{,}350 = €2{,}360$, so its savings are $(2{,}000 - 2{,}360)/2{,}000 = -18.0\%$. The closed form gives $(183 - 10)/2{,}533 = +6.8\%$. The closed form was derived under $\mathrm{Cost}_l = \sum_i y_i \mathrm{Amt}_i$; here the baseline is $N C_a$, and the formula reports a gain against a policy that is no longer the cheapest. The hypothesis $N C_a \ge \sum_i y_i \mathrm{Amt}_i$, an alert cost above the fraud loss per transaction, is exactly what rules this out. (The minimum-risk rule flags all ten listed rows at $C_a = €2$ and none of the other 990, cost €20, savings $99.0\%$ against the correct baseline.)
+
+**(b)** Every transaction with $\mathrm{Amt}_i \le C_a = €25$: since $p_i \le 1$, $\mathrm{Amt}_i\, p_i \le €25$, and equality needs $p_i = 1$ and $\mathrm{Amt}_i = €25$. On the running day that is rows 1 (€15), 6 (€25) and 9 (€8). The pattern it serves is probing: a fraudster tests a stolen card with a small amount and, if it passes, spends large amounts. The rule is optimal for the matrix it was given, and that matrix prices the test at its face value. Pricing a missed fraud at the card's available credit, or at the expected loss of the card until it is blocked, makes the test expensive and lets a high $p$ on a small amount trigger an alert.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "A model with higher average precision always produces higher savings." Construct a day of 1,000 transactions with two frauds, A of €2,000 and B of €10, and 998 genuine transactions with small amounts. Give two rankings of the day, compute the average precision of each, and compute the savings of alerting the top-ranked transaction only, at $C_a = €25$. Name what average precision does not see.
+
+<Solution>
+**Rankings.** Ranking R1 puts B first, A second, then the genuine rows. Ranking R2 puts A first, a genuine row second, B third, then the rest.
+
+**Average precision.** R1: frauds at ranks 1 and 2, precisions 1 and 1, AP $= 1.0$. R2: frauds at ranks 1 and 3, precisions 1 and $2/3$, AP $= 0.833$. R1 is the better ranking by AP.
+
+**Savings at one alert.** $\mathrm{Cost}_l = \min(€2{,}010,\ 1{,}000 \times €25) = €2{,}010$. R1 alerts B: cost $€25 + €2{,}000 = €2{,}025$, savings $(2{,}010 - 2{,}025)/2{,}010 = -0.7\%$. R2 alerts A: cost $€25 + €10 = €35$, savings $98.3\%$. The ranking with the lower AP saves 98% of the fraud; the one with perfect AP loses money.
+
+**What fails.** Average precision weights every fraud equally and ignores amounts; it measures how early the frauds appear, not which ones. Savings at a budget depend on the amounts of the frauds at the top. The two metrics agree only when amounts are unrelated to the ranking, and the scoring models in this course have no reason to make them so.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce, in miniature, the comparison of the IIT Hyderabad problem set on example-dependent cost-sensitive classification: $C_{TP} = C_{FP} = 6$, $C_{TN} = 0$, and a false-negative cost per row. Generate the data with
+```python
+rng = np.random.default_rng(seed); n = 40000
+X = rng.normal(size=(n, 4))
+amt = np.round(np.exp(3.5 + 0.9 * X[:, 3] + 0.8 * rng.normal(size=n)), 2)
+logit = -5.0 + 1.2 * X[:, 0] + 0.8 * X[:, 1] - 0.6 * X[:, 2] + 0.4 * X[:, 3]
+y = (rng.random(n) < 1 / (1 + np.exp(-logit))).astype(int)
+```
+and use $C_{FN_i} = \mathrm{amt}_i$. Train on the first 20,000 rows and test on the rest, with features `np.c_[X, np.log(amt)]` and scikit-learn's `LogisticRegression(max_iter=1000)`. Compare on the test rows: (i) plain logistic regression thresholded at 0.5; (ii) plain logistic regression with the minimum-risk rule $6 \le \mathrm{amt}\cdot p$; (iii) logistic regression fitted with `sample_weight` equal to $\mathrm{amt}_i - 6$ for frauds (floored at 0.01) and 6 for genuine rows, thresholded at 0.5. Report total cost and savings for seed 0, then the range over seeds 0 to 5, and state what would count as agreement between (ii) and (iii).
+
+<Solution>
+**Expected result, seed 0** (scikit-learn 1.9): the fraud rate is about 2.1%, and the test frauds total €51,640, which is the do-nothing cost.
+
+| policy | alerts | cost | savings |
+|---|---|---|---|
+| (i) LR, threshold 0.5 | 21 | €48,492 | 6.1% |
+| (ii) LR + minimum risk | 1,178 | €19,965 | 61.3% |
+| (iii) cost-weighted LR, 0.5 | 1,214 | €19,947 | 61.4% |
+| oracle (frauds above €6) | 420 | €2,597 | 95.0% |
+
+**Over seeds 0 to 5.** (i) saves 2 to 6%, (ii) 44 to 61%, (iii) 44 to 61%; the difference between (ii) and (iii) is at most 2.3 points and changes sign across seeds.
+
+**Why (ii) and (iii) agree.** The weighted log loss is minimised, at each $x$, by $q = w_1 p/(w_1 p + w_0(1 - p))$ with $w_1 = \mathrm{amt} - 6$ and $w_0 = 6$. So $q \ge 0.5$ iff $(\mathrm{amt} - 6)p \ge 6(1 - p)$, iff $\mathrm{amt}\cdot p \ge 6$: the minimiser of the weighted loss, thresholded at 0.5, is the minimum-risk rule. Whether a fitted logistic model reaches that minimiser depends on its specification, and the two fits differ there. The plain fit is the well-specified one: the generator's logit is linear in $X$, which is among the features, so (ii) feeds the rule a consistent estimate of $p$. The weighted target has logit $\mathrm{logit}(q) = \mathrm{logit}(p) + \log\bigl((\mathrm{amt} - 6)/6\bigr)$, a linear function of $X$ plus $\log(\mathrm{amt} - 6)$, which is not linear in $\log \mathrm{amt}$; below €6 the 0.01 floor replaces the offset by $\log(0.01/6)$, and the departure grows. For $\mathrm{amt} \gg 6$, $\log(\mathrm{amt} - 6) \approx \log \mathrm{amt}$, so the target is close to linear in the given features and (iii) is only mildly misspecified, with the error concentrated on amounts near €6, where a wrong decision costs a few euros. That is why the gap stays at most 2.3 points with no consistent sign. Agreement means savings within the seed-to-seed spread of either method, a few points, with no consistent sign. A consistent gap in favour of (iii) would indicate the reverse situation, a plain model misspecified for $p$: then the weighted fit spends its capacity where the costs are, and the plain fit does not.
+
+**Why (i) fails.** At a 2% base rate almost no transaction reaches $p = 0.5$; 21 alerts catch a few large frauds and leave 94% of the loss. The threshold is the problem, not the model, and (ii) uses the same model.
+</Solution>
+</Exercise>
+
+<Exercise>
+One card is compromised at 08:00. The fraudster tests it with €1, then spends €480, €520 and €610 within ten minutes. The same day holds three genuine transactions of interest on other cards (€35, €900, €60) and 1,993 others, genuine, with $\mathrm{Amt}\cdot p$ below €1 under both models below. Model R sees each transaction's raw fields only; model G also sees two features of the card's history, the number and the total amount of its transactions in the previous 24 hours. Their calibrated probabilities, with G's score on spend 1 left open:
+
+| transaction | amount | label | $p$ (R) | $p$ (G) |
+|---|---|---|---|---|
+| test | €1 | fraud | 0.02 | 0.02 |
+| spend 1 | €480 | fraud | 0.04 | ? |
+| spend 2 | €520 | fraud | 0.04 | 0.70 |
+| spend 3 | €610 | fraud | 0.05 | 0.85 |
+| other card | €35 | genuine | 0.03 | 0.01 |
+| other card | €900 | genuine | 0.06 | 0.01 |
+| other card | €60 | genuine | 0.02 | 0.02 |
+
+With $C_a = €25$: (a) compute the savings of R under the minimum-risk rule; (b) find the smallest $p_G$ on spend 1 at which the rule flags it, and the savings of G when spend 1 is flagged and when it is not; (c) when spend 1 arrives, the card's only new history is the €1 test. Say which of G's two features that test moves, whether a 24-hour window shows the move clearly, and what a window of an hour would change.
+
+<Solution>
+**Baseline.** Frauds total $1 + 480 + 520 + 610 = €1{,}611$; flagging all 2,000 would cost €50,000. $\mathrm{Cost}_l = €1{,}611$.
+
+**(a) Model R.** $\mathrm{Amt}\cdot p$: 0.02, 19.2, 20.8, 30.5, 1.05, 54, 1.2. Flags spend 3 and the genuine €900: €50 in calls. Passes €1 + €480 + €520 = €1,001. Cost €1,051, savings $(1{,}611 - 1{,}051)/1{,}611 = 34.8\%$.
+
+**(b) The bar on spend 1.** The rule flags it iff $480\,p_G \ge 25$, so $p_G \ge 25/480 = 0.052$: R's 0.04 needs to rise by about a third, not to anything near 0.5, because the amount is large. G's other scores flag spends 2 (364) and 3 (518.5) and nothing else; the €900 genuine row falls to 9. With spend 1 flagged: €75 in calls plus the €1 test, cost €76, savings $95.3\%$. Without it: €50 plus €481 passed, cost €531, savings $67.0\%$. The decision on spend 1 alone is worth 28 points of savings, and it turns on a score of 0.052.
+
+**(c) What has to move.** The test raises the 24-hour count by one and the 24-hour total by €1. Against a card that made a few purchases the day before, a count one higher and a total €1 higher is an ordinary day; the 24-hour window dilutes the probe into the cardholder's own history, and whether $p_G$ clears 0.052 depends on a signal that window barely carries. A one-hour window reads one transaction worth €1 where the card usually shows none, followed by a €480 spend: recent-low then recent-high, the probe-then-spend pattern, visible at spend 1 rather than from spend 2 on. Neither window helps the test itself, which is worth less than a call. <Ref lesson="transaction-aggregates">The transaction-aggregates lesson</Ref> builds these counts and sums over windows of several lengths, from rows known at the time of each transaction; the +201% that Correa Bahnsen and co-authors measured for aggregates is this effect averaged over a test set.
+</Solution>
+</Exercise>
+
+<Exercise>
+A model was trained on an undersample with $\beta = 0.1$ and outputs, for the ten transactions of the running day, the uncorrected scores $p_s$ = 0.938, 0.345, 0.983, 0.811, 0.959, 0.924, 0.577, 0.714, 0.989, 0.092 (rows 1 to 10). (a) Apply the minimum-risk rule at $C_a = €25$ to $p_s$ directly and list the flagged rows. (b) Correct the scores with the map of <Ref lesson="imbalance-techniques-revisited">the imbalance lesson</Ref> and apply the rule again. (c) Count the decisions that change, compute the savings of both, and say why the average precision of $p_s$ and $p'$ on this day is identical.
+
+<Solution>
+**(a)** $\mathrm{Amt}\cdot p_s$: 14.1, 690, 39.3, 730, 115, 23.1, 202, 42.8, 7.9, 138. Flagged: 2, 3, 4, 5, 7, 8, 10. Row 6, at 23.1, is just below €25.
+
+**(b)** $p' = 0.1\,p_s/(1 - 0.9\,p_s)$. Row 8: $0.0714/(1 - 0.6426) = 0.200$; row 10: $0.0092/(1 - 0.0828) = 0.010$; the other rows return to 0.60, 0.05, 0.85, 0.30, 0.70, 0.55, 0.12, 0.90 to rounding. The rule flags 2, 3, 4, 5, 7.
+
+**(c)** Two decisions change: rows 8 (€60) and 10 (€1,500), both genuine, flagged only on the uncorrected scores, where their expected losses look like €43 and €138 instead of €12 and €15. Uncorrected: 7 calls (€175) plus passed frauds €23, cost €198, savings $(2{,}533 - 198)/2{,}533 = 92.2\%$. Corrected: €148, savings $94.2\%$. Average precision depends only on the order of the scores, and the correction is strictly increasing, so it orders the ten rows identically; the €50 difference is invisible to every ranking metric and visible only to a rule that multiplies the score by an amount.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Correa Bahnsen, D. Aouada, A. Stojanovic, B. Ottersten, "Feature Engineering Strategies for Credit Card Fraud Detection," *Expert Systems with Applications* 51, 2016, pp. 134–142. Sec. 2: Tables 1–3, the example-dependent cost matrix, Eqs. 1–5 (cost, Whitrow's normalised cost, the do-nothing cost, savings), negative savings and available credit; Sec. 4.1: Table 7 (236,735 transactions, 1.50% fraud, €895,154); Sec. 4.3: the Bayes-minimum-risk condition (Eq. 15), cost-sensitive logistic regression (Eq. 16), the cost-sensitive tree, sampling; Sec. 5: Figs. 4–7. https://doi.org/10.1016/j.eswa.2015.12.030
+2. A. Correa Bahnsen, A. Stojanovic, D. Aouada, B. Ottersten, "Cost Sensitive Credit Card Fraud Detection Using Bayes Minimum Risk," *12th International Conference on Machine Learning and Applications (ICMLA)*, 2013, pp. 333–338. The card cost matrix and the minimum-risk decision. https://doi.org/10.1109/ICMLA.2013.68
+3. A. Correa Bahnsen, A. Stojanovic, D. Aouada, B. Ottersten, "Improving Credit Card Fraud Detection with Calibrated Probabilities," *Proceedings of the SIAM International Conference on Data Mining*, 2014, pp. 677–685. The minimum-risk model used in reference 1.
+4. A. Correa Bahnsen, D. Aouada, B. Ottersten, "Example-Dependent Cost-Sensitive Logistic Regression for Credit Scoring," *13th International Conference on Machine Learning and Applications (ICMLA)*, 2014, pp. 263–269. https://doi.org/10.1109/ICMLA.2014.48
+5. A. Correa Bahnsen, D. Aouada, B. Ottersten, "Example-Dependent Cost-Sensitive Decision Trees," *Expert Systems with Applications* 42(19), 2015, pp. 6609–6619. The cost-based split criterion. https://doi.org/10.1016/j.eswa.2015.04.042
+6. C. Elkan, "The Foundations of Cost-Sensitive Learning," *Proceedings of IJCAI*, 2001, pp. 973–978. The cost matrix, the optimal decision threshold, and example-dependent costs.
+7. D. J. Hand, C. Whitrow, N. M. Adams, P. Juszczak, D. J. Weston, "Performance Criteria for Plastic Card Fraud Detection Tools," *Journal of the Operational Research Society* 59(7), 2008, pp. 956–962. The constant cost matrix with $C_{FN} = 100\,C_a$. https://doi.org/10.1057/palgrave.jors.2602418
+8. C. Whitrow, D. J. Hand, P. Juszczak, D. J. Weston, N. M. Adams, "Transaction Aggregation as a Strategy for Credit Card Fraud Detection," *Data Mining and Knowledge Discovery* 18(1), 2009, pp. 30–55. The normalised cost; transaction aggregation. https://doi.org/10.1007/s10618-008-0116-z
+9. A. Dal Pozzolo, O. Caelen, R. A. Johnson, G. Bontempi, "Calibrating Probability with Undersampling for Unbalanced Classification," *IEEE Symposium Series on Computational Intelligence (SSCI)*, 2015. Sec. IV: the Bayes-minimum-risk threshold $\tau$ and its adjustment under undersampling.
+10. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015. Chapter 4, pp. 198–200: misclassification costs (Table 4.14), the cost-sensitive cut-off, MetaCost, AdaCost, and the recommendation of sampling; Chapter 6, pp. 286–290: selecting the sample to investigate by expected fraud amount.
+11. Y. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection: Practical Handbook*, Université Libre de Bruxelles / Worldline, 2022. Chapter 4, "Threshold-based metrics": cost matrix and weighted loss, fixed versus amount-dependent false-negative cost, spending limit, reaction time, no agreement on the cost of fraud. https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+12. A. Dal Pozzolo, O. Caelen, Y.-A. Le Borgne, S. Waterschoot, G. Bontempi, "Learned Lessons in Credit Card Fraud Detection from a Practitioner Perspective," *Expert Systems with Applications* 41(10), 2014, pp. 4915–4928. Sec. 5: the cost of a fraud versus its amount, probing with small amounts, reaction time. https://doi.org/10.1016/j.eswa.2014.02.026
+13. P. Domingos, "MetaCost: A General Method for Making Classifiers Cost-Sensitive," *Proceedings of the 5th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining*, 1999, pp. 155–164.
+14. Directive (EU) 2015/2366 on payment services in the internal market (PSD2), *OJ L 337*, 23.12.2015. Article 73 (refund of unauthorised transactions by the end of the following business day) and Article 74 (payer's liability up to €50).
+15. IIT Hyderabad CS6890 Fraud Analytics, problem statement 3, "Example-dependent cost-sensitive regression" (2023–24): $C_{TP} = C_{FP} = 6$, $C_{TN} = 0$, per-row false-negative cost; the approaches of Correa Bahnsen and co-authors (reference 4) and of N. Günnemann and J. Pfeffer, "Cost Matters: A New Example-Dependent Cost-Sensitive Logistic Regression Model," *PAKDD* 2017.
+</References>
