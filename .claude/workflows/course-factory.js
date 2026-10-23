@@ -252,6 +252,9 @@ if (phaseArg === 'structure') {
   if (summaries.length === 0) throw new Error('no source could be read — aborting before synthesis')
   const degraded = accessLog.filter((a) => a.access !== 'full')
   if (degraded.length) log(`ATTENTION — sources NOT fully read (report to the human, never silently omit; they can obtain copies from the publishers): ${degraded.map((d) => `"${d.title}" [${d.access}]`).join('; ')}`)
+  // A halt here lets the human refine the brief against what the canon
+  // actually says; resuming the run without `until` serves the reads from cache.
+  if (argv.until === 'read') return { phase: 'structure', until: 'read', sources: sources.length, read: summaries.length, not_fully_read: degraded, summaries }
 
   phase('Synthesize')
   const synthesis = await run(
