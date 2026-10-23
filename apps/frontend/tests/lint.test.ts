@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { listLessonDirs, loadCourse } from "@/lib/content/load";
@@ -108,6 +108,24 @@ describe("lintCourse", () => {
     });
     const warns = lintDir(dir).filter((d) => d.level === "warn").map((d) => d.rule);
     expect(warns).toContain("references-present");
+  });
+
+  it("warns when the body names a canon source outside References (source-in-prose)", () => {
+    const dir = brokenCopy((d) => {
+      mkdirSync(join(d, "research"));
+      writeFileSync(
+        join(d, "research/sources.yaml"),
+        'sources:\n  - title: "A Mathematical Theory of Communication"\n    authors: "C. E. Shannon"\n',
+      );
+      rewrite(
+        join(d, "lessons/intro-surprise/lesson.mdx"),
+        "## Information and probability\n",
+        "## Information and probability\n\nShannon and Weaver et al. give the measure.\n",
+      );
+    });
+    const warn = lintDir(dir).find((d) => d.rule === "source-in-prose");
+    expect(warn?.message).toContain("Shannon");
+    expect(warn?.message).toContain("et al.");
   });
 
   it("warns when an Exercise has no Solution (exercise-solution)", () => {

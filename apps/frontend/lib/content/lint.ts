@@ -9,6 +9,7 @@ import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import remarkMdx from "remark-mdx";
 import remarkMath from "remark-math";
+import { parse as parseYaml } from "yaml";
 import { toString as mdastToString } from "mdast-util-to-string";
 import type { Root } from "mdast";
 import { STATUS_RANK, type LoadedCourse, type LoadedLesson } from "./load";
@@ -99,11 +100,68 @@ function normalizeProse(text: string): string {
     .toLowerCase();
 }
 
+// Markers of a source being cited in prose rather than in <References>. The
+// author surnames come from the course's research/sources.yaml; these catch
+// the generic forms ("Smith et al.", "the handbook") whatever the course.
+const CITATION_MARKERS = [/\bet al\./g, /\b[Hh]andbook\b/g, /\b[Tt]extbook\b/g];
+
+/** Author surnames of the course's canon, read from research/sources.yaml. */
+function loadSourceNames(courseDir: string): string[] {
+  const path = join(courseDir, "research", "sources.yaml");
+  if (!existsSync(path)) return [];
+  const doc = parseYaml(readFileSync(path, "utf8")) as {
+    sources?: { authors?: unknown }[];
+  } | null;
+  const names = new Set<string>();
+  for (const source of doc?.sources ?? []) {
+    if (typeof source.authors !== "string") continue;
+    for (const person of source.authors.replace(/\([^)]*\)/g, "").split(/,|\band\b|&/)) {
+      const surname = person.trim().split(/\s+/).pop() ?? "";
+      // An initial or a two-letter particle would match ordinary prose.
+      if (/^\p{Lu}[\p{L}'’-]{2,}$/u.test(surname)) names.add(surname);
+    }
+  }
+  return [...names];
+}
+
+/**
+ * Source names found in the lesson's own prose. A <Quote> is exempt — the
+ * passage it attributes is the material — and so are <References>, code and
+ * math; JSX attributes (captions, titles) are not prose and are not read.
+ */
+function sourceMentions(root: Root, sourceNames: string[]): string[] {
+  const text: string[] = [];
+  const walk = (node: { type: string; name?: unknown; value?: unknown; children?: unknown[] }) => {
+    if (
+      (node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") &&
+      (node.name === "References" || node.name === "Quote")
+    ) {
+      return;
+    }
+    if (node.type === "text" && typeof node.value === "string") text.push(node.value);
+    for (const child of node.children ?? []) walk(child as typeof node);
+  };
+  walk(root);
+  const prose = text.join(" ");
+  const counts = new Map<string, number>();
+  const patterns = [
+    ...CITATION_MARKERS,
+    ...sourceNames.map((n) => new RegExp(`(?<![\\p{L}-])${n}(?![\\p{L}-])`, "gu")),
+  ];
+  for (const pattern of patterns) {
+    for (const match of prose.matchAll(pattern)) {
+      counts.set(match[0], (counts.get(match[0]) ?? 0) + 1);
+    }
+  }
+  return [...counts].map(([name, n]) => (n > 1 ? `${name} ×${n}` : name));
+}
+
 function lintLessonMdx(
   entry: LoadedLesson,
   lessonSlugs: Set<string>,
   diags: Diagnostic[],
   options: LintOptions,
+  sourceNames: string[],
 ): void {
   const { lesson } = entry;
   const file = entry.mdxPath;
@@ -402,6 +460,15 @@ function lintLessonMdx(
       message: `lesson does not start with the opening statement from course.yaml`,
     });
   }
+  const cited = sourceMentions(root, sourceNames);
+  if (cited.length > 0) {
+    diags.push({
+      level: "warn",
+      rule: "source-in-prose",
+      file,
+      message: `sources named in the lesson body (L8a — they belong in <References> only): ${cited.join(", ")}`,
+    });
+  }
   if (!jsx.some((n) => n.name === "Exercise")) {
     diags.push({
       level: "warn",
@@ -547,6 +614,7 @@ export function lintCourse(
   const diags: Diagnostic[] = [];
   const coursePath = join(loaded.dir, "course.yaml");
   const { course } = loaded;
+  const sourceNames = loadSourceNames(loaded.dir);
 
   // dup-slug: lessons unique across modules; modules unique.
   const seenLessons = new Set<string>();
@@ -845,7 +913,7 @@ export function lintCourse(
     }
 
     lintLab(entry, coursePath, diags);
-    lintLessonMdx(entry, new Set(bySlug.keys()), diags, options);
+    lintLessonMdx(entry, new Set(bySlug.keys()), diags, options, sourceNames);
   }
 
   // intro.mdx: must compile and render like any lesson document.

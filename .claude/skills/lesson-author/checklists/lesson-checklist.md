@@ -2,9 +2,21 @@
 
 Report PASS/FAIL for each, with a quoted line as evidence where sensible.
 
+## Clarity first (L0 — a FAIL here outweighs everything below)
+0. Newcomer test: reading as someone who knows only the prerequisites and
+   every earlier lesson of the course, nothing re-explained that an earlier
+   lesson already taught, list every point where they get lost — term before
+   explanation, conclusion before problem, arrangement without its reason,
+   leap between sentences, a source name. Zero left?
+0a. Every arrangement, procedure, metric or convention arrives as the
+   answer to a stated problem, with its "because"?
+0b. No source (author, book, paper) named anywhere in the body, exercises
+   and solutions included; `source-in-prose` silent?
+
 ## Structure (validator also checks the mechanical parts)
-1. Opens with the opening statement verbatim; the first paragraph states
-   factually what the lesson establishes.
+1. Opens with the opening statement verbatim, and it is the PROBLEM in
+   plain words — not the lesson's conclusion compressed; nothing after it
+   talks about the lesson or the course itself.
 2. Sections follow the material's own logic; a reader scanning only the
    headings and environment labels sees the chapter's skeleton.
 3. Every `<Exercise>` has a complete `<Solution>`; `<References>` closes the
@@ -24,7 +36,9 @@ Report PASS/FAIL for each, with a quoted line as evidence where sensible.
 10. Do solutions show the full path, to the worked-example standard (E4)?
 11. Is the chapter substantial — would it hold its own next to a good
     textbook's treatment of the same topic at this level?
-12. Hunt the whole lesson for register violations (L9): rhetorical questions,
-    teasers, chattiness, narrative framing, exclamations. Zero found?
-13. Could any sentence be deleted without losing a fact the goal needs?
-    (If yes, delete it.)
+12. Hunt the whole lesson for slop (L9): filler, hype, intensifiers, empty
+    transitions, restating summaries, idiom for mechanism, invented
+    personas, teasers, self-answering rhetorical questions. Zero found?
+13. Could any sentence be deleted without losing a fact or a step of the
+    explanation? (If yes, delete it — but never delete a step the
+    newcomer needs.)

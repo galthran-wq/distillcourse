@@ -15,6 +15,14 @@ external motivation: the lesson itself must generate the reason to continue.
 Material everywhere else is optimized for completeness; ours is optimized for
 being finished.
 
+**The first metric is clarity.** A lesson succeeds when a reader who knows
+the prerequisites — and nothing else — can follow every step of it without
+help. Every other rule below serves that one; where a rule and clarity
+collide, clarity wins and the rule is the one that gets fixed. The failure
+this guards against has a name: the **recap** — prose that names the
+results in the order a knowledgeable reader would recall them, readable
+only by someone who already knows the material.
+
 ## Course rules (C)
 
 - **C1 — Backward design.** Outcomes (with Bloom levels) are written before any
@@ -41,6 +49,38 @@ being finished.
 
 ## Lesson rules (L)
 
+- **L0 — Teach a newcomer, problem first.** The reader is seeing this
+  material for the first time. (a) **Problem before answer.** Every lesson,
+  and every `##` section, starts from a problem the reader can state in
+  their own words — a concrete situation with its constraint ("the bank has
+  two seconds to approve a payment and staff to check a hundred cards a
+  day out of four hundred thousand payments") — and only then gives the
+  answer. A section that opens with its conclusion is a recap. (b)
+  **Derive, don't list.** A design, a procedure, a metric or a convention is
+  derived from the constraints that force it: what must be achieved, what
+  stands in the way, why this answer and not the obvious alternative, what
+  breaks if it is done otherwise. "The system has five layers: …" is a
+  list; showing that the authorization deadline, the cost of a wrongly
+  declined purchase and the size of the investigation team force a fast
+  rule stage before authorization and a slow model after it is an
+  explanation. Every "it is done this way" carries its "because". (c)
+  **One step at a time.** No sentence relies on a term, symbol or fact the
+  reader has not yet been given; a sentence that packs a whole argument
+  into one clause ("a score produced by the fourth of five layers, acted on
+  by…") is unpacked into the steps it compresses. (d) **The newcomer
+  test** — the check QA runs first and blocks on: read the lesson as
+  someone who knows exactly the course prerequisites and every earlier
+  lesson of the course, and nothing else, and judge how easily they would
+  master what it presents. List every point where that reader is lost: a
+  term used before it is explained, a conclusion stated before its
+  problem, an arrangement given without its reason, a leap between two
+  sentences. Each one is a required fix. (e) **No repetition.** The same
+  reader already has the earlier lessons: what one of them explained is
+  recalled with a `<Ref>` and a clause of reminder (L11d), never explained
+  again — a re-taught passage is a required fix just as a missing step
+  is. What every earlier lesson actually explained is kept in the course's
+  ledger, `research/taught/<lesson>.md`, which the writer of each lesson
+  updates and every later writer and reviewer reads.
 - **L1 — One objective.** Exactly one `goal` per lesson, starting with a Bloom
   verb ("Compute…", "Explain…", "Construct…"). If a draft teaches two things,
   split it.
@@ -50,21 +90,34 @@ being finished.
   runs 1,500–3,000 words across 3–5 sections with several worked examples —
   if it reads in under ~10 minutes it is almost certainly too thin. Depth
   beats brevity; cutting scope is the syllabus's job, not the chapter's.
+  Length is a guideline, clarity the metric (L0): a chapter may run an hour
+  or an hour and a half when every part of it is needed to make the
+  material followable, and a short chapter that the reader fully follows
+  beats a long one they skim.
   `key_ideas` in course.yaml are the author's plan, not a mandated section
   list. The validator never dictates prose shape.
   (a) **Target depth.** A core lesson aims at 30–40 minutes of reading where
   the material warrants it — derivations carried through, worked examples
   computed, boundary cases examined, not a summary of results. A 15-minute
-  chapter is a signal to deepen, never a reason to split a coherent lesson
-  in two or to pad with restatement.
+  chapter is a signal to deepen, never a reason to pad with restatement.
+  Length beyond the target is justified by what it explains, never by what
+  the sources contain. When a chapter carries two problems that each need
+  their full treatment, it is two lessons: the writer reports the split, the
+  syllabus makes it.
   (b) **Starred sections.** Material that is genuinely off the main line —
   a sharper proof, a tangent, a historical detour — becomes a `## ★`-prefixed
   section inside the lesson. The core path must read correctly when every
   starred section is skipped; nothing after them may depend on them.
-- **L3 — Opening statement first.** The lesson opens with the `opening` from
-  course.yaml verbatim: a precise, declarative statement of the problem the
-  lesson solves or the fact it establishes. No rhetorical questions, no
-  teasers, no "by the end you'll love this".
+- **L3 — The problem first.** The lesson opens with the `opening` from
+  course.yaml verbatim: the problem the lesson solves, stated in plain words
+  for the newcomer (L0) — a concrete situation, what has to be decided or
+  computed, and what makes it hard. It uses no term the lesson has yet to
+  define and gives away no conclusion: "a fraud score is produced by the
+  fourth of five layers…" is the lesson's answer compressed into its first
+  line, not its problem. A direct question that states the task ("which
+  hundred of the day's four hundred thousand payments should the team
+  check?") is allowed; teasers, suspense and "by the end you'll love this"
+  are not.
 - **L4 — Concrete before general, conditionally.** The default: a concrete
   instance or computation precedes the general formula, and the formalism
   names what was just computed. The evidence-backed exception: when every
@@ -90,34 +143,47 @@ being finished.
 - **L8 — References.** Every lesson ends with a `<References>` section:
   the primary sources and one or two canonical texts, with chapter-level
   pointers. Real references, verified — never invented.
-- **L8a — Inline attribution only when provenance is content.** Narrative
-  facts are stated directly and sourced in `<References>` — never "Textbook
-  X's chapter describes…" mid-prose; the reader came for the material, not
-  for the compilation's scaffolding. Inline naming is reserved for cases
-  where the WHO is part of the claim: a primary artifact being read or
-  quoted (Las Casas's tract, Franklin's pamphlet), a measurement whose
-  method carries the argument (a tribute-register series), or a named thesis
-  under discussion (Turner's). Secondary surveys and syntheses appear once,
-  in References, with chapter pointers.
-  (a) **A citation must change something.** "Shannon's 1948 paper (§6)
-  introduces exactly this sum" after the sum is derived tells the reader
-  nothing they can use — it is provenance theatre. Cite where the pointer
-  buys the reader something: a different proof they may want, a stronger
-  version of the result, the place the notation comes from, a claim they
-  should be able to check. Everything else lives in `<References>`.
-  (b) **Attribution rides on the object, not in the prose.** A proof taken
-  from a text names it in the environment title —
-  `<Theorem title="Jensen bound (Cover & Thomas 2.6.4)">` — never as a
-  sentence of prose ("the argument below follows Cover & Thomas").
-- **L9 — Dry engineering register.** Declarative sentences; facts carry the
-  text. No rhetorical questions, no exclamations, no chattiness ("almost
-  embarrassingly simple"), no invented scenes or personas ("a friend says…"),
-  no filler. Second person only for instructions ("compute", "drag",
-  "verify"). Define jargon at the point of first use or don't use it. Every
-  sentence either advances the argument — a fact, or the connection between
-  facts — or gets cut: connective declaratives ("the previous section
-  established X; what it leaves unexplained is Y") are load-bearing prose,
-  not filler. Italics only for standard emphasis of a single term, sparingly.
+- **L8a — Sources live in References, nowhere else.** The body of a
+  lesson — prose, callouts, environment titles, captions, exercises and
+  solutions — names no source: no authors ("Dal Pozzolo et al. show…"), no
+  books ("the handbook's simulator", "Cover & Thomas 2.6.4"), no papers
+  ("what the APATE paper calls…"), no "the sources give δ from a week to a
+  month". A reader meeting the material for the first time gains nothing
+  from a name they do not know; they lose the thread. State the fact, the
+  number, the method directly, as the course's own — and list where the
+  ideas come from in `<References>`, with chapter-level pointers. An
+  exercise built on a source's figures states the figures ("a day of about
+  400,000 payments, 1,000 of them fraud, on 300 cards"), never their
+  origin. Two things are not citations and stay: (a) a primary text that is
+  itself the material, quoted in a `<Quote>` (Nietzsche's sentence, Las
+  Casas's tract) — the component carries its attribution; (b) a named
+  object the lesson studies as such — a dataset, a law, a standard, an
+  algorithm known by its inventor's name (Page–Hinkley, the Kraft
+  inequality), a public institution or system the material is about —
+  named as the thing, never as an authority ("X reports", "according to
+  Y"). `npm run validate` warns (rule `source-in-prose`) on every canon
+  author's surname or citation marker it finds in the body; QA treats each
+  warning as a required fix.
+- **L9 — Plain, direct register; no slop.** Write the way a good teacher
+  explains to a capable colleague: plain sentences, concrete cases,
+  connected reasoning. The register may be warm and lively — a concrete
+  case worked in front of the reader, a sentence that admits the obvious
+  approach is tempting before showing where it breaks, "you" addressing the
+  reader where it makes the explanation easier to follow. What it never
+  carries is **slop**: words that hold no information. Slop is filler and
+  throat-clearing ("it is worth noting that", "in this section we will"),
+  hype and intensifiers ("crucially", "powerful", "elegant", "almost
+  embarrassingly simple"), empty transitions that only announce, summaries
+  of what was just said, idiom in place of mechanism ("does the heavy
+  lifting"), invented personas ("a friend says…", "imagine Alice"),
+  exclamations, rhetorical questions that answer themselves for effect,
+  and padding to look thorough. A question that states the problem a
+  section solves is not slop. Every sentence either gives the reader a
+  fact, a step of an explanation, or the connection between two of them —
+  or gets cut. Liveliness never buys compression: the steps of an
+  explanation (L0) are never cut for pace. Define jargon at the point of
+  first use or don't use it. Italics only for standard emphasis of a
+  single term, sparingly.
   (a) **No narration of the obvious.** Naming the notation you are already
   writing ("in expectation notation, H(X) = E[…]"), announcing a figure the
   reader can see ("the full curve is recreated below"), or labelling a step
@@ -126,11 +192,16 @@ being finished.
   (b) **No idiom-for-flavour.** "Does the work", "the magic happens",
   "under the hood" — replace with what actually happens ("Jensen's
   inequality gives the bound because log is concave").
-- **L10 — Throughline.** A lesson is one move in the course's argument, and
-  says so. (a) Directly after the opening: two to four declarative sentences
-  placing the move — what the argument has established so far, what stands
-  open, what this lesson contributes; the course `spine` in course.yaml is
-  the reference for the sequence of moves. (b) Sections chain: every `##`
+- **L10 — Throughline.** A lesson is one step in the course, and the
+  reader feels the connection through the material, not through talk about
+  the course. (a) After the opening, the problem is developed — why it
+  matters, what the obvious approach is and where it fails. Where the
+  problem grows out of an earlier lesson, one plain sentence with a `<Ref>`
+  says so. The lesson never talks about itself or the course: no "this
+  lesson is the first move of the course", no "this lesson fixes the
+  diagram every later lesson annotates", no roadmap of what it will
+  establish. The course `spine` in course.yaml orders the problems; it is
+  never quoted to the reader. (b) Sections chain: every `##`
   opens with a sentence tying it to the lesson's running question or to what
   the previous section established — never with a cold definition. Where
   the material breaks the reader's natural expectation, the seam SAYS so —
@@ -138,9 +209,10 @@ being finished.
   record shows the opposite") — in the dry register; itinerary seams are
   for genuinely neutral hand-offs only, and no reversal is manufactured
   where the material contains none. (c) The
-  lesson closes by naming what is now established and what the next lesson
-  takes up, stated as fact. (d) Clarifying L3: stating what comes next is
-  required; manufacturing suspense ("you'll soon see…") stays banned.
+  lesson closes by saying, in plain words, what the reader can now do or
+  explain, and which problem stays open for the next lesson. (d) Stating
+  what comes next is required; manufacturing suspense ("you'll soon see…")
+  stays banned.
   (e) Sections argue, not inventory: within a section, paragraphs run
   claim → evidence → bearing on the lesson's question, and every section
   ends with its bearing visible in the body itself. The test: cover the

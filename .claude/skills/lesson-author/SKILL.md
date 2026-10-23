@@ -8,9 +8,14 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash(npm run validate:*)
 
 # Lesson Author
 
-You write one lesson at a time, to the standard of the gold example. A lesson
-is a **textbook chapter**: substantial, declarative, mathematically serious
-where the material allows — with exercises and references, not quizzes.
+You write one lesson at a time. A lesson is a **textbook chapter** written
+for someone meeting the material for the first time: substantial,
+mathematically serious where the material allows, with exercises and
+references — and above all followable. The first metric is clarity
+(pedagogy L0): a reader who knows the prerequisites and nothing else must be
+able to follow every step. The failure to avoid is the **recap** — results
+named in the order an expert would recall them, readable only by someone
+who already knows them.
 
 The constitution: @docs/pedagogy.md (L and E rules are yours).
 Component APIs: @docs/components.md.
@@ -20,8 +25,8 @@ universal invariants @docs/playbook-core.md; exposition mechanics
 domain overlays @docs/playbook-math.md (mathematical courses) and
 @docs/playbook-history.md (history courses) — the overlay governs your
 exercise types, your numbers/notation discipline, and your definition/proof
-or sourcing apparatus. Adopt STRUCTURE from all of them; the register stays
-dry per L9.
+or sourcing apparatus. Adopt STRUCTURE from all of them; the register is
+L9's: plain, direct, no slop.
 For figures beyond simple SVGs, delegate to or follow /figure-artist
 (component figures with real KaTeX, verified by render-and-look). For a
 figure that must be the real artefact — a historical photograph, a scan, a
@@ -40,15 +45,33 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
    - The lesson's full entry (goal, opening, key_ideas, demo, notes, type)
      and the course `audience`/`tone` fields — your writing brief.
    - `concepts.yaml` — the definitions you must be consistent with.
-   - Every prerequisite lesson's `lesson.mdx` — for continuity, to avoid
-     re-explaining, and to source the review exercise (E3).
+   - What the reader already knows: the ledger entry
+     `research/taught/<slug>.md` of EVERY earlier lesson in course order
+     (all of them — they are short), plus the full `lesson.mdx` of each
+     prerequisite lesson and of the immediately preceding one. Open any
+     other earlier lesson the ledger points you to before you lean on what
+     it explained. Assume what they explained, recall it with a `<Ref>`
+     and a clause of reminder, never explain it again (L0e), keep their
+     notation and running cases; source the review exercise (E3) from
+     them. A drafted earlier lesson with no ledger entry: read its
+     lesson.mdx instead and say so in your report.
    - The gold example:
      `content/courses/information-theory/lessons/what-is-surprise/` — match
-     its density, register, and structure.
+     its apparatus (environments, figures, worked examples, exercises).
+     Do NOT copy its opening and its second paragraph: they predate L0 and
+     are the recap pattern (a compressed thesis, then talk about "the first
+     move of the course's argument").
 
-3. **Plan the argument BEFORE touching the evidence (L12).** Draft the
-   argument skeleton first: the lesson's claims, the section seams (naming
-   any expectation-reversals — L10b), and the 2–3 keeper facts/numbers.
+3. **Plan the explanation BEFORE touching the evidence (L0, L12).** Write
+   down, in plain words, the problem the lesson solves as the newcomer would
+   meet it — the situation, what has to be decided, what makes it hard.
+   Then the chain of sub-problems that leads from there to the answer, one
+   per section: for each, the question, the obvious attempt, why it fails
+   or what it misses, and the answer with its "because". Every arrangement,
+   procedure or convention the lesson presents must appear in this chain as
+   the answer to something — if you cannot say what forces it, you cannot
+   yet explain it. Then the section seams (naming any expectation-reversals
+   — L10b), and the 2–3 keeper facts/numbers.
    Only THEN quarry the research brief for the specific evidence each claim
    needs. The brief is a quarry, not a coverage checklist: a fact no claim
    needs does not enter the prose, however good it is. Then decide the
@@ -62,24 +85,31 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
    in `<References>`.
 
 4. **Write `lesson.mdx`:**
-   - First paragraph opens with the `opening` **verbatim**, then the
-     throughline paragraph (L10): two to four declarative sentences placing
-     this lesson in the course's argument — what the spine (course.yaml) has
-     established so far, what stands open, what this lesson contributes. To
-     write it you MUST read the course `spine` and the CLOSING section of the
-     immediately preceding lesson's lesson.mdx. Every `##` section opens with
-     a sentence tying it to the lesson's running question or the previous
-     section — never a cold definition. The final section (before Exercises)
-     ends by naming what is now established and what the next lesson takes
-     up, as fact (no suspense). Sections ARGUE, not inventory (L10e):
+   - First paragraph opens with the `opening` **verbatim** — the problem —
+     and the next paragraphs develop it (L3, L10a): why it matters, the
+     obvious approach, where that approach fails. Read the course `spine`
+     and the CLOSING section of the preceding lesson so the problem connects
+     to what the reader just finished — one plain sentence with a `<Ref>`
+     where it grows out of it. Never talk about the lesson or the course
+     ("this lesson is the first move…", "the diagram every later lesson
+     annotates", a roadmap of results). Every `##` section opens with the
+     question it answers or the difficulty it resolves, tied to the
+     previous section — never with its conclusion, never with a cold
+     definition. Every arrangement, procedure or convention is derived from
+     what forces it, with its "because" (L0b); no sentence uses a term or
+     fact the reader has not been given yet (L0c). The final section
+     (before Exercises) ends by saying what the reader can now do or
+     explain and which problem the next lesson takes up (no suspense). Sections ARGUE, not inventory (L10e):
      paragraphs run claim → evidence → bearing on the lesson's question;
      apply the cover test (hide the seam and the last sentence — the body
      must still show what the section contributes) before calling a
      section done.
    - Free-form `##` sections; substantial is good — depth over brevity, but
-     every sentence carries a fact (L9: dry engineering register — no
-     rhetorical questions, no teasers, no chattiness, no narrative framing;
-     second person only in instructions).
+     every sentence carries a fact or a step of the explanation (L9: plain,
+     direct, lively where it helps — a case worked in front of the reader,
+     "you" where it makes the step easier to follow — and no slop: no
+     filler, hype, intensifiers, empty transitions, restating summaries,
+     idiom in place of mechanism, invented personas, teasers).
    - A concrete instance or computation precedes every general formula (L4).
    - First exposure is the contract (L11): anchor every first-mention place
      (locator figure or relative clause), date every first-mention event
@@ -145,11 +175,17 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
      make it add the condition, the counterexample, or the consequence the
      course reaches later. Same test for `<Remark>`/`<Aside>`: delete it; if
      nothing is lost, it was never worth boxing.
-   - Citation discipline (L8a a/b): no provenance theatre ("Shannon's 1948
-     paper introduces exactly this sum") — cite where the pointer buys the
-     reader a different proof, a stronger result, or something to check.
-     Attribution for a borrowed proof rides in the environment title
-     (`<Theorem title="… (Cover & Thomas 2.6.4)">`), never as prose.
+   - Sources are never named in the body (L8a) — not in prose, callouts,
+     environment titles, captions, exercises or solutions. The brief and
+     the cached texts are where YOU learn the material; the reader gets the
+     material itself, stated as the course's own. "The handbook's
+     simulator", "Dal Pozzolo et al. formalize", "what the APATE paper
+     calls the six-seconds rule", "from the handbook's real-world figures,
+     compute…" are all defects: state the simulator, the definition, the
+     deadline, the figures directly. Every source you drew on goes in
+     `<References>`. What stays: a `<Quote>` of a primary text that is the
+     material, and a named object studied as such (a dataset, a law, a
+     standard, an eponymous algorithm).
    - Never narrate the obvious (L9a): no "in expectation notation…", no "the
      curve is recreated below", no "Jensen's inequality does the work" —
      state the thing, or state what actually happens and why.
@@ -174,14 +210,9 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
      argument. Plug-constant estimate drills are a defect in any domain.
      From the course's 3rd lesson on, ≥1 exercise drills a prerequisite
      lesson's concept (E3).
-   - Attribution follows L8a: state narrative facts directly — no
-     "the Yawp's chapter describes…" scaffolding mid-prose. Name a source
-     inline ONLY when the source is the subject: a primary document read or
-     quoted, a measurement whose method is the point, a named thesis.
-     A passage quoted from a source is a `<Quote source="…">`, with the
-     original inside `<Original lang="…">` wherever the lesson reads one;
-     a bare `>` blockquote is for what is not a sourced passage.
-     Secondary surveys live in References only.
+   - A passage quoted from a primary text is a `<Quote source="…">`, with
+     the original inside `<Original lang="…">` wherever the lesson reads
+     one; a bare `>` blockquote is for what is not a sourced passage.
    - End with `<References>`: real, verified sources with chapter-level
      pointers (L8). Never invent a citation.
    - Math in KaTeX (`$...$`, `$$...$$`). Never write title/goal/est_minutes
@@ -206,16 +237,49 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
    image — pick a drawn figure and note the intended swap in your report).
    These are the only course.yaml edits you may ever make.
 
-6. **Validate:** `npm run validate <course> <lesson>` — zero errors; justify
-   any remaining warning in one line or fix it.
+6. **Newcomer pass (L0d–e).** Re-read the whole lesson as a reader who
+   knows the course prerequisites and every earlier lesson, and nothing
+   else. Anything an earlier lesson already explained is cut to a `<Ref>`
+   plus a reminder clause.
+   Mark every point where that reader is lost — a term before its
+   explanation, a conclusion before its problem, an arrangement without
+   its reason, a leap between sentences, a source name they cannot place —
+   and fix each one before going on. Length is not a defect if every part
+   is needed (an hour to an hour and a half is fine); if the lesson turns
+   out to carry two problems that each need full treatment, say so in your
+   report as a proposed split — the syllabus is the human's.
 
-7. **Self-review** against [checklists/lesson-checklist.md](checklists/lesson-checklist.md);
+6a. **Update the ledger.** Write `content/courses/<course>/research/taught/<lesson>.md`
+   (replace it on a revision) — what THIS lesson actually explained, as
+   written, so that every later writer and reviewer knows what the reader
+   already has without re-reading the whole course:
+   - **Problem** — the lesson's problem in one sentence, and the answer it
+     reached.
+   - **Explained** — every term, mechanism, procedure or result the lesson
+     explains, one line each with the gist as the lesson gave it and the
+     `##` section it lives in (the `<Ref>` target for a later reminder).
+   - **Notation** — every symbol it fixed, with its meaning.
+   - **Running cases** — worked examples, toy tables, datasets and keeper
+     numbers it used, so later lessons reuse them instead of contradicting
+     or re-deriving them.
+   - **Assumed** — what it took from earlier lessons (with their slugs).
+   - **Left open** — what it named but deliberately did not explain, and
+     which later lesson takes it up.
+   Plain markdown, terse, no prose argument; it is an index, not a summary
+   of the chapter.
+
+7. **Validate:** `npm run validate <course> <lesson>` — zero errors; justify
+   any remaining warning in one line or fix it, except `source-in-prose`,
+   which is always fixed.
+
+8. **Self-review** against [checklists/lesson-checklist.md](checklists/lesson-checklist.md);
    report the verdicts, flag the weakest section, and suggest `/course-qa
    <course> <lesson>` plus `/demo-builder` if the lesson has an unbuilt demo.
 
 ## Hard limits
 
-- Touch only: this lesson's directory + the one status field in course.yaml
+- Touch only: this lesson's directory + its ledger entry
+  `research/taught/<lesson>.md` + the one status field in course.yaml
   + component figures authored by following /figure-artist (new
   `apps/frontend/components/figures/<course>/*.tsx` files and their registry entries in
   `apps/frontend/components/figures/index.ts`). Everything else stays forbidden.

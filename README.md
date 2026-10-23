@@ -40,8 +40,13 @@ content/courses/<course>/
     texts/           #   raw fetched material (PDFs, extracted text) with
                      #   .meta.yaml sidecars — git-ignored; writers read from
                      #   here instead of re-fetching the sources
-    <lesson>.md      #   per-lesson brief: which chapters to consult, key
-                     #   points, figure plan (each visual draw: or source:)
+    <lesson>.md      #   per-lesson brief: which chapters to consult, the
+                     #   explanation plan, figure plan (draw: or source:)
+    taught/<lesson>.md #  what the drafted lesson actually explained — terms
+                     #   as it defined them, notation, running examples,
+                     #   what it left open; the next writer and QA read
+                     #   every earlier entry so nothing is assumed or
+                     #   taught twice
   lessons/<slug>/
     lesson.mdx       # a textbook chapter: free-form MDX, no frontmatter —
                      # numbered Definition/Theorem/Proof/Example/Remark
