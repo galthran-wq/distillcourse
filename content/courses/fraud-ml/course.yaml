@@ -1,0 +1,1504 @@
+schema_version: 1
+slug: fraud-ml
+title: Fraud and Financial-Crime ML
+tagline: Detectors that survive one positive in a thousand, labels that arrive weeks late, an adversary who adapts, and an EU regulator who reads the logs
+status: planned
+audience: >
+  Engineers who have finished classical-ml (gradient boosting, calibration,
+  cross-validation, the imbalance playbook, SHAP) and want financial-crime
+  detection as a discipline: evaluation under rarity and an alert budget,
+  transaction features computed as of the moment, supervised, anomaly, graph
+  and sequence detectors, the adversary and the feedback loop, and the EU
+  legal frame the model ships into. Comfortable with numpy, pandas and a
+  notebook; no banking background assumed.
+tone: >
+  Dry, precise, engineering register — the classical-ml voice. Declarative
+  statements of fact; no rhetorical questions, no teasers. Derivations and
+  worked tables carried through; legal text quoted short and read as a
+  constraint on the pipeline, never summarized as policy. Second person only
+  in instructions.
+intro: >
+  A fraud detector is not a classifier that happens to see rare positives.
+  It is the fourth layer of a system — terminal checks, blocking rules,
+  scoring rules, then the model, then human investigators — in which the
+  humans can open about a hundred alerts a day out of hundreds of thousands
+  of transactions, the labels they produce arrive a week or more later, the
+  labels only ever cover what the model chose to show them, and the people
+  being detected read the detector's behaviour and change theirs. Every
+  method in this course is an answer to one question: what does a detector
+  have to be, and how must it be judged, when it sits inside that loop?
+
+
+  The answer has a shape. Under one positive in a thousand and a fixed alert
+  budget, accuracy and most of the ROC curve measure nothing, so the course
+  begins by replacing them with precision at the budget, amount-weighted
+  cost, and validation that runs forward in time with a delay block
+  (modules 1–2). A raw transaction carries no signal; the signal is the
+  distance from the entity's own history, computed only from what was
+  knowable at the time (module 3). On those features the supervised
+  detectors — scorecards, boosted trees, feed-forward nets — turn out to
+  differ less from each other than the metrics differ from one another
+  (module 4). Supervised models see only yesterday's fraud, so anomaly
+  scores by isolation and reconstruction cover the unlabeled frontier
+  (module 5); fraud is organised, so the graph around a transaction is
+  propagated and learned (module 6); the data drift and the fraudster
+  adapts, so the model is re-estimated on a cadence, watched for change,
+  and trained on labels it knows are biased by its own alerts (modules
+  7–8). A score becomes a decision under a budget, with an explanation and
+  a monitoring record (module 9), and in the EU that loop is written into
+  law: the AML single rulebook, PSD2's fraud-rate ceiling on friction, the
+  AI Act's high-risk regime, GDPR Article 22 and the travel rule (module
+  10). The capstone assembles the system (module 11). Case studies run on
+  named public data — the ULB handbook simulator and Worldline replay,
+  PaySim, the ULB credit-card set, Elliptic — and six labs make the learner
+  build the harness, the features, the scorecard, the anomaly scorers, the
+  graph propagator and the pipeline.
+prerequisites:
+  - text: "classical-ml, or equivalent: logistic regression, gradient-boosted trees and XGBoost, ROC/PR curves and calibration, cross-validation, the class-imbalance playbook, feature encoding, k-means and PCA — assumed and applied, never re-taught"
+    course: classical-ml
+  - text: "Neural-network basics (an MLP, backpropagation, Adam, dropout) at the level of having trained one; modules 4–7 use them"
+  - text: "Linear algebra for graphs: sparse matrices, matrix powers, eigenvectors, power iteration"
+  - text: "Python, numpy and pandas at working-engineer level, including time-based groupby and rolling operations (labs are notebook assignments)"
+key_results:
+  - text: "A detector sits between rule layers and human investigators who review about $k \\approx 100$ alerts a day; precision at that budget, not accuracy, is the objective, and labels return weeks later only for what was alerted"
+    lesson: fraud-detection-system
+  - text: "At one positive in a thousand, 99% sensitivity and 99% specificity give about 9 true frauds per 100 alerts; the base rate, not the error rates, sets the precision"
+    lesson: economics-of-detection
+  - text: "Investigator capacity of 0.1–1% of daily volume makes every ROC point with $\\mathrm{FPR} > 0.01$ operationally unreachable; average precision and card precision at $k$ are the metrics that see the reachable region"
+    lesson: alert-budget-metrics
+  - text: "Validation must run forward in time with a delay block the width of the label latency and with known-compromised cards removed from the test days; prequential folds agree with the test week where random folds and AUC-selected depth do not"
+    lesson: delayed-labels-prequential
+  - text: "Undersampling with negative-keep rate $\\beta$ biases the posterior to $p_s = p/(p + \\beta(1-p))$; the inverse map $p' = \\beta p_s/(\\beta p_s - p_s + 1)$ restores calibration without changing the ranking, and every rebalancing technique in the handbook raises ROC-AUC while lowering average precision"
+    lesson: imbalance-techniques-revisited
+  - text: "With $C_{FN} = $ amount and $C_{FP} = C_{TP} = C_a$, the Bayes-minimum-risk rule flags a transaction iff $C_a \\le \\mathrm{Amt}\\cdot P(\\text{fraud}\\mid x)$, and savings against doing nothing can be negative"
+    lesson: example-dependent-cost
+  - text: "Windowed aggregates over the entity's own history — count and amount over 1/7/30 days, conditional on type and country — more than triple the savings of raw features; a terminal risk computed over $[t-(d+w),\\,t-d]$ uses only labels known at $t$"
+    lesson: transaction-aggregates
+  - text: "On real card data a prequentially tuned depth-6 decision tree matches XGBoost on card precision at 100 at one to two orders of magnitude lower training cost; the metric, not the model class, decides the ranking"
+    lesson: gbm-model-selection
+  - text: "Isolation Forest scores a point by its expected path length under random axis-parallel splits, normalised by $c(n) = 2H(n-1) - 2(n-1)/n$: $s = 2^{-E[h]/c(n)}$, with sub-sampling to $\\psi = 256$ clearing swamping and masking"
+    lesson: isolation-forest
+  - text: "Guilt by association is a random walk with restart from the known-fraud nodes, $\\xi = \\alpha Q\\xi + (1-\\alpha)z$, a sparse linear system solved by power iteration; nine such exposure features alone reach AUC 0.92 on Worldline data"
+    lesson: guilt-by-association
+  - text: "Sequence models add signal only where the sequence is constrained: an LSTM lifts card-present AUCPR from 0.14 to 0.20 and leaves e-commerce unchanged, and hand-built aggregates close the gap either way"
+    lesson: sequence-models-for-transactions
+  - text: "A statically trained detector ranks last for every balancer and metric over 422 days; daily re-estimation with all past frauds retained ranks first"
+    lesson: concept-drift
+  - text: "Feedback labels are selected by the model that is then trained on them; importance weighting cannot correct that bias because selection depends on the label, and a separate feedback classifier averaged with a delayed-sample classifier beats pooling them"
+    lesson: alert-feedback-selection-bias
+  - text: "Under the PSD2 RTS the TRA exemption is lawful only while the 90-day value-weighted fraud rate stays under the band's reference rate (0.13% / 0.06% / 0.01% for cards at EUR 100 / 250 / 500); two breached quarters suspend it, and model precision therefore sets the legally allowed friction"
+    lesson: psd2-sca-tra
+  - text: "The AI Act lists credit scoring of natural persons as high-risk and carves out 'AI systems used for the purpose of detecting financial fraud' (Annex III 5(b)); a system that profiles natural persons under any Annex III heading is high-risk regardless of the Article 6(3) derogation"
+    lesson: eu-ai-act-fraud
+sources:
+  - 'Y. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook, ULB / Worldline, 2022'
+  - 'B. Baesens, V. Van Vlasselaer, W. Verbeke, Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques, Wiley, 2015'
+  - 'R. J. Bolton, D. J. Hand, "Statistical Fraud Detection: A Review" (with discussion), Statistical Science 17(3), 2002'
+  - 'A. Dal Pozzolo, O. Caelen, Y. Le Borgne, S. Waterschoot, G. Bontempi, "Learned Lessons in Credit Card Fraud Detection from a Practitioner Perspective," Expert Systems with Applications 41, 2014'
+  - 'A. Dal Pozzolo, O. Caelen, R. A. Johnson, G. Bontempi, "Calibrating Probability with Undersampling for Unbalanced Classification," IEEE SSCI 2015'
+  - 'A. Dal Pozzolo, G. Boracchi, O. Caelen, C. Alippi, G. Bontempi, "Credit Card Fraud Detection: A Realistic Modeling and a Novel Learning Strategy," IEEE TNNLS 29(8), 2018'
+  - 'A. Correa Bahnsen, D. Aouada, A. Stojanovic, B. Ottersten, "Feature Engineering Strategies for Credit Card Fraud Detection," Expert Systems with Applications 51, 2016'
+  - 'Y. Lucas, J. Jurgovsky, "Credit Card Fraud Detection Using Machine Learning: A Survey," arXiv:2010.06479, 2020'
+  - 'J. Jurgovsky et al., "Sequence Classification for Credit-Card Fraud Detection," Expert Systems with Applications 100, 2018'
+  - 'V. Chandola, A. Banerjee, V. Kumar, "Anomaly Detection: A Survey," ACM Computing Surveys 41(3), 2009'
+  - 'F. T. Liu, K. M. Ting, Z.-H. Zhou, "Isolation Forest," IEEE ICDM 2008'
+  - 'V. Van Vlasselaer et al., "APATE: A Novel Approach for Automated Credit Card Transaction Fraud Detection Using Network-Based Extensions," Decision Support Systems 75, 2015'
+  - 'L. Akoglu, H. Tong, D. Koutra, "Graph-Based Anomaly Detection and Description: A Survey," Data Mining and Knowledge Discovery 29(3), 2015'
+  - 'M. Weber et al., "Anti-Money Laundering in Bitcoin: Experimenting with Graph Convolutional Networks for Financial Forensics," KDD Workshop on Anomaly Detection in Finance, 2019'
+  - 'B. Sanchez-Lengeling, E. Reif, A. Pearce, A. Wiltschko, "A Gentle Introduction to Graph Neural Networks," Distill, 2021'
+  - 'E. Altman et al., "Realistic Synthetic Financial Transactions for Anti-Money Laundering Models," NeurIPS Datasets and Benchmarks, 2023'
+  - 'E. A. Lopez-Rojas, A. Elmir, S. Axelsson, "PaySim: A Financial Mobile Money Simulator for Fraud Detection," EMSS 2016'
+  - 'J. Gama, I. Žliobaitė, A. Bifet, M. Pechenizkiy, A. Bouchachia, "A Survey on Concept Drift Adaptation," ACM Computing Surveys 46(4), 2014'
+  - 'N. Dalvi, P. Domingos, Mausam, S. Sanghai, D. Verma, "Adversarial Classification," KDD 2004'
+  - 'Regulation (EU) 2024/1624 (AMLR), Directive (EU) 2024/1640 (AMLD6), Regulation (EU) 2024/1620 (AMLA), OJ L, 19.6.2024'
+  - 'Directive (EU) 2015/2366 (PSD2) and Commission Delegated Regulation (EU) 2018/389 (RTS on strong customer authentication)'
+  - 'Regulation (EU) 2024/1689 (Artificial Intelligence Act), OJ L, 12.7.2024'
+  - 'Regulation (EU) 2016/679 (GDPR), Articles 4–6, 9, 13–15, 22, 35 and Recitals 47, 71'
+  - 'Regulation (EU) 2023/1113 on information accompanying transfers of funds and certain crypto-assets'
+  - 'Google Cloud Platform, FraudFinder — a lab series on building a real-time fraud detection system, GitHub, 2023'
+  - 'Neo4j GraphAcademy, Graph Data Science in Practice, Module 2 "Community Detection for Fraud"'
+  - 'IIT Hyderabad CS6890 Fraud Analytics problem statements 1–5 (2023–24); HKU FITE7410 Financial Fraud Analytics assignments 1–2 (2022–23); York University EECS 4486 syllabus (Fall 2023); USI Data Analytics for Fraud Detection catalogue entry'
+
+spine:
+  - step: >-
+      A fraud detector is the fourth layer of a five-layer system: rules
+      run before it, investigators with a budget of about a hundred alerts a
+      day run after it, and the labels those investigators produce come
+      back weeks later and only for what was alerted — every later
+      difficulty is a consequence of that loop.
+    label: The detector inside the loop
+    years: "2002–2021"
+    caption: >-
+      Worldline's Belgian e-commerce stream carries about 400,000
+      transactions a day with roughly a thousand frauds on some 300 cards;
+      investigators open about a hundred alerts; a label returns in days
+      to weeks; and the public datasets the field runs on are two days of
+      PCA components, a simulator, and a Bitcoin graph.
+    lessons: [fraud-detection-system, financial-crime-typology, economics-of-detection, canonical-datasets]
+  - step: >-
+      With one positive in a thousand and a hundred alerts a day, accuracy
+      and 99.9% of the ROC curve measure nothing: the honest metrics are
+      precision at the budget and amount-weighted cost, the honest
+      validation runs forward in time with a delay block, and under those
+      the imbalance toolkit mostly stops helping.
+    label: Rare positives, honest metrics
+    years: "2002–2022"
+    caption: >-
+      On the handbook's simulator every rebalancing technique raises
+      ROC-AUC and lowers average precision; a depth-50 tree wins on
+      validation AUC and loses on the test week; the undersampled
+      classifier's probabilities are wrong by a closed-form factor that
+      the lab restores.
+    lessons: [alert-budget-metrics, delayed-labels-prequential, imbalance-techniques-revisited, example-dependent-cost, ulb-handbook-benchmark, cost-aware-evaluation-lab]
+  - step: >-
+      A raw transaction has no fraud signal; the signal is the deviation
+      from the entity's own history, which means windowed aggregates over
+      the cardholder and the terminal, computed from what was known at
+      scoring time — including labels that had not yet arrived.
+    label: Features are context
+    years: "2009–2023"
+    caption: >-
+      Count and amount over the last 1/7/30 days, conditional on type and
+      country, lift savings 201% over raw fields and a periodic
+      time-of-day flag adds 13% more; a terminal's fraud rate is shifted
+      back seven days so that it uses only labels an investigator had
+      produced.
+    lessons: [transaction-aggregates, behavioural-profiles, point-in-time-features, paysim-feature-matrix, point-in-time-feature-lab]
+  - step: >-
+      On honest features under honest metrics, supervised detection is a
+      model-selection problem: a scorecard the regulator can read, a
+      boosted tree as the robust default, a feed-forward net for what
+      trees cannot do — and the gap between model classes is smaller than
+      the gap between metrics.
+    label: Supervised detectors compared
+    years: "2015–2022"
+    caption: >-
+      On Worldline data a tuned depth-6 tree matches XGBoost on card
+      precision at 100 at a hundredth of the compute; the neural net wins
+      ROC-AUC and ties the rest; the scorecard's points are a logistic
+      regression on weights of evidence rescaled to 20 points per doubling
+      of the odds.
+    lessons: [scorecards-woe, gbm-model-selection, neural-tabular-detectors, worldline-model-comparison, scorecard-vs-gbm-lab]
+  - step: >-
+      Supervised models detect only the fraud they were shown; new fraud
+      enters as a departure from normality scored by distance, isolation
+      or reconstruction, which buys a decent ROC-AUC and a poor precision —
+      a complement to the supervised score, not its replacement.
+    label: The unlabeled frontier
+    years: "2000–2022"
+    caption: >-
+      An autoencoder trained with zero labels reaches ROC-AUC 0.84 and
+      average precision 0.18 on the simulator; a k-means cluster on the
+      ULB set is 71% fraud against a 0.2% base rate and still floods the
+      queue; adding the reconstruction error to a supervised model moves
+      nothing.
+    lessons: [anomaly-detection-framing, density-and-distance-scores, isolation-forest, one-class-and-reconstruction, ulb-unsupervised-scores, anomaly-scorers-lab]
+  - step: >-
+      Fraud is organised: the cardholders, merchants, devices and accounts
+      around a transaction carry signal no per-row feature sees, recovered
+      by propagating known fraud through the graph as a random walk with
+      restart, or by learning the neighbourhood with a graph network.
+    label: The graph around the transaction
+    years: "2015–2023"
+    caption: >-
+      Nine exposure scores propagated from labelled fraudulent transactions
+      reach AUC 0.92 alone and lift a random forest from 0.953 to 0.986;
+      on the Elliptic Bitcoin graph a random forest on hand-aggregated
+      neighbour features beats a GCN, and every model collapses when a
+      dark market shuts down.
+    lessons: [fraud-as-a-graph, graph-features-and-communities, guilt-by-association, graph-neural-networks, elliptic-illicit-nodes, graph-propagation-lab]
+  - step: >-
+      The transaction stream drifts and the fraud evolves, so a model
+      trained once ranks last: the detector is re-estimated on a cadence,
+      the sequence of an entity's events is itself a feature, and change
+      is detected with a statistic that fires on the error stream.
+    label: Drift and sequence
+    years: "2014–2020"
+    caption: >-
+      Over 422 days of Worldline data the static model is last for every
+      balancer; daily retraining beats weekly; an LSTM helps on
+      card-present transactions and not on e-commerce; a classifier that
+      tells Tuesday's transactions from Sunday's exposes the weekly cycle
+      as drift.
+    lessons: [sequence-models-for-transactions, concept-drift, drift-strategies-on-worldline]
+  - step: >-
+      The adversary reads the detector and edits the cheapest features
+      until the score crosses the threshold, and the detector labels only
+      what it chose to show the investigators — so the training data is
+      biased by the model itself, and the correction is to know which
+      samples it selected.
+    label: The adversary and the feedback loop
+    years: "2004–2018"
+    caption: >-
+      Against naive Bayes the spammer's cheapest edit lets every one of
+      481 messages through; the adversary-aware classifier recovers all
+      but 93. Importance weighting fixes a covariate shift on amount > 500
+      and fails on alert feedback, because the selection depends on the
+      label.
+    lessons: [adversarial-classification, alert-feedback-selection-bias, arms-race-replay]
+  - step: >-
+      A score becomes an action under a budget — decline, step up, or
+      review — must be explained to an investigator and to the customer,
+      and must be monitored for stability and recalibrated; the model is a
+      managed asset with a life cycle, not a file.
+    label: From score to governed decision
+    years: "2015–2023"
+    caption: >-
+      A 90% probability on EUR 10 is not worth an investigation and 25% on
+      EUR 10,000 is; eight rules collapse to four decision-table columns
+      and expose a conflict; a stability index above 0.25 is a red light;
+      a deployed pipeline monitors 9 of its 25 features and gates on
+      accuracy 0.95 that a constant model passes.
+    lessons: [score-to-action, alert-explanations, model-risk-monitoring, fraudfinder-monitoring-read]
+  - step: >-
+      In the EU the loop is written into law: the AML rulebook fixes what
+      is monitored, reported, recorded and never outsourced; PSD2 caps the
+      fraud rate a risk-based exemption may run at; the AI Act decides
+      whether the model is high-risk; GDPR Article 22 governs the
+      automated decision; and the travel rule fixes which fields travel
+      with a transfer.
+    label: The regulator reads the logs
+    years: "2015–2027"
+    caption: >-
+      Detection criteria, the onboarding decision and the suspicious
+      transaction report cannot be outsourced; a card exemption at EUR 250
+      is lawful while the 90-day value-weighted fraud rate stays under
+      0.06%; credit scoring of natural persons is high-risk and fraud
+      detection is carved out by one clause.
+    lessons: [eu-aml-single-rulebook, psd2-sca-tra, eu-ai-act-fraud, gdpr-financial-crime-data, transfer-of-funds-crypto, tra-exemption-engine]
+  - step: >-
+      The system assembles it all: real-time scoring on point-in-time
+      features served from one store, labels that mature over weeks and
+      feed a retraining cadence, monitoring that closes the loop, and a
+      record the regulator can audit.
+    label: The system
+    years: "2018–2024"
+    caption: >-
+      A decision within six seconds, features from a store that answers
+      "what was known at t", daily retraining on feedbacks plus delayed
+      samples, a 90-day fraud-rate controller and an alert ledger: the
+      pipeline the course argued for, built on the simulator.
+    lessons: [real-time-scoring-architecture, label-maturation, eu-transaction-monitoring-design, pipeline-capstone-lab]
+
+outcomes:
+  - id: co-frame
+    text: "Explain why financial-crime detection differs from generic classification: the layered system, the investigator budget, delayed and selected labels, and an adapting adversary"
+    bloom: understand
+  - id: co-evaluate
+    text: "Evaluate a detector under extreme imbalance with budget-aware and amount-weighted metrics and delay-aware temporal validation, and diagnose when a reported gain is a metric artifact"
+    bloom: evaluate
+  - id: co-features
+    text: "Construct point-in-time-correct entity features from raw transaction logs and audit a feature pipeline for label and temporal leakage"
+    bloom: create
+  - id: co-detect
+    text: "Build supervised, anomaly, graph and sequence detectors and attribute their differences to the data regime rather than the model class"
+    bloom: create
+  - id: co-adapt
+    text: "Analyze drift, adversarial adaptation and alert-feedback selection bias in a deployed detector and design its retraining and labelling strategy"
+    bloom: analyze
+  - id: co-govern
+    text: "Design decision policies, explanations and monitoring that satisfy the EU frame — AMLR, PSD2 and its RTS, the AI Act, GDPR Article 22, the travel rule — and locate each obligation in the pipeline"
+    bloom: create
+
+modules:
+  - slug: problem
+    title: "The fraud detection problem"
+    outcomes: [co-frame]
+    lessons:
+      - slug: fraud-detection-system
+        title: "The layered fraud detection system"
+        type: core
+        status: planned
+        goal: "Explain the five-layer fraud detection system and locate the model, the investigator budget and the delayed-label feedback loop within it"
+        opening: "A fraud score is produced in under a second by the fourth of five layers, is acted on by investigators who can open about a hundred alerts a day, and is corrected by labels that return days to weeks later for the alerted transactions only."
+        est_minutes: 30
+        prerequisites: []
+        concepts:
+          introduces: [fraud-detection-system, alert-feedback-interaction, verification-latency]
+          reinforces: []
+        key_ideas:
+          - "Terminal checks and blocking rules in milliseconds, scoring rules and the data-driven model in near real time, investigators offline"
+          - "The investigator budget k: alerts are a ranking, not a classification, and precise alerts are the objective"
+          - "Labels come from investigation and complaints; silence is read as genuine; the delay is a design parameter"
+          - "Blocking rules must be fast and precise; scoring rules catch known patterns; the model is retrained, not edited"
+        demo: null
+      - slug: financial-crime-typology
+        title: "A typology of financial crime as learning problems"
+        type: core
+        status: planned
+        goal: "Classify the major financial-crime types — card fraud, account takeover, laundering, mules, sanctions evasion — by the learning problem each poses"
+        opening: "Fraud is uncommon, well considered, concealed, time-evolving and organised, and each of those five traits names a difficulty the detector inherits: scarce labels, camouflage, drift, and relational structure."
+        est_minutes: 32
+        prerequisites: [fraud-detection-system]
+        concepts:
+          introduces: [card-not-present-fraud, money-laundering-stages, superimposition-fraud]
+          reinforces: [fraud-detection-system]
+        key_ideas:
+          - "Card-present vs card-not-present; CNP is over half of losses on under 15% of volume"
+          - "Placement, layering, integration; structuring as adaptation to a reporting threshold; levels transaction/account/business/ring"
+          - "Subscription vs superimposed fraud: the whole account vs calls mixed into a legitimate stream — account takeover is superimposition"
+          - "Each type as (unit, label source, delay, structure): the table the rest of the course fills in"
+        demo: null
+      - slug: economics-of-detection
+        title: "The economics of detection: base rates, costs and the alert budget"
+        type: core
+        status: planned
+        goal: "Compute the precision, expected cost and inspection value of a detector from its error rates, the base rate and the alert budget"
+        opening: "A detector that is 99% sensitive and 99% specific, applied to a stream with one fraud per thousand transactions, produces alerts of which about nine in a hundred are fraud."
+        est_minutes: 32
+        prerequisites: [fraud-detection-system]
+        concepts:
+          introduces: [base-rate-funnel, cost-matrix, inspection-budget]
+          reinforces: [alert-feedback-interaction]
+        key_ideas:
+          - "The base-rate funnel: 1,000 → 1 fraud → ~11 flagged → ~1 true; precision is set by prevalence"
+          - "Cost matrix with four outcomes; fixed vs amount-dependent false-negative cost; the do-nothing baseline"
+          - "Hit rate is not a target: 100% hit rate means too few inspections; the optimal budget maximises total utility"
+          - "Value of detection decays with delay while evidence accrues; 1% false alarms on a million accounts is 10,000 calls a day"
+        demo: null
+      - slug: canonical-datasets
+        title: "The canonical datasets: ULB, the handbook simulator, PaySim, Elliptic, AMLworld"
+        type: core
+        status: planned
+        goal: "Analyze what each public financial-crime dataset contains, how its labels were produced, and which of the detection loop's difficulties it hides"
+        opening: "The field runs on five public datasets, and each omits a different part of the loop: two days of PCA components without time, a simulator with three scripted fraud scenarios, a mobile-money log whose fraud was added after the paper, a Bitcoin graph with no feature names, and a laundering world with complete labels that no real bank has."
+        est_minutes: 34
+        prerequisites: [financial-crime-typology, economics-of-detection]
+        concepts:
+          introduces: [transaction-simulator, label-completeness]
+          reinforces: [verification-latency, money-laundering-stages]
+        key_ideas:
+          - "ULB 2013: 284,807 transactions, 492 frauds (0.172%), 28 PCA components, Time and Amount — released by the undersampling-calibration paper"
+          - "The handbook simulator: 100×100 grid, three scenarios (amount > 220; compromised terminals for 28 days; ×5 amounts for 14 days), 0.84% fraud"
+          - "PaySim: aggregate replay of a mobile-money log; the 2016 paper injects no fraud"
+          - "Elliptic: 203k transactions, 2% illicit, 49 time steps with no edges between them; AMLworld: 8 patterns, transitive taint, 1 in 800–1,750"
+        demo: null
+
+  - slug: rare-positives
+    title: "Rare positives: imbalance and evaluation"
+    outcomes: [co-evaluate]
+    lessons:
+      - slug: alert-budget-metrics
+        title: "Metrics under an alert budget: average precision and card precision at k"
+        type: core
+        status: planned
+        goal: "Compute average precision and card precision at k for a ranked day of transactions and explain why the ROC curve's reachable region is a sliver"
+        opening: "Investigators who check 100 transactions of 8,300 a day reach a false-positive rate of at most one percent, so 99% of the ROC curve describes operating points that will never be used."
+        est_minutes: 38
+        prerequisites: [economics-of-detection]
+        concepts:
+          introduces: [average-precision, precision-at-k, card-precision-at-k]
+          reinforces: [inspection-budget, base-rate-funnel]
+        key_ideas:
+          - "The 10-transaction toy: MME ties a useless and a good classifier; the PR curve dips 0.5 → 0.33 → 0.5"
+          - "AP as a step sum, random AP = prevalence; PR dominance iff ROC dominance; PR as the zoom at low FPR"
+          - "P@k per day with the remaining-fraud ceiling (55 frauds → max 0.55 at k=100); CP@k with one alert per card"
+          - "Removing detected cards from later days: mean CP@100 falls 0.286 → 0.241 — the number the rest of the course reports"
+        demo:
+          component: RankingBudgetExplorer
+          spec: >-
+            Ten transactions (two fraud) with draggable rank order; live
+            ROC-AUC, average precision and P@3 as the reader reorders.
+            Task: find an ordering that raises ROC-AUC while lowering AP,
+            then an ordering with the same AUC and P@3 = 0 — the reader
+            falsifies "AUC orders classifiers" by construction before the
+            prose explains which region of the curve the budget can reach.
+      - slug: delayed-labels-prequential
+        title: "Temporal validation with delayed labels: prequential folds"
+        type: core
+        status: planned
+        goal: "Design a train/delay/test validation for a transaction stream and explain why prequential folds estimate the test week where random folds and AUC-selected depth do not"
+        opening: "The test week's labels did not exist when the model was trained, so a validation that mimics the test must shift its own training window back by the label delay plus the test width, and must drop the cards the bank already knew were compromised."
+        est_minutes: 38
+        prerequisites: [alert-budget-metrics]
+        concepts:
+          introduces: [delay-period, prequential-validation, known-card-removal]
+          reinforces: [card-precision-at-k, verification-latency]
+        key_ideas:
+          - "Blocks: training, delay (labels not yet known), test; older blocks dropped for drift"
+          - "Test-day construction: remove transactions of cards known compromised at day − delay; remaining frauds 74–91 → 41–60"
+          - "Hold-out vs repeated hold-out vs prequential: the same-period repeated hold-out understates variance 3–8×"
+          - "Overfitting set piece: train AUC climbs to depth 50, test AP peaks at 4–6; AUC still selects depth 50 on validation"
+        demo: null
+      - slug: imbalance-techniques-revisited
+        title: "Imbalance techniques under honest metrics and the undersampling correction"
+        type: core
+        status: planned
+        goal: "Derive the posterior bias introduced by undersampling and its inverse correction, and evaluate when cost-sensitive learning, resampling and balanced ensembles help under AP and card precision"
+        opening: "Every rebalancing technique in the handbook raises ROC-AUC on the transaction data and lowers average precision, and the undersampled model's probabilities are wrong by a factor that has a closed form."
+        est_minutes: 40
+        prerequisites: [delayed-labels-prequential]
+        concepts:
+          introduces: [undersampling-calibration, imbalance-ratio, balanced-bagging]
+          reinforces: [average-precision, card-precision-at-k, prequential-validation]
+        key_ideas:
+          - "Class-dependent selection keeps p(x|y) and shifts the prior: p_s = p/(p + β(1−p)); inverse p' = βp_s/(βp_s − p_s + 1); monotone so AUC unchanged"
+          - "Bias is largest where the classes overlap; the matched threshold τ' = β τ_s/((β−1)τ_s + 1) equals the original prior"
+          - "Transaction data: class weight, SMOTE, RUS, SMOTE+RUS all raise AUC and lower AP; balanced bagging gains come from diversity"
+          - "XGBoost is the most robust: residual-based boosting upweights the minority implicitly; samplers go inside the prequential pipeline"
+        demo: null
+      - slug: example-dependent-cost
+        title: "Example-dependent cost-sensitive learning and the Bayes-minimum-risk threshold"
+        type: core
+        status: planned
+        goal: "Derive the Bayes-minimum-risk decision rule for a transaction whose false-negative cost is its amount, and compute the savings of a detector against doing nothing"
+        opening: "A missed fraud costs the transaction amount and a flagged transaction costs a fixed administrative sum, so the optimal decision depends on the amount: flag iff $C_a \\le \\mathrm{Amt}\\cdot P(\\text{fraud}\\mid x)$."
+        est_minutes: 36
+        prerequisites: [imbalance-techniques-revisited]
+        concepts:
+          introduces: [example-dependent-cost, savings-metric, bayes-minimum-risk]
+          reinforces: [cost-matrix, undersampling-calibration]
+        key_ideas:
+          - "Cost matrix C_FN = Amt, C_TP = C_FP = C_a, C_TN = 0; Cost(f) summed over examples; Hand's constant 100×C_a by contrast"
+          - "Savings = (Cost_l − Cost(f))/Cost_l with Cost_l = total fraud amount; savings can be negative"
+          - "Elkan's constant-cost threshold 1/(1 + C(2,1)/C(1,2)) as the special case; the BMR rule per transaction"
+          - "Cost-sensitive LR and DT; resampling does not improve savings because it distorts the cost distribution"
+        demo: null
+      - slug: ulb-handbook-benchmark
+        title: "The handbook benchmark: five models, three metrics, simulated and real data"
+        type: core
+        status: planned
+        goal: "Evaluate the handbook's five baseline models on simulated and Worldline data and attribute every ranking reversal to the metric and the data regime"
+        opening: "On the simulator an unlimited-depth tree beats a depth-2 tree on ROC-AUC (0.788 vs 0.763) and loses on average precision (0.309 vs 0.496); on 400,000 real transactions a day the precision of every model falls below 0.1 and card precision at 100 is the only number investigators can use."
+        est_minutes: 32
+        prerequisites: [delayed-labels-prequential, imbalance-techniques-revisited]
+        concepts:
+          introduces: []
+          reinforces: [average-precision, card-precision-at-k, prequential-validation, known-card-removal, transaction-simulator]
+        key_ideas:
+          - "The artifact: Handbook Ch3–4 — LR/DT2/DT∞/RF/XGB on 67k training transactions with 598 frauds, a one-week delay and a one-week test"
+          - "The depth-2 tree reads the simulator's amount > 220 rule off the data (threshold 218.67); on real data it finds terminal risk × burst"
+          - "Real data: 0.25% fraud, ~3 frauds per compromised card, random CP@100 ≈ 0.0025, LR ≈ 0.15; the PR curves squashed to the floor"
+          - "Departures from the idealisation: a one-week delay is a simplification; labels in the real replay are complete; the simulator's fraud is scripted"
+        demo: null
+      - slug: cost-aware-evaluation-lab
+        title: "Lab: a budget- and cost-aware evaluation harness"
+        type: lab
+        status: planned
+        goal: "Build an evaluation harness — prequential split with delay and known-card removal, average precision, card precision at k, savings, the Bayes-minimum-risk threshold and the undersampling correction — and use it to referee a model selection on the simulator"
+        opening: "The harness you build here is the referee for every later lab: forward-in-time folds with a delay block, precision at the investigator's budget, amount-weighted savings, and probabilities corrected for the undersampling you trained on."
+        est_minutes: 12
+        prerequisites: [example-dependent-cost, ulb-handbook-benchmark]
+        concepts:
+          introduces: []
+          reinforces: [prequential-validation, card-precision-at-k, savings-metric, bayes-minimum-risk, undersampling-calibration]
+        key_ideas:
+          - "A step-sum average precision and a per-day card precision with detected-card removal, checked against the handbook's numbers"
+          - "Folds that shift the training start back by the delay plus the test width"
+          - "Savings with FN cost = amount; the per-transaction BMR decision"
+          - "The β correction turns an undersampled model's scores back into probabilities without touching the ranking"
+        demo: null
+        lab:
+          est_hours: 4
+          checkpoints:
+            - id: average-precision
+              kind: exact
+              text: "Average precision as the step sum over the ranked list, no interpolation"
+            - id: savings-metric
+              kind: exact
+              text: "Cost and savings with the false-negative cost equal to the amount and a fixed administrative cost"
+            - id: prequential-split
+              kind: exact
+              text: "Train/delay/test index generator with known-compromised-card removal, shifted back one block per fold"
+            - id: card-precision-top-k
+              kind: exact
+              text: "Card precision at k per day — one alert per card, detected cards removed from later days — averaged over the test week"
+            - id: bmr-threshold
+              kind: exact
+              text: "Per-transaction Bayes-minimum-risk decision from a calibrated probability and the amount"
+            - id: undersampling-correction
+              kind: exact
+              text: "The β correction that maps an undersampled model's posteriors back to the full-data prior, with the matched threshold"
+            - id: prequential-selection
+              kind: exact
+              text: "Model selection over a depth grid by validation AP and by validation ROC-AUC on prequential folds — two different winners"
+            - id: why-auc-picks-fifty
+              kind: review
+              text: "Written answer: why validation ROC-AUC selects the overfitted tree and card precision does not"
+            - id: beat-card-precision
+              kind: metric
+              text: "Beat the card-precision-at-100 bar on the held-out simulator week with any model, scored by your own harness"
+              required: false
+        notes: "Canon grounding (CS6890 PS3, HKU FITE7410 A2 cost comparison, the handbook's shared_functions), dataset and checkpoint detail live in research/cost-aware-evaluation-lab.md (LAB PLAN)."
+
+  - slug: features
+    title: "Features from transactions"
+    outcomes: [co-features]
+    lessons:
+      - slug: transaction-aggregates
+        title: "Entity-centric aggregation: RFM, windowed counts and delayed terminal risk"
+        type: core
+        status: planned
+        goal: "Construct windowed count and amount aggregates over a cardholder's and a terminal's history, including a terminal risk that uses only labels known at scoring time"
+        opening: "A transaction record — amount, time, customer id, terminal id — has no fraud signal of its own; the signal is how far it sits from the entity's own recent behaviour, which is a set of windowed aggregates computed over earlier rows only."
+        est_minutes: 38
+        prerequisites: [delayed-labels-prequential]
+        concepts:
+          introduces: [rfm-aggregates, windowed-aggregation, delayed-terminal-risk]
+          reinforces: [delay-period, verification-latency]
+        key_ideas:
+          - "RFM over the entity: recency, frequency, monetary; the probe-then-spend pattern as recent-low then recent-high"
+          - "Whitrow aggregation: count and sum over the last t_p hours grouped by card, then by type/merchant group/country; Bahnsen's 7-row worked table"
+          - "The handbook's 14 features; customer 0's 30-day mean converging to its generating parameters"
+          - "Terminal risk over [t−(d+w), t−d] as a difference of two rolling sums: the delay is the label latency"
+          - "★ Identifiers: card ID dropped because blocked cards leak; terminal embeddings add nothing over aggregates"
+        demo: null
+      - slug: behavioural-profiles
+        title: "Behavioural profiles: periodic time, peer groups and break points"
+        type: core
+        status: planned
+        goal: "Construct profile-deviation features — a von Mises time-of-day flag, peer-group and break-point statistics, inter-event time — and explain why each is a contextual anomaly score"
+        opening: "Transactions at 02:00, 03:00, 22:00 and 23:00 have an arithmetic mean of 12:30, an hour at which the customer never transacts; a feature built on clock time must be built on the circle."
+        est_minutes: 34
+        prerequisites: [transaction-aggregates]
+        concepts:
+          introduces: [periodic-time-feature, peer-group-analysis, break-point-analysis]
+          reinforces: [rfm-aggregates, windowed-aggregation]
+        key_ideas:
+          - "Circular mean and von Mises confidence interval; the binary 'inside the expected window' feature; at least seven days of history"
+          - "Peer-group analysis is inter-account (Christmas spending not flagged); break-point analysis is intra-account (t-test old vs new window)"
+          - "tdelta between consecutive events because frauds come in bursts; trading entropy; the cumulative-spend line and its slope change"
+          - "Contextual anomaly: same value normal in one context, anomalous in another — the user is the context"
+        demo:
+          component: CircularMeanClock
+          spec: >-
+            A 24-hour clock on which the reader places up to six transaction
+            times; the arithmetic mean and the circular (von Mises) mean are
+            drawn as two hands, the fitted concentration as a shaded arc.
+            Task: place four times so the arithmetic hand points at an hour
+            with no transactions while the circular hand sits among them;
+            then add one 06:00 transaction and read off whether it falls
+            inside the 90% arc.
+      - slug: point-in-time-features
+        title: "Point-in-time correctness: as-of joins, feature stores and parity"
+        type: core
+        status: planned
+        goal: "Design a feature pipeline whose training rows contain only what was known at each transaction's timestamp and whose serving path computes the same values"
+        opening: "A feature joined to a training row must be the value that existed at that row's timestamp, which for a label-derived feature means the value after the label delay, and the serving path must reproduce that value or the offline score is a fiction."
+        est_minutes: 36
+        prerequisites: [transaction-aggregates]
+        concepts:
+          introduces: [point-in-time-join, feature-store, training-serving-skew]
+          reinforces: [delayed-terminal-risk, delay-period]
+        key_ideas:
+          - "The as-of join: last value up to but not after t; the read-instances table of (entity, timestamp, label)"
+          - "Batch features over days in SQL, streaming features over minutes in a sliding window; one store answers both reads"
+          - "Training/serving skew: FraudFinder trains on zero-filled minute features and serves real ones; the parity check the series omits"
+          - "Label time travel: train on a date whose labels have settled; the feature log keyed by feature_time"
+        demo: null
+      - slug: paysim-feature-matrix
+        title: "From PaySim logs to a feature matrix"
+        type: core
+        status: planned
+        goal: "Analyze the PaySim mobile-money log as an artifact — what its generator replays, what its fraud label encodes — and construct a feature matrix whose signal survives that reading"
+        opening: "Of PaySim's 6.4 million rows, every one of the 8,213 frauds is a TRANSFER or a CASH_OUT, the fraud is uniform over time steps while genuine traffic has a daily rhythm, and the balance columns disagree with the amounts in ways the generator never intended as signal."
+        est_minutes: 32
+        prerequisites: [behavioural-profiles, point-in-time-features, canonical-datasets]
+        concepts:
+          introduces: []
+          reinforces: [rfm-aggregates, windowed-aggregation, periodic-time-feature, transaction-simulator, label-completeness]
+        key_ideas:
+          - "The artifact: the Kaggle PaySim log read against the 2016 paper — aggregate replay per day/hour, five types, no fraud injected in the paper"
+          - "HKU's EDA findings: fraud only in TRANSFER/CASH_OUT, step mod 24, per-account counts, no extreme amounts among frauds"
+          - "Features that survive: type gate, hour-of-day, origin and destination balance deltas, per-account windowed counts; features that are artefacts"
+          - "Departure from the idealisation: no delay, no feedback loop, a label that is a generator flag"
+        demo: null
+      - slug: point-in-time-feature-lab
+        title: "Lab: a point-in-time feature pipeline"
+        type: lab
+        status: planned
+        goal: "Build a feature pipeline that turns raw transaction logs into the handbook's windowed aggregates, Bahnsen's conditional aggregates, a delayed terminal risk and a periodic time flag, joined point-in-time onto every scoring row"
+        opening: "The pipeline you build here produces, for every transaction, only numbers that existed at its timestamp — and the one leak the shipped reference pipeline hides is yours to find."
+        est_minutes: 12
+        prerequisites: [paysim-feature-matrix]
+        concepts:
+          introduces: []
+          reinforces: [windowed-aggregation, delayed-terminal-risk, periodic-time-feature, point-in-time-join, training-serving-skew]
+        key_ideas:
+          - "Time-based rolling windows over strictly earlier rows, checked against Bahnsen's seven-row table"
+          - "A terminal risk as the difference of two rolling sums shifted by the delay"
+          - "A von Mises time flag checked against the paper's worked example"
+          - "An as-of join that never reads the future"
+        demo: null
+        lab:
+          est_hours: 4
+          checkpoints:
+            - id: calendar-flags
+              kind: exact
+              text: "Weekend and night flags from the transaction timestamp"
+            - id: customer-windows
+              kind: exact
+              text: "Count and mean amount over the customer's previous 1, 7 and 30 days, strictly earlier rows only"
+            - id: conditional-aggregates
+              kind: exact
+              text: "Count and sum over the last 24 hours restricted to the same type and the same country"
+            - id: terminal-risk-delayed
+              kind: exact
+              text: "Terminal fraud rate over a window shifted back by the label delay, as a difference of two rolling sums"
+            - id: periodic-time-flag
+              kind: exact
+              text: "Circular mean, von Mises concentration and the inside-the-interval flag for a customer's clock times"
+            - id: point-in-time-join
+              kind: exact
+              text: "As-of join of a timestamped feature log onto scoring rows — last value up to, never after, each timestamp"
+            - id: find-the-leak
+              kind: review
+              text: "Written answer: name the leak in the shipped reference pipeline and the row on which it first shows"
+            - id: feature-lift
+              kind: metric
+              text: "Beat the average-precision bar of a fixed logistic regression on the held-out week using your feature matrix"
+              required: false
+        notes: "Canon grounding (FraudFinder notebook 02's batch windows and delayed terminal risk; HKU FITE7410 A1 Part I feature engineering on PaySim), dataset and checkpoint detail live in research/point-in-time-feature-lab.md (LAB PLAN)."
+
+  - slug: supervised
+    title: "Supervised detectors"
+    outcomes: [co-detect]
+    lessons:
+      - slug: scorecards-woe
+        title: "Logistic scorecards: weights of evidence, information value and points"
+        type: core
+        status: planned
+        goal: "Construct a points-based fraud scorecard from coarse-classified variables through weights of evidence to a scaled logistic regression, and explain why its monotone one-coefficient-per-variable form is what a regulator can read"
+        opening: "A scorecard is a logistic regression on weights of evidence, rescaled so that the score rises 20 points each time the odds of fraud halve; every step from raw variable to points is a table a reviewer can check."
+        est_minutes: 36
+        prerequisites: [example-dependent-cost]
+        concepts:
+          introduces: [weight-of-evidence, information-value, points-scorecard]
+          reinforces: [cost-matrix]
+        key_ideas:
+          - "Coarse classification: equal-interval vs equal-frequency bins, odds pivot tables, chi-squared comparison (583 vs 662)"
+          - "WOE = ln(Dist non-fraud / Dist fraud); IV = Σ(DistG − DistB)·WOE; the 2,000-row age example with IV 0.6502"
+          - "Score = Offset + Factor·ln(odds); 20 points per doubling gives Factor 28.85, Offset −12.87 at 100 points for 50:1"
+          - "Variable selection under sign constraints and operational latency; filters are univariate"
+        demo: null
+      - slug: gbm-model-selection
+        title: "Tree ensembles and prequential model selection"
+        type: core
+        status: planned
+        goal: "Evaluate decision trees, random forests and XGBoost under prequential selection on simulated and real card data, and explain why a tuned tree matches the boosted ensemble on card precision at a hundredth of the cost"
+        opening: "Under prequential selection on real card data the best-validation XGBoost scores card precision 0.235 at 100 where 50 trees would have scored 0.249, a tuned depth-7 tree scores 0.232, and the grid for the tree took 1,617 seconds against 8,788 for the ensemble."
+        est_minutes: 36
+        prerequisites: [imbalance-techniques-revisited]
+        concepts:
+          introduces: [best-estimated-vs-optimal, random-search]
+          reinforces: [prequential-validation, card-precision-at-k, average-precision, imbalance-ratio]
+        key_ideas:
+          - "Model selection = argmax of validation performance; the triplet default / best-estimated / optimal parameters per metric"
+          - "Decision tree: AUC picks depth 50, AP picks 3, CP@100 picks 5; optimal 4/4/5 — the metric sets the model"
+          - "Random search: 10 of 18 XGBoost combinations in 690 s vs 1,251 s with the same scores (Bergstra and Bengio)"
+          - "XGBoost's robustness to imbalance; prequential folds give AP std 0.022 where repeated hold-out gives 0.0065"
+        demo: null
+      - slug: neural-tabular-detectors
+        title: "Feed-forward networks on transaction features"
+        type: core
+        status: planned
+        goal: "Construct and tune a feed-forward network on engineered transaction features and explain when a network earns its place against a tree ensemble that already wins"
+        opening: "On static tabular features a tree ensemble wins, and the four reasons to train a network anyway are incremental updating, representation learning, federated averaging and diversity for stacking — none of which is accuracy."
+        est_minutes: 36
+        prerequisites: [gbm-model-selection]
+        concepts:
+          introduces: [feed-forward-detector, early-stopping-on-validation, entity-embedding]
+          reinforces: [prequential-validation, average-precision, card-precision-at-k]
+        key_ideas:
+          - "Input scaling matters for the first layer and not for trees; log1p for heavy-tailed amount; SGD 251 epochs vs Adam 13 to a better optimum"
+          - "Early stopping with patience on validation loss; dropout 0.2 helps and 0.4 hurts; batch size and epochs interact"
+          - "An embedding of dimension k is a linear layer on one-hot input; terminal and weekday embeddings add nothing over aggregates on the simulator"
+          - "Benchmark: NN 0.876 / 0.675 / 0.303 vs XGBoost 0.869 / 0.687 / 0.303 — a 162-network grid cost 7,350 s"
+        demo: null
+      - slug: worldline-model-comparison
+        title: "Eight models on Worldline data: the metric-dependent ranking"
+        type: core
+        status: planned
+        goal: "Evaluate the handbook's eight-model comparison on real card data and attribute each ranking to the metric, the validation design and the compute spent"
+        opening: "On the same real test weeks the random forest has the best ROC-AUC of the tree models, the LSTM with attention the best average precision, and a depth-6 decision tree ties the field on card precision at 100 — three leaderboards from one table."
+        est_minutes: 30
+        prerequisites: [neural-tabular-detectors, scorecards-woe]
+        concepts:
+          introduces: []
+          reinforces: [best-estimated-vs-optimal, card-precision-at-k, average-precision, prequential-validation, feed-forward-detector]
+        key_ideas:
+          - "The artifact: Handbook Ch5 real-world model selection and Ch7.5's global table — DT, LR, RF, XGB, FFNN, CNN, LSTM, LSTM+attention × three metrics"
+          - "Overfitting reproduced on real data: test AP peaks at depth 4–5 while train keeps rising to 50; optimal depth higher than on the simulator"
+          - "Sequential nets beat tree ensembles on AP (0.104 vs 0.095), tie on CP@100, lose on AUC; attention adds little"
+          - "Departures: labels are complete in the replay, grids are 4 folds, the best LSTM came from the slowest schedule"
+        demo: null
+      - slug: scorecard-vs-gbm-lab
+        title: "Lab: a scorecard and a boosted tree under the same referee"
+        type: lab
+        status: planned
+        goal: "Build a weight-of-evidence scorecard from scratch, train a gradient-boosted detector on the same prequential folds, and choose between them by savings and card precision with a written case for the choice"
+        opening: "Two detectors, one referee: the scorecard you build table by table and the boosted tree you tune, scored by the harness from module 2 on the same forward-in-time folds, with the decision argued in money."
+        est_minutes: 12
+        prerequisites: [worldline-model-comparison, cost-aware-evaluation-lab]
+        concepts:
+          introduces: []
+          reinforces: [weight-of-evidence, information-value, points-scorecard, best-estimated-vs-optimal, savings-metric]
+        key_ideas:
+          - "Equal-frequency bins, WOE and IV reproduced against the textbook's age table"
+          - "Points per attribute from Factor and Offset; a score that adds"
+          - "The boosted tree tuned by random search on prequential folds with the module-2 harness"
+          - "The choice argued as a cost comparison, not a metric comparison"
+        demo: null
+        lab:
+          est_hours: 4
+          checkpoints:
+            - id: equal-frequency-bins
+              kind: exact
+              text: "Equal-frequency binning of a numeric variable with the bin edges and counts"
+            - id: woe-iv
+              kind: exact
+              text: "Weight of evidence per bin and the variable's information value, checked against the textbook's 2,000-row age table"
+            - id: chi2-binning-compare
+              kind: exact
+              text: "Chi-squared comparison of two candidate binnings of the same variable"
+            - id: scorecard-points
+              kind: exact
+              text: "Factor and Offset for 20 points per doubling of the odds, and the points of every attribute of a fitted logistic regression on WOE features"
+            - id: fit-scorecard
+              kind: exact
+              text: "The full scorecard: bins → WOE → logistic fit → points, scoring a held-out transaction table"
+            - id: tuned-gbm
+              kind: exact
+              text: "Random search over a boosted-tree grid on prequential folds with the module-2 harness, returning the best-validation configuration per metric"
+            - id: which-to-ship
+              kind: review
+              text: "Written answer: which detector to ship, argued in savings and investigation cost, naming what the other one buys"
+            - id: beat-savings
+              kind: metric
+              text: "Beat the savings bar on the held-out week with either detector"
+              required: false
+        notes: "Canon grounding (HKU FITE7410 A2: two supervised algorithms and a practical cost-based comparison; Baesens' worked scorecard; CS6890 PS3), dataset and checkpoint detail live in research/scorecard-vs-gbm-lab.md (LAB PLAN)."
+
+  - slug: anomaly
+    title: "The unlabeled frontier: anomaly detection"
+    outcomes: [co-detect]
+    lessons:
+      - slug: anomaly-detection-framing
+        title: "Anomaly types, label regimes and the assumption behind each detector"
+        type: core
+        status: planned
+        goal: "Classify anomalies as point, contextual or collective and detectors by label regime and key assumption, and predict from the assumption which detector fails on which data geometry"
+        opening: "A supervised detector finds only the fraud it was shown; new fraud enters as a departure from normality, and every anomaly detector encodes one assumption about what normal looks like that doubles as a statement of when it fails."
+        est_minutes: 34
+        prerequisites: [behavioural-profiles]
+        concepts:
+          introduces: [point-contextual-collective-anomaly, label-regime, anomaly-assumption]
+          reinforces: [peer-group-analysis, superimposition-fraud]
+        key_ideas:
+          - "Point, contextual (user or season as context) and collective anomalies with the card examples; EUR 1,000 a week in December vs July"
+          - "Supervised / semi-supervised / unsupervised; the rarity assumption and where it breaks (worm traffic)"
+          - "Breiman's two fuzzy balls: the unsupervised boundary around normal vs the supervised second ball"
+          - "Three 2-D thought experiments: which family succeeds on a tight cluster, a ring with central anomalies, a tight anomalous cluster"
+        demo: null
+      - slug: density-and-distance-scores
+        title: "Distance and density scores: kth-neighbour distance, LOF and Mahalanobis"
+        type: core
+        status: planned
+        goal: "Compute kth-nearest-neighbour, local-outlier-factor and Mahalanobis anomaly scores and explain the varying-density failure that LOF repairs"
+        opening: "A point near a dense cluster can have a larger kth-neighbour distance than an outlier beside a sparse one, so a global distance score ranks it wrong; the repair is to compare each point's density to its neighbours' densities."
+        est_minutes: 36
+        prerequisites: [anomaly-detection-framing]
+        concepts:
+          introduces: [knn-distance-score, local-outlier-factor, mahalanobis-score]
+          reinforces: [anomaly-assumption, break-point-analysis]
+        key_ideas:
+          - "z-score, 1.5-IQR and 3σ coincide for Gaussian data (99.3% vs 99.7%); Grubbs' test; Mahalanobis as its multivariate form"
+          - "kth-NN distance, count within radius, the O(N²) cost and its pruning"
+          - "LOF = ratio of neighbours' local density to the point's; COF for line structures; what both miss (a dense anomaly cluster)"
+          - "Histogram profiles miss the rare combination of common values; robust PCA score as Mahalanobis in a subspace"
+        demo: null
+      - slug: isolation-forest
+        title: "Isolation Forest"
+        type: core
+        status: planned
+        goal: "Derive the Isolation Forest anomaly score from expected path length under random partitioning and explain why sub-sampling improves detection"
+        opening: "Anomalies are few and different, so random axis-parallel splits isolate them in fewer cuts than normal points: 4 against 12 on the paper's Gaussian, and the expected number of cuts is the score."
+        est_minutes: 36
+        prerequisites: [density-and-distance-scores]
+        concepts:
+          introduces: [isolation-path-length, isolation-score, swamping-masking]
+          reinforces: [knn-distance-score, anomaly-assumption]
+        key_ideas:
+          - "iTree as a binary search tree; c(n) = 2H(n−1) − 2(n−1)/n from unsuccessful-search path length"
+          - "s = 2^(−E[h]/c(n)): 0.5 when E[h] = c(n), near 1 for anomalies; why neither n nor log n normalises"
+          - "Swamping and masking: Mulcross AUC 0.67 on 4,096 points, 0.91 on a 128-point sub-sample; ψ = 256, t = 100, height limit ⌈log₂ψ⌉"
+          - "Linear time, 511 nodes per tree; kNN misses anomaly clusters larger than k; the curse of dimensionality and kurtosis selection"
+        demo:
+          component: IsolationSplitter
+          spec: >-
+            A 2-D cloud with one planted outlier; a click on any point grows
+            a random isolation tree around it frame by frame and reports the
+            path length; a counter accumulates the mean over trees. Task:
+            before clicking, predict which of three marked points isolates
+            fastest, then verify; then switch to the "masked cluster" preset
+            and lower the sub-sample ψ until the planted anomaly cluster's
+            mean path drops below the normal points' — the swamping effect
+            the reader removes by hand.
+      - slug: one-class-and-reconstruction
+        title: "One-class boundaries and reconstruction error: ν-SVM, SVDD and autoencoders"
+        type: core
+        status: planned
+        goal: "Explain one-class SVM and SVDD as boundary estimators and the autoencoder reconstruction error as an anomaly score, and evaluate the handbook's unsupervised and semi-supervised results"
+        opening: "An autoencoder trained on the simulator's transactions reconstructs genuine ones with mean squared error $6.9\\times10^{-5}$ and frauds with $1.83\\times10^{-3}$, a 27-fold gap that yields ROC-AUC 0.84 with zero labels and average precision 0.18."
+        est_minutes: 38
+        prerequisites: [isolation-forest, neural-tabular-detectors]
+        concepts:
+          introduces: [one-class-svm, reconstruction-error, semi-supervised-fusion]
+          reinforces: [isolation-score, feed-forward-detector, average-precision]
+        key_ideas:
+          - "ν-SVM: separate the data from the origin in feature space, ν bounds the outlier fraction; SVDD as the smallest enclosing sphere"
+          - "Replicator network / autoencoder: 15-100-20-100-15, MSE as score; the untrained 0.93 falling to 8e-5"
+          - "Isolation Forest 0.808 / 0.164 / 0.19 vs AE 0.836 / 0.18 / 0.217 vs supervised 0.859 / 0.646 / 0.28"
+          - "Semi-supervised W1A/W1B/W2: adding the reconstruction error as a feature moves 0.646 → 0.651 — a null result reported honestly"
+        demo: null
+      - slug: ulb-unsupervised-scores
+        title: "Unsupervised scores on the ULB credit-card set"
+        type: core
+        status: planned
+        goal: "Evaluate Isolation Forest, an autoencoder and a k-means cluster rule on the ULB credit-card data against a supervised baseline, and explain why a cluster that is 71% fraud still floods the queue"
+        opening: "On the ULB set a k-means cluster chosen for its fraud share is 71% fraud on the test split against a base rate of 0.2%, and the rule 'alert the cluster' still has recall near 1 and F1 near 0."
+        est_minutes: 30
+        prerequisites: [one-class-and-reconstruction, canonical-datasets]
+        concepts:
+          introduces: []
+          reinforces: [isolation-score, reconstruction-error, local-outlier-factor, average-precision, label-regime]
+        key_ideas:
+          - "The artifact: HKU FITE7410 A1 Part II and CS6890 PS4 — k-means (k = 3 under SMOTE, 4 under ROSE), an autoencoder, a VAE on 284,807 PCA rows"
+          - "Resampling before clustering leaks the resampler into the clusters; the elbow moves with the preprocessing"
+          - "Scores compared under AP and precision at a budget; AUC flatters every unsupervised method"
+          - "Departures: no time axis beyond seconds, PCA'd features with no entity, a two-day window — what the set cannot test"
+        demo: null
+      - slug: anomaly-scorers-lab
+        title: "Lab: an Isolation Forest and an autoencoder from scratch"
+        type: lab
+        status: planned
+        goal: "Build an Isolation Forest and a numpy autoencoder as anomaly scorers, verify each against the paper's constants and a finite-difference referee, and score the ULB credit-card set under average precision"
+        opening: "Two scorers that use no labels — random isolation trees and a reconstruction network — built from the formulas, checked against the paper's numbers, and ranked on real card transactions by the metric investigators would use."
+        est_minutes: 12
+        prerequisites: [ulb-unsupervised-scores]
+        concepts:
+          introduces: []
+          reinforces: [isolation-path-length, isolation-score, swamping-masking, reconstruction-error, average-precision]
+        key_ideas:
+          - "c(n) and the score as closed forms checked at n = 2, 256, 4096"
+          - "A random iTree with a height limit; the path length with the c(Size) adjustment at a truncated leaf"
+          - "A tied-weight autoencoder with its gradient refereed by finite differences"
+          - "Both scores on the ULB set under AP, with the supervised number as the ceiling"
+        demo: null
+        lab:
+          est_hours: 4.5
+          checkpoints:
+            - id: path-normaliser
+              kind: exact
+              text: "The normaliser c(n) from the harmonic number and the score s(x, n) from an expected path length"
+            - id: itree-build
+              kind: exact
+              text: "A random isolation tree on a seeded sub-sample with a height limit"
+            - id: path-length
+              kind: exact
+              text: "Path length of a point through a tree, adding c(Size) at a truncated external node"
+            - id: iforest-score
+              kind: exact
+              text: "The forest: t trees on ψ-sub-samples, mean path length, the anomaly score for a matrix of points"
+            - id: autoencoder-forward-loss
+              kind: exact
+              text: "Forward pass and mean-squared reconstruction loss of a tied-weight autoencoder"
+            - id: autoencoder-gradient
+              kind: exact
+              text: "Backpropagation through the autoencoder, refereed by finite differences"
+            - id: train-autoencoder
+              kind: exact
+              text: "Training loop on genuine transactions only; reconstruction error as the anomaly score"
+            - id: why-auc-flatters
+              kind: review
+              text: "Written answer: why both unsupervised scores reach a respectable ROC-AUC and a poor average precision"
+            - id: beat-ap-bar
+              kind: metric
+              text: "Beat the average-precision bar on the held-out ULB split with either scorer or any combination"
+              required: false
+        notes: "Canon grounding (CS6890 PS4: autoencoder and VAE on the ULB set scored by F1; HKU FITE7410 A1 Part II: k-means cluster analysis on the same set), dataset and checkpoint detail live in research/anomaly-scorers-lab.md (LAB PLAN)."
+
+  - slug: graphs
+    title: "Networks and money movement"
+    outcomes: [co-detect]
+    lessons:
+      - slug: fraud-as-a-graph
+        title: "Transactions as a graph: entities, motifs and entity resolution"
+        type: core
+        status: planned
+        goal: "Construct a bipartite or tripartite graph from a transaction log, resolve entities through shared identifiers, and classify laundering typologies as motifs"
+        opening: "Eight rows of a transaction table hide a cycle A → C → D → A that one glance at the graph exposes, and the same graph exposes which two cardholders share a card, a device or an address."
+        est_minutes: 36
+        prerequisites: [financial-crime-typology]
+        concepts:
+          introduces: [transaction-graph, entity-resolution, laundering-motif, homophily-test]
+          reinforces: [money-laundering-stages]
+        key_ideas:
+          - "Nodes = accounts or cardholders and merchants; edges = transactions with time-decayed weights; the tripartite trick turns labelled edges into nodes"
+          - "AMLworld's eight patterns: fan-in/out, gather-scatter, scatter-gather, cycle, random, bipartite, stack; only 19% of its laundering follows one"
+          - "Entity resolution as new edges: shared card, shared device; the high-degree identifier problem (coffee-shop IP) and a degree cap of 10"
+          - "Homophily test: 5 cross-labelled edges where 8 expected, p = 0.03; dyadicity and heterophilicity; auction fraud is heterophilous"
+        demo:
+          component: IdentifierDegreeCap
+          spec: >-
+            A small user–identifier graph (users, cards, devices, one
+            coffee-shop IP) with a slider for the identifier degree cap;
+            shared-identifier edges between users appear only through
+            identifiers under the cap, and connected components recolour
+            live. Task: find the smallest cap at which the two planted
+            fraud rings stay separate from the honest users, then the cap
+            at which everything collapses into one component — the
+            high-degree identifier problem found by hand.
+      - slug: graph-features-and-communities
+        title: "Neighbourhood, centrality and community features"
+        type: core
+        status: planned
+        goal: "Compute degree, triangle, egonet, path-count, closeness, betweenness and community features on a toy network and explain which ones narrow a fraud search and which ones rank suspects"
+        opening: "On a 20-node toy network every feature a classifier could take from the graph — degree by class, triangles, closeness, betweenness, paths of length three — is one table, and on a 204,000-user payment graph a single Louvain run leaves 1.7% of communities containing any known fraud."
+        est_minutes: 38
+        prerequisites: [fraud-as-a-graph]
+        concepts:
+          introduces: [egonet-features, centrality-measures, community-detection, connected-components]
+          reinforces: [transaction-graph, entity-resolution]
+        key_ideas:
+          - "Degree, triangles by alter label, density 2M/(N(N−1)); A^k counts k-hop paths; closeness as inverse farness; betweenness"
+          - "OddBall: egonet feature pairs with power-law fits; recursive (ReFeX) aggregates"
+          - "Connected components by union-find are deterministic and auditable; Louvain's modularity Q = Σ(e_ii − a_i²) = 0.41 on the toy split; the resolution limit"
+          - "Search-space reduction: 11,500 communities, 200 with fraud; WCC on entity-resolution edges alone: 211 risk users with 13% of volume"
+        demo: null
+      - slug: guilt-by-association
+        title: "Guilt by association: relational classifiers and random walks with restart"
+        type: core
+        status: planned
+        goal: "Derive the fraud-personalised PageRank as a random walk with restart on the transaction graph, implement it by power iteration with time-decayed weights, and explain why plain PageRank is useless for fraud"
+        opening: "Plain PageRank tracks degree and ranks nothing useful for fraud; restarting the walk only at known-fraud nodes turns the same iteration into an exposure score that ranks a legitimate node above a fraudulent one for a reason the graph makes visible."
+        est_minutes: 40
+        prerequisites: [graph-features-and-communities]
+        concepts:
+          introduces: [relational-neighbour-classifier, random-walk-with-restart, exposure-score, collective-inference]
+          reinforces: [transaction-graph, centrality-measures]
+        key_ideas:
+          - "Relational neighbour P(c|n) ∝ Σ w(n,n_j)[class = c] (2/5, 3/5); probabilistic RN 0.45; link features for a logistic regression"
+          - "ξ = αQξ + (1−α)z with α = 0.85, Q column-normalised, z = 1 on fraud nodes; power iteration, not inversion; Table 5.12's ranking D, F, E, G above I"
+          - "APATE: edge weights exp(−γh) for day/week/month, the tripartite Q, the cold-start local update ξ_tx = ξ_cch/(Σw+1) + ξ_mc/(Σw+1)"
+          - "Nine exposure features reach AUC 0.920 alone; Gotcha's anticipating and forgiving effects; Gibbs, relaxation labelling and loopy BP in one paragraph each"
+        demo:
+          component: RestartWalkPropagator
+          spec: >-
+            The textbook's 20-node toy network with click-to-toggle fraud
+            seeds and a step button that runs one power iteration of
+            ξ ← αQξ + (1−α)z, node sizes tracking ξ. Task: with the given
+            seeds, step until the ranking stabilises and read off which
+            legitimate node outranks a fraudulent one; then find a seed
+            set of two nodes that flips that order — the reader discovers
+            that restart placement, not degree, decides the ranking.
+      - slug: graph-neural-networks
+        title: "Graph convolutional networks for node classification"
+        type: core
+        status: planned
+        goal: "Derive the GCN layer as neighbourhood aggregation with a normalised adjacency, show that a skip connection makes it at least a logistic regression, and evaluate when it beats hand-aggregated neighbour features"
+        opening: "One GCN layer is $H' = \\sigma(\\hat A H W)$ with $\\hat A = \\tilde D^{-1/2}(A+I)\\tilde D^{-1/2}$; two layers see two hops; and with zero weights on the graph term a Skip-GCN is exactly logistic regression on the node's own features."
+        est_minutes: 38
+        prerequisites: [guilt-by-association, neural-tabular-detectors]
+        concepts:
+          introduces: [message-passing, gcn-layer, neighbourhood-sampling]
+          reinforces: [egonet-features, random-walk-with-restart, feed-forward-detector]
+        key_ideas:
+          - "Gather, aggregate, update; AX as sum aggregation; A^k as k-hop walks; sum/mean/max aggregation and the pairs each cannot distinguish"
+          - "Why adjacency matrices are not permutation-invariant inputs; adjacency lists; mini-batching by neighbourhood sampling with a masked loss"
+          - "Depth: best at 2 layers, deeper dilutes; a global node for long range; attention as a learned weighted sum"
+          - "Elliptic: Skip-GCN 0.705 vs GCN 0.628 illicit F1, RF 0.788 on 72 hand-aggregated one-hop features; EvolveGCN 0.720"
+        demo: null
+      - slug: elliptic-illicit-nodes
+        title: "Illicit-node classification on the Elliptic Bitcoin graph"
+        type: core
+        status: planned
+        goal: "Evaluate the Elliptic benchmark — random forest, MLP, GCN, Skip-GCN, EvolveGCN on 49 time steps — and explain the collapse of every model at the dark-market shutdown"
+        opening: "On 203,769 Bitcoin transactions with 2% labelled illicit, a random forest on the given features reaches illicit-class F1 0.788 against the GCN's 0.628, the micro-averaged F1 of every model sits above 0.93, and at time step 43 all of them fall to zero."
+        est_minutes: 32
+        prerequisites: [graph-neural-networks, canonical-datasets]
+        concepts:
+          introduces: []
+          reinforces: [gcn-layer, egonet-features, message-passing, label-completeness, average-precision]
+        key_ideas:
+          - "The artifact: Weber et al. 2019 — temporal 70:30 split, 94 local + 72 one-hop features, weighted cross-entropy 0.3/0.7"
+          - "Aggregated features help every model; GCN embeddings concatenated help LR and RF; Skip-GCN > GCN says the inputs were already informative"
+          - "Micro-F1 0.96–0.98 beside illicit-F1 0.45–0.80: the accuracy trap in a graph setting"
+          - "Step 43: a dark market closes and even an RF retrained each step with oracle labels does not recover — drift the module cannot fix"
+        demo: null
+      - slug: graph-propagation-lab
+        title: "Lab: fraud propagation and a GCN on a transaction graph"
+        type: lab
+        status: planned
+        goal: "Build a graph fraud scorer — sparse adjacency, connected components, a fraud-personalised random walk with restart with time-decayed weights, egonet features and a two-layer GCN in numpy — and score an Elliptic subset"
+        opening: "From an edge list to an exposure score and a graph network: union-find for the components, power iteration for the walk, a normalised adjacency for the layer, all refereed on a 20-node toy before the Bitcoin graph."
+        est_minutes: 12
+        prerequisites: [elliptic-illicit-nodes]
+        concepts:
+          introduces: []
+          reinforces: [connected-components, random-walk-with-restart, exposure-score, egonet-features, gcn-layer]
+        key_ideas:
+          - "A sparse column-normalised transition matrix from an edge list with exponential time decay"
+          - "The restart walk converging by power iteration, checked against the textbook's 20-node table"
+          - "Egonet features from A, A² and A³"
+          - "A two-layer GCN with a finite-difference gradient referee, trained on a temporal split"
+        demo: null
+        lab:
+          est_hours: 4.5
+          checkpoints:
+            - id: sparse-adjacency
+              kind: exact
+              text: "Sparse adjacency and column-normalised transition matrix from an edge list, with exponential time-decay weights"
+            - id: connected-components
+              kind: exact
+              text: "Weakly connected components by union-find, component sizes sorted"
+            - id: restart-walk
+              kind: exact
+              text: "Fraud-personalised PageRank by power iteration from a seed vector, checked against the 20-node toy ranking"
+            - id: egonet-features
+              kind: exact
+              text: "Degree, triangles and 2- and 3-hop path counts per node from powers of the adjacency"
+            - id: gcn-forward
+              kind: exact
+              text: "Normalised adjacency and the forward pass of a two-layer GCN with a skip term"
+            - id: gcn-gradient
+              kind: exact
+              text: "Backpropagation through the GCN, refereed by finite differences"
+            - id: train-on-time-split
+              kind: exact
+              text: "Training on the first time steps and scoring the later ones, with a weighted cross-entropy for the illicit class"
+            - id: why-rf-wins
+              kind: review
+              text: "Written answer: why a random forest on hand-aggregated neighbour features beats the GCN here"
+            - id: beat-illicit-f1
+              kind: metric
+              text: "Beat the illicit-class F1 bar on the held-out time steps with any combination of walk scores, egonet features and the GCN"
+              required: false
+        notes: "Canon grounding (CS6890 PS2: TrustRank from a bad-node file on a payment graph; CS6890 PS1: GCN embeddings; Neo4j GraphAcademy module 2: WCC on entity-resolution edges and guilt by association), dataset and checkpoint detail live in research/graph-propagation-lab.md (LAB PLAN)."
+
+  - slug: sequences-drift
+    title: "Sequences, streams and drift"
+    outcomes: [co-adapt]
+    lessons:
+      - slug: sequence-models-for-transactions
+        title: "Sequence models over an entity's transactions"
+        type: core
+        status: planned
+        goal: "Construct fixed-length transaction sequences per cardholder and evaluate 1-D convolutions, LSTMs and attention against hand-built aggregates on card-present and e-commerce data"
+        opening: "An LSTM over the previous nine transactions of a card lifts card-present AUCPR from 0.138 to 0.200 and leaves e-commerce at 0.179 against 0.180 — the sequence carries signal only where physical constraints make it consistent."
+        est_minutes: 40
+        prerequisites: [neural-tabular-detectors, behavioural-profiles]
+        concepts:
+          introduces: [landmark-sequence, sequence-detector, hidden-markov-features]
+          reinforces: [feed-forward-detector, windowed-aggregation, rfm-aggregates]
+        key_ideas:
+          - "Landmark = customer id; seq_len 5–10 because a compromised account carries ~4 frauds; the padding-row trick and groupby-shift"
+          - "Conv1d shape arithmetic (5,15) → (4,100) → (3,50); LSTM final state; attention weights near one-hot on the last transaction"
+          - "Jurgovsky: F2F vs ECOM, BASE/TDELTA/AGG; with aggregates the LSTM gain vanishes; TP-set Jaccard 25% between RF and LSTM"
+          - "Multi-perspective HMM likelihoods as eight features (+15%); t-STIDE window counts; the simulator shows no sequence gain"
+        demo: null
+      - slug: concept-drift
+        title: "Concept drift: taxonomy, detection and adaptation"
+        type: core
+        status: planned
+        goal: "Classify drift as real, virtual or prior shift, detect it with CUSUM, Page–Hinkley, DDM and ADWIN on an error stream, and design a windowing, forgetting and ensemble strategy for a transaction stream"
+        opening: "Over 422 days of card transactions the model trained once ranks last for every balancer and every metric, the model retrained daily on a 90-day window ranks near the top, and the one trained on yesterday alone ranks worst of the adaptive ones because yesterday held too few frauds."
+        est_minutes: 40
+        prerequisites: [delayed-labels-prequential, gbm-model-selection]
+        concepts:
+          introduces: [concept-drift-types, drift-detector, forgetting-strategy]
+          reinforces: [prequential-validation, delay-period, imbalance-ratio]
+        key_ideas:
+          - "p(y|x) vs p(x) vs p(y) drift; sudden, incremental, gradual, reoccurring, and the outlier that is not drift"
+          - "Day-distinguishability: train a classifier to tell day A from day B; its AUC is the distance; the weekly cycle appears"
+          - "CUSUM and Page–Hinkley on the error stream; DDM's warning/drift bands at 2σ and 3σ; ADWIN's two-subwindow cut"
+          - "Static vs Update vs Forget (keep all past frauds, recent genuine); DWM and weighted ensembles; prequential evaluation with a sliding window"
+        demo:
+          component: DriftDetectorTuner
+          spec: >-
+            A seeded error stream with a planted mean shift at a hidden
+            step and a drift-free stretch before it; the reader sets the
+            Page–Hinkley δ and λ and sees the statistic, the alarm step and
+            the false alarms on the stable stretch. Task: detect the shift
+            within 50 steps with zero false alarms on the stable stretch;
+            then switch to the "gradual" preset and find that no setting
+            achieves both — the delay/false-alarm trade the lesson derives.
+      - slug: drift-strategies-on-worldline
+        title: "Updating strategies on 422 days of Worldline data"
+        type: core
+        status: planned
+        goal: "Evaluate the static, update and forget strategies with three balancers over 422 daily chunks of real card data and attribute the rank ordering to drift and to the fraud count per chunk"
+        opening: "Ranked over 422 daily test chunks, EasyEnsemble with forgetting and daily updates is first on average precision, ROC-AUC and precision at rank, and the static model is last for every balancer; the ordering is the drift measured."
+        est_minutes: 30
+        prerequisites: [concept-drift, sequence-models-for-transactions]
+        concepts:
+          introduces: []
+          reinforces: [concept-drift-types, forgetting-strategy, drift-detector, sequence-detector, imbalance-ratio]
+        key_ideas:
+          - "The artifact: Dal Pozzolo et al. 2014 — 2.2M transactions, daily chunks of ~5,200, 90-day aggregates, Friedman rank sums"
+          - "Random forest beats NNET and SVM; daily update beats weekly and 15-day at the same K; K = 1 is worst"
+          - "Keeping all past frauds plus 30 days of genuine; SMOTE pairs with Update, EasyEnsemble with Forget; the compute cost of each"
+          - "Departures: labels assumed instant, e-commerce only, one dataset; what the Elliptic collapse and the day-shift heat map add"
+        demo: null
+
+  - slug: adversary
+    title: "The adversary and the feedback loop"
+    outcomes: [co-adapt]
+    lessons:
+      - slug: adversarial-classification
+        title: "Adversarial classification: evasion as a knapsack and the arms race"
+        type: core
+        status: planned
+        goal: "Formulate evasion against a cost-sensitive classifier as a minimum-cost camouflage problem, derive the adversary-aware classifier, and explain why the repeated game oscillates instead of converging"
+        opening: "Against a naive Bayes filter the cheapest set of word insertions that crosses the log-odds threshold is a knapsack, the adversary buys log-odds reduction at per-feature prices until the gap closes, and the untouched classifier then passes every one of 481 spam messages."
+        est_minutes: 38
+        prerequisites: [example-dependent-cost, concept-drift]
+        concepts:
+          introduces: [minimum-cost-camouflage, adversary-aware-classifier, arms-race]
+          reinforces: [bayes-minimum-risk, cost-matrix, concept-drift-types]
+        key_ideas:
+          - "Game: classifier utility U_C with measurement costs, adversary utility U_A minus edit cost W; single-shot sequential play"
+          - "Gap = log-odds minus threshold; MCC as a 0-1 knapsack with a pseudo-linear DP over discretised log-odds; act iff cost < ΔU_A"
+          - "Adversary-aware: P_A(x'|+) sums the pre-images that would have been camouflaged to x'; FN 481 → 93 with 0 false positives"
+          - "Repeated game: good words lose their log-odds and regain them, utility oscillates with period 2; Provost's probing anecdotes; the AI Act's threat list"
+        demo:
+          component: CamouflageKnapsack
+          spec: >-
+            A message with eight candidate word edits, each showing its
+            log-odds reduction and its cost, a log-odds gap bar and a
+            budget. The reader picks edits to close the gap under budget
+            (the knapsack); on success the classifier retrains and the
+            edits' log-odds reductions shrink. Task: get three rounds of
+            spam through; then find that from round four no affordable
+            edit set closes the gap — the adversary-aware bound the reader
+            loses against.
+      - slug: alert-feedback-selection-bias
+        title: "Alert-feedback selection bias and learning from feedbacks plus delayed samples"
+        type: core
+        status: planned
+        goal: "Analyze the sample selection bias created by labelling only alerted transactions, show why importance weighting cannot remove it, and derive the feedback-plus-delayed-sample learning strategy"
+        opening: "Investigators label the transactions the model ranked highest, so the freshest labels are a sample selected by the previous classifier — biased in class prior, in features and in their joint — and a reweighting that fixes a covariate shift on amount > 500 does nothing here because the selection depends on the label."
+        est_minutes: 38
+        prerequisites: [delayed-labels-prequential, concept-drift]
+        concepts:
+          introduces: [sample-selection-bias, feedback-samples, delayed-samples, feedback-delayed-aggregation]
+          reinforces: [alert-feedback-interaction, verification-latency, prequential-validation]
+        key_ideas:
+          - "Feedbacks F_t = all recent transactions of alerted cards; delayed samples D_{t−δ}; silence read as genuine"
+          - "Three bias types; importance weight P(s=1)/P(s=1|x,y) and the sanity check that works for amount > 500 and fails for alerts"
+          - "Active learning is not an option: investigators must see the most suspicious, not the most informative"
+          - "P_A = αP_F + (1−α)P_D: AW beats pooled W (P_k 0.77 vs 0.61); F has the worst AUC and the best alert precision; NCP_k rises with k (hiring case)"
+        demo: null
+      - slug: arms-race-replay
+        title: "The arms race and the feedback loop replayed on the simulator"
+        type: core
+        status: planned
+        goal: "Evaluate Dalvi's oscillating repeated game and Dal Pozzolo's feedback-versus-delayed-sample comparison by reproducing both as a computational study on the handbook simulator, and state where the simulator departs from the papers"
+        opening: "With the simulator's amount rule under a static detector, a fraudster who learns the threshold and spends 219 instead of 221 is invisible after one retraining and visible again after the next, and a model trained on alert feedback alone drifts away from the stream it is meant to score."
+        est_minutes: 32
+        prerequisites: [adversarial-classification, alert-feedback-selection-bias]
+        concepts:
+          introduces: []
+          reinforces: [arms-race, minimum-cost-camouflage, feedback-delayed-aggregation, sample-selection-bias, transaction-simulator]
+        key_ideas:
+          - "The artifact: Dalvi Fig. 3 (period-2 utility oscillation) and Dal Pozzolo Table III (F, D, W, AW) re-run on the simulator's scenario 1 and 3 frauds"
+          - "An adaptive scenario: fraudsters shift amounts below the learned split; the detector's retraining cadence vs the fraudster's"
+          - "Feedback-only training: top-k alerts → labels → retrain; the training set's fraud share and feature distribution drift from the stream"
+          - "Departures: the simulator's fraudster has one knob, the papers' had a cost model; alerts are raised by ranking, not online"
+        demo: null
+
+  - slug: governance
+    title: "Decisions, explanations and governance"
+    outcomes: [co-govern]
+    lessons:
+      - slug: score-to-action
+        title: "From score to action: routing, decision tables and the inspection frontier"
+        type: core
+        status: planned
+        goal: "Design the decision policy that turns a fraud probability into decline, step-up or review, including a probability-by-amount investigation frontier and a verified rule table"
+        opening: "A 90% fraud probability on a EUR 10 transaction is worth EUR 9 of expected fraud and not an investigation; 25% on EUR 10,000 is worth EUR 2,500 and is — the action is a function of probability and amount, drawn as a frontier."
+        est_minutes: 36
+        prerequisites: [example-dependent-cost, alert-feedback-selection-bias]
+        concepts:
+          introduces: [decision-zones, decision-table, investigation-frontier, false-positive-harm]
+          reinforces: [inspection-budget, bayes-minimum-risk, savings-metric]
+        key_ideas:
+          - "Traffic-light zones with a referral band; automatic decisions at the extremes, analysts in the middle who may overrule"
+          - "Decision tables: eight card rules collapse to four columns and reveal that card-not-present is always fraud; conflicts and gaps found mechanically"
+          - "Expected fraud amount = P × amount; the stepwise frontier; hit rate is not a target; routing, mitigation first, audit trail"
+          - "The cost of friction: blocked cards, de-risking, per-group false-positive rates; 10,000 false alarms a day on a million accounts"
+        demo: null
+      - slug: alert-explanations
+        title: "Explaining an alert: attributions, rules and reason codes"
+        type: core
+        status: planned
+        goal: "Produce an explanation for an individual alert — Shapley attributions, extracted rules, attention weights — and judge which satisfies an investigator, a customer and a supervisor"
+        opening: "An alert that reads 'score 0.93' is not actionable; the same alert as 'terminal risk over 30 days 0.075 and 14 transactions today, against a base of 0.003' is, and the difference is an attribution that sums to the score."
+        est_minutes: 36
+        prerequisites: [score-to-action, gbm-model-selection]
+        concepts:
+          introduces: [alert-attribution, rule-extraction, reason-code]
+          reinforces: [decision-zones, weight-of-evidence, points-scorecard]
+        key_ideas:
+          - "Shapley attributions restated: three axioms, additivity to the score, the top-5 feature contributions BigQuery ML returns per prediction"
+          - "Opening the black box: Hinton diagrams, backward elimination, decompositional vs pedagogical rule extraction with fidelity (a+d)/(a+b+c+d), two-stage models"
+          - "Attention weights as per-prediction weights over history; scorecard points as the explanation that needs no method"
+          - "Three audiences: the investigator's narrative, the customer's 'meaningful information about the logic', the supervisor's decision record"
+        demo: null
+      - slug: model-risk-monitoring
+        title: "Model risk: backtesting, stability indices and the life cycle"
+        type: core
+        status: planned
+        goal: "Compute population and performance stability tests for a deployed detector and design its monitoring, champion–challenger and retirement life cycle"
+        opening: "A system stability index of 0.0605 is green and one of 0.304 on a single variable is red: the detector that scored well last quarter is backtested every period against ex-post outcomes because the fraudsters have changed since."
+        est_minutes: 36
+        prerequisites: [concept-drift, score-to-action]
+        concepts:
+          introduces: [stability-index, performance-backtest, champion-challenger]
+          reinforces: [drift-detector, concept-drift-types, undersampling-calibration]
+        key_ideas:
+          - "SSI = Σ(obs − exp)·ln(obs/exp) — the information value again; thresholds 0.10 and 0.25; population then per variable"
+          - "Performance traffic lights: absolute change 5%/10%, or a bootstrap over pooled train and out-of-time samples at 95%/99%"
+          - "Calibration backtests: binomial critical rate, Hosmer–Lemeshow; the independence assumption that network effects break"
+          - "Life cycle: development, testing, staging in parallel, production, retirement; direct, phased and parallel changeover; the documentation test"
+        demo: null
+      - slug: fraudfinder-monitoring-read
+        title: "A deployed pipeline's monitoring read against the theory"
+        type: core
+        status: planned
+        goal: "Evaluate the monitoring and deployment gates of Google's FraudFinder reference pipeline against this module's results and locate the gates that pass a constant model"
+        opening: "The reference pipeline gates deployment on accuracy above 0.95, which a model that never alerts clears at a 2% fraud rate; monitors 9 of its 25 features for skew at 0.5 and drift at 0.05 with no stated reason; and fills a cold customer's missing features with zero."
+        est_minutes: 30
+        prerequisites: [model-risk-monitoring, alert-explanations, point-in-time-features]
+        concepts:
+          introduces: []
+          reinforces: [stability-index, performance-backtest, champion-challenger, training-serving-skew, decision-zones]
+        key_ideas:
+          - "The artifact: FraudFinder bqml/05–07 and vertex_ai/06 — the pipeline DAG, the metric gate, the monitoring job, the Cloud Run handler"
+          - "Skew vs drift as the pipeline uses them; the training table as the skew baseline; what the thresholds would catch"
+          - "The accuracy gate against the AP gate of the sibling track; the explanation spec; the request/response log as the audit record"
+          - "Departures: synthetic data with AUC 1.0, a stale pinned stack, a hand-copied feature contract in four places"
+        demo: null
+
+  - slug: eu-regulation
+    title: "The European regulatory frame"
+    outcomes: [co-govern]
+    lessons:
+      - slug: eu-aml-single-rulebook
+        title: "The EU AML single rulebook: AMLR, AMLD6 and AMLA as constraints on the model"
+        type: core
+        status: planned
+        goal: "Identify in the AML package every obligation that binds a transaction-monitoring model — monitoring scope, suspicion criteria, non-outsourceable decisions, automated-decision safeguards, records, supervisory access — and map each to a pipeline component"
+        opening: "From 10 July 2027 the detection criteria, the customer risk decision, the onboarding decision and the suspicious transaction report cannot be outsourced, every automated decision to refuse or exit a customer needs meaningful human intervention, and a supervisor may demand the documents of a decision 'developed by algorithms'."
+        est_minutes: 40
+        prerequisites: [score-to-action, model-risk-monitoring]
+        concepts:
+          introduces: [transaction-monitoring-duty, suspicious-transaction-report, non-outsourceable-decision, fiu-feedback-loop]
+          reinforces: [decision-zones, performance-backtest, alert-attribution]
+        key_ideas:
+          - "AMLR Rec 72 and Art 26: monitoring covers all products, intensity risk-based; Art 34(2)'s four triggers read as an anomaly spec; Art 69(2)'s suspicion bases as a feature taxonomy"
+          - "Art 18(3): detection criteria, risk profile, onboarding and STR filing stay in-house; a bought model is not outsourcing (Rec 47) but liability stays"
+          - "Art 76(5): automated decisions and profiling allowed with human intervention, explanation and challenge; Art 77: the assessment record kept whether or not an STR was filed, five years"
+          - "AMLD6: FIU triage, 5- and 10-working-day suspension windows, annual STR-quality feedback; AMLA Art 18(1)(d) algorithm access; fines of 10% of turnover"
+        demo: null
+      - slug: psd2-sca-tra
+        title: "PSD2, strong customer authentication and the transaction-risk-analysis exemption"
+        type: core
+        status: planned
+        goal: "Derive the constraint the PSD2 RTS places on a fraud model — the value-weighted 90-day fraud rate per exemption band, its cessation rule and the liability shift — and compute a lawful exemption policy"
+        opening: "A remote card payment of EUR 240 may skip strong customer authentication only while the issuer's rolling 90-day fraud rate on such payments, measured by value and counting recovered funds, stays under 0.06%; two quarters above it suspend the exemption and the model's precision therefore sets the friction the law allows."
+        est_minutes: 40
+        prerequisites: [alert-budget-metrics, model-risk-monitoring]
+        concepts:
+          introduces: [strong-customer-authentication, transaction-risk-analysis, fraud-rate-reference, liability-shift]
+          reinforces: [precision-at-k, performance-backtest, decision-zones]
+        key_ideas:
+          - "Art 97: SCA on access, initiation, remote action; dynamic linking to amount and payee; MOTO out of scope (Rec 95)"
+          - "RTS Art 2 mandatory monitoring factors; Art 18 TRA: fraud rate ≤ reference, amount ≤ ETV, six real-time flags, a per-transaction risk score; the Annex table"
+          - "Art 19: rate = fraudulent value / all remote value over 90 days, SCA'd and exempted flows both in the denominator; Art 20's two-quarter trip and one-quarter reset; yearly external audit"
+          - "Art 73/74: refund by next business day, EUR 50 payer cap, no payer loss without SCA — why issuers invest in scoring"
+        demo:
+          component: FraudRateCeiling
+          spec: >-
+            A stream of seeded remote transactions with scores and amounts;
+            the reader sets a score threshold below which payments are
+            exempted in the EUR 100/250/500 bands and sees exempted volume
+            and the rolling 90-day value-weighted fraud rate per band
+            against the Annex reference rates, with a quarter-by-quarter
+            trip indicator. Task: maximise exempted volume at EUR 250
+            without tripping the 0.06% line for two consecutive quarters;
+            then raise the band to EUR 500 and find no threshold does it —
+            the precision the law demands, found by hand.
+      - slug: eu-ai-act-fraud
+        title: "The AI Act and fraud detection: the high-risk line and what sits on each side"
+        type: core
+        status: planned
+        goal: "Classify a financial-crime model under the AI Act — the Annex III credit-scoring entry and its fraud carve-out, the Article 6(3) derogation and its profiling override — and map the high-risk obligations onto the pipeline"
+        opening: "Annex III lists 'AI systems intended to be used to evaluate the creditworthiness of natural persons or establish their credit score, with the exception of AI systems used for the purpose of detecting financial fraud'; that clause, and the rule that any Annex III system which profiles natural persons is high-risk regardless, decide what the pipeline owes."
+        est_minutes: 40
+        prerequisites: [eu-aml-single-rulebook, alert-explanations]
+        concepts:
+          introduces: [high-risk-ai-system, annex-iii-fraud-carve-out, post-market-monitoring, right-to-explanation]
+          reinforces: [performance-backtest, alert-attribution, non-outsourceable-decision]
+        key_ideas:
+          - "Annex III 5(a)/(b)/(c), 1(a)'s verification exclusion, Rec 42's suspicious-transaction risk analytics, Rec 59's FIU exclusion; Rec 58's 'provided for by Union law' wording"
+          - "Art 6(3)'s four conditions and the profiling override; Art 6(4) documentation; Art 49(2) registration of a non-high-risk claim; Art 80 re-evaluation and fines"
+          - "Arts 9–15 as pipeline artefacts: risk register, data-governance sheet with bias and feedback-loop checks (Art 10), logs, declared metrics (Art 13), human oversight and automation bias (Art 14), poisoning and evasion (Art 15(5))"
+          - "Financial institutions: QMS deemed by CRD rules except risk management, post-market monitoring and incident reporting (Art 17(4)); the prudential supervisor as market surveillance; FRIA for 5(b)/(c); Art 86 explanation; Art 99 penalties"
+        demo: null
+      - slug: gdpr-financial-crime-data
+        title: "GDPR for fraud data: lawful basis, Article 22 and minimisation against feature richness"
+        type: core
+        status: planned
+        goal: "Classify a fraud-scoring decision by its lawful basis, its Article 22 status and its information duties, and audit a feature set against data minimisation and special-category rules"
+        opening: "Processing strictly necessary for preventing fraud is a legitimate interest by Recital 47, a decision based solely on automated processing with significant effect is one the data subject has a right not to be subject to by Article 22(1), and the two sentences bound what a decline model may do on its own."
+        est_minutes: 36
+        prerequisites: [eu-ai-act-fraud]
+        concepts:
+          introduces: [legitimate-interest-fraud, solely-automated-decision, data-minimisation-audit]
+          reinforces: [right-to-explanation, reason-code, non-outsourceable-decision]
+        key_ideas:
+          - "Art 6(1)(b)/(c)/(f) for fraud processing; the balancing test and reasonable expectations; Art 6(4) compatibility for reusing logs"
+          - "Art 22(1)–(4) and Rec 71: the credit-refusal example, the fraud and tax-evasion carve-out through a law with safeguards, human intervention, explanation, challenge"
+          - "Art 9 and Art 22(4): no special-category features in the automated decision; Art 35 DPIA mirrors Art 22's trigger"
+          - "Art 5(1)(c) against the feature store: minimisation, purpose limitation, storage limitation; Art 13(2)(f)/15(1)(h) 'meaningful information about the logic'"
+        demo: null
+      - slug: transfer-of-funds-crypto
+        title: "The Transfer of Funds Regulation and the crypto travel rule"
+        type: extra
+        status: planned
+        goal: "Identify the originator and beneficiary data that must travel with a funds or crypto transfer under Regulation 2023/1113, the threshold logic, and the missing-information checks a receiving institution must run"
+        opening: "For a bank transfer inside the Union the account numbers suffice until a EUR 1,000 threshold is crossed; for a crypto transfer there is no threshold, the information need not sit on the chain, and a transfer to a self-hosted address above EUR 1,000 obliges the provider to assess who controls the address."
+        est_minutes: 30
+        prerequisites: [eu-aml-single-rulebook]
+        concepts:
+          introduces: [travel-rule, self-hosted-address]
+          reinforces: [transaction-monitoring-duty, suspicious-transaction-report]
+        key_ideas:
+          - "Art 4/14: name, account or ledger address, address or document or date and place of birth, LEI; UTI for off-ledger transfers"
+          - "EUR 1,000 logic for funds with linked-transaction aggregation and cash overrides; no threshold for crypto (Rec 30's structuring argument)"
+          - "Art 7/16: admissible characters, detection of missing fields, execute/reject/return/suspend, the repeat-offender escalation ladder"
+          - "Art 23 sanctions screening; mixers and privacy wallets as risk factors; DLT analytics and know-your-transaction"
+        demo: null
+      - slug: tra-exemption-engine
+        title: "A PSD2-compliant transaction-risk-analysis exemption engine"
+        type: core
+        status: planned
+        goal: "Design and run a TRA exemption engine — a per-transaction risk score, the Annex exemption bands, the rolling 90-day value-weighted fraud rate and the cessation controller — on the simulator and state where it departs from the RTS"
+        opening: "An exemption engine is a threshold on a risk score, a band table, a rolling value-weighted fraud rate per band and a controller that trips after two bad quarters; run on the simulator it shows how much friction a given precision buys and where the legal ceiling bites first."
+        est_minutes: 34
+        prerequisites: [psd2-sca-tra, gdpr-financial-crime-data, example-dependent-cost]
+        concepts:
+          introduces: []
+          reinforces: [transaction-risk-analysis, fraud-rate-reference, bayes-minimum-risk, savings-metric, performance-backtest]
+        key_ideas:
+          - "The artifact: RTS Arts 18–21 and the Annex as code — bands, 90-day rate, two-quarter trip, one-quarter reset, quarterly report"
+          - "Value weighting vs count weighting: a few large frauds move the rate; recovered funds still count; SCA'd flows dilute the denominator"
+          - "The simulator study: exempted volume vs precision per band; the band at which no threshold is lawful; savings against the EUR 50 liability"
+          - "Departures: the simulator's fraud is not remote-card fraud, the real rate is audited yearly, the controller's hysteresis is the law's, not a design choice"
+        demo: null
+
+  - slug: system
+    title: "The system"
+    outcomes: [co-govern, co-adapt]
+    lessons:
+      - slug: real-time-scoring-architecture
+        title: "Real-time scoring: latency budgets, feature stores and the rule layers"
+        type: core
+        status: planned
+        goal: "Design the serving path of a fraud detector — latency budget, batch and streaming features from one store, rule layers around the model, daily retraining — and verify offline/online parity"
+        opening: "A card authorisation decides in under six seconds and the model's part of it in under one, so the aggregates it reads were computed before the transaction arrived, the minute-scale ones by a streaming window, and both from the same store the training set was built from."
+        est_minutes: 36
+        prerequisites: [point-in-time-features, score-to-action, concept-drift]
+        concepts:
+          introduces: [latency-budget, streaming-aggregation, parity-check]
+          reinforces: [feature-store, training-serving-skew, fraud-detection-system, forgetting-strategy]
+        key_ideas:
+          - "The five layers again with their clocks: ms, sub-second, daily, weeks; what each may compute"
+          - "Sliding windows with a period: one 60-minute window yields 15/30/60-minute aggregates by conditional sums; the new-records filter"
+          - "Serving: message → store lookup → payload → score → log; the handler that returns 204 always; null-to-zero as a silent cold-start bug"
+          - "Parity check: replay the day's stream through the serving path and diff it against the batch features; daily retraining at end of day"
+        demo: null
+      - slug: label-maturation
+        title: "Label maturation: chargebacks, reports and the training set as of a date"
+        type: core
+        status: planned
+        goal: "Design the labelling pipeline of a deployed detector — which outcomes become labels, when each settles, how alert dispositions are recorded — and assemble a training set as of a date"
+        opening: "A card fraud label settles when the customer disputes within 13 months, an investigator confirms within days, or nobody says anything and the silence is read as genuine; a laundering label settles when a report is filed, and most laundering is never labelled at all."
+        est_minutes: 34
+        prerequisites: [alert-feedback-selection-bias, eu-aml-single-rulebook]
+        concepts:
+          introduces: [label-source, alert-disposition-record, training-set-as-of]
+          reinforces: [feedback-samples, delayed-samples, label-completeness, verification-latency, suspicious-transaction-report]
+        key_ideas:
+          - "Label sources and their clocks: feedback (days), dispute (up to 13 months), STR and FIU feedback (a year), silence"
+          - "The insurance funnel: small claims never labelled; real AML labels radically incomplete against AMLworld's transitive taint"
+          - "The alert ledger: assessment record kept whether or not reported (AMLR Art 77); dispositions as the feedback label and as the audit trail"
+          - "Assembling a training set as of date t: features from the store, labels settled by t − δ, cards blocked since removed; retraining cadence"
+        demo: null
+      - slug: eu-transaction-monitoring-design
+        title: "Designing an end-to-end EU transaction-monitoring system"
+        type: core
+        status: planned
+        goal: "Design a transaction-monitoring system for an EU payment institution by reading FraudFinder's reference architecture and Neo4j's graph workflow against every result and obligation of this course, naming each component's clock, data, metric and legal hook"
+        opening: "The reference architecture on the page — stream, warehouse, batch and streaming features, one store, training, registry, endpoint, monitoring — is a correct skeleton with no delay block, no alert budget, no feedback classifier, no graph, no fraud-rate controller and no record a supervisor could read; this lesson adds each one and says which result or article requires it."
+        est_minutes: 36
+        prerequisites: [real-time-scoring-architecture, label-maturation, tra-exemption-engine, graph-features-and-communities]
+        concepts:
+          introduces: []
+          reinforces: [fraud-detection-system, latency-budget, feature-store, feedback-delayed-aggregation, transaction-monitoring-duty, fraud-rate-reference, high-risk-ai-system]
+        key_ideas:
+          - "The artifacts: FraudFinder's architecture diagram and notebooks; Neo4j's explore–hypothesise–encode–resolve–label workflow"
+          - "Layer by layer: rules, score, graph exposure, queue; the clocks; the stores; the retraining and feedback loop"
+          - "The legal overlay: Art 18(3) in-house decisions, Art 76(5) human intervention, Art 77 records, RTS Art 19–21 reporting, AI Act Arts 9–15 artefacts, GDPR Art 22"
+          - "Departures from the reference: vendor stack, synthetic data, no graph, no regulation — what a real institution adds"
+        demo: null
+      - slug: pipeline-capstone-lab
+        title: "Lab: the pipeline on the simulator stream"
+        type: lab
+        status: planned
+        goal: "Assemble the full detector on the handbook simulator's stream — point-in-time feature lookup, daily scoring with a top-k alert queue, feedbacks and delayed labels feeding a retraining cadence, a stability monitor, the PSD2 fraud-rate controller and an alert ledger — and report cumulative card precision over the stream"
+        opening: "Every lab so far built a part; this one runs them as a system over a simulated stream: features as of each day, a model retrained on what the investigators returned, alerts capped at the budget, a monitor and a controller watching the result, and a ledger that records why each alert was raised."
+        est_minutes: 12
+        prerequisites: [eu-transaction-monitoring-design, cost-aware-evaluation-lab, point-in-time-feature-lab]
+        concepts:
+          introduces: []
+          reinforces: [point-in-time-join, feedback-delayed-aggregation, card-precision-at-k, stability-index, fraud-rate-reference, alert-disposition-record]
+        key_ideas:
+          - "A feature log and an as-of lookup serving every day's scoring rows"
+          - "The daily loop: score, alert top k, receive feedbacks now and delayed labels after δ, retrain on both"
+          - "A stability index per period and a 90-day value-weighted fraud-rate controller with hysteresis"
+          - "Cumulative card precision at 100 over the stream as the one number the system is judged by"
+        demo: null
+        lab:
+          est_hours: 5
+          checkpoints:
+            - id: feature-asof-lookup
+              kind: exact
+              text: "Point-in-time lookup from a timestamped feature log for a day's scoring rows"
+            - id: daily-alert-queue
+              kind: exact
+              text: "One day's scoring, the top-k alert queue with one alert per card, and the feedback rows it generates"
+            - id: label-arrival
+              kind: exact
+              text: "Feedbacks available at once, delayed labels available after δ days, blocked cards removed from later days"
+            - id: feedback-delayed-retrain
+              kind: exact
+              text: "Daily retraining on feedbacks and delayed samples as two models averaged, versus one pooled model"
+            - id: stability-monitor
+              kind: exact
+              text: "A population stability index of the score distribution per period against the training baseline, with traffic-light thresholds"
+            - id: fraud-rate-controller
+              kind: exact
+              text: "The rolling 90-day value-weighted fraud rate per exemption band with the two-quarter trip and one-quarter reset"
+            - id: alert-ledger
+              kind: exact
+              text: "A per-alert record: score, top attributions, action, disposition, timestamps — kept whether or not the alert was escalated"
+            - id: parity-report
+              kind: review
+              text: "Written answer: the feature on which the replayed serving path and the batch features disagree, and why"
+            - id: cumulative-card-precision
+              kind: metric
+              text: "Beat the cumulative card-precision-at-100 bar over the held-out stream with your assembled system"
+              required: false
+        notes: "Canon grounding (FraudFinder notebooks 02, 04 and 07: batch features → point-in-time training table → online scoring from the store; Dal Pozzolo 2018 Algorithm 1), dataset and checkpoint detail live in research/pipeline-capstone-lab.md (LAB PLAN)."
