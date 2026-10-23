@@ -29,7 +29,18 @@ Opus — so any session model can orchestrate it.
    will not have caught it — it builds only labs already at `drafted`, and
    even then a missing `uv` is a warning there, not an error.
 
-3. **Launch:** Workflow
+3. **Pilot first.** When the course has no `drafted` lesson yet, or the
+   factory (the workflows, the lesson-author / lab-author / course-qa
+   skills, docs/pedagogy.md or the playbooks) has changed since the
+   course's last drafted lesson, the run covers ONLY the first module that
+   still has planned lessons: set `count` to that module's planned
+   lessons, whatever the human asked for, and say so. After it, stop and
+   ask the human to read the module before the rest of the course is
+   written. A mistake in the factory then costs one module, not a course;
+   the next run, once the human has read the pilot, takes the count they
+   ask for.
+
+4. **Launch:** Workflow
    `{name: "course-factory", args: {phase: "lessons", slug: "<slug>", count: <n if given>, root: "<absolute worktree path>"}}`.
    `root` is mandatory: workflow subagents inherit the session's launch
    directory, not your worktree — without it they write into the wrong
@@ -46,7 +57,7 @@ Opus — so any session model can orchestrate it.
    against the rubric's lab section. Labs are slow — a single one is a
    multi-hour authoring loop; `count` applies to them like any lesson.
 
-4. **On completion:** run `npm run validate <slug>`; report per-lesson
+5. **On completion:** run `npm run validate <slug>`; report per-lesson
    outcomes (written / QA verdict / revised), remaining planned lessons, and
    remind the human: review in `npm run dev`, flip statuses to `reviewed`
    themselves, and merge the branch when ready — a lab is reviewed by
