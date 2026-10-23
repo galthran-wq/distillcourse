@@ -3,7 +3,7 @@ export const meta = {
   description: 'Research-driven course production: canon discovery, source-reading swarm, structure synthesis with a resumable research dossier; then per-lesson write→demo→QA iteration',
   whenToUse: 'Invoked by the /course-architect (phase: structure) and /lesson-factory (phase: lessons) skills. Args: {phase, slug, topic?, count?}.',
   phases: [
-    { title: 'Canon', detail: 'perplexity deep research: the mainstream sources', model: 'opus' },
+    { title: 'Canon', detail: 'perplexity deep research: the mainstream sources; then the taught courses and their coursework', model: 'opus' },
     { title: 'Read', detail: 'scope → readers (big books shard by ToC) → merge; readers capture image candidates and the source\'s own assignments', model: 'sonnet' },
     { title: 'Synthesize', detail: 'course.yaml (chapters + the labs the canon\'s assignments justify) + research dossier', model: 'fable' },
     { title: 'Lessons', detail: 'write(opus) → figures (drawn + sourced, in parallel) → demo → QA(opus) → fix → re-QA(opus), per lesson; a lab lesson goes to lab-author instead of the writer' },
@@ -36,7 +36,9 @@ const SUMMARY_SCHEMA = {
   required: ['title', 'topics', 'key_results', 'chapter_map'],
   properties: {
     title: { type: 'string' },
-    access: { type: 'string', description: 'full | toc-only | summary-based' },
+    access: { type: 'string', description: 'full | partial | toc-only | summary-based — full ONLY if every line of your range was read' },
+    chars_total: { type: 'integer', description: 'characters of extracted text in your range' },
+    chars_read: { type: 'integer', description: 'characters of that text you actually read — sampled, grepped or truncated text does not count' },
     topics: { type: 'array', items: { type: 'string' }, description: 'ToC-order topic list, chapter/section granularity' },
     key_results: { type: 'array', items: { type: 'string' }, description: 'central theorems/definitions with chapter pointers' },
     pedagogy: { type: 'string', description: 'proof style, exercise style, assumed prerequisites' },
@@ -97,12 +99,12 @@ const SCOPE_SCHEMA = {
     where: { type: 'string', description: 'best reading location found: URL(s), archive.org id, mirror — enough that a reader needs no re-hunting; for not-found, what you tried' },
     shards: {
       type: 'array',
-      description: '1 entry = no split; 2-4 entries only for big fully-accessible sources, split on chapter boundaries',
+      description: '1 entry = no split; otherwise one entry per ~150 KB of extracted text, split on chapter (or, for a legal act, title/chapter) boundaries; a source bundling several documents shards per document first',
       items: {
         type: 'object',
         required: ['range'],
         properties: {
-          range: { type: 'string', description: 'explicit chapter/page range, e.g. "chs. 1-9 (pp. 1-310)"' },
+          range: { type: 'string', description: 'explicit document and chapter/page range, e.g. "chs. 1-9 (pp. 1-310)" or "AMLR Arts. 1-49"' },
           note: { type: 'string', description: 'what this stretch of the book covers, one line' },
         },
       },
@@ -199,7 +201,14 @@ if (phaseArg === 'structure') {
   const rereadNote = (s) => reread.some((t) => s.title.toLowerCase().includes(t))
     ? ' RE-READ: the human has since staged a copy of this source under research/texts/ — it is there now; find it and confirm it against its first pages.'
     : ''
-  const sources = [...canon.sources, ...(argv.extraSources ?? [])]
+  // Labs are justified only by what the canon makes students build, and a
+  // canon of papers and statutes assigns nothing — so a second scout hunts the
+  // taught courses and their coursework, on top of the (cached) canon.
+  const coursework = argv.coursework === false ? { sources: [] } : await run(
+    `${at}A canon for learning "${topic}" has been chosen (JSON): ${JSON.stringify(canon.sources.map((s) => s.title))}. It is mostly books, papers and primary texts, which assign no coursework. Find what it lacks: university courses, bootcamps and practitioner trainings on this subject that make students BUILD things — homework notebooks, programming assignments, projects, competition-style tasks — whose syllabus AND assignment handouts (or the notebooks themselves) are publicly readable. Use WebSearch (and GitHub search for course repos). Return only courses whose assignments you actually located (put the URL of the assignments, not just the course page, in \`url\`; kind "syllabus"), each with \`why\` naming what its students build. Nothing already in the canon list; no course whose assignments you could not see. Five strong ones beat fifteen thin ones; an empty list is an honest answer.${brief}`,
+    { label: 'coursework-scout', model: 'opus', schema: CANON_SCHEMA },
+  )
+  const sources = [...canon.sources, ...(coursework?.sources ?? []), ...(argv.extraSources ?? [])]
   log(`canon: ${sources.length} sources — ${sources.map((s) => s.title).join('; ')}`)
 
   phase('Read')
@@ -220,7 +229,7 @@ if (phaseArg === 'structure') {
       sources,
       (s) =>
         run(
-          `${at}Scope ONE source for a reading swarm: "${s.title}"${s.author ? ` by ${s.author}` : ''} (${s.kind})${s.url ? `, URL: ${s.url}` : ' — locate it yourself (WebSearch), prefer official/legal copies'}. Before searching the web, list content/courses/${slug}/research/texts/: if a file there IS this source (confirm against the PDF’s own first pages, not just the filename), that is your answer — access "full", \`where\` = that file’s absolute path, and say in \`where\` that the human staged it. Only hunt online when nothing on disk matches. Otherwise, find where it can actually be read, fetch its table of contents, and decide the split. Shard ONLY when the full text is accessible AND the source is big (roughly 350+ pages or 25+ chapters): 2-4 shards along chapter boundaries, balanced by page count. Otherwise return a single shard covering everything. Report access honestly (full | toc-only | summary-based | not-found) and pass on the best reading location you found so readers do not re-hunt. If you cannot find the source at all, do NOT invent a location and do NOT quietly settle for second-hand descriptions of it — return access "not-found" with \`where\` describing what you tried; the human will obtain a copy from the publisher.${rereadNote(s)}`,
+          `${at}Scope ONE source for a reading swarm: "${s.title}"${s.author ? ` by ${s.author}` : ''} (${s.kind})${s.url ? `, URL: ${s.url}` : ' — locate it yourself (WebSearch), prefer official/legal copies'}. Before searching the web, list content/courses/${slug}/research/texts/: if a file there IS this source (confirm against the PDF’s own first pages, not just the filename), that is your answer — access "full", \`where\` = that file’s absolute path, and say in \`where\` that the human staged it. Only hunt online when nothing on disk matches. Otherwise, find where it can actually be read, fetch its table of contents, and decide the split. The split is by SIZE OF TEXT, never by page or chapter count: extract the full text (pdftotext, or the flattened HTML) into the texts cache and measure it with \`wc -c\`. A source bundling several documents (three regulations, a book plus its notebooks) shards per document first. Then any document over ~150 KB of text is cut into shards of at most ~150 KB each along chapter/section boundaries (titles/chapters for a legal act), however many that takes; a document under that is one shard. State each shard's size in its \`note\`. Report access honestly (full | toc-only | summary-based | not-found) and pass on the best reading location you found so readers do not re-hunt. If you cannot find the source at all, do NOT invent a location and do NOT quietly settle for second-hand descriptions of it — return access "not-found" with \`where\` describing what you tried; the human will obtain a copy from the publisher.${rereadNote(s)}`,
           { label: `scope: ${s.title.slice(0, 28)}`, phase: 'Read', model: 'sonnet', schema: SCOPE_SCHEMA },
         ).then((scope) => {
           accessLog.push({ title: s.title, access: scope ? scope.access : 'scope-failed', where: scope ? scope.where : '' })
@@ -232,17 +241,19 @@ if (phaseArg === 'structure') {
         parallel(
           scope.shards.map((shard, i) => () =>
             run(
-              `${at}Source to summarize: "${s.title}"${s.author ? ` by ${s.author}` : ''} (${s.kind}). Reason it is canon: ${s.why}. Access per the scoper: ${scope.access}; read it at: ${scope.where}. ${scope.shards.length > 1 ? `YOUR SHARD (${i + 1}/${scope.shards.length}): ${shard.range} — read ONLY this range, report ONLY from it, and stay silent about the rest of the book; the swarm covers it.` : 'You cover the whole source.'} Follow your source-reader briefing.\n\n${capNote} For this source use the tag \`${(s.title.match(/[A-Za-z0-9]+/g) || ['src']).slice(0, 2).join('').toLowerCase().slice(0, 12)}${scope.shards.length > 1 ? `-s${i + 1}` : ''}-\`.`,
+              `${at}Source to summarize: "${s.title}"${s.author ? ` by ${s.author}` : ''} (${s.kind}). Reason it is canon: ${s.why}. Access per the scoper: ${scope.access}; read it at: ${scope.where}. ${scope.shards.length > 1 ? `YOUR SHARD (${i + 1}/${scope.shards.length}): ${shard.range} — read ONLY this range, report ONLY from it, and stay silent about the rest of the book; the swarm covers it.` : 'You cover the whole source.'} Follow your source-reader briefing.\n\nREAD EVERY LINE of your range, in order, in consecutive windows (Read with offset/limit, or \`sed -n\` ranges that tile the file with no gaps). Never \`cut -c\`, \`head -c\`, \`head -n\` or \`grep\` your way through it in place of reading: sampling is not reading, and what the course is built from is what you actually saw. Measure your range with \`wc -c\` and report chars_total, and chars_read as the text you really read. access is "full" only when chars_read covers the whole range; anything less is "partial" — say what you skipped and why, and the human will see it.\n\n${capNote} For this source use the tag \`${(s.title.match(/[A-Za-z0-9]+/g) || ['src']).slice(0, 2).join('').toLowerCase().slice(0, 12)}${scope.shards.length > 1 ? `-s${i + 1}` : ''}-\`.`,
               { label: `read: ${s.title.slice(0, 22)}${scope.shards.length > 1 ? ` [${i + 1}/${scope.shards.length}]` : ''}`, phase: 'Read', agentType: 'source-reader', schema: SUMMARY_SCHEMA },
             ),
           ),
         ),
       (parts, s) => {
         const kept = (parts || []).filter(Boolean)
+        const short = kept.filter((p) => !String(p.access ?? '').startsWith('full') || (p.chars_total && (p.chars_read ?? 0) < 0.9 * p.chars_total))
+        if (short.length) accessLog.push({ title: s.title, access: 'partial', where: short.map((p) => `${p.access ?? '?'} — read ${p.chars_read ?? '?'} of ${p.chars_total ?? '?'} chars`).join('; ') })
         if (kept.length === 0) return null
         if (kept.length === 1) return kept[0]
         return run(
-          `${at}Merge these shard summaries of ONE source — "${s.title}"${s.author ? ` by ${s.author}` : ''} — into a single source summary of the same shape. Concatenate topics, chapter_map and assignments in book order; keep EVERY key_result, gem, assignment and figure idea with its chapter pointer (dedupe only true duplicates); rank image_candidates across shards and keep at most 8 (do NOT delete the losing captures from disk — just omit them from the list); synthesize one pedagogy note. Shard summaries (JSON): ${JSON.stringify(kept)}`,
+          `${at}Merge these shard summaries of ONE source — "${s.title}"${s.author ? ` by ${s.author}` : ''} — into a single source summary of the same shape (chars_total and chars_read are the shard sums; access is "full" only if every shard's is). Concatenate topics, chapter_map and assignments in book order; keep EVERY key_result, gem, assignment and figure idea with its chapter pointer (dedupe only true duplicates); rank image_candidates across shards and keep at most 8 (do NOT delete the losing captures from disk — just omit them from the list); synthesize one pedagogy note. Shard summaries (JSON): ${JSON.stringify(kept)}`,
           { label: `merge: ${s.title.slice(0, 28)}`, phase: 'Read', model: 'sonnet', schema: SUMMARY_SCHEMA },
         )
       },
