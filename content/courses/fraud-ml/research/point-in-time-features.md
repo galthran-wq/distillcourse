@@ -1,57 +1,76 @@
-# Point-in-time correctness: as-of joins, feature stores and parity — research brief
+# Point-in-time correctness: label-derived features, as-of joins and parity — research brief
 
-Lesson: `point-in-time-features` (module: features, core, planned). NEW.
-Goal: Design a feature pipeline whose training rows contain only what was known at each transaction's timestamp and whose serving path computes the same values.
+Lesson: `point-in-time-features` (module: features, type: core, status: planned). NEW — full re-synthesis, no draft exists, so no REVISION block.
+Goal: Design a feature pipeline whose training rows contain only what was known at each transaction's timestamp — including a terminal risk shifted by the label delay — and whose serving path computes the same values
+Opening (verbatim, the lesson must start with it): A terminal's fraud rate over the last month is a strong feature, but the frauds of the last week are not yet known when today's payment is scored. If the training table is built from the final labels, the feature there contains information the live system will never have, and the offline score is a fiction. How do you build every feature so that each training row holds only what was knowable at that row's moment, and the serving path computes the same value?
 
-## Sources
-- FraudFinder (primary): 02_feature_engineering_batch lines 849–851 (batch over days in SQL, streaming over minutes in Beam, one Feature Store as the single source for training and serving), 993–1006 (feature tables keyed by feature_time), 1237–1358 (placeholder minute-window columns zero-filled for schema agreement), 1360–1688 (why a feature store: real-time reads, same values for training and serving, time-series model supports point-in-time queries; Featurestore → EntityType → Feature; ingestion with feature_time); bqml/04 2448–2545 (read-instances table of entity ids + event timestamp + pass-through label; BatchReadFeatureValues returns the last value up to, but not after, each timestamp — line 2473; labels by LEFT JOIN tx to txlabels; "time travel" to a date when labels are settled — line 2452); vertex_ai/04 L4160–4225 (batch_serve_to_df); 03 lines 1869–2160 (sliding window 1 h / period 1 min; TS_DIFF; new-records filter; 15/30-min counts by conditional sums; composite key entity_windowEnd; WriteFeatureValues); scripts/cloud_run_model_inference/main.py L6022–6106 (online read entity_type.read(entity_ids, feature_ids='*'); None → 0.0; 25-feature payload); PAYLOAD_SCHEMA repeated in bqml/04 (2378–2404), bqml/07 L3733, train_xgb.py L4898, monitoring L3517–3527 (hand-copied contract); the dossier's pedagogy note: "the series never demonstrates the train/serve skew it is built to prevent and never compares streaming values to batch".
-- Handbook Ch3.3 and shared_functions: features computed offline on the whole frame with rolling windows — the batch idealisation; Ch2.3: aggregated features computed by the DDM layer; Ch2.4 challenge "near real-time".
-- Dal Pozzolo 2018 Sec. II-B: profile features precomputed offline per cardholder, updated once a day; Sec. VI-A card-ID removal.
-- Bahnsen Sec. 6: unlimited feature count → per-transaction recomputation latency may exceed decision time.
-- Baesens Ch4 p.136 and Ch1 pp.29–30: operational efficiency — real-time scoring cannot afford trend variables or high-latency external data; under 8 seconds.
-- APATE Sec. 2.2 and 3: scores recomputed at midnight and used for the next day's transactions; features extracted in real time; six-second rule.
-- Altman App. D: GFP processes edges in timestamp order so features use past data only — the same rule on a graph.
-- AMLR Art 10(1) last paragraph (new technologies risk-assessed before launch) — one sentence, forward to module 10.
+## Sources to consult
+- Handbook Ch3 "Baseline feature transformation", terminal section: the risk over a window shifted back by the delay d = 7, computed as (delay+window rolling sums) minus (delay rolling sums), `get_count_risk_rolling_window`, RISK_WINDOW = NB_FRAUD_WINDOW/NB_TX_WINDOW, 0 if no transaction; terminal 3059 as the example — `research/texts/reproducible-Chapter_3_GettingStarted_BaselineFeatureTransformation.md` (lines ~300–440).
+- Handbook Ch3 Baseline_RealWorldData: the depth-2 tree on real data splits on TERMINAL_ID_RISK_30DAY_WINDOW > 0.075 then CUSTOMER_ID_NB_TX_1DAY_WINDOW > 13.5 — `research/texts/reproducible-Chapter_3_GettingStarted_Baseline_RealWorldData.md`.
+- FraudFinder notebook 02 (batch features): customer windows with `RANGE BETWEEN n PRECEDING AND CURRENT ROW` over 86400/604800/1209600 s (includes the current row); the terminal risk index with a 7-day delay (fraud count in window minus fraud count in the last 7 days over tx count minus delay count, +0.0001); placeholder minute-window columns zero-filled for schema agreement; the feature store hierarchy and ingestion with feature_time — `research/texts/fraudfinder-gcp.txt` (lines ~979–1688).
+- FraudFinder bqml/04 and vertex_ai/04: the read-instances table (entity ids + event timestamp + pass-through label), batch serving that returns the last value up to but not after each timestamp; the label-delay caveat ("time-travel to a date when labels are settled"; the lab goes back to yesterday) — `research/texts/fraudfinder-gcp.txt` (lines ~2448–2545, ~4160–4225).
+- FraudFinder main.py and bqml/07: the serving handler reads the online store, replaces None with 0.0, assembles the 24/25-feature payload; the hand-copied PAYLOAD_SCHEMA in four places; the never-run parity comparison — `research/texts/fraudfinder-gcp.txt` (lines ~5962–6106, ~3733).
+- HKU FITE7410 A2 code: target encoding by fraud mean computed on the full data before the split — a label leak into test features — `research/texts/hku-fite7410-a2code.txt`.
+- Dal Pozzolo 2018 Sec. II-B (aggregated features precomputed offline per cardholder) and Sec. VI-A (card ID removal because cards are blocked after the first detected fraud) — `research/texts/creditcard-tnnls.txt`.
+- Lucas & Jurgovsky Sec. 4.1 (likelihood/target encoding is feature engineering that uses labels) — `research/texts/creditcard-.txt`.
 
-## Key points
-1. The as-of join defined: for each row (entity, t), the feature value with the largest feature_time ≤ t — "up to but not after"; the read-instances table; training = as-of reads at each row's timestamp; serving = the latest value. One store, two reads.
-2. Three clocks of feature freshness: daily batch (yesterday's aggregates), minute streaming (sliding windows), per-request (computed from the transaction itself). Which features belong on which clock, by latency budget and by label dependence (the delayed terminal risk can only be batch).
-3. Label time travel: a feature derived from labels (terminal risk) has a feature_time equal to the label's arrival, not the transaction's; a training set built "as of yesterday" with a 7-day delay must read label-derived features as of t − δ; FraudFinder simplifies to yesterday and says so.
-4. Training–serving skew, three forms: (a) different code paths for the same feature (SQL RANGE includes the current row; the pandas version excludes it), (b) different fill values (None → 0 at serving, NaN dropped at training; the cold customer becomes a "zero-activity" customer), (c) placeholder columns zero-filled in training and populated at serving (FraudFinder's minute windows) — the model never saw the feature's real distribution. The parity check as the test the series omits.
-5. Sliding-window streaming: one 60-minute window with 1-minute period yields 15/30/60-minute aggregates by conditional sums on TS_DIFF; each element appears in many windows; the new-records filter writes an entity once per period.
-6. Contracts: the feature list declared in four places by hand is how parity is lost; a single schema object; the monitoring job covering 9 of 25 features (forward to fraudfinder-monitoring-read).
+## EXPLANATION PLAN
+### The problem as the newcomer meets it
+Module 2 separated training from test by a delay block because labels arrive late. The previous two lessons built features from earlier rows. This lesson meets the case where a feature is built from earlier *labels*: a terminal's fraud rate. The training table is assembled months later, when every label has arrived, so the natural computation — frauds in the last 30 days over payments in the last 30 days — uses labels that, on the day of the payment, had not been reported yet. The model learns to rely on a number that is sharper than anything the live system can produce; its offline card precision is real on the table and false in production. The second half of the problem is the same leak from the other side: even a correctly built training feature is useless if the serving code computes something slightly different. Terms the newcomer does not have: "point-in-time", "as-of join", "feature log/store", "parity", "training–serving skew", "target encoding".
 
-## Set pieces & gems
-- "Last value up to, but not after, each timestamp" (bqml/04 line 2473) — the sentence that defines the lesson.
-- The zero-filled placeholder columns (02 lines 1264–1319): training on all-zero streaming features while serving sees real ones.
-- None → 0.0 in main.py: the silent cold-start bug.
-- The streaming trick (one window, three aggregates) and the composite key.
-- APATE's midnight recompute as the batch clock; the six-second budget as the serving clock.
+### Chain of sub-problems
+1. **Why a label-derived feature leaks** — Obvious attempt: terminal risk = frauds among the terminal's last 30 days of payments ÷ its payments, on the final table. Why it fails: on day t the frauds of days t−7…t are not yet labelled (verification latency δ ≈ 7); the training feature sees them, the live feature cannot. Answer: compute the rate over the window [t − (d + w), t − d]: labels from the last d days excluded. Because: those are exactly the labels an investigator had produced by day t.
+2. **Computing the shifted window cheaply** — Obvious attempt: for each row, filter the terminal's history by two dates. Why it fails: quadratic per terminal, and the lab's pandas will not finish. Answer: two rolling sums over the sorted terminal rows — frauds and counts over (d + w) days minus frauds and counts over d days — then divide; zero where the window is empty. Because: a window that ends d days ago is the difference of two windows that end now.
+3. **Does the delayed feature still carry signal** — on a real week the depth-2 tree splits first on the 30-day terminal risk at 0.075 and then on the 1-day customer count at 13.5; on the simulator, scenario 2 (terminals compromised for 28 days) is found by this feature. Because: a compromised terminal stays compromised longer than the delay, so the stale rate still points at it.
+4. **Other label-derived features** — target (likelihood) encoding of a category by its fraud mean is the same object; computed on the whole table before the split it leaks the test labels into the test features (the HKU code does exactly this). Answer: any statistic that uses labels is computed as of the row's date minus δ, from training rows only. Because: "uses labels" is the test, not the feature's name.
+5. **Which value of a feature belongs to a row** — Obvious attempt: join the training rows to the feature table by entity id. Why it fails: an entity's feature changes over time; a join by id attaches the latest value to every row, including rows from before the value existed. Answer: the as-of (point-in-time) join — for each row, the last feature value recorded up to, and never after, the row's timestamp; the read-instances table of (entity, timestamp, label) is what drives it. Because: the feature a model should learn from is the one the live system would have read at that instant.
+6. **Keeping one definition for training and serving** — Obvious attempt: SQL for the training table, application code for the live path, "the same formula". Why it fails: two implementations drift; the reference pipeline declares its feature contract by hand in four places, zero-fills minute-window columns in the batch table while serving real values, and fills a missing feature with 0.0 so a new customer becomes a customer with no activity. Answer: a time-keyed feature log (the feature store) written once and read two ways — as-of a timestamp for training, latest value for serving. Because: one write path means one definition; two reads of one log cannot disagree.
+7. **Proving they agree** — Obvious attempt: trust the store. Answer: a parity check — replay a day's events through the serving path, diff the feature vectors against the batch table for the same rows, and count the disagreements per feature; the reference pipeline is built to prevent skew and never runs this check. Because: a skew that is not measured is a skew that is deployed.
+8. **The label-settled training date** — assembling a training set on date t means features as of each row and labels settled by t − δ; the reference lab "time-travels" only to yesterday because its labels arrive instantly. Because: this is the delay block of module 2 seen from the pipeline's side (forward to `label-maturation`).
+9. **What else must leave** — the card id (blocked cards never return), and any feature whose computation needs the authorisation to have already happened. ★ Starred: batch (days) vs streaming (minutes) features and why both land in one store — forward to `real-time-scoring-architecture`.
 
-## Pitfalls
-- Vendor names are the artifact, not the lesson: describe the design pattern; FraudFinder is quoted for its decisions and its omissions.
-- Do not teach the serving system (module 11); this lesson is the data contract.
-- The lab's planted leak is the current-row inclusion; keep that example visible here.
+### Set pieces and worked examples to recreate
+- The delayed terminal risk as two rolling sums: NB_FRAUD_DELAY_WINDOW − NB_FRAUD_DELAY over NB_TX_DELAY_WINDOW − NB_TX_DELAY, windows 1/7/30 days, delay 7, terminal 3059 (Handbook Ch3 feature chapter, `get_count_risk_rolling_window`).
+- The real-data tree: TERMINAL_ID_RISK_30DAY_WINDOW > 0.075 AND CUSTOMER_ID_NB_TX_1DAY_WINDOW > 13.5 (Handbook Ch3 Baseline_RealWorldData, Fig. 2).
+- The read-instances table (customer, terminal, timestamp, label) and "last value up to, but not after, each timestamp" (FraudFinder bqml/04 lines ~2463–2473).
+- Zero-filled minute features in training vs real ones in serving; the 24-column payload schema hand-copied in notebook, Cloud Run app, training script and monitoring config (FraudFinder 02 lines ~1264–1319; bqml/06 lines ~3517–3527).
+- None → 0.0 in the inference handler (FraudFinder main.py lines ~6036–6040).
+- Target encoding on the full insurance table before the 70/30 split (HKU a2code).
+- The "time-travel to a settled date" caveat, done only to yesterday (FraudFinder bqml/04 line ~2452).
+
+### Pitfalls and terms to define
+- "Point-in-time" and "as-of join": define with a two-row picture (feature values at 09:00 and 14:00; a payment at 12:00 gets the 09:00 value) before the term.
+- "Feature store": a time-keyed log with two read modes, not a product; name no vendor in the body.
+- "Training–serving skew" vs "drift": skew is the same feature computed differently now; drift is the data changing later (module 7); keep them apart.
+- Window inclusivity: the reference SQL window includes the current row; the handbook's delay formula excludes the last d days; state both conventions.
+- "+0.0001" in the reference risk denominator is a divide-by-zero guard, not part of the definition.
+- Do not use "feedback samples" or "delayed samples" (module 8); say "labels that had arrived".
+
+### Recalled, not re-taught
+- Verification latency and the delay block (`fraud-detection-system`, `delayed-labels-prequential`): one clause each.
+- Windowed aggregates and the earlier-rows rule (`transaction-aggregates`): recalled, with the new rule stated as its extension to labels.
+- Data leakage in general (classical-ml): the reader knows the word; the lesson adds the two fraud-specific forms.
 
 ## FIGURE PLAN
-- draw: The as-of join as a timeline: a feature log for one entity (values at feature_times) above, scoring rows (t₁, t₂, t₃) below, each row's arrow landing on the last value ≤ t — with one row's arrow deliberately pointing past a later value to show what "not after" excludes. Single figure; key image. Inspired by bqml/04's read-instances description.
-- draw: `<FigureSequence>` (3 frames): the same timeline for a label-derived feature — (1) frauds occur, (2) labels arrive δ days later and the terminal-risk value updates at that feature_time, (3) the training row reads the value as of its own t, which still shows the pre-label risk.
-- draw: One store, two reads: a feature table keyed by (entity, feature_time) with a batch read (as-of each row) and an online read (latest) drawn as two arrows — architecture tiers bottom-up (voita rule 5).
-- draw: Training–serving skew triptych: three near-identical panels (code-path difference; fill difference; placeholder difference) each showing the training column and the serving column for the same feature with the mismatching cells highlighted. Inspired by FraudFinder's defects (dossier gems).
-- draw: The sliding window: a 60-minute window stepping by 1 minute over an event stream, the 15/30/60-minute sub-counts as nested brackets, and the "new records" (TS_DIFF ≤ period) highlighted. Inspired by 03's pipeline description.
-- source: fraudfindera-s1-architecture — stem `fraudfinder-architecture`; the reader must see stream → warehouse → batch and streaming feature engineering → one feature store → training/registry/endpoint/monitoring; centered at the end as the artifact the capstone revisits (vendor diagram, sourced because it is the thing read, not a redrawable idea). Placement note: the capstone's application reuses the same file; credit once per lesson.
+- draw: key image — a terminal's timeline with payments and frauds; the 30-day window and the 7-day delay drawn so the risk window [t−37, t−7] is visible; `<FigureSequence>` 3 frames: the naive window ending at t, the labels not yet known shaded out, the shifted window that remains (inspired by the handbook's delay description; redrawn).
+- draw: the two-rolling-sums construction as a bar diagram: sum over 37 days minus sum over 7 days = sum over the shifted window; single `<Figure>`.
+- source: reproducible-wl-decision-tree — stem `wl-depth2-tree`; the reader must see the two split conditions (terminal risk 30-day > 0.075, customer 1-day count > 13.5) with their leaf counts on real data; centered, under the "does it still carry signal" section (check legibility of node text; if unreadable, draw instead and drop).
+- draw: the as-of join as two timelines: a feature log with values at 09:00 and 14:00 and payments at 08:30, 12:00, 15:00, arrows to the value each receives (12:00 → 09:00's value); single `<Figure>` (inspired by the read-instances table).
+- draw: one feature log, two reads: batch read "as-of t" for training rows, online read "latest" for the live payment; single `<Figure>` (inspired by the reference architecture, no vendor icons).
+- draw: `<FigureSequence>` 3 frames of skew: training table with zero-filled minute columns → serving payload with real minute values → the parity diff per feature with the disagreeing column highlighted.
+- draw: the training set as of date t: rows up to t, features as of each row, labels settled only up to t − δ, blocked cards struck out; single `<Figure>`.
 
 ## EXERCISE PLAN
-1. Warm-up: given a feature log with five (feature_time, value) rows and four scoring timestamps, write the as-of values; then the online (latest) value.
-2. Derivation the lesson skipped: show that a 1-day RANGE window that includes the current row and a strictly-earlier window differ exactly by the current row's contribution, and derive the resulting leak into AVG_AMOUNT as a function of n (window count).
-3. Boundary probe: a brand-new customer at serving time — the store returns nothing; compare the three fills (0, NaN, "no profile" indicator) under a tree and under a logistic regression trained with NaN rows dropped; name which fill makes the serving distribution unseen at training.
-4. Claim to refute: "If training and serving read from the same feature store, training–serving skew is impossible." Refute with the placeholder-column case and the fill case: same store, different values; name the two reads.
-5. Research-shaped: replay one simulator day through a pandas "serving path" (per-transaction computation from a feature log) and through the batch rolling computation; diff feature by feature; report which feature differs and by how much (the parity check).
-6. FORWARD (E7): build the training set "as of today" for the simulator with a δ = 7 delay and count the rows whose label is not yet knowable; then build it as of 7 days ago and compare the label counts → the reader meets the "which labels when" question → lands on `label-maturation` (and, nearer, the lab's point-in-time join).
-7. Mixed review (E3): place the delayed terminal risk (transaction-aggregates) on the right clock (batch, label-time-travelled) and the von Mises arc (behavioural-profiles) on its clock; justify each by latency budget and label dependence.
+1. [warm-up] For a terminal with payments and frauds listed by day over 40 days, compute the 30-day risk with delay 7 on day 40 by the two-sums method and check it against a direct count.
+2. [boundary probe] Set the delay to zero and to a value larger than the window; show what the shifted risk becomes in each case and why the second is identically zero.
+3. [claim to refute] "Target-encoding the terminal id by its fraud mean on the training rows only is point-in-time correct." Refute: the training rows' labels include frauds reported after each row's date; the step that fails is "as of the row", not "training only".
+4. [derivation skipped] Show that an as-of join of n payments onto a feature log of m timestamped values costs O((n + m) log(n + m)) after sorting, with a two-pointer merge, and why a naive per-row filter is O(nm).
+5. [research-shaped] On the simulator, train a depth-5 tree on the naive 30-day terminal risk and on the delayed one, evaluate both with the module-2 harness on a test week, and report the CP@100 gap — the size of the fiction.
+6. [mixed review] Apply the undersampling correction of `undersampling-calibration` to the model of exercise 5, and explain why a leaky feature cannot be repaired by recalibration.
+7. FORWARD → `label-maturation`: compute, for each day of the simulator's test month, the share of that day's frauds that would be labelled by day + 7, + 30 and + 90 under a dispute clock drawn from a given distribution; the reader sees labels mature at different speeds before the lesson that names label sources.
 
 ## ARC
-- Inherits: aggregates and profiles (previous two lessons); the delay clock (module 2).
-- Contributes: the data contract — as-of reads, feature-time for label-derived features, the three skews, the parity check, the clocks.
-- Hands off: the application (paysim-feature-matrix) and the lab; the serving architecture (real-time-scoring-architecture); the monitoring read (fraudfinder-monitoring-read); the training set as-of (label-maturation).
-- Spine step 3: features are context.
+- Spine step 3 "Features are context": "A raw transaction has no fraud signal; the signal is the deviation from the entity's own history, which means windowed aggregates over the cardholder and the terminal, computed from what was known at scoring time — including labels that had not yet arrived."
+- Inherits: verification latency and the delay block (`fraud-detection-system`, `delayed-labels-prequential`); windowed aggregates (`transaction-aggregates`).
+- Contributes: the delayed terminal risk, the as-of join, the feature log read two ways, the parity check, the training set as of a date.
+- Hands off: the leak to find in `point-in-time-feature-lab`; the store and the serving path to `real-time-scoring-architecture`; label settling to `label-maturation`; skew monitoring to `fraudfinder-monitoring-read`.

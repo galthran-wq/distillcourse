@@ -1,62 +1,72 @@
-# Updating strategies on 422 days of Worldline data — research brief (module 7 APPLICATION)
+# Updating strategies on 422 days of Worldline data — research brief
 
-Lesson: `drift-strategies-on-worldline` (module: sequences-drift, core, planned). NEW. Module-final application (L16): a paper's central experiment read in full and its design reproduced on the simulator.
-Goal: Evaluate the static, update and forget strategies with three balancers over 422 daily chunks of real card data and attribute the rank ordering to drift and to the fraud count per chunk.
+Lesson: `drift-strategies-on-worldline` (module: sequences-drift, type: core, status: planned). NEW — full re-synthesis, no draft exists, so no REVISION block. Module-final APPLICATION.
+Goal: Evaluate the static, update and forget strategies with three balancers over 422 daily chunks of real card data and attribute the rank ordering to drift and to the fraud count per chunk
+Opening (verbatim, the lesson must start with it): Over 422 days of real card payments, six ways of handling time — train once; retrain daily, weekly or fortnightly on a window; keep every past fraud; three rebalancing methods — are ranked day by day. Which ordering comes out, and what does the ordering measure about the stream?
 
-## Sources
-- Dal Pozzolo et al. 2014 (primary, read in full): Sec. 2 the practitioner questions (which algorithm, update frequency, training size, rebalance or not, which metric); Sec. 3.2 balancers (undersampling, SMOTE, EasyEnsemble); Sec. 4 formalisation (history window T, aggregated features replace the card id; drift as non-stationary P(X,Y)); Sec. 5 metrics (AUC rank form, AP, PrecisionRank at top-a); Sec. 6 strategies — Static (Fig 1, one model on K chunks), Update (Fig 2, M models on the K latest chunks, ensemble weights w_m = (PR_m − PR_min)/(PR_max − PR_min)), Forget (Fig 3, all past frauds + K_gen chunks of genuine), balancing step (Fig 4), Table 2 strengths/weaknesses; Sec. 7.1 dataset (Feb 2012–May 2013, 422 days, 45 variables, 2,202,228 transactions, < 0.4% fraud, daily chunks averaging 5,218, H = 90-day aggregation, e-commerce only); Sec. 7.2 method (per-chunk ranking summed over chunks — Friedman rank sums; paired t-tests on ranks; 5 replications; naming scheme Algo.Sampling.Frequency.MModels.Approach.K); 7.2.1 RF > NNET > SVM; 30/60/90 days improve static; 7.2.2 best RF.Under.Daily.5M.Update.90K; K = 1 worst (too few frauds); daily > weekly > 15-day at the same K; 7.2.3 K_gen 0 → 30 helps, beyond 30 rarely; best 5 models, K_gen = 30; 7.2.4 SMOTE and EasyEnsemble > undersampling; static worst for every balancer; Forget > Update with EasyEnsemble, SMOTE better with Update; SMOTE heavy, Forget highest prediction time (Fig 9); 7.2.5 overall best EasyEnsemble + Forget + daily update; multi-chunk > single-chunk; with overlapping training sets single models can beat ensembles; the balancer depends on the strategy; Sec. 8 future work (racing/F-race, HDDT, combination rules, minority sub-concepts); Sec. 9 conclusion; caveats — single dataset, e-commerce only, no cost-based metric, daily chunks, labels assumed available at once (no delay modelled).
-- Dal Pozzolo 2018 Sec. VI-D (the delayed-label sequel: S < W^D < AW over time; synthetic abrupt drift 7.7% vs 12.5% loss) — the "what changes with δ" paragraph.
-- Jurgovsky Sec. 5.1 (daily AUCPR co-moves across models; fraud density per day explains part of it) and Fig. 3–4.
-- Lucas & Jurgovsky Fig. 4 (day-shift matrix) and Weber's step 43 — the two other drift artifacts the lesson sets beside this one.
-- Gama Sec. 4.2 (prequential, controlled permutations, Nemenyi) for the evaluation design the paper uses in its own form.
-- Handbook Ch6 (balancer findings under AP/CP@k) — the module-2 result to reconcile: here SMOTE/EasyEnsemble help; there they hurt AP — the reconciliation is the strategy × balancer interaction plus the metric (PrecisionRank at a vs CP@k with card removal).
+## Sources to consult
+- Dal Pozzolo et al. 2014 (research/texts/staged-dalpozzolo2014-learned-lessons.pdf; txt staged beside it): Sec 4 (formalisation, 90-day history aggregates replacing the card id, P(X)/P(Y|X) drift), Sec 5 (AUC in rank form, AP, PrecisionRank at top-a), Sec 6 (Static Fig 1, Update Fig 2 with M models on K chunks and weights w_m, Forget Fig 3 with all past frauds + K_gen genuine chunks, balancing Fig 4, Table 2), Sec 7.1 (1 Feb 2012 – 20 May 2013, 422 days, 45 variables, 2,202,228 transactions, < 0.4% fraud, ≈ 5,218 per daily chunk, H = 90 days), Sec 7.2.1–7.2.5 (RF beats NNET and SVM; 30/60/90 training days; daily beats weekly and 15-day at K = 90; K = 1 worst; K_gen 0 → 30 helps, beyond rarely; SMOTE and EasyEnsemble beat plain undersampling; Static worst for every balancer; Forget better with EasyEnsemble, SMOTE with Update; Fig 9 compute cost; Fig 10 overall), Sec 7.2 method (per-chunk Friedman rank sums, paired t-tests on ranks, 5 replications; strategy naming Algo.Sampling.Frequency.MModels.Approach.K), Sec 8 (racing, HDDT, sub-concepts).
+- Dal Pozzolo 2018 Sec VI-D (research/texts/creditcard-tnnls.txt): static S loses to W^D and AW over time (Fig. 5); the juxtaposed-months drift with CP_k loss 7.7% vs 12.5%; CP_k tracks the daily count of fraud cards (peak Feb 2015, trough Oct 2014).
+- Gama et al. 2014 Sec 4.2.3 (research/texts/asurvey-s2-.txt): Friedman/Nemenyi CD = q_α √(k(k+1)/(6N)), Dunnett against a control — the statistics the ranking uses; Sec 4.2.1 why average accuracy masks adaptation.
+- Jurgovsky 2018 Sec 5.1 and 6.1: day-to-day AUCPR variance co-moving with fraud density; dropout for time-stability — the sequence models' row.
+- Lucas & Jurgovsky 2020 Sec 3.2 (research/texts/creditcard-.txt): the day-shift matrix as the label-free view of the same stream type.
+- Weber et al. 2019 Sec 4: the step-43 collapse an RF retrained each step cannot recover from — the limit of retraining.
 
-## Key points
-1. The artifact: 422 daily chunks, three strategies × three balancers × three algorithms × windows, ranked per chunk and summed — Fig. 10's full ordering with EasyEnsemble.Forget first and Static last.
-2. Why static is last: drift measured as a ranking; the K = 1 result (too few frauds) shows the other constraint — a window must hold enough positives, so the fraud count per chunk sets the minimum K; daily > weekly > 15-day at fixed K isolates the update frequency.
-3. Forget's mechanism: positives are scarce and informative, negatives abundant and drifting — keep all past frauds, window the genuine (K_gen = 30); the cost (prediction time) and the limit (old frauds that no longer occur — Gama's reoccurring/obsolete concepts).
-4. Balancer × strategy: SMOTE with Update, EasyEnsemble with Forget; undersampling discards 99.6% of genuine per chunk and EasyEnsemble repairs the variance with 5 draws — the interaction is the paper's methodological point; reconcile with module 2's "rebalancing hurts AP": different metric (PrecisionRank at top-a over a chunk), no card removal, and the stream setting where variance from tiny chunks dominates.
-5. The evaluation design: Friedman rank sums over chunks (why ranks: chunk difficulty varies, as Jurgovsky's co-movement shows), paired t-tests on ranks, five replications; what it cannot say (effect sizes in AP units).
-6. The simulator reproduction (the reader can run): Static vs Update (daily, K = 30) vs Forget (all frauds + 30 days genuine) with RF over 40 simulator days, ranked per day on AP and CP@100 with the module-2 harness — on scripted drift (scenario 2's 28-day terminals) the ordering reproduces; state what the simulator cannot show (fraud-type evolution).
-7. Departures (L16): labels assumed instant (Dal Pozzolo 2018 adds δ and the feedback split — module 8); e-commerce only; one dataset; no cost metric; daily chunks; R implementation.
+## EXPLANATION PLAN
+### The problem as the newcomer meets it
+The previous lesson derived a cadence (daily, 90-day window, keep all frauds) from the stream's clocks. Now a real experiment ranks strategies over 422 days. The newcomer can read a table of ranks but not yet what a rank-sum over chunks is, why a rank rather than an average, how a balancer (module 2) interacts with a time strategy, or what the ordering says about drift. The module's claims are on trial: does the static model really lose, does daily beat weekly, does keeping frauds help.
 
-## Set pieces & gems
-- K = 1 coherently worst; daily > weekly > 15-day.
-- 99.6% of genuine discarded at 50/50; EasyEnsemble's five draws.
-- Static at the bottom for every balancer and metric.
-- The naming scheme RF.Under.Daily.5M.Update.90K.
-- "The best balancer depends on the strategy."
-- Fig. 9: SMOTE's and Forget's compute.
+### Chain of sub-problems
+1. **How do you compare strategies on a stream fairly?** — Obvious attempt: average AP over 422 days. Why it fails: averages hide adaptation — a strategy great for a month and bad after can tie a steady one; and days differ in difficulty (fraud cards per day). Answer: score every strategy on every daily chunk, rank them within the chunk, sum the ranks (Friedman), test differences with paired t-tests on the ranks, repeat five times to average sampling noise. Because: within-day ranks remove day difficulty, which the previous lessons showed co-moves across models.
+2. **What are the candidates?** — Answer: the naming scheme Algo.Sampling.Frequency.MModels.Approach.K — Static (one model on K chunks, used forever), Update (a new model per chunk on the K latest, M models ensembled with weights w_m = (PR_m − PR_min)/(PR_max − PR_min)), Forget (every model keeps all past frauds plus the genuine of the last K_gen chunks, size capped); each with undersampling, SMOTE or EasyEnsemble before learning; RF, NNET, SVM; daily, weekly, 15-day frequency. Because: these are exactly the memory, replacement and ensemble choices of the previous lesson, instantiated.
+3. **Does the static model lose?** — Answer: last for every balancer and every metric (AP, AUC, PrecisionRank) — Fig 10. Because: over 14 months the stream moved; a model that never sees the move cannot follow it — the module's first claim confirmed.
+4. **Does the frequency matter?** — Answer: at the same K = 90, daily beats weekly beats 15-day; the one-chunk window K = 1 is coherently worst. Because: fraud keeps evolving within a week, and one day holds a handful of frauds (< 0.4% of 5,218 ≈ 20) — the starved-learner failure from the previous lesson, measured.
+5. **Does keeping old frauds help?** — Answer: K_gen from 0 to 30 days of genuine helps; beyond 30 rarely significantly; best AP/PrecisionRank with 5 models and K_gen = 30. Because: frauds are the scarce class, genuine history goes stale faster than fraud history.
+6. **Does the balancer interact with the strategy?** — Answer: SMOTE and EasyEnsemble both beat plain undersampling (which at 0.4% fraud discards 99.6% of the genuine per chunk); EasyEnsemble pairs with Forget, SMOTE with Update; Forget has the highest prediction time, SMOTE the heaviest training. Because: EasyEnsemble repairs undersampling's variance by learning from five different undersamples per chunk — diversity again (module 2's balanced-bagging finding) — and the best balancer depends on how much history the strategy keeps.
+7. **What does the ordering measure?** — Answer: the gap between Static and the adaptive strategies is the drift over 422 days as seen by the metrics; the gap between K = 1 and K = 90 is the fraud count per chunk; the balancer × strategy interaction is the imbalance ratio changing with the window. Because: each contrast isolates one of the previous lesson's variables.
+8. **What does the experiment not show?** — Answer: labels are assumed available at once (no δ, no feedback bias — module 8), e-commerce only, one dataset, no cost metric, no detector-triggered replacement (the cadence is fixed). The Elliptic step 43 shows a change no retraining catches; the day-shift matrix shows the label-free view the experiment never took. Because: an application states where it departs from the idealisation.
 
-## Pitfalls
-- PrecisionRank at a ≠ CP@k; say so when reconciling with module 2.
-- Rank sums are not AP differences; the lesson reports the ordering and the test, not invented effect sizes.
-- The 2014 paper models no label delay; the 2018 paper does — keep the chronology (the capstone uses the 2018 loop).
+### Set pieces and worked examples to recreate
+- Dataset facts: 422 days, 45 variables, 2,202,228 transactions, mean 5,218 per daily chunk, < 0.4% fraud, 90-day aggregates (Sec 7.1).
+- Static / Update / Forget timelines with K = 3, M = 4, K_gen = 2 (Figs 1–3) and the balancing step (Fig 4).
+- The rank-sum bar charts: Fig 5 (algorithm × training days), Fig 6 (frequency), Fig 7 (K_gen), Fig 8 (balancers × strategy), Fig 10 (all strategies: EasyEnsemble.Forget on top, Static at the bottom) — recreate as house-style horizontal bars with significance ticks.
+- Undersampling to 50/50 at 0.4% discards about 99.6% of genuine per chunk (Sec 7.2.4).
+- The compute chart: SMOTE training-heavy, Forget prediction-heavy (Fig 9).
+- The juxtaposed-months abrupt drift: CP_k loss 7.7% (AW) vs 12.5% (W^D) (TNNLS Sec VI-D) — the same question with a planted change.
+- Nemenyi's CD formula with k strategies and N = 422 chunks (Gama Sec 4.2.3).
+
+### Pitfalls and terms to define
+- "Rank sum" and "Friedman test": define before the bars; a reader will read the bar length as a score.
+- PrecisionRank at top-a is module 2's P@k under another name; say so.
+- The paper's K_gen and K are two different window parameters; keep them apart.
+- "EasyEnsemble" and "SMOTE" are recalled from module 2, not re-taught; one clause each.
+- The experiment assumes instant labels: say it at the departure step, not as a footnote.
+- The paper's own naming scheme (RF.Under.Daily.5M.Update.90K) is a convenience; introduce it once.
+
+### Recalled, not re-taught
+- Memory/forgetting/ensembles and the cadence argument (<Ref> `stream-learning-and-adaptation`); drift kinds (<Ref> `concept-drift`); AP, AUC in rank form, P@k (<Ref> `alert-budget-metrics`); undersampling, SMOTE, balanced ensembles and the diversity finding (<Ref> `imbalance-techniques-revisited`); the sequence models' daily variance (<Ref> `sequence-models-for-transactions`); the Elliptic collapse (<Ref> `elliptic-illicit-nodes`).
 
 ## FIGURE PLAN
-- draw: The three strategies as three chunk timelines (Static: one model on K chunks predicting all future; Update: a model per chunk on the K latest, ensemble of M; Forget: all past frauds + K_gen genuine chunks) — one figure, three rows. Inspired by Figs 1–3 (recreated). Key image.
-- draw: Rank-sum bar chart of the pooled strategies (EasyEnsemble.Forget at top, Static at bottom) for AP — a house-style recreation of Fig. 10's ordering from the paper's description (values as ordering only; mark as ordering).
-- draw: `<FigureSequence>` (3 frames) of the K = 1 failure: (1) one day's chunk with ~20 frauds, (2) the model's decision region fitted to them, (3) the next day's frauds outside it — the "too few positives" picture, computed on the simulator.
-- draw: Balancer × strategy as a 3 × 3 grid (Under / SMOTE / EasyEnsemble × Static / Update / Forget) shaded by rank, with the two diagonal winners marked — from Sec. 7.2.4–7.2.5.
-- draw: Our simulator reproduction: per-day AP for Static / Update / Forget over 40 days as three lines with scenario-2 compromise windows shaded — computed.
-- draw: Compute cost per strategy and balancer as a bar chart (SMOTE heavy, Forget slow to predict) — from Fig. 9's description, as relative bars.
+- draw (key image): the overall rank-sum chart — horizontal bars for every strategy with EasyEnsemble.Forget at the top and Static at the bottom, significance against the best marked. Inspired by Dal Pozzolo Fig 10.
+- draw: <FigureSequence>, 3 frames — the per-chunk ranking procedure: frame 1 three strategies' AP on five days, frame 2 ranks within each day, frame 3 the rank sums.
+- draw: daily frauds per chunk over the 422 days as a strip with the K = 1, 7, 30, 90 windows drawn to scale — the fraud count each window holds.
+- draw: frequency contrast — rank sums for daily / weekly / 15-day at K = 90 and the K = 1 bar. Inspired by Fig 6.
+- draw: balancer × strategy interaction as a 3 × 2 grid of rank sums (Under / SMOTE / EasyEnsemble × Update / Forget). Inspired by Fig 8.
+- draw: compute cost per strategy and balancer as grouped bars (training vs prediction time). Inspired by Fig 9.
+- draw: the departures panel — the experiment's timeline with "labels instant" against the course's δ-late timeline, and the Elliptic step-43 curve beside it as what retraining cannot fix.
 
 ## EXERCISE PLAN
-1. Warm-up: with 5,218 transactions per daily chunk at 0.4% fraud, compute the expected frauds per chunk and the number of genuine rows retained by undersampling to 50/50.
-2. Boundary probe: K → all history (Static with everything) and K = 1 — write what each training set contains on day 400 and why both lose: one to drift, one to variance; derive the chunk count at which the expected fraud count passes 100.
-3. Claim to refute: "Module 2 showed rebalancing hurts AP, so this paper's finding that SMOTE and EasyEnsemble help must be wrong." Reconcile: different metric (PrecisionRank at a per chunk), tiny chunks where variance dominates, stream setting with daily refits; name the experiment that would decide (the same strategies scored by CP@k with card removal).
-4. Research-shaped: reproduce the Static vs Update vs Forget ordering on the simulator (RF, daily, K = 30, K_gen = 30) over 40 days with the harness; report Friedman rank sums on AP and on CP@100.
-5. Derivation the lesson skipped: show that the ensemble weight w_m = (PR_m − PR_min)/(PR_max − PR_min) gives the best model weight 1 and the worst 0 and is invariant to affine rescaling of PR; then show why with overlapping training windows the M models are nearly identical and the ensemble reduces to a single model (the paper's Sec. 7.2.5 remark).
-6. FORWARD (E7): rerun Update on the simulator where only the top-100 alerted transactions of each day receive labels (the others remain unlabelled rather than being read as genuine) — the reader finds the strategy's rank collapsing and the training set's fraud share rising → lands on `alert-feedback-selection-bias`.
-7. Mixed review (E3): compute the day-distinguishability AUC (concept-drift) between simulator day 10 and day 40 and state whether the Update strategy's gain on those days is explained by p(x) or p(y|x) change (scenario 2 is which?).
+1. Warm-up: given AP for three strategies on six days, compute the Friedman rank sums and say which is best.
+2. [claim to refute] "Strategy A has the higher mean AP over 422 days, so it beats strategy B." Construct a six-day example where A wins the mean and B wins the rank sum, and say which the deployment should prefer and why (day difficulty).
+3. [derivation skipped] Derive the Nemenyi critical difference for k = 6 strategies on N = 422 chunks at α = 0.05 and state how far apart two rank sums must be; then show why overlapping training windows make consecutive chunk ranks dependent and what that does to the test.
+4. [boundary probe] K_gen = 0 with Forget: the training set is all past frauds and the current day's genuine; compute its imbalance ratio after 300 days on the paper's stream and say what a balancer does to it.
+5. [research-shaped] On the simulator over 120 days, implement Static, Update (daily, K = 30) and Forget (all frauds + 30 days genuine) with a random forest and rank them per day on AP and CP@100; report whether Static is last and whether the K = 1 window is starved.
+6. [mixed review] Re-run exercise 5 with labels arriving δ = 7 days late (<Ref> `delayed-labels-prequential`): which strategy loses most, and what does the "feedback" sample of <Ref> `alert-feedback-selection-bias` (the next module) look like in this loop?
+7. FORWARD → `adversarial-classification`: plant a fraudster on the simulator who, each week, moves the fraud amount just below the threshold the retrained model learned; rank Static and daily Update on that stream — the reader watches the adaptive strategy chase a target that moves because of it, the arms race the next module names.
 
 ## ARC
-- Inherits: sequence models and daily co-movement; the drift taxonomy, detectors and strategies; module 2's balancer findings and harness.
-- Contributes: the module cashed out on 422 real days — the static model last, the cadence and window effects, the balancer × strategy interaction, and its reproduction on the simulator.
-- Hands off: the delay-aware sequel (alert-feedback-selection-bias; Dal Pozzolo 2018); the retraining loop of the capstone; monitoring (model-risk-monitoring).
-- Spine step 7: drift and sequence.
-
-## APPLICATION (L16)
-- Artifact: Dal Pozzolo et al. 2014's experiment on 2.2M Worldline e-commerce transactions over 422 days (static results; data proprietary), reproduced in design on the simulator.
-- Module results used: the drift taxonomy and the window/forgetting/ensemble strategies (concept-drift); the sequence lesson's daily co-movement as the reason for rank-based evaluation; module 2's harness and balancer findings for the reconciliation.
-- Departures from the idealisation: labels assumed instant, e-commerce only, one dataset, no cost metric, daily chunks; the simulator's drift is scripted (scenario 2) and shows no fraud-type evolution.
+- Spine step 7 "Drift and sequence": "The transaction stream drifts and the fraud evolves, so a model trained once ranks last: the sequence of an entity's events is itself a feature, change is measured on the features before labels arrive and detected on the error stream once they do, and the learner remembers, forgets and replaces itself on a cadence that the stream's own evaluation has to score."
+- Inherits: every claim of the module — sequence models' daily variance, the kinds of change, the detectors' delay, memory/forgetting/ensembles and the cadence; module 2's metrics and balancers.
+- Contributes: the ranking method for streams and the measured ordering: Static last, daily first, frauds kept, balancer × strategy.
+- Hands off: the fixed cadence as the baseline the capstone's loop runs (`pipeline-capstone-lab`); drift the model causes (`adversarial-classification`, `alert-feedback-selection-bias`); performance backtesting per period (`model-risk-monitoring`).
+- APPLICATION spec: the artifact is the 422-day Worldline strategy comparison (2.2M e-commerce transactions, daily chunks, 90-day aggregates, Friedman rank sums). It uses the module's results: prequential-style per-chunk scoring (lesson 38), the window/forgetting/ensemble choices (lesson 38), the drift taxonomy to name what the Static gap measures (lesson 36), module 2's metrics and balancers. Departures from the idealisation: labels are taken as instantly available (no δ, no alert-feedback bias); replacement is on a fixed cadence, never detector-triggered (lesson 37's detectors are absent); e-commerce only, one processor, no cost metric; no label-free shift measurement; and the Elliptic collapse shows a change retraining cannot follow.

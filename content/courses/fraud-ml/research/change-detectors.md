@@ -1,0 +1,72 @@
+# Change detectors on the error stream: CUSUM, Page–Hinkley, DDM and ADWIN — research brief
+
+Lesson: `change-detectors` (module: sequences-drift, type: core, status: planned). NEW — full re-synthesis, no draft exists, so no REVISION block.
+Goal: Derive the CUSUM, Page–Hinkley, DDM and ADWIN tests from the problem of telling a real change in a running error rate from noise, and evaluate a detector by its mean time between false alarms, time to detection and missed detections
+Opening (verbatim, the lesson must start with it): Every day a few more labels arrive and the detector's error on them can be measured. Some days it is high by chance; some days it is high because the stream has changed. A rule is needed that watches the running error and raises an alarm when the change is real, quickly, without crying wolf on a stable stream. What statistic does that, and what does it cost in delay and false alarms?
+
+## Sources to consult
+- MOA book ch. 5 (research/texts/moa-book-ch5-dealing-with-change.txt): 5.3.1 the measures (MTFA, FAR = 1/MTFA, MTD(θ), MDR(θ), ARL(θ) with MTFA = ARL(0)); 5.3.2 CUSUM on standardised residuals z_t = (x_t − μ)/σ, the guideline k = half the change to detect in σ units and h = ln(1/δ) (3 to 5 typical), the Page–Hinkley variant, one-sided vs two-sided (Ex. 5.3); 5.3.3 the window tests — normal test on the difference of two means at 5% (1.96), the χ² test on variances, the Hoeffding test with the harmonic mean n = 1/(1/n0 + 1/n1); 5.3.4 DDM (p_t, binomial σ, warning at p_min + 2s_min, drift at 3s_min, the slow-reaction drawback and Ex. 5.5); 5.3.5 ADWIN (the trade-off paragraph, "maximal length statistically consistent with no change", δ, exponential histograms); Ex. 5.6 (ADWIN under abrupt vs linear drift), Ex. 5.7 (the lab). The display formulas are lost in the flattened text — take them from the survey below and say so.
+- Gama et al. 2014 (research/texts/asurvey-s1-.txt): Sec 3.2.1 CUSUM g_t = max(0, g_{t−1} + (x_t − δ)), alarm g_t > λ; Page–Hinkley m_T = Σ(x_t − x̄_T − δ), M_T = min m_t, PH_T = m_T − M_T, alarm > λ; Sec 3.2.2 SPC/DDM p_i, σ_i = √(p_i(1−p_i)/i), Warning/Out-of-Control, EWMA Z_t with σ_Z; Sec 3.2.3 ADWIN's cut ε_cut = √((1/2m) ln(4|W|/δ)), m the harmonic mean of the sub-window sizes, O(log W) via exponential histograms; Table II costs; Sec 4.1 detector criteria (probability of true detection, ARL on drift-free data, delay, point accuracy); App. A Algorithms 1–3 pseudocode.
+- Gavaldà, Lecture 6 (research/texts/gavalda-ds-lecture6.txt): slides 31–39 — CUSUM with v ≈ σ and h = kσ; Kifer's reference vs sliding window; Gama's DDM "slow to react after long stretches with no change"; ADWIN's test contract (Pr[test true] ≤ δ if same, > 1 − δ if d ≥ ε) and its two guarantees; ADWIN2 on exponential histograms; pluses and cons (100–500× slower than EWMA+CUSUM).
+- Carta OML2 (research/texts/carta-oml2-concept-drift.txt): the three-uniform stream (changes at 1,000 and 2,000) and the detection indices ADWIN 1055/2047, Page–Hinkley 1156/2136, DDM 1059/2085, hand-written CUSUM (δ = 0.005, λ = 50, min_obs 30) 1154/2135 — the one comparison with numbers; carta-oml2-cumusm.txt for the two-sided CUSUM.
+- Dal Pozzolo 2018 Sec VI-D (research/texts/creditcard-tnnls.txt): the synthetic abrupt drift by juxtaposing two months; CP_k loss 7.7% vs 12.5%.
+
+## EXPLANATION PLAN
+### The problem as the newcomer meets it
+From the previous lesson: a change in p(y|x) is seen only on the error stream, δ days late, and any fixed window is a guess. Now the labels for day t − δ arrive and the model's errors on them are a stream of 0/1s. The newcomer needs a rule, not a plot. Terms not yet available: MTFA/MTD/MDR, residual, CUSUM, Page–Hinkley, the warning/drift bands, a reference window, Hoeffding's bound, ADWIN, exponential histogram. The opening's "crying wolf" is the only name for a false alarm until MTFA is defined.
+
+### Chain of sub-problems
+1. **What makes one detector better than another?** — Obvious attempt: "it finds the change". Why it fails: a detector that alarms every day finds every change. Answer: three measures on a stream with a known change of size θ: mean time between false alarms on the stable part (MTFA; the false-alarm rate is 1/MTFA), mean time to detection after the change (MTD(θ)), the probability of never alarming (MDR(θ)); ARL(θ) unifies the first two with MTFA = ARL(0). Because: any rule can lower MTD by lowering its threshold, which also lowers MTFA; a detector is a point on that trade, so it must be reported as a pair.
+2. **The running mean jumped — is it noise?** — Obvious attempt: alarm when the latest mean exceeds the old one by some margin. Why it fails: a single high day happens by chance; the margin must accumulate. Answer: CUSUM — standardise x_t against the normal-condition mean and sd, keep g_t = max(0, g_{t−1} + x_t − δ), alarm when g_t > λ, reset. Because: the floor at 0 forgets evidence against a change, so only sustained excess over δ accumulates; δ about half the change to detect, λ ≈ ln(1/false-alarm rate) in the 3–5 range; O(1) memory.
+3. **What if the normal mean is not known?** — Answer: Page–Hinkley — cumulate deviations from the running mean, m_T = Σ(x_t − x̄_T − δ), keep the minimum M_T, alarm when m_T − M_T > λ. Because: the running minimum is the "best past"; a rise of λ above it is the evidence. Both are one-sided; the two-sided version is two statistics (Ex. 5.3).
+4. **The error of a learner is not any number — can that help?** — Answer: DDM. The error count over t items is binomial, so the error rate has sd s_t = √(p_t(1−p_t)/t); track the smallest p_min with its s_min; warning when p_t + s_t ≥ p_min + 2s_min, drift at 3s_min; store items from the warning on and rebuild on drift. Because: the bands are the 95% and 99% one-sided limits of a stable error rate, no parameter to set. Its cost: p_t is computed since the last reset, so after a long calm the band is narrow but the mean is slow to move — a small change takes many items to show (Ex. 5.5 asks for the fix: a window or an EWMA on the error).
+5. **Can two windows be compared directly?** — Answer: a reference window and a sliding window, a normal test on the difference of means at 1.96 for 5%, or a χ² test on variances; after an alarm the sliding window becomes the reference. Because: it is a hypothesis test with a known false-alarm rate — but the window sizes are a guess again.
+6. **Can the window choose itself?** — Obvious attempt: try many sizes. Why it fails: cost, and many tests inflate false alarms. Answer: ADWIN keeps a window W as long as it is consistent with "no change inside W": for every split W = W0·W1 it compares the two means and drops W0 when |μ̂0 − μ̂1| ≥ ε_cut = √((1/2m) ln(4|W|/δ)), m the harmonic mean of the two sizes. Derive ε_cut: Hoeffding's bound for a mean of n bounded values, applied to both sub-windows at confidence δ shared across the |W| splits (the 4|W|/δ inside the log), gives the cut as the sum of the two bounds in harmonic-mean form. Because: with probability ≥ 1 − δ no cut without change, and a change of at least ε is cut with probability ≥ 1 − δ; the window length is the estimator's choice, not the user's. Cost O(log W) in time and memory via exponential histograms; 100–500× slower than CUSUM in a direct implementation.
+7. **How does each behave on the course's stream?** — Answer: the error stream arrives δ days late, so every alarm is δ days after the fact; and p(y) swings day to day (the number of fraud cards per day), so a detector on raw error rate will fire on base-rate swings — monitor a rate normalised by the day's positives, or CP_k. Because: the measures of step 1 must be evaluated on the stream as it is, with its delay and its daily rhythm. The design consequence: detectors inform the retraining cadence; they do not replace it (next lesson).
+8. **How do the four compare on one stream?** — Answer: on a stream of three uniform segments with changes at 1,000 and 2,000, ADWIN alarms at 1055/2047, DDM 1059/2085, Page–Hinkley 1156/2136, a hand-written CUSUM 1154/2135. Because: the window-based test sees a mean difference as soon as the second sub-window fills; the cumulative tests wait for the sum to climb — the delay half of the trade, with no false alarms on this clean stream.
+
+### Set pieces and worked examples to recreate
+- Page–Hinkley traced step by step on a 12-value error stream with a planted shift: m_T, M_T, PH_T, the alarm step (construct the numbers; matches the demo).
+- DDM's bands: p_t over time with p_min + 2s_min and + 3s_min lines and the warning stretch shaded (Gama Sec 3.2.2, MOA 5.3.4).
+- The Hoeffding derivation of ε_cut and the harmonic mean m = 1/(1/n0 + 1/n1) (Gama Sec 3.2.3; MOA 5.3.3 states the harmonic mean).
+- Carta's three-segment stream and the four detection indices (OML2).
+- CUSUM guideline numbers: k = half the change in σ units, h = ln(1/δ) ∈ [3, 5] (MOA 5.3.2).
+- Dal Pozzolo's juxtaposed-months abrupt drift and the 7.7% vs 12.5% CP_k loss (TNNLS Sec VI-D) — a fraud-scale instance of "detect and adapt".
+- The MOA tutorial's description: naive Bayes accuracy dropping inside the drift window and never recovering without a detector (Tutorial 5 Fig. 10).
+
+### Pitfalls and terms to define
+- "False alarm rate" is defined on a stable stream only; report it as MTFA, never as a fraction of all alarms.
+- CUSUM's δ (the drift allowance) is a different δ from ADWIN's confidence δ and from the course's label delay δ; name each at first use and pick distinct symbols in prose (the lesson may write ADWIN's as δ_c).
+- DDM's σ uses t = items since the last reset, not since the start of the stream.
+- Hoeffding needs values in [0,1]; an error indicator qualifies, a raw amount does not.
+- The MOA book's display formulas did not survive the text flattening; the lesson's formulas come from the survey and must be checked against the online chapter.
+- Exponential histograms: one sentence on what they are (buckets of 1, 2, 4… ones with timestamps) and why they give O(log W); not more.
+- A detector on CP_k rather than on raw error: say why (daily swings in the number of fraud cards).
+
+### Recalled, not re-taught
+- The three kinds of change and the window-size trade-off (<Ref> `concept-drift`); the delay δ (<Ref> `fraud-detection-system`); the binomial variance of a proportion and Hoeffding's inequality (classical-ml / prerequisites — state the bound in one line, do not prove it); CP_k (<Ref> `alert-budget-metrics`).
+
+## FIGURE PLAN
+- draw (key image): <FigureSequence>, 4 frames — Page–Hinkley on a seeded error stream: (1) the stream with the planted shift, (2) the cumulative m_T, (3) the running minimum M_T, (4) PH_T = m_T − M_T crossing λ, the alarm step marked and false alarms on the stable stretch counted. Computed; matches the demo.
+- draw: the MTFA / MTD trade as a curve: for one detector, MTD against MTFA as λ varies, a second detector's curve below it — "better" is the lower curve, not a point.
+- draw: CUSUM's g_t with its floor at zero on the same stream, the δ allowance shown as a slope.
+- draw: DDM's bands — error rate p_t with the 2σ and 3σ lines, the warning window shaded, and a second panel after a long calm where the same shift takes longer to cross. Inspired by the survey's Warning/Out-of-Control description.
+- draw: <FigureSequence>, 3 frames — ADWIN: a window split at one point with the two sub-window means and ε_cut written under it; the split moving; the older part dropped when the difference exceeds the cut.
+- draw: Carta's three-segment stream with the four detectors' alarm positions as vertical ticks (1055, 1059, 1154, 1156 / 2047, 2085, 2135, 2136).
+- draw: the δ-late error stream: a change at t on the transaction timeline, the first labelled error at t + δ, the alarm at t + δ + MTD.
+
+## EXERCISE PLAN
+1. Warm-up: run CUSUM by hand on a 12-value standardised error stream with δ = 0.05, λ = 0.5 and report the alarm step.
+2. [derivation skipped] (MOA Ex. 5.3) Write the two-sided versions of CUSUM and Page–Hinkley and show that running the one-sided test on −x_t is the second half.
+3. [derivation skipped] Derive DDM's warning and drift thresholds from the binomial variance and show why the bands narrow as t grows; then (MOA Ex. 5.5) propose two fixes for its slow reaction after a long calm and state the parameter each introduces.
+4. [boundary probe] (MOA Ex. 5.6) ADWIN under an abrupt change from μ0 to μ1 at T and under a linear rise μ_{t+1} = μ_t + Δ: deduce when the first cut happens in each case and how the window length evolves afterwards.
+5. [claim to refute] "ADWIN has no parameters, so it has no false-alarm rate to tune." Name δ, what it bounds, and why the per-split union over |W| splits is what puts 4|W| in the log.
+6. [research-shaped] Simulate a drift-free Bernoulli(0.05) error stream and estimate Page–Hinkley's MTFA as a function of λ by simulation; set λ so MTFA > 10,000 and measure MTD for a shift to 0.08 — reproduce the demo's trade with numbers.
+7. [mixed review] A day's CP@100 (<Ref> `alert-budget-metrics`) falls from 0.30 to 0.18 while the number of fraud cards that day halves: which detector input (error rate, CP_k, NCP_k) would not alarm, and why is that the right behaviour?
+8. FORWARD → `stream-learning-and-adaptation`: after DDM declares drift, rebuild the model on the items stored since the warning only, and count how many frauds that window holds on the simulator's stream — the reader hits the "too few frauds to relearn from" wall the next lesson's forgetting rule removes.
+
+## ARC
+- Spine step 7 "Drift and sequence": "The transaction stream drifts and the fraud evolves, so a model trained once ranks last: the sequence of an entity's events is itself a feature, change is measured on the features before labels arrive and detected on the error stream once they do, and the learner remembers, forgets and replaces itself on a cadence that the stream's own evaluation has to score."
+- Inherits: the window-size trade-off and the kinds of change (`concept-drift`), the delay δ (module 1), CP_k (module 2).
+- Contributes: the detector-evaluation measures, four detectors with their derivations and costs, the δ-late caveat.
+- Hands off: triggered replacement and the cadence (`stream-learning-and-adaptation`); the lab's four detectors (`drift-detector-lab`); the input-side stability index as the detector's complement (`model-risk-monitoring`); the RTS Art 20 two-quarter controller as a detector with hysteresis (`psd2-sca-tra`).

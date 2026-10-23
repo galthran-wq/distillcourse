@@ -9,7 +9,7 @@ concepts:
   # ── module 1: the problem ───────────────────────────────────────────────
   - id: fraud-detection-system
     name: Layered fraud detection system
-    definition: "Five layers around a payment: terminal checks and blocking rules in real time, scoring rules and the data-driven model in near real time, human investigators offline; the model is the fourth"
+    definition: "The layers around a payment forced by its deadline and its label loop: terminal checks and blocking rules in real time, scoring rules and the data-driven model in near real time, human investigators offline"
     introduced_in: fraud-detection-system
   - id: alert-feedback-interaction
     name: Alert–feedback interaction
@@ -79,7 +79,11 @@ concepts:
   - id: undersampling-calibration
     name: Undersampling calibration correction
     definition: "With negative-keep rate β, the undersampled posterior is p_s = p/(p + β(1−p)); the inverse p' = βp_s/(βp_s − p_s + 1) restores the full-data probability without changing the ranking"
-    introduced_in: imbalance-techniques-revisited
+    introduced_in: undersampling-calibration
+  - id: matched-threshold
+    name: Matched threshold
+    definition: "τ' = βτ_s/((β−1)τ_s + 1), the threshold on the corrected probability p' that reproduces exactly the decisions of threshold τ_s on the undersampled posterior; for τ_s equal to the undersampled prior it equals the original prior"
+    introduced_in: undersampling-calibration
   - id: imbalance-ratio
     name: Imbalance ratio
     definition: "IR = |positives|/|negatives| of a training set; the heuristic class-weight 1/IR and the sampling target of a rebalancing technique"
@@ -107,11 +111,11 @@ concepts:
     introduced_in: transaction-aggregates
   - id: windowed-aggregation
     name: Windowed aggregation
-    definition: "Count and sum (or mean) over the entity's strictly earlier transactions within the last t_p hours, optionally restricted to rows sharing a categorical value with the current one"
+    definition: "Count and sum (or mean) over the entity's strictly earlier transactions within the last t_p hours or days"
     introduced_in: transaction-aggregates
-  - id: delayed-terminal-risk
-    name: Delayed terminal risk
-    definition: "A terminal's fraud rate over the window [t − (d + w), t − d], computed as the difference of two rolling sums, so that only labels known by the delay d enter"
+  - id: conditional-aggregation
+    name: Conditional aggregation
+    definition: "A windowed aggregate restricted to the entity's earlier transactions that share a categorical value — type, country, merchant group — with the current one; the semantics differ from a fixed-merchant aggregate"
     introduced_in: transaction-aggregates
   - id: periodic-time-feature
     name: Periodic time feature
@@ -125,6 +129,10 @@ concepts:
     name: Break-point analysis
     definition: "Intra-account profiling: a fixed window split into an old and a new part, ranked by the t-test between their means"
     introduced_in: behavioural-profiles
+  - id: delayed-terminal-risk
+    name: Delayed terminal risk
+    definition: "A terminal's fraud rate over the window [t − (d + w), t − d], computed as the difference of two rolling sums, so that only labels known by the delay d enter"
+    introduced_in: point-in-time-features
   - id: point-in-time-join
     name: Point-in-time join
     definition: "An as-of join that attaches to each row the last feature value recorded up to, and never after, the row's timestamp"
@@ -226,7 +234,7 @@ concepts:
     introduced_in: fraud-as-a-graph
   - id: entity-resolution
     name: Entity resolution
-    definition: "Adding edges between entities that share an identifier (card, device, address), excluding high-degree identifiers that would link everyone"
+    definition: "Adding edges between entities that share an identifier (card, device, address) so that accounts controlled by one person become one connected object"
     introduced_in: fraud-as-a-graph
   - id: laundering-motif
     name: Laundering motif
@@ -235,23 +243,27 @@ concepts:
   - id: homophily-test
     name: Homophily test
     definition: "Comparing the observed fraction of cross-labelled edges to the 2lf expected under independence; dyadicity D and heterophilicity H as the two ratios"
-    introduced_in: fraud-as-a-graph
+    introduced_in: neighbourhood-and-centrality
   - id: egonet-features
     name: Egonet features
     definition: "Degree, triangles, density and their aggregates over a node's one-hop neighbourhood, including counts by neighbour label; paths of length k from A^k"
-    introduced_in: graph-features-and-communities
+    introduced_in: neighbourhood-and-centrality
   - id: centrality-measures
     name: Centrality measures
     definition: "Closeness (inverse average geodesic distance), betweenness (share of shortest paths through the node) and PageRank as rankings of a node's position"
-    introduced_in: graph-features-and-communities
+    introduced_in: neighbourhood-and-centrality
   - id: community-detection
     name: Community detection
     definition: "Partitioning a graph into densely connected groups by modularity (Louvain) or edge betweenness (Girvan–Newman); used to narrow a fraud search, not to assign it"
-    introduced_in: graph-features-and-communities
+    introduced_in: communities-and-components
   - id: connected-components
     name: Connected components
     definition: "The maximal sets of nodes joined by any path, computed deterministically by union-find; run on entity-resolution edges alone they are the fraud rings"
-    introduced_in: graph-features-and-communities
+    introduced_in: communities-and-components
+  - id: identifier-degree-cap
+    name: Identifier degree cap
+    definition: "Excluding identifiers shared by more than a threshold of users (a coffee-shop IP, a library device) before shared-identifier edges are drawn, because a high-degree identifier links everyone"
+    introduced_in: communities-and-components
   - id: relational-neighbour-classifier
     name: Relational neighbour classifier
     definition: "P(c | n) ∝ Σ_j w(n, n_j)·[label_j = c] over a node's neighbours; its probabilistic form uses the neighbours' class probabilities"
@@ -270,202 +282,246 @@ concepts:
     introduced_in: guilt-by-association
   - id: message-passing
     name: Message passing
-    definition: "Gather neighbours' representations, aggregate them permutation-invariantly, update the node's own; k layers reach k hops"
+    definition: "Gather the neighbours' vectors, aggregate them (sum, mean or max), update the node's vector with a learned function; k layers reach k hops"
     introduced_in: graph-neural-networks
   - id: gcn-layer
     name: GCN layer
-    definition: "H' = σ(Â H W) with Â = D̃^{−1/2}(A + I)D̃^{−1/2}; a skip term X W̃ makes the layer at least a logistic regression"
+    definition: "H' = σ(Â H W) with Â = D̃^{−1/2}(A + I)D̃^{−1/2}; with a skip term X W̃ and zero graph weights it reduces to logistic regression on the node's own features"
     introduced_in: graph-neural-networks
   - id: neighbourhood-sampling
     name: Neighbourhood sampling
-    definition: "Mini-batching a graph by sampling each target node's k-hop neighbourhood and masking the loss to nodes whose neighbourhoods are complete"
+    definition: "Mini-batching a large graph by sampling each training node's k-hop neighbourhood and masking the loss to the nodes whose neighbourhoods are complete"
     introduced_in: graph-neural-networks
   # ── module 7: sequences and drift ───────────────────────────────────────
   - id: landmark-sequence
     name: Landmark sequence
-    definition: "The fixed-length sequence of a landmark entity's (customer's) previous transactions, padded with a sentinel row and built with a group-wise shift"
+    definition: "The fixed-length sequence of a landmark entity's (the cardholder's) previous transactions, padded with a sentinel row where history is short"
     introduced_in: sequence-models-for-transactions
   - id: sequence-detector
     name: Sequence detector
-    definition: "A 1-D convolution, LSTM or attention model over a landmark sequence that outputs P(fraud) for the last transaction"
+    definition: "A 1-D convolution, LSTM or attention model that reads the landmark sequence and scores the last transaction; competitive with aggregates on the simulator, better only on constrained (card-present) streams"
     introduced_in: sequence-models-for-transactions
   - id: hidden-markov-features
-    name: Hidden Markov features
-    definition: "Likelihoods of an entity's recent sequence under HMMs trained on genuine and on fraud-containing histories, from the cardholder's and the merchant's perspective"
+    name: Hidden-Markov likelihood features
+    definition: "Likelihoods of a transaction sequence under HMMs fitted per perspective (genuine vs fraud, cardholder vs merchant, amount vs time delta) used as features for a supervised model"
     introduced_in: sequence-models-for-transactions
   - id: concept-drift-types
     name: Concept drift types
-    definition: "Real drift (p(y|x) changes), virtual drift (p(x) changes), prior shift (p(y) changes); sudden, incremental, gradual or reoccurring in time"
+    definition: "A change in p(X) (virtual drift), in p(y) (prior shift) or in p(y | X) (real drift); only the last moves the decision boundary"
     introduced_in: concept-drift
-  - id: drift-detector
-    name: Drift detector
-    definition: "A statistic on the error stream — CUSUM, Page–Hinkley, DDM's warning and drift bands, ADWIN's adaptive window — that raises an alarm when the distribution of errors changes"
+  - id: drift-patterns
+    name: Drift patterns
+    definition: "Sudden, incremental, gradual and reoccurring change over time, as distinct from an outlier that is not drift"
     introduced_in: concept-drift
+  - id: day-distinguishability
+    name: Day distinguishability
+    definition: "A label-free shift measure: pool two days' transactions, label each by its day, and read a classifier's AUC at telling them apart as the distance between the days"
+    introduced_in: concept-drift
+  - id: window-size-tradeoff
+    name: Window-size trade-off
+    definition: "On a changing stream a longer estimation window lowers variance and raises staleness; the right size depends on the unknown rate of change, so no fixed window is right forever"
+    introduced_in: concept-drift
+  - id: cumulative-sum-tests
+    name: CUSUM and Page–Hinkley tests
+    definition: "Memoryless detectors on a stream of numbers: CUSUM g_t = max(0, g_{t−1} + x_t − δ) alarms when g_t > λ; Page–Hinkley alarms when the cumulative deviation from the running mean exceeds its running minimum by λ"
+    introduced_in: change-detectors
+  - id: drift-detection-method
+    name: Drift detection method (DDM)
+    definition: "Bands on a learner's running error rate at p_min + 2σ_min (warning) and p_min + 3σ_min (drift), from the binomial variance of the error"
+    introduced_in: change-detectors
+  - id: adwin
+    name: ADWIN
+    definition: "An adaptive window that drops its older sub-window whenever two sub-window means differ by more than the Hoeffding cut ε_cut = √((1/2m) ln(4|W|/δ)), m the harmonic mean of their sizes; O(log W) memory"
+    introduced_in: change-detectors
+  - id: detector-run-length
+    name: Detector run-length measures
+    definition: "Mean time between false alarms on a stable stream (MTFA), mean time to detection after a change of size θ (MTD), missed-detection rate (MDR); ARL(0) = MTFA"
+    introduced_in: change-detectors
+  - id: prequential-stream-evaluation
+    name: Prequential stream evaluation
+    definition: "Interleaved test-then-train: predict each item, score, then learn from it; the landmark version is pessimistic, so a sliding window or fading factor tracks current performance"
+    introduced_in: stream-learning-and-adaptation
   - id: forgetting-strategy
     name: Forgetting strategy
-    definition: "How a stream learner discards old data: a sliding window, a fading factor, or keeping all past positives while windowing the negatives"
-    introduced_in: concept-drift
-  # ── module 8: adversary ─────────────────────────────────────────────────
+    definition: "How a stream learner drops old data: a fixed or variable window, a fading factor, reservoir sampling, or the fraud rule of keeping every past fraud and windowing the genuine"
+    introduced_in: stream-learning-and-adaptation
+  - id: adaptive-ensemble
+    name: Adaptive ensemble
+    definition: "A pool of models whose weights fall on error and whose members are added on an ensemble error and pruned below a threshold (DWM); streaming bagging by Poisson(1) copies"
+    introduced_in: stream-learning-and-adaptation
+  # ── module 8: adversary and feedback ────────────────────────────────────
   - id: minimum-cost-camouflage
     name: Minimum-cost camouflage
-    definition: "The cheapest set of feature edits whose summed log-odds reductions close the gap to the classifier's threshold — a 0-1 knapsack over discretised log-odds"
+    definition: "The cheapest set of feature edits whose log-odds reduction closes the gap to the classifier's threshold — a 0-1 knapsack solved by dynamic programming over discretised log-odds"
     introduced_in: adversarial-classification
   - id: adversary-aware-classifier
     name: Adversary-aware classifier
-    definition: "A classifier that replaces P(x′|+) with the mass of all positives the adversary would have camouflaged into x′, assuming optimal adversary play"
+    definition: "A classifier that replaces P(x' | +) by the mass of all pre-images that the adversary's optimal strategy would have camouflaged into x'"
     introduced_in: adversarial-classification
   - id: arms-race
     name: Arms race
-    definition: "The repeated game in which the detector retrains on the adversary's edits and the adversary re-optimises; utility oscillates rather than converging"
+    definition: "The repeated classifier–adversary game: the adversary's best edits lose their value once the classifier retrains and regain it once dropped, so utility oscillates rather than converging"
     introduced_in: adversarial-classification
   - id: sample-selection-bias
     name: Sample selection bias
-    definition: "Training samples drawn with a selection probability that depends on x (covariate shift), on y (prior shift) or on both; importance weighting corrects only the first"
+    definition: "Training on a sample whose inclusion depends on the features, the label, or both; alert feedback is complete bias because selection depends on the label through the previous model"
     introduced_in: alert-feedback-selection-bias
   - id: feedback-samples
     name: Feedback samples
-    definition: "F_t: all recent transactions of the cards alerted on day t, labelled by investigators within the day"
+    definition: "F_t: all recent transactions of the cards alerted on day t, labelled by investigators at once; biased, few, fresh"
     introduced_in: alert-feedback-selection-bias
   - id: delayed-samples
     name: Delayed samples
-    definition: "D_{t−δ}: all transactions of day t − δ, labelled by the end of the verification latency, unreported ones as genuine"
+    definition: "D_{t−δ}: all transactions of day t − δ, labelled by disputes or silence after the delay; unbiased, many, stale"
     introduced_in: alert-feedback-selection-bias
   - id: feedback-delayed-aggregation
     name: Feedback–delayed aggregation
-    definition: "P_A(+|x) = αP_F(+|x) + (1 − α)P_D(+|x): a classifier trained on feedbacks averaged with one trained on delayed samples, instead of one model on their union"
+    definition: "P_A(+|x) = αP_F(+|x) + (1 − α)P_D(+|x): two classifiers trained separately on feedbacks and on delayed samples, averaged; beats pooling them on alert precision"
     introduced_in: alert-feedback-selection-bias
   # ── module 9: governance ────────────────────────────────────────────────
   - id: decision-zones
     name: Decision zones
-    definition: "Probability bands mapped to actions — approve, step up, review, decline — with a referral band where analysts decide and may overrule"
+    definition: "Probability bands mapped to actions — approve, step up, review, decline — with automatic decisions at the extremes and a referral band for analysts"
     introduced_in: score-to-action
   - id: decision-table
     name: Decision table
-    definition: "A condition-by-action grid that minimises a rule set by merging identical-action columns and exposes conflicts and gaps mechanically"
+    definition: "A rule set laid out as conditions × actions, contracted and minimised by merging columns; exposes conflicts and gaps mechanically"
     introduced_in: score-to-action
   - id: investigation-frontier
     name: Investigation frontier
-    definition: "The curve in the (probability, amount) plane above which P × amount exceeds the investigation cost; the stepwise rule for which alerts to work"
+    definition: "The stepwise boundary in the probability × amount plane above which expected fraud amount P · Amt justifies an investigation"
     introduced_in: score-to-action
   - id: false-positive-harm
     name: False-positive harm
-    definition: "The cost of friction borne by legitimate customers — blocked cards, declined payments, exited accounts — measured per group and set against the detection gain"
+    definition: "The cost of friction a wrong alert imposes: a blocked card, a lost customer, a de-risked segment; measured per group as well as in total"
     introduced_in: score-to-action
   - id: alert-attribution
     name: Alert attribution
-    definition: "A per-alert decomposition of the score into feature contributions that sum to the score (Shapley attributions) or a rule the prediction satisfies"
+    definition: "A decomposition of one alert's score into per-feature contributions that sum to the score (Shapley values), read against each feature's baseline"
     introduced_in: alert-explanations
   - id: rule-extraction
     name: Rule extraction
-    definition: "Deriving a rule set that mimics a black-box model, decompositionally from its internals or pedagogically from its inputs and outputs, judged by accuracy, conciseness and fidelity"
+    definition: "Deriving an if-then rule set from an opaque model, decompositionally (from its parts) or pedagogically (from its input–output behaviour), judged by accuracy, conciseness and fidelity"
     introduced_in: alert-explanations
   - id: reason-code
     name: Reason code
-    definition: "The short, customer-facing statement of the main elements of an automated decision — the 'meaningful information about the logic involved' the law requires"
+    definition: "A short, customer-facing statement of the main factors behind a decision, the practical form of 'meaningful information about the logic involved'"
     introduced_in: alert-explanations
   - id: stability-index
     name: Stability index
-    definition: "SSI (PSI) = Σ_i (obs_i − exp_i) ln(obs_i/exp_i) between a reference and a current distribution; < 0.10 green, 0.10–0.25 yellow, ≥ 0.25 red"
+    definition: "SSI = Σ_i (observed_i − expected_i) ln(observed_i/expected_i) over score or variable bins, the information value between two periods; < 0.10 green, 0.10–0.25 yellow, ≥ 0.25 red"
     introduced_in: model-risk-monitoring
   - id: performance-backtest
     name: Performance backtest
-    definition: "Comparing ex-ante predictions with ex-post outcomes period by period — metric traffic lights by absolute change or by a bootstrap, calibration by binomial and Hosmer–Lemeshow tests"
+    definition: "Contrasting ex-ante predictions with ex-post outcomes each period: a ranking metric with absolute-change or bootstrap traffic lights, and a calibration test per probability pool"
     introduced_in: model-risk-monitoring
   - id: champion-challenger
     name: Champion–challenger
-    definition: "Running a candidate model in parallel with the production model on live traffic before replacing it directly, in phases, or by weighted blending"
+    definition: "Running a candidate model in parallel with the production model on live traffic before a direct, phased or parallel changeover; one stage of the model life cycle"
     introduced_in: model-risk-monitoring
   # ── module 10: EU regulation ────────────────────────────────────────────
   - id: transaction-monitoring-duty
     name: Transaction-monitoring duty
-    definition: "AMLR Art 26 and Rec 72: the obligation to scrutinise transactions against the customer's known profile, covering all products with risk-based intensity, flagging complex, unusually large, patterned or purposeless transactions (Art 34(2))"
-    introduced_in: eu-aml-single-rulebook
+    definition: "AMLR Art 26 and Rec 72: ongoing scrutiny of all transactions against the customer's profile and expected activity, with risk-based intensity; Art 34(2)'s four triggers for closer examination"
+    introduced_in: aml-transaction-monitoring-duty
   - id: suspicious-transaction-report
     name: Suspicious transaction report
-    definition: "The AMLR Art 69 report to the FIU on knowing, suspecting or having reasonable grounds to suspect, regardless of amount, with the assessment recorded whether or not it is filed"
-    introduced_in: eu-aml-single-rulebook
+    definition: "The report to the financial intelligence unit under AMLR Art 69 of any suspicion regardless of amount, with the three-working-day refraining rule of Art 71 and the tipping-off ban of Art 73"
+    introduced_in: aml-transaction-monitoring-duty
+  - id: linked-transactions
+    name: Linked transactions
+    definition: "AMLR Art 2(1)(20): transactions with identical or similar origin, destination, purpose or characteristics over a period, aggregated for thresholds — the legal hook for structuring detection"
+    introduced_in: aml-transaction-monitoring-duty
+  - id: assessment-record
+    name: Assessment record
+    definition: "AMLR Art 77: the record of every Art 69(2) assessment, kept five years whether or not a report was filed — the alert disposition as a legal record"
+    introduced_in: aml-transaction-monitoring-duty
   - id: non-outsourceable-decision
     name: Non-outsourceable decision
-    definition: "AMLR Art 18(3): approving the risk assessment and policies, deciding a customer's risk profile, onboarding or executing, filing reports and approving the detection criteria may not be outsourced"
-    introduced_in: eu-aml-single-rulebook
+    definition: "AMLR Art 18(3): the detection criteria, the customer risk profile, the onboarding and transaction decisions and the report can never be outsourced; a bought model is not outsourcing but liability stays"
+    introduced_in: aml-automated-decisions-and-supervision
+  - id: meaningful-human-intervention
+    name: Meaningful human intervention
+    definition: "AMLR Art 76(5): automated decisions to enter, refuse, maintain or exit a relationship, or to change due diligence, require meaningful human intervention, an explanation and a way to challenge"
+    introduced_in: aml-automated-decisions-and-supervision
   - id: fiu-feedback-loop
     name: FIU feedback loop
-    definition: "The AMLD6 cycle in which the financial intelligence unit triages reports, may suspend transactions and accounts for fixed working-day windows, and returns annual feedback on report quality"
-    introduced_in: eu-aml-single-rulebook
+    definition: "The financial intelligence unit's powers and duties under AMLD6: suspension (5 and 10 working days), monitoring orders, alerts, and at least annual feedback on report quality to each reporting entity"
+    introduced_in: aml-automated-decisions-and-supervision
   - id: strong-customer-authentication
     name: Strong customer authentication
-    definition: "PSD2 Art 4(30): authentication by two or more independent elements from knowledge, possession and inherence, dynamically linked to amount and payee for remote payments"
+    definition: "PSD2 Art 4(30) and Art 97: two or more independent elements (knowledge, possession, inherence), dynamically linked to amount and payee for remote payments"
     introduced_in: psd2-sca-tra
   - id: transaction-risk-analysis
-    name: Transaction risk analysis exemption
-    definition: "RTS Art 18: a remote payment may skip SCA when the provider's fraud rate is under the band's reference, the amount under the band's ceiling, and a real-time risk analysis raises none of six flags"
+    name: Transaction risk analysis
+    definition: "RTS Art 18: the exemption from SCA for a remote payment scored low-risk in real time, allowed only while the PSP's fraud rate is under the Annex reference and the amount under the band's threshold"
     introduced_in: psd2-sca-tra
   - id: fraud-rate-reference
     name: Reference fraud rate
-    definition: "The RTS Annex ceilings — 0.13% / 0.06% / 0.01% for cards at EUR 100 / 250 / 500 — against the rolling 90-day value-weighted fraud rate of Art 19, with Art 20's two-quarter cessation"
+    definition: "RTS Art 19 and Annex: the value-weighted rolling 90-day fraud rate per transaction type and band (cards 0.13% / 0.06% / 0.01% at EUR 100 / 250 / 500), with Art 20's two-quarter cessation and one-quarter reset"
     introduced_in: psd2-sca-tra
   - id: liability-shift
     name: Liability shift
-    definition: "PSD2 Art 73–74: unauthorised transactions refunded by the next business day, a EUR 50 payer cap, and no payer liability at all where the provider did not require SCA"
+    definition: "PSD2 Arts 73–74: the payer bears at most EUR 50 of an unauthorised payment and nothing if SCA was not required; the refund is due by the next business day"
     introduced_in: psd2-sca-tra
   - id: high-risk-ai-system
     name: High-risk AI system
-    definition: "An AI system in an Annex III area (or a product safety component) subject to the AI Act's Articles 9–15 requirements, conformity assessment, registration and post-market monitoring"
+    definition: "An AI system in an Annex III area (or a regulated product) that is subject to the AI Act's Arts 9–15 requirements and the provider and deployer duties; Art 6(3) exempts systems that do not materially influence the decision unless they profile natural persons"
     introduced_in: eu-ai-act-fraud
   - id: annex-iii-fraud-carve-out
     name: Annex III fraud carve-out
-    definition: "The clause in Annex III 5(b) excepting 'AI systems used for the purpose of detecting financial fraud' from the high-risk credit-scoring entry; purpose-based, natural persons only, overridden where the system profiles"
+    definition: "Annex III 5(b): creditworthiness scoring of natural persons is high-risk 'with the exception of AI systems used for the purpose of detecting financial fraud' — a purpose-based clause of one entry only"
     introduced_in: eu-ai-act-fraud
   - id: post-market-monitoring
     name: Post-market monitoring
-    definition: "AI Act Art 72: the provider's documented, continuous collection and analysis of performance data over the system's lifetime, with serious incidents reported within 15 days"
+    definition: "AI Act Art 72: a documented system that collects and analyses performance data over the lifetime of a high-risk system, with Art 73's serious-incident deadlines"
     introduced_in: eu-ai-act-fraud
   - id: right-to-explanation
     name: Right to explanation
-    definition: "AI Act Art 86: a person subject to a decision based mainly on a high-risk system's output may obtain clear and meaningful explanations of the system's role and the decision's main elements"
+    definition: "AI Act Art 86: a person subject to a decision based mainly on a high-risk system's output may obtain clear and meaningful explanations of the system's role and the main elements of the decision"
     introduced_in: eu-ai-act-fraud
   - id: legitimate-interest-fraud
     name: Legitimate interest in fraud prevention
-    definition: "GDPR Art 6(1)(f) read with Recital 47: processing strictly necessary to prevent fraud is a legitimate interest, subject to the balancing test and the data subject's reasonable expectations"
+    definition: "GDPR Art 6(1)(f) with Recital 47: processing strictly necessary for preventing fraud is a legitimate interest, subject to the balancing test and reasonable expectations"
     introduced_in: gdpr-financial-crime-data
   - id: solely-automated-decision
     name: Solely automated decision
-    definition: "GDPR Art 22: a decision based solely on automated processing with legal or similarly significant effect, allowed only under contract, law with safeguards, or explicit consent, with human intervention and challenge"
+    definition: "GDPR Art 22: a decision based solely on automated processing with legal or similarly significant effect, which the data subject has the right not to be subject to unless contract, law with safeguards or explicit consent applies"
     introduced_in: gdpr-financial-crime-data
   - id: data-minimisation-audit
     name: Data-minimisation audit
-    definition: "Testing each feature against Art 5(1)(c) — adequate, relevant, limited to what is necessary — and each reuse against Art 6(4) compatibility"
+    definition: "Checking a feature set against GDPR Art 5(1)(c) (adequate, relevant, limited to what is necessary), Art 9 special categories and Art 22(4)"
     introduced_in: gdpr-financial-crime-data
   - id: travel-rule
     name: Travel rule
-    definition: "Regulation 2023/1113: the originator and beneficiary data that must accompany a transfer of funds or crypto-assets, verified by the sender and checked for completeness by the receiver"
+    definition: "Regulation 2023/1113 Arts 4 and 14: the originator and beneficiary information that must accompany a transfer of funds or crypto-assets, with the EUR 1,000 logic for funds and no threshold for crypto"
     introduced_in: transfer-of-funds-crypto
   - id: self-hosted-address
     name: Self-hosted address
-    definition: "A distributed-ledger address not held by a crypto-asset service provider; transfers to or from one above EUR 1,000 require assessing whether the provider's client controls it"
+    definition: "A distributed-ledger address not held by a crypto-asset service provider; above EUR 1,000 the provider must assess whether its customer controls it"
     introduced_in: transfer-of-funds-crypto
-  # ── module 11: the system ───────────────────────────────────────────────
+  # ── module 11: system ───────────────────────────────────────────────────
   - id: latency-budget
     name: Latency budget
-    definition: "The time each layer may spend on a decision — milliseconds for rules, under a second for the score, seconds for the authorisation — which fixes what may be computed online"
+    definition: "The sub-second share of an authorisation's few seconds that the model and its feature lookups may spend; what cannot fit is precomputed"
     introduced_in: real-time-scoring-architecture
   - id: streaming-aggregation
     name: Streaming aggregation
-    definition: "Minute-scale entity aggregates computed by a sliding window with a period, written to the feature store as new records arrive"
+    definition: "Minute-scale entity features computed in a sliding window with a short period, written to the online store as events arrive"
     introduced_in: real-time-scoring-architecture
   - id: parity-check
     name: Parity check
-    definition: "Replaying a day's stream through the serving path and diffing the resulting features against the batch-computed ones, feature by feature"
+    definition: "Replaying a day's events through the serving path and diffing the features it computes against the batch features the model was trained on"
     introduced_in: real-time-scoring-architecture
   - id: label-source
     name: Label source
-    definition: "Where a label comes from — investigator feedback, customer dispute, suspicious-transaction report, silence — and the clock on which each settles"
+    definition: "Where a training label comes from — investigator feedback, a customer dispute, a filed report and its reply, or silence — each with its own settling time"
     introduced_in: label-maturation
   - id: alert-disposition-record
     name: Alert disposition record
-    definition: "The per-alert entry of score, attributions, action, investigator disposition and timestamps, kept for every alert whether or not it was escalated"
+    definition: "The per-alert row holding score, attributions, action, investigator disposition and timestamps; the feedback label and the audit record are the same row"
     introduced_in: label-maturation
   - id: training-set-as-of
     name: Training set as of a date
-    definition: "The feature matrix and labels a model could legitimately have seen on date t: features from the store as of each row, labels settled by t − δ, blocked cards removed"
+    definition: "The rows, features and labels that were knowable on date t: features from the store as of each row, labels settled by t − δ, cards blocked since removed"
     introduced_in: label-maturation

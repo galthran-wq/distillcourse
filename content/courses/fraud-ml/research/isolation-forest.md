@@ -1,57 +1,68 @@
 # Isolation Forest — research brief
 
-Lesson: `isolation-forest` (module: anomaly, core, planned). NEW.
-Goal: Derive the Isolation Forest anomaly score from expected path length under random partitioning and explain why sub-sampling improves detection.
+Lesson: `isolation-forest` (module: anomaly, type: core, status: planned). NEW — full re-synthesis, no draft exists, so no REVISION block.
+Goal: Derive the Isolation Forest anomaly score from expected path length under random partitioning and explain why sub-sampling improves detection
+Opening (verbatim, the lesson must start with it): Scoring every point by its distance to every other costs time quadratic in the data, which a stream of hundreds of thousands of payments a day cannot pay. Anomalies are few and different: a random axis-aligned cut separates them from the rest in fewer tries than a normal point. Can 'how many random cuts does it take' be turned into a score, and why does a tiny random sub-sample of the data make it better?
 
-## Sources
-- Liu, Ting, Zhou 2008 (primary, read in full): Sec. 1 (profiling's false alarms and cost; anomalies "few and different"; two parameters t, ψ; no distance or density); Sec. 2 (random partitioning Fig. 1: x_i 12 splits vs x_o 4; averages 12.82 vs 4.02 over 1,000 trees; iTree definition — internal node test q < p with q random, p uniform between min and max of q; grow until height limit, |X| = 1 or all equal; proper binary tree n external, n − 1 internal; path length h(x); BST analogy — c(n) = 2H(n − 1) − 2(n − 1)/n, H(i) ≈ ln i + 0.5772 (Eq. 1, Table 1, Preiss §10.3.3); s(x, n) = 2^{−E[h(x)]/c(n)} (Eq. 2); E[h] → c(n) gives 0.5, → 0 gives 1, → n − 1 gives 0; s near 1 = anomaly, well below 0.5 = normal, all ≈ 0.5 = no distinct anomaly; why not normalise by n or log n; Fig. 2–3); Sec. 3 (sub-sampling helps: swamping and masking; Fig. 4 Mulcross 4,096 points AUC 0.67 vs 128-point sub-sample 0.91; different sub-samples per tree act as specialised experts; sampling without replacement); Sec. 4 (height limit l = ⌈log₂ ψ⌉ — only shorter-than-average paths matter, a partial model; ψ = 256, t = 100; path lengths converge before t = 100; Algorithm 3 returns e + c(Size) at a truncated external node; training O(tψ log ψ), evaluation O(nt log ψ); top-m by sorting); Sec. 5 (ORCA k = 5, LOF k = 10, RF with synthetic class; Table 2 datasets; Table 3: Http iForest 15.58 s AUC 1.00 vs ORCA 9,487 s AUC 0.36; Mulcross 12.5 s vs 2,512 s; LOF on Shuttle 7,490 s; kNN detects only anomaly clusters smaller than k; Fig. 5 AUC converges early in t; Fig. 6 near-optimal AUC at ψ = 128 (Http) / 512 (ForestCover), little variation after; Sec. 5.3 high-dimensional: 506 noise attributes, kurtosis selection restores AUC; Sec. 5.4 training on normal only: Http 0.9997 → 0.9919, ForestCover 0.8817 → 0.8802, larger ψ restores); Sec. 6 memory < 511·t·b bytes; Http 283,748 points in 7.6 s; ψ 64× larger → time 1.6×; Sec. 1 names credit-card fraud as the first application.
-- Handbook Ch7 Autoencoders: Isolation Forest baseline on the simulator 0.808 / 0.164 / 0.19 (AUC / AP / CP@100) vs AE 0.836 / 0.18 / 0.217 — the fraud numbers.
-- Chandola Sec. 5 pros/cons (test cost of kNN) and Sec. 11 (kNN/clustering miss a tight anomaly cluster) — the problems isolation addresses.
-- CS6890 PS4 / HKU A1 (lab canon, next lessons).
+## Sources to consult
+- Liu, Ting, Zhou 2008, *Isolation Forest* (ICDM) — Sec. 1 (profiling drawbacks, "few and different", only two parameters), Sec. 2 (random partitioning; Fig. 1 with 12 vs 4 splits and the 12.82 / 4.02 averages over 1,000 trees; iTree definition; path length h(x); the BST analogy and Table 1; c(n) Eq. 1; the score Eq. 2; Fig. 2 score vs E(h); Fig. 3 contours), Sec. 3 (sub-sampling, swamping and masking, Fig. 4 Mulcross AUC 0.67 → 0.91 at ψ = 128), Sec. 4.1 (Algorithms 1–2, height limit ⌈log₂ψ⌉, ψ = 256, t = 100, O(tψ log ψ)), Sec. 4.2 (Algorithm 3 with the c(Size) adjustment, O(nt log ψ)), Sec. 5.1 (kNN fails on clusters larger than k; Table 3 Http 15.58 s vs 9,487 s), Sec. 5.2 (AUC vs ψ, Fig. 6), Sec. 5.3 (506 noise attributes, kurtosis selection, Fig. 7), Sec. 5.4 (normal-only training), Sec. 6 (memory < 511·t·b bytes). File: research/texts/isolationfor-.txt (and .pdf for the figures).
+- Handbook Ch7 Autoencoders, the Isolation Forest baseline on the simulator: AUC 0.808, AP 0.164, CP@100 0.19 — research/texts/reproducible-Chapter_7_DeepLearning_Autoencoders.md (for the closing comparison and the hand-off).
+- Chandola et al. 2009 Sec. 5 pros/cons (the cost and the clustered-anomaly failure this lesson answers) — research/texts/anomalydetec-s1-.txt.
 
-## Key points
-1. The idea as a repair: distance/density methods profile normal (O(N²), swamped by dense anomaly clusters); isolation profiles nothing — it asks how many random cuts separate a point. Fig. 1's 12 vs 4 computed-by-eye; the 1,000-tree averages 12.82 vs 4.02.
-2. The iTree precisely: random attribute, uniform split between the node's min and max, recursion to singletons or the height limit; a proper binary tree; h(x) counts edges.
-3. The normaliser derived: an iTree on n points has the structure of a BST built by random insertions; the average unsuccessful-search depth is c(n) = 2H(n − 1) − 2(n − 1)/n; compute c(2) = 1, c(256) ≈ 10.2, c(4096) ≈ 15.7; why n (max height) and log n (average height) both fail as normalisers (one unbounded, one not comparable).
-4. The score: s = 2^{−E[h]/c(n)} with its three anchor cases; the reading rules (near 1, ≈ 0.5, ≪ 0.5); monotone in h; the contour picture (Fig. 3).
-5. Sub-sampling as the second idea: swamping (normals near anomalies isolated with them) and masking (dense anomaly clusters hide); Mulcross 0.67 → 0.91 by using 128 points; each tree on its own sub-sample; ψ = 256, t = 100 as defaults; height limit ⌈log₂ ψ⌉ and the c(Size) adjustment at truncated leaves (Algorithm 3) — derive why: the untraversed subtree below the limit would have added c(Size) on average.
-6. Cost: O(tψ log ψ) training independent of N; O(nt log ψ) scoring; memory 511 nodes per tree; the Http timings against ORCA/LOF; the kNN limitation (anomaly clusters larger than k).
-7. On fraud: the handbook's 0.808 / 0.164 / 0.19 on the simulator — AUC respectable, AP low — the module's refrain; what isolation catches on the simulator (scenario 1's amounts; scenario 3's ×5 amounts relative to the customer only if the features are the module-3 deviations).
-8. ★ Starred: high dimensions and kurtosis attribute selection; training on normal only; the random-forest-with-synthetic-class baseline.
+## EXPLANATION PLAN
+### The problem as the newcomer meets it
+Lesson 2 ended with two walls: scoring by neighbours costs N² distances, and a cluster of anomalies larger than k is invisible to it. The reader now has a 2-D cloud of 135 points with one point far off to the side and asks a different question: not "how far is it from the others" but "how easy is it to cut off from the others". Draw a random vertical or horizontal line through a random position; keep the half the point is in; repeat. The far point is alone after about 4 cuts; a point in the middle needs about 12. Nothing in that procedure computes a distance or a density. What the newcomer lacks: a way to make "number of cuts" a score that means the same thing for 100 points and 100,000 (not yet: path length, the normaliser c(n), the anomaly score s); a reason to believe a tree of random cuts is a sensible object (not yet: isolation tree as a binary search tree); and the counter-intuitive fact that fewer data make the score better (not yet: swamping, masking, sub-sampling ψ).
 
-## Set pieces & gems
-- 12 vs 4 splits; 12.82 vs 4.02.
-- c(n) from the BST analogy — a derivation the reader can follow in five lines.
-- Mulcross 0.67 → 0.91 with 128 of 4,096 points.
-- Http: 15.58 s / AUC 1.00 vs ORCA 9,487 s / 0.36.
-- 511·t·b bytes; ψ 64× → time 1.6×.
-- "The paper names credit card fraud as its first application."
+### Chain of sub-problems
+1. **Turn "cuts until alone" into an algorithm.** — Obvious attempt: cut the whole space at random until every point is alone. Why it is already an object we know: each cut is a node testing attribute q < p with q random and p uniform between the node's min and max of q; recursion until |X| = 1, all values equal, or a height limit — that is a binary tree with n external nodes, n − 1 internal, 2n − 1 total: an isolation tree. The path length h(x) is the number of edges from the root to the external node holding x. Because: anomalies are few and different, so random cuts strip them off near the root; this is the whole inductive bias.
+2. **One tree is noisy; average over many.** — Obvious attempt: one tree, read h(x). Why it fails: a single random tree can isolate a normal point early by luck. Answer: t trees, each on its own random sub-sample, E[h(x)] as the mean; the Fig. 1 curves converge to 12.82 and 4.02 well before 1,000 trees; t = 100 is enough. Because: path lengths converge fast (Fig. 5), and the trees are independent experts.
+3. **Make the number comparable across data sizes.** — Obvious attempt: score = E[h(x)]. Why it fails: path lengths grow with n — the maximum height grows like n, the average like log n — so a path of 8 is short in 4,096 points and long in 16; normalising by n or by log n leaves the score unbounded or not comparable. Answer: an isolation tree is structurally a binary search tree, and the expected path length of a *failed* search in a BST of n keys is c(n) = 2H(n − 1) − 2(n − 1)/n with H(i) ≈ ln i + 0.5772; that is the expected path of an average point. Score s(x, n) = 2^{−E[h(x)]/c(n)}. Because: E[h] → c(n) gives s → 0.5; E[h] → 0 gives s → 1; E[h] → n − 1 gives s → 0; monotone in h; and the reading rule follows: near 1 is an anomaly, well below 0.5 is safely normal, all ≈ 0.5 means no distinct anomaly. Carry the arithmetic for n = 256: c(256) ≈ 10.2; a path of 4 gives s ≈ 0.76, a path of 12 gives s ≈ 0.44.
+4. **Why less data is better.** — Obvious attempt: train on everything. Why it fails: with 4,096 Mulcross points normal points crowd the two anomaly clusters (swamping: normal points near anomalies get isolated with them) and the anomaly clusters are dense enough to look normal (masking); AUC 0.67. Answer: a random sub-sample of ψ = 128 clears the crowd — AUC 0.91 — and each tree's different sub-sample makes the trees specialised experts; ψ = 256 is the default, with near-optimal AUC at ψ = 128 for Http (0.045% of the data) and 512 for ForestCover. Because: isolation needs the anomalies to be few *in the sample*, not few in the world; sub-sampling without replacement restores that.
+5. **Stop growing early, and account for it.** — Obvious attempt: grow every tree to single points. Why it is wasteful: only shorter-than-average paths matter for anomalies. Answer: height limit l = ⌈log₂ψ⌉ (about the average height), and at an external node that still holds Size > 1 points return e + c(Size) — the path length the unbuilt subtree would have added. Because: the partial model keeps the anomaly end of the ranking exact and bounds each tree to at most 511 nodes at ψ = 256, so memory is under 511·t·b bytes and training costs O(tψ log ψ), evaluation O(nt log ψ) — the linear time the opening demanded. Table 3: Http scored in 15.58 s with AUC 1.00 where the kNN method took 9,487 s for AUC 0.36.
+6. **Where it fails, and the fix.** — Irrelevant dimensions: with 506 uniform-noise attributes added, random attribute choice wastes cuts; per-tree attribute selection by kurtosis restores AUC, peaking when the subspace size equals the original attribute count (Fig. 7). Training on normal data only works (Http 0.9997 → 0.9919), larger ψ restores it. Because: the method has the curse of dimensionality like the rest; its assumption is "few and different *along some axis*".
+7. **How do we know it works on payments?** — On the simulator with 14 features: AUC 0.808, AP 0.164, CP@100 0.19 — a decent ranking and a poor precision, exactly the module's expectation; the autoencoder of the next lesson does slightly better (0.836 / 0.18 / 0.217). Because: the frauds the simulator plants (amount > 220, ×5 amounts) are "different along an axis"; the compromised-terminal frauds are not.
 
-## Pitfalls
-- State sampling without replacement and the per-tree sub-sample; a common implementation error is one sub-sample for all trees.
-- The c(Size) adjustment at truncated leaves is the canonical bug (lab's wrong variant) — show it explicitly.
-- Do not oversell on fraud: AP 0.164 vs supervised 0.646 on the same split.
+### Set pieces and worked examples to recreate
+- Fig. 1: the 135-point Gaussian with the random partition lines, x_i isolated in 12 cuts and x_o in 4, and panel (c)'s convergence to 12.82 and 4.02 over 1,000 trees (Liu et al. Sec. 2, Fig. 1).
+- The score curve s vs E(h) with s = 0.5 at c(n), and the contour plot with s = 0.5 / 0.6 / 0.7 lines on a 64-point Gaussian (Fig. 2, Fig. 3).
+- Mulcross: 4,096 points AUC 0.67 vs a 128-point sub-sample AUC 0.91 (Sec. 3, Fig. 4).
+- Timing table: Http 15.58 s / AUC 1.00 for iForest vs 9,487 s / 0.36 for ORCA; Mulcross 12.5 s vs 2,512 s; LOF on Shuttle 7,490 s (Table 3); 283,748 Http points scored in 7.6 s at ψ = 256, 11.9 s at ψ = 16,384 (Sec. 6).
+- The 511-nodes-per-tree memory bound and the ⌈log₂ψ⌉ height limit (Sec. 4.1, Sec. 6).
+- The kurtosis subspace experiment with 506 noise attributes (Sec. 5.3, Fig. 7).
+- The simulator numbers 0.808 / 0.164 / 0.19 (Handbook Ch7 Autoencoders).
+
+### Pitfalls and terms to define
+- "Isolation" is defined as separating one instance from all others — say it in the first paragraph; the newcomer will read "isolation tree" as a decision tree with labels. There are no labels and no split criterion.
+- c(n) is the expected length of an *unsuccessful* search in a BST, not of a successful one — the lesson names the analogy and gives the formula with H(i) ≈ ln i + 0.5772156649; it does not re-derive BST theory (one sentence of why: an external node of an iTree corresponds to a failed search).
+- "ψ" (sub-sample size) vs "t" (trees) vs "n" in s(x, n): n in the score is the sub-sample size the tree was built on, not the dataset size — a canonical bug in the lab.
+- Swamping vs masking: define each with the Mulcross picture; the newcomer conflates them.
+- The paper's defaults are stated as what they are (choices that worked on 11 datasets), not laws.
+
+### Recalled, not re-taught
+- Binary search trees and harmonic numbers: assumed from the course prerequisites (one clause: "a BST of n keys; a failed search walks to an external node").
+- kNN distance, LOF and their two failures (`density-and-distance-scores`): one Ref each at the opening and at sub-problem 5.
+- ROC-AUC vs AP (`alert-budget-metrics`): recalled at sub-problem 7 to read the 0.808 / 0.164 pair.
 
 ## FIGURE PLAN
-- draw: `<FigureSequence>` (5 frames): random axis-parallel splits on a 2-D Gaussian cloud, one split per frame, until the planted anomaly is alone at depth 4 while the normal point is still in a crowd — our own re-enactment of Fig. 1(a)–(b). Key image.
-- draw: The path-length average vs number of trees for the two points converging to ~12.8 and ~4.0 — computed on our cloud (Fig. 1(c)'s idea).
-- draw: c(n) vs n (log x) with n, log₂ n and c(n) as three curves — why c(n) is the right normaliser. Computed from Eq. 1.
-- draw: s as a function of E[h] with the three anchors (0, c(n), n − 1) marked and the 0.5 line — Fig. 2 recreated.
-- source: isolationfor-fig4-swamping-masking — stem `mulcross-subsample`; the reader must see the 4,096-point Mulcross cloud with its two triangle anomaly clusters wrapped in normal circles, beside the 128-point sub-sample where the clusters stand clear; centered in the sub-sampling section (the authors' actual generated data behind the 0.67 → 0.91 claim).
-- draw: The height-limit adjustment: a truncated iTree with the untraversed subtree drawn faint and "+ c(Size)" written at the leaf — single figure.
-- draw: Score contour map of an iForest on a 64-point Gaussian with contours at 0.5, 0.6, 0.7 — computed (Fig. 3's idea).
+- draw: <FigureSequence>, 5 frames: a 2-D cloud with one planted outlier; frame by frame a random axis-parallel cut is added, the half not holding the two marked points greyed, until the outlier is alone (frame 3) and the normal point is still in a crowd (frame 5) with the path counts written; inspired by Fig. 1(a)–(b). **Key image.**
+- draw: mean path length vs number of trees for the two marked points, converging to ≈12.8 and ≈4.0 — single <Figure>; inspired by Fig. 1(c), computed by us.
+- draw: the score s as a function of E[h] for n = 256 with c(n) marked at s = 0.5 and the two reading zones shaded — single <Figure>; inspired by Fig. 2.
+- source: isolationfor-fig4-swamping-masking — stem `mulcross-subsample`; the reader must see the real Mulcross draw: 4,096 points where normal circles crowd the two triangle clusters, and the 128-point sub-sample where the clusters stand clear; centered under sub-problem 4 (the specific random draw behind AUC 0.67 → 0.91 is the evidence; a redraw would be another dataset).
+- draw: an isolation tree as a BST with the height limit drawn as a horizontal line and one truncated external node annotated "+ c(Size)" — single <Figure>.
+- draw: AUC against sub-sample size ψ (log axis) for two datasets, flat after ≈128–512 — single <Figure>; inspired by Fig. 6, values as reported.
+- draw: the three-metric bar for Isolation Forest vs the autoencoder vs the supervised MLP on the simulator (0.808/0.164/0.19, 0.836/0.18/0.217, 0.859/0.646/0.28) — single <Figure>.
 
 ## EXERCISE PLAN
-1. Warm-up: compute c(n) for n ∈ {2, 16, 256, 4096} and the score of a point with E[h] = 4 at n = 256 and at n = 4096.
-2. Derivation the lesson skipped: derive c(n) from the BST unsuccessful-search recurrence (or from the expected depth of a random insertion), and show c(n) ~ 2 ln n − O(1).
-3. Boundary probe: all points identical in every attribute — the tree stops at the root; what h, c and s become, and why the paper's stopping rule ("all values equal") is needed to avoid an infinite loop.
-4. Claim to refute: "Using the full dataset per tree (ψ = N) gives better trees because each sees more data, so AUC must be at least as high as with ψ = 256." Refute with Mulcross and the swamping/masking mechanism; name the step (isolation depth of a point inside a dense anomaly cluster) that fails.
-5. Research-shaped: reproduce the Mulcross effect on a seeded 2-D dataset (two dense anomaly clusters inside a normal cloud): AUC at ψ ∈ {N, 1024, 256, 128, 64}; report the curve.
-6. FORWARD (E7): run the iForest on the simulator's 14 features and inspect the ten highest-scored genuine transactions — the reader finds rare-but-legitimate behaviour (large amounts, night) and asks what a model trained to reconstruct genuine rows would say about them → lands on `one-class-and-reconstruction`'s reconstruction error and the "low precision alone" finding.
-7. Mixed review (E3): score a simulator week with the iForest and with LOF (density-and-distance-scores); compute AUC and AP with the module-2 harness; compare with the handbook's 0.808 / 0.164.
+1. [warm-up] Compute c(n) for n = 2, 16, 256, 4,096 using H(i) ≈ ln i + 0.5772, and the score of a point with E[h] = 5 under each n.
+2. [boundary probe] n = 2: what is c(2), what path lengths are possible, and what does s take for each — why is the score meaningless until ψ is tens of points?
+3. [claim to refute] "A point whose attributes are all within the normal range cannot get a high isolation score." Refute with the rare-combination argument: a point alone in the joint space is cut off by two orthogonal cuts even though each marginal is central; sketch the 2-D case.
+4. [derivation skipped] Derive the expected path length of a point isolated by the first cut as a function of its distance from the sample's range, i.e. show that a point beyond max(q) by a margin m is isolated at the root with probability m/(range + m) when attribute q is chosen — the "different along an axis" assumption made quantitative.
+5. [research-shaped] Reproduce the swamping effect on the simulator: plant 200 scenario-3-style frauds (×5 amounts) for one customer, run the forest on all 150,000 rows and on ψ = 256 sub-samples, and report the AP of each; state what would count as reproducing the paper's direction.
+6. FORWARD → `one-class-and-reconstruction`: compute the per-feature reconstruction a PCA with 2 components gives for the simulator's 14 features and rank points by squared reconstruction error; compare the ranking's AP with the forest's — the reader has built the reconstruction-error score before the autoencoder names it.
+7. [mixed review] Using `alert-budget-metrics`: the forest scores AUC 0.808 and CP@100 0.19 on the simulator; with 85 frauds a day on 80 cards, what is the best CP@100 any scorer could reach, and what fraction of that ceiling does the forest attain?
 
 ## ARC
-- Inherits: the framework and the distance/density family's costs and failures (previous two lessons).
-- Contributes: isolation as a profiling-free score with a derived normaliser, the sub-sampling argument, linear cost; the fraud numbers.
-- Hands off: reconstruction as the learned alternative (one-class-and-reconstruction); the ULB application and the lab's first half.
-- Spine step 5: the unlabeled frontier.
+- Spine step 5 "The unlabeled frontier": "Supervised models detect only the fraud they were shown; new fraud enters as a departure from normality scored by distance, isolation or reconstruction, which buys a decent ROC-AUC and a poor precision — a complement to the supervised score, not its replacement."
+- Inherits: the N² cost and the masked-cluster failure of neighbour methods (`density-and-distance-scores`); the family/assumption table (`anomaly-detection-framing`); the simulator and its three scenarios (`canonical-datasets`).
+- Contributes: a linear-time label-free score with two parameters, its derivation from path length and c(n), and the sub-sampling argument.
+- Hands off: the forest's simulator numbers as the baseline the autoencoder is compared with (`one-class-and-reconstruction`); its ULB performance to `ulb-unsupervised-scores`; the full implementation (c(n), iTree, path length with c(Size), the forest) to `anomaly-scorers-lab`.

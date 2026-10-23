@@ -1,60 +1,70 @@
-# From PaySim logs to a feature matrix — research brief (module 3 APPLICATION)
+# From PaySim logs to a feature matrix — research brief
 
-Lesson: `paysim-feature-matrix` (module: features, core, planned). NEW. Module-final application (L16): a real public artifact (the Kaggle PaySim log) read against the 2016 paper and turned into a feature matrix with the module's tools.
-Goal: Analyze the PaySim mobile-money log as an artifact — what its generator replays, what its fraud label encodes — and construct a feature matrix whose signal survives that reading.
+Lesson: `paysim-feature-matrix` (module: features, type: core, status: planned). NEW — full re-synthesis, no draft exists, so no REVISION block.
+Goal: Analyze the PaySim mobile-money log as an artifact — what its generator replays, what its fraud flag encodes — and construct a feature matrix whose signal survives that reading
+Opening (verbatim, the lesson must start with it): A six-million-row mobile-money log on Kaggle carries 8,213 rows marked fraud. Before building features on it: what did the simulator that produced it actually replay from the real service, how did the fraud flag get there, and which patterns in the data are signal and which are artefacts of the generator?
 
-## Sources
-- Lopez-Rojas et al. 2016 in full (the artifact's own account): aggregate replay from a per-day/hour file (count, mean, std per type); five types CASH-IN, CASH-OUT, DEBIT, PAYMENT, TRANSFER; Client agents with limits and age class; repetition probabilities from in/out degree; outputs (logfile with balance deltas for all parties, aggregate dump, parameter history with seed); 744 steps = one month; PS41840 ≈ 23M rows; Table 1 type mix (CASH-IN 4.5M @ 153,019; CASH-OUT 9.0M @ 155,989; TRANSFER 2.0M @ 630,810; PAYMENT 9.0M @ 10,793; DEBIT 0.14M @ 5,016); SSE-selected run; first 14 days busier (income); NO fraud injected (abstract, Sec. 6).
-- HKU FITE7410 A1 answer Part I (the EDA the canon has students do): 6,362,620 rows, 11 attributes; 99.871% non-fraud vs 0.129%; CASH_OUT 5.4× DEBIT; fraud only in TRANSFER and CASH_OUT; fraud roughly uniform over steps while genuine traffic has a rhythm; step mod 24 trough at night; correlations (amount vs oldbalanceOrig/newbalanceOrig) shift between classes; no NA or negatives; fraud rows have no extreme outliers (fraudsters keep amounts small); feature engineering: step mod 24, numeric ids, per-account counts. HKU A1 code `hku-fite7410-a1code.txt` Part 1.
-- Transaction-aggregates and behavioural-profiles (this module): the aggregates and the hour-of-day treatment to apply; point-in-time-features: the as-of discipline — PaySim has a step axis (hours) but no label delay.
-- Canonical-datasets (module 1): the dataset card for PaySim; the "replays aggregates" reading.
-- Handbook Ch3.3 for the feature recipe transplanted; Bahnsen Sec. 3.1 conditional aggregates by type.
-- Jurgovsky Sec. 4.1: account-level sampling when rows of one account are not independent — applies to PaySim's nameOrig/nameDest.
+## Sources to consult
+- Lopez-Rojas, Elmir, Axelsson 2016 (PaySim): Sec. 3 (five transaction types CASH-IN, CASH-OUT, DEBIT, PAYMENT, TRANSFER), Sec. 4.2–4.3 (the aggregated transaction file per day/hour: "day 1 hour 15, 8703 PAYMENT, mean 180000, std 15000"; repetitions file; balance container), Sec. 4.4 (a TRANSFER needs a counterpart client), Sec. 4.5 (outputs with balance deltas for all parties; seed and parameter history), Sec. 5 (744 steps = one month; run PS41840 ≈ 23M rows; Table 1 counts and mean amounts; SSE selection; Figs. 1–5 overlays; first 14 days busier), Abstract and Sec. 6 (no fraud injected; fraudulent agents are future work) — `research/texts/paysima-.txt`.
+- HKU FITE7410 A1 handout and answer, Part I (PaySim EDA): 6,362,620 rows, 11 attributes; 99.871% non-fraud vs 0.129% fraud; CASH_OUT 2,237,500 is 5.4× DEBIT 414,324; fraud only in TRANSFER and CASH_OUT; fraud uniform over steps while genuine traffic has a rhythm; step mod 24 trough at night; amount–balance correlations shift between classes; no NA or negative values; no extreme outliers among frauds; feature step 6 (numeric IDs, per-account counts) — `research/texts/hku-fite7410-a1q.txt`, `hku-fite7410-a1a.txt`, `hku-fite7410-a1code.txt`.
+- Handbook Ch2.4 (the only public card data is the 2-day Kaggle set; the simulator argument) and Ch3.2 (what a simulator must replay to be useful: entities with profiles, time, scripted fraud) — `research/texts/reproducible-Chapter_2_Background_MachineLearningForFraudDetection.md`, `reproducible-Chapter_3_GettingStarted_SimulatedDataset.md`.
+- Altman et al. 2023 Sec. 7 and Table 1 (synthetic data's labels are complete by construction; the scale ladder of synthetic AML sets; a generator released as data only) — `research/texts/realisticsyn-.txt`.
+- Bolton & Hand Sec. 4 (mobile-money-style laundering levels; structuring) for the TRANSFER→CASH_OUT reading — `research/texts/statisticalf-.txt`.
 
-## Key points
-1. The artifact read first: what the generator does (replay of hour-level aggregates per type with agent limits) and does not (behavioural fraud); the Kaggle release's isFraud and isFlaggedFraud columns postdate the paper — their semantics come from the Kaggle description, which the course quotes as such (the mule-style "transfer then cash out" story is Kaggle's, not the paper's).
-2. The EDA as evidence: fraud only in TRANSFER/CASH_OUT (a type gate reduces the problem to 2.6M rows), uniform over time steps (no daily rhythm — unlike genuine), balance-column arithmetic (newbalance ≠ oldbalance − amount for frauds — a generator artefact that is also the strongest feature), amounts without extremes.
-3. The feature matrix built with the module's tools: type gate; hour-of-day on the circle (step mod 24 with the von Mises arc per account — mostly unavailable because most accounts appear once; say what fraction has ≥ 7 events); per-account windowed counts over nameOrig and nameDest (strictly earlier steps); destination-account in-degree over the last 24 steps (mule signature); balance deltas; the point-in-time discipline with step as the clock.
-4. What survives and what is artefact: the balance-inconsistency feature is a generator bug that no real log has; the type gate is real; the uniform-over-time fraud is a generator choice; the account windows carry genuine signal where accounts repeat. The lesson labels each feature "real pattern" or "simulator artefact" with the reason.
-5. Departure from the idealisation (L16): no delay, no feedback loop, a label that is a generator flag, accounts mostly single-use (so entity history is thin), no terminal/merchant entity — so the terminal-risk feature of module 3 has no analogue here; the module's as-of machinery reduces to "earlier steps only".
-6. Evaluation sketch (using module 2's harness, not re-taught): a forward split on step, AP and P@k per step-day for a fixed logistic regression on (a) raw, (b) +windows, (c) +balance deltas — the lesson reports the lifts as computed on our run and names which lift is artefact.
+## EXPLANATION PLAN
+### The problem as the newcomer meets it
+The module has taught how to build features from an entity's past, under the rule that nothing from the future and no unarrived label enters. The application turns that on a dataset most courses use without reading its origin: the PaySim log on Kaggle. The reader knows from `canonical-datasets` that it is a simulator replay with a fraud flag the 2016 paper never describes. The task is to read the artifact against the module's results: which columns are the generator's bookkeeping, which patterns a feature can lean on, and which "findings" from published coursework are the generator showing through. Terms the newcomer does not have: "agent-based simulation", "aggregate replay", "step", the column names (`oldbalanceOrg`, `newbalanceDest`, `isFlaggedFraud`).
 
-## Set pieces & gems
-- "Day 1 hour 15, 8,703 PAYMENT at mean 180,000" — the replay in one row.
-- Type mix: TRANSFER 9% of rows at the largest mean amount.
-- Fraud only in TRANSFER and CASH_OUT; uniform over steps (HKU Figs 4–5, 9).
-- Balance arithmetic that fails for frauds — the artefact-as-feature.
-- The lowest-SSE-of-several-seeds published run (selection bias in a benchmark).
+### Chain of sub-problems
+1. **What the generator replays** — Obvious attempt: treat the log as a bank's transactions. Why it fails: the paper describes an agent-based simulation calibrated on *aggregates* — per day and hour, a count, a mean and a standard deviation of amounts per type — plus a repetition profile per client and an initial-balance distribution; individual behaviour is not replayed, only its hourly totals. Answer: read each column as what the generator wrote: `step` is the hour index (744 = one month), `type` one of five, `amount` a draw from that hour's distribution, the four balance columns the generator's ledger for both parties, `nameOrig`/`nameDest` agent ids. Because: a feature that assumes a per-account habit assumes something the generator did not model beyond a repetition count.
+2. **Where the fraud flag came from** — Obvious attempt: cite the paper for how fraud was injected. Why it fails: the paper says fraud injection is out of scope and future work; the Kaggle release carries `isFraud` and `isFlaggedFraud` with a one-paragraph description. Answer: treat `isFraud` as a generator flag of unknown script, infer its script from the data, and treat `isFlaggedFraud` (a rule: transfers over a threshold) as a rule-layer output, not a label. Because: a label whose production is unknown is read by its footprint.
+3. **The footprint** — fraud rows are only TRANSFER and CASH_OUT; 8,213 of 6,362,620 (0.129%); uniform over steps while genuine traffic has the daily rhythm and the busy first two weeks; no extreme amounts among frauds; the amount–balance correlations differ by class; no missing or negative values anywhere. Because: these are the signatures of a script that empties an account by a transfer followed by a cash-out at a flat rate, not of behaviour.
+4. **Which features survive** — Obvious attempt: run the whole module-3 pipeline. Why parts of it fail: with no per-account habit, 30-day customer windows mostly count one or two rows; the circular-time feature has nothing to fit. Answer: the type gate (model TRANSFER and CASH_OUT only), hour of day from step mod 24, the balance deltas (origin and destination, before vs after, their disagreement with the amount), per-account counts in the window, and the pairing of a TRANSFER with the CASH_OUT that follows it. Because: those are the quantities the script moves.
+5. **Which features are artefacts** — the balance columns disagreeing with the amount (the generator's ledger quirks), destination balances that are zero for merchants, `isFlaggedFraud` as a near-constant; a model that scores perfectly on them has learned the generator. Because: the module's point is that a feature is a statement about the entity; here the entity is a script.
+6. **Point-in-time reading** — there is no label delay, no feedback loop, no adversary and the labels are complete, so the delayed terminal risk and the delay block have nothing to do; say so, and build the matrix with the as-of discipline anyway so the lab can reuse it. Because: the discipline costs nothing and the departure must be named, not silently skipped.
+7. **What the dataset can and cannot test** — a feature pipeline, type gating, the burst count; not evaluation under delay, not drift, not the adversary. Because: the application states the departures from the idealisation (L16).
 
-## Pitfalls
-- Do not cite the 2016 paper for how fraud was encoded — it wasn't; cite Kaggle's release notes as a secondary source and say so.
-- Licence: PaySim on Kaggle is CC BY-SA 4.0 — the human settles shipping an extract (issue gate); the lesson needs only summaries.
-- No model race here (module 4); a fixed LR as the yardstick only.
+### Set pieces and worked examples to recreate
+- The calibration row "day 1 hour 15, 8703 PAYMENT, mean 180000, std 15000" as the whole generator in one line (PaySim Sec. 4.3).
+- Table 1 of the PS41840 run: CASH-IN 4,496,947 at 153,019; CASH-OUT 9,014,407 at 155,989; TRANSFER 2,030,969 at 630,810; PAYMENT 8,955,794 at 10,793; DEBIT 139,935 at 5,016 (PaySim Sec. 5) — against the Kaggle file's 6.36M rows, which is a different, smaller run.
+- Fraud only in TRANSFER and CASH_OUT; 99.871% / 0.129%; CASH_OUT 5.4× DEBIT; step mod 24 trough; class-dependent correlations; no outliers among frauds (HKU A1 answer, Part I Steps 2–6).
+- The first 14 days busier than the rest, attributed to salaries early in the month (PaySim Sec. 5).
+- "Simulation is not replication"; the run published is the best of several by SSE (PaySim Sec. 2, Sec. 5).
+
+### Pitfalls and terms to define
+- The Kaggle release is not the paper's run: do not quote the paper's Table 1 counts as the file's; the file has 6,362,620 rows, 8,213 frauds.
+- `isFlaggedFraud` is a rule output, not ground truth; define it once and exclude it as a feature.
+- `step` is an hour index; "step mod 24" gives hour of day only if the run started at hour 0 — say it is an assumption.
+- Do not say "the fraud was injected by …" with any specific script; the lesson infers, and labels it inference.
+- Licence: the Kaggle PaySim page's licence terms must be checked before any file ships in a lab; the lab brief handles this.
+- No author names in the body: "the simulator paper", "a course assignment's analysis".
+
+### Recalled, not re-taught
+- What PaySim is among the datasets (`canonical-datasets`): one clause.
+- Windowed aggregates, the circular time flag, the as-of join (`transaction-aggregates`, `behavioural-profiles`, `point-in-time-features`): named as the pipeline being applied, not re-derived.
+- Label completeness (`canonical-datasets`): recalled when stating that nothing here is delayed.
 
 ## FIGURE PLAN
-- draw: Fraud count by transaction type as a bar chart with the two non-zero bars highlighted — the type gate. Computed on the Kaggle log (numbers from HKU's EDA confirmed on our run). Key image.
-- draw: Transactions per step (all / genuine / fraud) as three small panels: genuine with its daily rhythm, fraud flat — the uniform-over-time artefact. Inspired by HKU Fig 5 (recreated from our run).
-- source: paysima-fig1-4-orig-vs-synthetic — stem `paysim-replay-fidelity`; the reader must see the per-type COUNT/SUM/AVG/STD overlays (original red vs synthetic blue dashed) with the heavy first two weeks; float right beside the "what the generator replays" paragraph. (Already sourced in canonical-datasets; this lesson crops to one type's four panels — distinct crop, separate credit.)
-- draw: The balance-arithmetic artefact: a `<FigureSequence>` (3 frames) — (1) a genuine TRANSFER row with old/new balances consistent, (2) a fraud row where the destination balance does not move, (3) the feature "balance delta minus amount" separating the two classes in a histogram.
-- draw: The feature matrix as a labelled grid: raw columns → gate → windows over nameOrig/nameDest → circular hour → balance deltas, each column tagged "real" or "artefact". Component figure.
-- draw: AP per step-day for raw / +windows / +balance under a fixed logistic regression as three lines over the forward split — computed on our run.
+- draw: key image — the generator as a pipeline: aggregate file (day, hour, type, count, mean, std) + repetitions file + balance container → the step loop → the log row with its 11 columns; single `<Figure>` (inspired by the paper's ODD description).
+- source: paysima-fig1-4-orig-vs-synthetic — stem `paysim-orig-vs-synthetic`; the reader must see the original (red) and synthetic (blue dashed) COUNT per step overlaying each other for one type, with the busy first two weeks; centered under "what the generator replays" (crop to the CASH-OUT COUNT panel).
+- draw: fraud count per type as a bar chart with zeros on CASH-IN, DEBIT, PAYMENT; single `<Figure>` (from the HKU finding, computed).
+- draw: genuine vs fraud counts by step mod 24, two normalised histograms, the genuine trough at night and the flat fraud line; single `<Figure>`.
+- draw: `<FigureSequence>` 3 frames: a TRANSFER row and the CASH_OUT that follows it from the destination account, with origin and destination balances before and after — the script's footprint.
+- draw: the feature matrix as a table: columns kept (type gate, hour, balance deltas, per-account count, pairing) and columns dropped (`isFlaggedFraud`, raw ids, merchant destination balance) with the reason beside each.
+- draw: the departures grid — delay, feedback loop, adversary, label completeness — with a tick or cross per dataset for PaySim, the handbook simulator, the ULB set; single `<Figure>`.
 
 ## EXERCISE PLAN
-1. Warm-up: from HKU's counts (CASH_OUT 2,237,500; DEBIT 414,324; total 6,362,620) compute the share of rows the type gate keeps and the fraud rate inside the gate.
-2. Boundary probe: an account that appears exactly once — every windowed aggregate is zero; compute the fraction of such accounts in the log (on our run) and state what feature value a cold account should carry (link point-in-time-features' fill discussion).
-3. Claim to refute: "The balance-inconsistency feature should be kept because it has the highest importance." Refute on provenance: it is a generator artefact with no real-world analogue; name the test (does the pattern exist in the 2016 paper's generator? in a real ledger?) that decides.
-4. Research-shaped: reproduce HKU's step-mod-24 histogram for genuine and fraud on the log and test whether fraud is uniform over hours (a chi-squared against uniform) — report the statistic.
-5. Derivation: for a destination account receiving k transfers in a window, derive the in-degree feature's expected value under PaySim's repetition model (each client transacts with probability P per step) and show what in-degree a mule-style pattern would need to stand out.
-6. FORWARD (E7): train a plain logistic regression and a depth-5 tree on the +windows matrix under the forward split and compare AP; then look at the tree's top split — the reader finds the artefact feature at the root and the question "which model class, and tuned how?" → lands on `scorecards-woe` / `gbm-model-selection`.
-7. Mixed review (E3): apply the as-of rule (point-in-time-features) to the destination in-degree feature with step as the clock and state the one-step leak if the current row is counted.
+1. [research-shaped] Reproduce from the file: the fraud count per type, the 0.129% rate, and the share of frauds whose origin balance after the transaction is zero.
+2. [boundary probe] Restrict the matrix to TRANSFER and CASH_OUT and recompute the base rate; show how the type gate changes the precision ceiling of any detector at k = 100 on one day.
+3. [claim to refute] "`isFlaggedFraud` is a free feature: it marks fraud with high precision." Refute with its count and its definition (a threshold rule on transfers); the step that fails is that it is an output of the rule layer, not an observation.
+4. [research-shaped] Test the "uniform over time" claim: compare the fraud rate per step mod 24 against the genuine rhythm and state what a time-of-day feature would learn here that it would not learn on real data.
+5. [derivation skipped] Show that with a per-account repetition count of r, the expected number of rows in a 30-day customer window is r and the circular-time arc needs at least seven points — derive the fraction of accounts for which the module's profile features are defined.
+6. [mixed review] Build the as-of join of `point-in-time-features` for a per-account running count on this file and show on one origin account that the naive join by id assigns a later count to an earlier row.
+7. FORWARD → `anomaly-detection-framing`: cluster the TRANSFER rows by (amount, origin balance delta, destination balance delta) with k-means and report the fraud share of the purest cluster — the reader meets the cluster-as-detector that module 5 will judge.
 
 ## ARC
-- Inherits: aggregates, profiles, point-in-time (this module); the dataset card (canonical-datasets); the harness (module 2).
-- Contributes: the module cashed out on a public log — a feature matrix with every column's provenance stated.
-- Hands off: the feature lab (next); the supervised comparison (module 4); the mule/graph reading of nameDest (fraud-as-a-graph).
-- Spine step 3: features are context.
-
-## APPLICATION (L16)
-- Artifact: the Kaggle PaySim log (6.36M rows) read against Lopez-Rojas et al. 2016 and the Kaggle release notes.
-- Module results used: windowed aggregates over strictly earlier rows and conditional aggregates by type (transaction-aggregates); circular hour-of-day and the no-profile case (behavioural-profiles); the as-of discipline with step as the clock and the cold-account fill (point-in-time-features); AP/P@k on a forward split (module 2).
-- Departures from the idealisation: no label delay, no feedback loop, a generator fraud flag, thin entity histories, no merchant/terminal entity, a balance artefact that doubles as the strongest feature — each named, with the module claim it blocks.
+- Spine step 3 "Features are context": "A raw transaction has no fraud signal; the signal is the deviation from the entity's own history, which means windowed aggregates over the cardholder and the terminal, computed from what was known at scoring time — including labels that had not yet arrived."
+- Inherits: the dataset's place and label completeness (`canonical-datasets`); aggregates, profiles and the as-of discipline (`transaction-aggregates`, `behavioural-profiles`, `point-in-time-features`).
+- Contributes: a reading of the artifact — the generator, the flag's footprint, surviving vs artefact features — and the feature matrix the lab extends.
+- Hands off: the matrix and the licence question to `point-in-time-feature-lab`; the cluster-as-detector to `anomaly-detection-framing` and `ulb-unsupervised-scores`.
+- APPLICATION spec: the artifact is the Kaggle PaySim log read against the 2016 paper and a published course analysis of it. Module results used: windowed and conditional aggregates (`transaction-aggregates`), hour-of-day and inter-event features (`behavioural-profiles`), the as-of join and the rule that label-derived features are shifted (`point-in-time-features`). Departures from the idealisation: no label delay and no feedback loop (labels are a generator flag, complete and instant), no entity habit beyond a repetition count, no adversary; the published run is the best of several by SSE and the Kaggle file is a different run.

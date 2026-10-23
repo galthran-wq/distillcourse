@@ -1,60 +1,71 @@
-# One-class boundaries and reconstruction error — research brief
+# One-class boundaries and reconstruction error: ν-SVM, SVDD and autoencoders — research brief
 
-Lesson: `one-class-and-reconstruction` (module: anomaly, core, planned). NEW.
-Goal: Explain one-class SVM and SVDD as boundary estimators and the autoencoder reconstruction error as an anomaly score, and evaluate the handbook's unsupervised and semi-supervised results.
-Prerequisite from classical-ml (svm-dual-kernels): the SVM primal/dual and kernels — recalled; and neural-tabular-detectors for the MLP machinery.
+Lesson: `one-class-and-reconstruction` (module: anomaly, type: core, status: planned). NEW — full re-synthesis, no draft exists, so no REVISION block.
+Goal: Explain one-class SVM and SVDD as boundary estimators and the autoencoder reconstruction error as an anomaly score, and evaluate what each delivers on transactions with and without labels
+Opening (verbatim, the lesson must start with it): If no labels exist, a model can still be fitted to the normal payments alone: a boundary that encloses them, or a network trained to reproduce them. A payment outside the boundary, or one the network reproduces badly, is suspect. How are the boundary and the reconstruction trained, how good are their scores on transactions with no labels at all, and does adding such a score to a supervised model help?
 
-## Sources
-- Handbook Ch7 Autoencoders (primary; shard 6 partly read — the AE part is covered): definition and taxonomy; representation learning; PyTorch AE 15-100-20-100-15; unsupervised reconstruction-error scoring — trained AE mean MSE 8.0e-5 on validation, fraud mean error 1.83e-3 vs genuine 6.9e-5 (~27×); AUC 0.836, AP 0.18, CP@100 0.217; untrained AE's 0.93 average MSE falling to 8e-5; Isolation Forest 0.808 / 0.164 / 0.19; 2-D code scatter coloured by label and K-means (k = 10) on the code; semi-supervised W1A (score fusion) / W1B (AE score as a feature) / W2 (shared-code AE with a supervised head on labelled samples); supervised FFNN baseline 0.859 / 0.646 / 0.28; with reconstruction error added (W1B) 0.861 / 0.651 / 0.276 — "mitigated"; conclusion: unsupervised AE catches off-distribution points including rare genuine ones, so AUC is decent but precision-based metrics low.
-- Chandola Sec. 4 (classification-based: multi-class vs one-class; one-class SVM Schölkopf 2001; one-class kernel Fisher; SVDD Tax & Duin smallest hypersphere), Sec. 4.1 replicator neural network (same input/output size, three hidden layers compressing; δ_i = (1/n)Σ_j (x_ij − o_ij)² as the score), Sec. 4 pros/cons (labels rather than scores; Platt scaling), Sec. 9 spectral (PCA low-variance components; robust PCA score — the linear autoencoder), Sec. 11 Fig. 10(b): a circular one-class boundary misses anomalies inside a ring of clusters.
-- Baesens Ch3 "One-class SVMs": ν-SVM — separate data from the origin with hyperplane w·φ(x) − ρ = 0; ν bounds the fraction of outliers; objective ½Σw² − ρ + (1/(νn))Σe; the dual with a kernel.
-- Baesens Ch4 pp.155–164 (SVM recap pointers) — Ref only.
-- CS6890 PS4 (lab canon): AE and VAE on the ULB set, log-scaled Time/Amount, scored by F1; PS5 VAE synthesis — one line as what the course does not do.
-- HKU A1 Part II: k-means cluster rule on ULB — recall near 1, F1 near 0 (the application's set piece; named here as a clustering-family instance).
-- Akoglu Sec. 4.1 (NrMF residuals as anomaly indicators) — one forward sentence to module 6.
+## Sources to consult
+- Baesens et al. 2015, Ch3 "One-class SVMs" (separate the data from the origin by w·φ(x) − ρ = 0; ν bounds the outlier fraction; the objective ½Σw² − ρ + (1/νn)Σe; dual with kernel) — research/texts/fraudanalyti-s2-ch2-3.txt; Ch4 pp.155–164 for the SVM margin/kernel recap pointers only — fraudanalyti-s3-ch04a.txt.
+- Chandola et al. 2009, Sec. 4 (classification-based assumption; multi-class vs one-class, Fig. 6), Sec. 4.3 (one-class SVM, kernel Fisher discriminant, SVDD as the smallest hypersphere), Sec. 4.1 (replicator neural network: same number of input and output neurons, three compressing hidden layers, score δ_i = (1/n)Σ_j(x_ij − o_ij)²), end of Sec. 4 (pros/cons; Platt scaling for scores), Sec. 11 Fig. 10(b) (the ring where a one-class boundary fails). Files: research/texts/anomalydetec-s1-.txt, anomalydetec-s2-.txt.
+- Handbook Ch7 Autoencoders: definition, taxonomy, the PyTorch AE 15-100-20-100-15, unsupervised reconstruction-error scoring (untrained MSE 0.93 → 8.0e-5 on valid; fraud 1.83e-3 vs genuine 6.9e-5; AUC 0.836 / AP 0.18 / CP@100 0.217), the Isolation Forest baseline (0.808 / 0.164 / 0.19), the 2-D code with k-means, semi-supervised W1A / W1B / W2 (supervised FFNN 0.859 / 0.646 / 0.28; with reconstruction error as a feature 0.861 / 0.651 / 0.276), the conclusion — research/texts/reproducible-Chapter_7_DeepLearning_Autoencoders.md (and reproducible-s5-ch6-ens-rwd-ch7-intro-rwd-summary.txt for Ch7 intro). NOTE: this shard was read to 130,000 of 146,768 chars — the end of the autoencoder section may hold detail not in the dossier; the writer reads the staged file to the end.
+- Handbook Ch7 FeedForwardNeuralNetworks (the training loop, early stopping, scaling — recalled, not re-taught) — reproducible-Chapter_7_DeepLearning_FeedForwardNeuralNetworks.md.
 
-## Key points
-1. One-class boundaries: the ν-SVM derived from the SVM margin story (classical-ml recall): hyperplane from the origin in feature space, ν as both the outlier-fraction bound and the support-vector-fraction bound; SVDD's hypersphere; the kernel makes the boundary a union of blobs — and Fig. 10(b)'s ring shows the boundary-around-everything failure when the kernel width is wrong; cost O(n²) and what that means at 400k/day (a sub-sample again).
-2. The linear case first: PCA reconstruction — project onto the top q components, reconstruct, the residual norm is the score; equivalently the robust-PCA χ² score of density-and-distance-scores; a linear autoencoder with q hidden units learns exactly this subspace.
-3. The autoencoder: encoder, bottleneck (code), decoder; trained on genuine rows (semi-supervised regime) with MSE; the reconstruction error as score; the 15-100-20-100-15 net and its numbers (0.93 → 8e-5; 27× gap; 0.836 / 0.18 / 0.217 vs iForest 0.808 / 0.164 / 0.19); the 2-D code scatter as a learned map where frauds sit at the edge; what the AE learns about scenario 1 (amount), 2 (terminal risk window), 3 (customer deviation) given module-3 features.
-4. Why precision is low (the module's refrain, now explained mechanically): the AE reconstructs what is common; rare genuine behaviour (a large purchase, a night-time transaction) is reconstructed badly too; under a budget those rows fill the queue; AUC survives because frauds are, on average, rarer than rare-genuine.
-5. Semi-supervised fusion: W1A (combine scores), W1B (AE error as a feature of the supervised model) — 0.646 → 0.651 on AP, 0.28 → 0.276 on CP@100: null; W2 (shared code with a supervised head); the honest reading: on the simulator the supervised model already sees the deviation features the AE would discover.
-6. Regime placement: ν-SVM/SVDD and AE are semi-supervised (normal-only training) — contaminate the training set with frauds and the boundary/subspace absorbs them (Liu's Sec. 5.4 analogue); the cleaning step.
-7. ★ Starred: the VAE as a density model (CS6890 PS4/PS5 do it; the course names it and stops); K-means on the code; NrMF forward.
+## EXPLANATION PLAN
+### The problem as the newcomer meets it
+The reader has two label-free scores (neighbour density, isolation) and a supervised MLP from module 4. A third route is open: fit something to the genuine payments *only* and measure how badly it fits a new payment. Two shapes for "something": a surface in feature space that encloses the normal payments as tightly as possible (then: outside = suspect), or a function that maps a payment to itself through a bottleneck (then: badly reproduced = suspect). Both are trained with zero fraud labels. The questions the newcomer cannot yet answer: how to fit a boundary with no negative examples at all (not yet: ν-SVM, SVDD, the ν parameter), how a network that copies its input can learn anything (not yet: bottleneck, reconstruction error), what such scores are worth on transactions (the simulator numbers), and whether a label-free score adds anything once labels exist (not yet: score fusion, score-as-feature, shared code — the three semi-supervised arrangements).
 
-## Set pieces & gems
-- 6.9e-5 vs 1.83e-3: the 27× gap.
-- Untrained 0.93 → trained 8e-5.
-- W1B's 0.646 → 0.651 — the null result "reported honestly".
-- "AE gets AUC 0.836 with zero labels but AP only 0.18."
-- Fig. 10(b): the boundary that encloses the anomalies.
-- The linear AE = PCA identity.
+### Chain of sub-problems
+1. **A boundary with only one class.** — Obvious attempt: train an SVM with genuine vs "everything else" — but there is no "everything else". Answer: separate the data from the *origin* in feature space with the largest margin: hyperplane w·φ(x) − ρ = 0, minimise ½‖w‖² − ρ + (1/νn)Σ_i e_i with slacks e_i; points on the origin side are outliers. The parameter ν is an upper bound on the fraction of training points allowed outside (and a lower bound on the fraction of support vectors). Because: with a Gaussian kernel every point maps to the unit sphere's positive orthant and "far from the origin" means "inside the data's region" — so the origin stands in for the missing class. SVDD: the same idea as the smallest sphere enclosing the data with slacks; for the Gaussian kernel the two are equivalent.
+2. **What a boundary cannot see.** — Return to lesson 1's ring: a boundary that encloses the normal clusters encloses the centre too, so central anomalies pass; and a boundary learned from last quarter's unflagged payments encloses whatever undiscovered fraud those contained. Because: the assumption "a boundary around normal can be learned" fails where normal is not simply connected and where normal is polluted. ν is therefore also the lever for pollution: set it at the fraud rate you expect.
+3. **A network that copies its input.** — Obvious attempt: a network from 15 inputs to 15 outputs trained to reproduce them — it can learn the identity. Why it fails to fail: force a bottleneck, 15-100-20-100-15, so the identity cannot pass; the network must learn the regularities of genuine payments to reconstruct them. Score = mean squared reconstruction error per row. Because: a fraud lies off those regularities and reconstructs badly. The handbook's run: untrained AE mean error 0.93 → 8.0e-5 after training on genuine rows; frauds reconstruct at 1.83e-3 vs 6.9e-5 for genuine — 27× worse. (The replicator network of the 2000s is the same object with the same score formula δ_i = (1/n)Σ_j(x_ij − o_ij)².)
+4. **Training it: what carries over from module 4.** — Scaling first (the first layer is not scale-invariant), Adam, early stopping on validation reconstruction loss, training on genuine rows only (semi-supervised regime) or on all rows (unsupervised, relying on rarity). Because: it is the module-4 pipeline with the label replaced by the input; the lesson recalls, not re-teaches.
+5. **What the scores are worth with zero labels.** — Answer: on the simulator's test week, Isolation Forest 0.808 / 0.164 / 0.19, autoencoder 0.836 / 0.18 / 0.217, supervised MLP 0.859 / 0.646 / 0.28 (AUC / AP / CP@100). The ranking is decent (AUC near the supervised one) and the precision is a quarter of it. Because: an unsupervised score catches *off-distribution* rows — rare genuine behaviour as much as fraud — so the top of the ranking fills with honest surprises; AUC, which integrates the whole ranking, does not see that; AP and CP@100 do (recall module 2).
+6. **The bottleneck as a picture.** — A 2-D code: plot the two code coordinates of the test rows coloured by label, and the k-means (k = 10) clusters on the code — frauds sit at the edges of the code cloud. Because: this is what "learned the regularities" looks like, and it previews the clustering result of the next lesson.
+7. **Does a label-free score help a supervised model?** — Three arrangements: W1A score fusion (average the two scores), W1B the reconstruction error as an extra feature of the supervised MLP, W2 a shared code with a supervised head trained on the labelled rows. The W1B result: 0.859 / 0.646 / 0.28 → 0.861 / 0.651 / 0.276 — no significant gain. Because: on the simulator the supervised model already sees the planted scenarios; the unsupervised score adds information only for fraud the supervised one never saw, which the simulator does not contain. The lesson reports the null result as a result and names the condition under which fusion would help (new schemes).
+8. **How do we know it works?** — The three-metric comparison and its reading: use the unsupervised score where no labels exist or as a second queue for new behaviour; never as the replacement for the supervised score.
 
-## Pitfalls
-- The handbook shard was partially read (autoencoder part complete, sequence part cut short — module 7's brief notes it); do not cite seq2seq AE specifics.
-- Do not write a VAE lesson; PS4's VAE is a lab option at most (not planned).
-- Keep the semi-supervised/unsupervised vocabulary consistent with anomaly-detection-framing (AE trained on genuine = semi-supervised).
+### Set pieces and worked examples to recreate
+- The ν-SVM objective and the geometric reading (origin stands for the absent class; ν bounds the outlier fraction) (Baesens Ch3 One-class SVMs; Chandola Sec. 4.3).
+- The 15-100-20-100-15 autoencoder and its error trajectory 0.93 → 8e-5; the 27× fraud/genuine gap (Handbook Ch7 Autoencoders).
+- The three-way table AE 0.836 / 0.18 / 0.217, IF 0.808 / 0.164 / 0.19, supervised 0.859 / 0.646 / 0.28 (Handbook Ch7 Autoencoders).
+- The semi-supervised null result 0.646 → 0.651 AP (Handbook Ch7 Autoencoders, W1B).
+- The 2-D code scatter coloured by label, and the k-means-on-code clusters (Handbook Ch7 Autoencoders figures).
+- The replicator network's score formula (Chandola Sec. 4.1).
+- Fig. 10(b): the ring where a circular one-class boundary encloses the central anomalies (Chandola Sec. 11).
+
+### Pitfalls and terms to define
+- "One-class" — the newcomer reads it as a classifier with one output; define as a boundary fitted to one class with no negatives, and say how the origin substitutes for them.
+- "ν" — two roles at once (outlier fraction bound, support-vector fraction bound); state both and say which the practitioner uses.
+- "Bottleneck", "code", "reconstruction" — define before the architecture string 15-100-20-100-15 appears; the newcomer must see why a bottleneck is needed (else the identity).
+- "Semi-supervised" is the normal-only regime from lesson 1, and in this lesson also the name of the three fusion arrangements — disambiguate at sub-problem 7.
+- Reconstruction error is scale-dependent: features must be standardised or the amount dominates (the 500-vs-505 lesson again).
+- The handbook's code keeps hidden layers in plain lists (not registered as parameters) and uses deprecated calls — the lab, not this lesson, deals with it; the lesson states results only.
+
+### Recalled, not re-taught
+- SVM margin, slack, kernel trick: classical-ml prerequisite — one clause with the prerequisite named, then the one-class objective.
+- The MLP training loop, scaling, Adam, early stopping, dropout (`neural-tabular-detectors`): Ref plus one clause at sub-problem 4.
+- Isolation Forest's score (`isolation-forest`) and the family table (`anomaly-detection-framing`): Refs at sub-problems 2 and 5.
+- AP vs AUC (`alert-budget-metrics`): Ref when reading the three-metric table.
 
 ## FIGURE PLAN
-- draw: `<FigureSequence>` (3 frames) of the ν-SVM in feature space: (1) the data and the origin, (2) the hyperplane pushed away from the origin with margin ρ/‖w‖, (3) the slack points beyond it as the ν-fraction. Inspired by Baesens Fig 3.32 (recreated).
-- draw: Fig. 10(b) with a one-class boundary: a ring of five tight clusters, the anomalies at the centre, a wide-kernel boundary enclosing everything vs a narrow-kernel boundary hugging the clusters — two near-identical panels (voita rule 8).
-- draw: The autoencoder as a tiered diagram 15 → 100 → 20 → 100 → 15 with the bottleneck highlighted and the reconstruction error dissected under the output (voita rules 5, 7). Key image.
-- draw: Reconstruction-error histograms for genuine and fraud rows on log scale with the two means (6.9e-5 and 1.83e-3) marked — computed on our simulator run.
-- draw: The 2-D code scatter coloured by label (frauds at the periphery) — computed; inspired by Handbook Ch7's bottleneck scatter.
-- draw: Linear AE = PCA: a 2-D cloud with its first principal axis, a point, its projection and the residual as the score, beside a one-hidden-unit linear autoencoder diagram — identity figure.
-- draw: Three fusion architectures W1A / W1B / W2 as three small tier diagrams with the supervised head marked — inspired by Handbook Ch7's taxonomy description.
+- draw: the one-class SVM picture — the data cloud in feature space, the origin, the separating hyperplane and the ν-fraction of points left on the origin side; a second panel with SVDD's sphere — single <Figure>; inspired by Baesens Fig. 3.32 (idea only). 
+- draw: the autoencoder as a funnel 15 → 100 → 20 → 100 → 15 with one transaction row entering and its reconstruction leaving, the squared differences summed into the score — single <Figure>; inspired by the handbook's AE diagram. **Key image.**
+- draw: <FigureSequence>, 3 frames: reconstruction error histograms of genuine (narrow, at ≈7e-5) and fraud (wide, at ≈2e-3) rows on a log axis — (1) untrained network, both at ≈1, (2) after training, genuine collapses, (3) the threshold at the top-100 cut and what it catches; computed by us from the simulator.
+- draw: the 2-D code scatter of test rows coloured by label, frauds at the cloud's edge — single <Figure>; inspired by the handbook's code plot, recomputed.
+- draw: the three semi-supervised arrangements W1A / W1B / W2 as three small wiring diagrams (two scores averaged; score fed as a feature; shared code with a supervised head) — single <Figure>; inspired by the handbook's taxonomy.
+- draw: grouped bars AUC / AP / CP@100 for IF, AE, supervised, supervised + AE feature — single <Figure>, the module's expectation in one picture.
 
 ## EXERCISE PLAN
-1. Warm-up: compute the reconstruction error of three given rows under a provided 3 → 1 → 3 linear autoencoder (weights given) and rank them.
-2. Derivation the lesson skipped: show that a linear autoencoder with a q-unit bottleneck and MSE loss has the PCA subspace as a global optimum (the Eckart–Young argument in outline), hence its score equals the PCA residual norm.
-3. Boundary probe: ν → 0 and ν → 1 in the one-class SVM — what the boundary and the support-vector set become; why ν is "the fraction of outliers you are willing to declare".
-4. Claim to refute: "Adding the autoencoder's reconstruction error as a feature to the supervised model must help, because it carries information about rarity the model lacks." Refute with W1B's numbers and the mechanism (the supervised model already sees the deviation features; rarity ≠ fraud); name what would have to be true (a fraud type absent from the labels) for the gain to appear.
-5. Research-shaped: on the simulator, train the 15-100-20-100-15 AE on genuine rows of the training block and report AUC/AP/CP@100 on the test week with the module-2 harness; compare with 0.836 / 0.18 / 0.217.
-6. FORWARD (E7): list the ten highest-reconstruction-error genuine transactions and the ten highest-scored by the supervised FFNN; compute the overlap of their cards with the cards of known frauds' counterparties (same terminal within 7 days) — the reader notices rarity in the AE list and shared terminals in the supervised list, and asks what the terminal's other customers would add → lands on `fraud-as-a-graph`.
-7. Mixed review (E3): place iForest, LOF, ν-SVM and AE in the framework table (anomaly-detection-framing): assumption, regime, train cost, test cost; then state which one the budget k makes operationally usable at 400k rows/day.
+1. [warm-up] For a tiny 1-D autoencoder with a scalar code (x → w₁x → w₂w₁x), compute the reconstruction error of x = 1 and x = 10 for w₁w₂ = 0.9 and explain why training on genuine rows pushes w₁w₂ toward 1 only on the genuine range.
+2. [boundary probe] ν → 0 and ν → 1 for the one-class SVM: what boundary results in each limit, and which fraud rate makes each limit the wrong choice?
+3. [claim to refute] "An autoencoder trained on all rows, 0.84% of them fraud, learns to reconstruct fraud as well as genuine, so its error cannot separate them." Refute by the capacity argument and the rarity assumption: name what would make the claim true (bulk anomalies) and quote the 27× gap as the simulator's answer.
+4. [derivation skipped] Show that a linear autoencoder with a k-dimensional code trained by squared error spans the same subspace as the top-k principal components, so its reconstruction error is the PCA residual — then say what the nonlinearity adds.
+5. [research-shaped] Reproduce the direction of the W1B null result: on the simulator, train the MLP with and without the reconstruction-error feature on one prequential fold and report AP of both; state the margin that would count as "no gain".
+6. FORWARD → `ulb-unsupervised-scores`: run k-means with k = 10 on the 2-D code of the simulator's test week, compute each cluster's fraud share, and alert the purest cluster whole — report its precision and the queue size; the reader meets the "71% fraud cluster that still floods the queue" before the next lesson names it.
+7. [mixed review] Using `undersampling-calibration`: the autoencoder was trained on genuine rows only; explain why its score is not a probability, which calibration map (if any) would make it one, and why Platt scaling on a validation set with labels is the only honest route.
 
 ## ARC
-- Inherits: the framework and the distance/isolation scores; the MLP machinery (neural-tabular-detectors); classical-ml's SVM and PCA.
-- Contributes: boundary and reconstruction scores with their numbers, the mechanism of low precision, the semi-supervised null result.
-- Hands off: the ULB application (next) and the lab's AE half; the graph as the missing context (module 6); score fusion in the stack (module 11).
-- Spine step 5: the unlabeled frontier.
+- Spine step 5 "The unlabeled frontier": "Supervised models detect only the fraud they were shown; new fraud enters as a departure from normality scored by distance, isolation or reconstruction, which buys a decent ROC-AUC and a poor precision — a complement to the supervised score, not its replacement."
+- Inherits: the label regimes and the ring thought experiment (`anomaly-detection-framing`); the forest's simulator numbers (`isolation-forest`); the MLP training pipeline (`neural-tabular-detectors`); the metrics (`alert-budget-metrics`).
+- Contributes: the two normal-only scores (boundary, reconstruction), their training, their simulator results, and the honest null result of fusion.
+- Hands off: the ULB evaluation and the k-means cluster rule to `ulb-unsupervised-scores`; the numpy autoencoder with a finite-difference referee to `anomaly-scorers-lab`; the "representation learning" reason to train networks to module 7's sequence models.

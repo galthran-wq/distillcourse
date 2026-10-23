@@ -1,60 +1,75 @@
 # Graph convolutional networks for node classification — research brief
 
-Lesson: `graph-neural-networks` (module: graphs, core, planned). NEW.
-Goal: Derive the GCN layer as neighbourhood aggregation with a normalised adjacency, show that a skip connection makes it at least a logistic regression, and evaluate when it beats hand-aggregated neighbour features.
-Prerequisite: neural-tabular-detectors (MLP, BCE, Adam, early stopping); guilt-by-association (Q, power iteration).
+Lesson: `graph-neural-networks` (module: graphs, type: core, status: planned). NEW — full re-synthesis, no draft exists, so no REVISION block.
+Goal: Derive the GCN layer as neighbourhood aggregation with a normalised adjacency, show that a skip connection makes it at least a logistic regression, and evaluate when it beats hand-aggregated neighbour features
+Opening (verbatim, the lesson must start with it): Hand-built neighbourhood features summarise a node's neighbours with fixed statistics — counts, means, maxima — chosen in advance. Could a network learn which summary of the neighbourhood matters, the way a convolution learns which summary of nearby pixels matters, and what does one layer of such a network compute?
 
-## Sources
-- Sanchez-Lengeling et al., Distill 2021 (primary for mechanics): graph = nodes, edges, global context; adjacency matrices sparse and not permutation-invariant (the 4-node permutation gallery), adjacency lists O(n_edges); the simplest GNN (one MLP per attribute type, connectivity unused); pooling (gather + aggregate ρ; edges → nodes, nodes → edges, nodes → global; readout); message passing in three steps (gather, aggregate, update), k layers = k hops; convolution analogy with variable neighbourhood; global/master node; empirical lessons (more communicating attributes better; best at 2 layers, deeper dilutes; sum slightly better on average, mean/max fine; ~3k parameters suffice); aggregation counterexamples (max vs sum/mean each fail on some pairs); AX as sum aggregation with binary A; A^k counts walks; GCN as subgraph function approximator; attention as a permutation-invariant weighted sum (Transformer = GNN on a complete graph); neighbourhood sampling and masked loss; edge prediction = node prediction on the dual; GNNExplainer (one line).
-- Weber et al. 2019 Sec. 3.2–3.3 and 4–5 (primary for the fraud result): H^(l+1) = σ(Â H^(l) W^(l)), Â = D̃^{−1/2}(A + I)D̃^{−1/2}; two-layer GCN H₂ = softmax(Â ReLU(Â X W₀) W₁); Skip-GCN adds X W̃ — with W₀ = W₁ = 0 it reduces to logistic regression; EvolveGCN (GCN weights as a GRU's state); hyperparameters (2 layers, embedding 100, 1,000 epochs, Adam 0.001, weighted CE 0.3/0.7); Table 1 (illicit P/R/F1: RF(AF) 0.956/0.670/0.788; GCN 0.812/0.512/0.628; Skip-GCN 0.812/0.623/0.705; LR(AF) 0.481 F1; MLP(AF) 0.653; +NE node embeddings help LR and RF); Table 2 (EvolveGCN 0.720); Sec. 5: RF = voting ensemble; GCN ends in an LR layer; concatenating GCN embeddings to RF helps marginally; proposed differentiable decision forests.
-- Altman Sec. 4 and App. C/E: GIN, GIN+EU (edge updates), PNA on AMLworld; neighbour sampling; PNA near-par with GBT + graph features (HI-Small: XGB 63.2 vs PNA 56.8; LI-Medium 28.2 vs 27.7); ~1,000 GPU hours; code IBM/Multi-GNN; temporal snapshots for train/val/test.
-- Akoglu Sec. 2.2.3 (collective classification as the pre-neural relative), Sec. 4 (interpretation of graph anomalies — one line).
-- Handbook Ch7 FFNN (the MLP vocabulary) and Ch7 SequentialModeling attention (the weighted-sum mechanism — Ref).
-- CS6890 PS1 (lab canon): Node2Vec / spectral / GCN embeddings for clustering a payment graph.
+## Sources to consult
+- Sanchez-Lengeling, Reif, Pearce, Wiltschko 2021 (Distill) — "Images as graphs" (the 5×5 pixel grid with its banded adjacency; convolution as neighbourhood aggregation), "The challenges of using graphs in ML" (adjacency matrices are not permutation-invariant, sparse, factorially many; adjacency lists O(edges)), "The simplest GNN" (an MLP per node, connectivity unused), "GNN predictions by pooling", "Passing messages between parts of the graph" (gather, aggregate, update; k layers = k hops; the analogy to convolution), "Adding global representations" (master node), "Some empirical GNN design lessons" (best at 2 layers, deeper dilutes; ≈3k parameters suffice; sum slightly better on average), "Comparing aggregation operations" (sum/mean/max and the graph pairs each cannot distinguish), "Graph convolutions as matrix multiplications" (AX is sum aggregation; A^k counts walks), "GCN as subgraph function approximators", "Sampling graphs and batching" (neighbourhood sub-graphs, masked loss), "Graph attention networks" (attention as a permutation-invariant weighted sum) — research/texts/agentle-.txt.
+- Weber et al. 2019 — Sec. 3.2 (H^(l+1) = σ(Â H^(l) W^(l)), Â = D̃^{−1/2}(A + I)D̃^{−1/2}; the two-layer GCN softmax(Â ReLU(Â X W0) W1); Skip-GCN with the X W̃ term reducing to logistic regression at W0 = W1 = 0), Sec. 3.3 (EvolveGCN: GCN weights evolved by a GRU), Sec. 4 (hyperparameters: 2 layers, embedding 100, 1,000 epochs, Adam 0.001, weighted cross-entropy 0.3/0.7; Table 1: GCN 0.812/0.512/0.628, Skip-GCN 0.812/0.623/0.705, RF(AF) 0.956/0.670/0.788; Table 2 EvolveGCN 0.720), Sec. 2.2 (hand aggregates lose information under heterogeneous neighbourhood sizes), Sec. 5 (why RF beats GCN; GCN ends in an LR layer) — research/texts/antimoney-.txt.
+- Altman et al. 2023 Sec. 4 (GIN, GIN+EU, PNA edge classification; PNA near-par with boosted trees without hand features; GBT needs graph feature preprocessing) and App. E (≈1,000 GPU hours) — research/texts/realisticsyn-.txt (one paragraph on the alternative architectures and the cost).
+- Akoglu et al. 2015 Sec. 2.2.3 (relational learning as the family GNNs belong to) — research/texts/graphbased-s1-.txt.
+- CS6890 PS1 (GCN embeddings for clustering a payment graph) — research/texts/cs6890-ps1.txt (lab pointer).
 
-## Key points
-1. Flaw-first: RWR propagates a scalar from seeds with fixed weights; a one-hop logistic regression on (own, mean-of-neighbours) features (the forward exercise of the previous lesson) learns the weights but fixes the aggregation at one hop and one statistic. A GCN layer is that regression with learned W, applied in layers.
-2. The layer derived: AX as sum over neighbours; (A + I) adds self; symmetric normalisation D̃^{−1/2}(A + I)D̃^{−1/2} so high-degree nodes do not dominate (compare with Q's column normalisation from RWR); H′ = σ(ÂHW); two layers = two hops; the walk-counting reading of Â^k.
-3. Permutation invariance: why a flattened adjacency matrix cannot be a feature vector (the permutation gallery), and why aggregation must be invariant — sum/mean/max and the pairs each cannot distinguish; depth 2 as the empirical sweet spot and the dilution beyond; the global node for long range.
-4. Skip-GCN: H′ = σ(ÂHW + XW̃); with W = 0 it is logistic regression on X — "cannot be worse than LR"; the empirical ladder on Elliptic: LR 0.48 → GCN 0.63 → Skip-GCN 0.71 → RF on hand-aggregated features 0.79.
-5. Training a GCN on a fraud graph: node classification with a weighted CE for the illicit class; temporal split by snapshot; neighbourhood sampling with the masked loss for large graphs (Elliptic fits in memory; AMLworld does not); EvolveGCN as a GRU over the layer weights across time steps (+0.015 F1).
-6. When it beats hand features: Weber's negative result (72 one-hop aggregates + RF beat GCN; aggregates are what the first layer would learn), Altman's near-par (PNA ≈ GBT + GFP), the cost (1,000 GPU hours); when it should pay: heterogeneous neighbourhood sizes the min/max/std aggregates lose, edge features (GIN+EU), unlabelled-majority graphs (semi-supervised propagation through the layer).
-7. ★ Starred: attention aggregation (GAT) as a learned weighted sum; edge classification on the dual (AMLworld is an edge task); Node2Vec embeddings (PS1's other two methods) in one paragraph.
+## EXPLANATION PLAN
+### The problem as the newcomer meets it
+The reader has neighbour aggregates chosen by hand (max, mean, std of neighbours' features; exposure from a walk) and knows from lesson 2 that a max over 3 neighbours and over 3,000 are not the same feature. In image classification the same problem — which summary of a pixel's neighbours matters — was solved by learning the summary: a convolution. A payment graph is not a grid: nodes have different numbers of neighbours in no order. What the newcomer lacks: a way to write "aggregate the neighbours" that does not depend on their order or number (not yet: message passing, permutation invariance, sum/mean/max aggregation); the matrix form of one such layer (not yet: normalised adjacency Â, GCN layer); why it is at least as good as ignoring the graph (not yet: skip connection); how to train it on a graph that does not fit in memory (not yet: neighbourhood sampling, masked loss); and what two layers see (two hops) and why more is worse.
 
-## Set pieces & gems
-- The 4-node graph with all its permuted adjacency matrices.
-- "After three layers a node has information about nodes three steps away."
-- Skip-GCN reduces to LR at zero weights — a one-line argument.
-- Elliptic ladder: LR 0.48 → GCN 0.63 → Skip-GCN 0.71 → RF 0.79.
-- Aggregation counterexamples (max vs sum).
-- ~3k parameters already reach high performance; 2 layers best.
-- 1,000 GPU hours vs a random forest.
+### Chain of sub-problems
+1. **Why a convolution does not transfer directly.** — An image is a graph whose adjacency is banded and whose neighbourhood is always 8 pixels in a fixed order; the filter's 9 weights are indexed by position. A transaction graph's node has 3 or 3,000 neighbours in no order; a weight per neighbour position does not exist. Answer: an operation that is invariant to the order of neighbours and defined for any count — a sum, mean or max over neighbour vectors. Because: the adjacency matrix of the same graph has factorially many row orderings; a network that read it as a picture would learn the ordering, not the graph.
+2. **The simplest graph network.** — An MLP applied to every node's features separately, with the graph used only at the end (pooling for a graph-level prediction): nothing about neighbours enters a node's vector. Why it is the baseline: for node classification it is exactly module 4's MLP on local features (Elliptic's MLP(LF) 0.649 illicit F1). Because: the question is what the graph adds, so the no-graph model must be named first.
+3. **Message passing: gather, aggregate, update.** — For each node: gather the neighbours' vectors, aggregate them with a permutation-invariant function, update the node's vector with a learned transform of (own vector, aggregate). Stacking k layers lets a node's vector depend on nodes k hops away — the receptive field of the convolution analogy. Because: this is the one operation that respects what a graph is; sum, mean and max each fail to distinguish some pairs of neighbourhoods (sum sees counts, mean does not; max sees salient features, neither sees multiplicity).
+4. **The matrix form: one GCN layer.** — AX sums each node's neighbours' rows — sum aggregation is a sparse matrix product; A + I adds the node itself; scaling by D̃^{−1/2} on both sides turns the sum into a degree-normalised mean so that a 3,000-neighbour node is not 1,000× louder; so H' = σ(Â H W) with Â = D̃^{−1/2}(A + I)D̃^{−1/2}; two layers: softmax(Â ReLU(Â X W0) W1) — W0 and W1 are the learned "which summary matters". Because: the only learned objects are W0, W1 — the aggregation is fixed and the graph supplies the weights; this is where lesson 4's ξ ← αQξ + (1−α)z reappears with W learned.
+5. **Never worse than no graph: the skip term.** — Obvious worry: forcing every node through its neighbours could hurt when neighbours are noise. Answer: add X W̃ to the layer (Skip-GCN); with W0 = W1 = 0 the model is exactly logistic regression on the node's own features, so training can fall back to it. Because: on Elliptic, Skip-GCN 0.705 vs GCN 0.628 illicit F1 says the inputs were already informative and the plain layer was diluting them.
+6. **Depth, dilution, long range.** — Best models at 2 layers, deeper dilutes (each layer averages over a wider ball; the node's own signal washes out); a global node connected to everything for long-range information; attention as a learned, per-edge weighted sum instead of the degree weights. Because: two hops is the merchant's other cardholders — the depth the fraud signal lives at.
+7. **Training on a million nodes.** — The whole adjacency does not fit; sample each training node's k-hop neighbourhood, batch the sub-graphs, mask the loss to the core nodes whose neighbourhoods are complete; weighted cross-entropy (0.3 licit / 0.7 illicit) for the imbalance; inductive training (the test steps' graphs are unseen). Because: a GCN on a sub-graph is correct only for nodes whose receptive field is inside it.
+8. **How do we know it works, and when it does not.** — Elliptic: RF on hand aggregates 0.788 > Skip-GCN 0.705 > GCN 0.628 > LR; concatenating GCN embeddings to the features helps LR and RF a little; the temporal evolution EvolveGCN adds 0.72 vs 0.705; on the synthetic laundering world a graph network without hand features (PNA) is near par with boosted trees *given* graph features — at about 1,000 GPU hours. Because: the GCN's last layer is a logistic regression and a forest is an ensemble of thresholds — on tabular aggregates the forest wins; the network earns its place where the aggregates are not yet known or the graph is the only input (lesson 6 and the lab decide).
 
-## Pitfalls
-- Keep Â (symmetric, GCN) and Q (column-normalised, RWR) visibly distinct; one figure shows both.
-- No spectral derivation of the GCN (Chebyshev filters); the neighbourhood-aggregation view is the lesson.
-- The Elliptic numbers are the application's; here they are the ladder only.
+### Set pieces and worked examples to recreate
+- The 5×5 smiley as pixels, as a banded adjacency matrix and as a graph; text as a chain graph (Distill "Images as graphs").
+- The four-node graph with all its permuted adjacency matrices (Distill "Challenges").
+- Gather–aggregate–update on a 5-node toy, with the information reaching a node after 1, 2, 3 layers (Distill "Passing messages").
+- AX on the 4-node toy as the sum of neighbour rows; A² as 2-hop walks (Distill "Graph convolutions as matrix multiplications"; the lesson-2 example reused).
+- The Â normalisation worked on a node of degree 1 and a node of degree 3 (Weber Sec. 3.2).
+- Skip-GCN at W0 = W1 = 0 is logistic regression (Weber Sec. 3.2).
+- The empirical sweep: ≈3k parameters reach high performance; best depth 2; aggregation choice not uniform (Distill "Empirical design lessons").
+- The pooling counter-examples: graph pairs sum, mean and max cannot tell apart (Distill "Comparing aggregation operations").
+- Elliptic's Table 1 and Table 2 numbers (Weber Sec. 4).
+
+### Pitfalls and terms to define
+- "Permutation invariance" — define with the permuted-matrix picture before message passing.
+- "Receptive field" borrowed from CNNs — define as "the set of nodes whose features can influence this node's vector" at first use.
+- Â's symmetric normalisation vs the column normalisation of lesson 4's Q — the lesson contrasts them explicitly (one gives a mean, the other a probability flow).
+- "Inductive" vs "transductive": Elliptic's test steps are disconnected graphs, so the model must be inductive — say what that means in one sentence.
+- Illicit-F1 vs micro-F1 is lesson 6's subject; here quote only illicit-class numbers.
+- Do not present attention or EvolveGCN beyond a paragraph each; the lesson's object is the GCN layer.
+
+### Recalled, not re-taught
+- MLP, backpropagation, Adam, weighted cross-entropy (`neural-tabular-detectors`, classical-ml): Refs.
+- Matrix powers as path counts and hand aggregates' size dependence (`neighbourhood-and-centrality`): Refs at sub-problems 1 and 4.
+- The random walk's iteration (`guilt-by-association`): Ref at sub-problem 4 as the unlearned cousin.
+- Convolution on images: prerequisite (NN basics), one clause.
 
 ## FIGURE PLAN
-- draw: `<FigureSequence>` (4 frames) of message passing on a 7-node graph: (1) node features as small cell vectors, (2) gather from neighbours (fan arrows), (3) aggregate (sum) into one vector, (4) update through W and σ — the target node's cell vector changing per frame (voita rules 6, 9). Key image.
-- draw: Â dissected: (A + I), D̃, the normalised product as three cell grids with one row highlighted; beside it Q from RWR for the same graph — the two normalisations compared.
-- draw: The 4-node graph and four of its permuted adjacency matrices as cell grids — "same graph, different matrix". Inspired by Distill's permutation figure (recreated).
-- draw: Skip-GCN as a tiered diagram (X → ÂXW and XW̃ summed → σ → next layer) with the W = 0 case greyed to show the surviving LR path.
-- draw: Aggregation counterexample: two small graphs that sum distinguishes and max does not, with the aggregated values written. Inspired by Distill's pooling counterexample (recreated).
-- draw: Depth vs hop reach: the same graph with 1-, 2-, 3-hop neighbourhoods of a node shaded progressively, and a note on dilution. Three small panels.
-- draw: The Elliptic ladder as a bar chart (LR, GCN, Skip-GCN, MLP, RF) of illicit F1 — from Weber Table 1.
+- draw: the same 5×5 image as pixel grid, banded adjacency matrix and graph, with one pixel's 8 neighbours highlighted in all three — single <Figure>; inspired by Distill's "Images as graphs".
+- draw: a 4-node graph beside three of its permuted adjacency matrices — single <Figure>; inspired by Distill's "Challenges".
+- draw: <FigureSequence>, 4 frames: gather (neighbour vectors as cell strips), aggregate (summed strip), update (through W), and the two-hop reach after a second layer shaded on the graph; inspired by Distill's message-passing schematic. **Key image.**
+- draw: Â H W as cell grids — Â sparse with the diagonal added and the D̃^{−1/2} scaling written on two rows of different degree, H as feature rows, W as the learned block — single <Figure>; in the house's matrix-as-grid style.
+- draw: Skip-GCN wiring: X → Â X W0 → ReLU → Â · W1, with the X W̃ bypass arrow, and the W0 = W1 = 0 case greyed to leave logistic regression — single <Figure>.
+- draw: neighbourhood sampling — a large graph, a sampled 2-hop sub-graph around three core nodes, the loss mask on the core — single <Figure>; inspired by Distill's sampling figure.
+- draw: Elliptic illicit-F1 bars LR / MLP / GCN / Skip-GCN / RF with the AF vs LF pairs — single <Figure>; from Weber Table 1.
 
 ## EXERCISE PLAN
-1. Warm-up: compute Â for a 4-node path graph and one forward pass of ÂXW with given X (4 × 2) and W (2 × 1).
-2. Derivation the lesson skipped: show that with W₀ = W₁ = 0 the Skip-GCN's output is a logistic regression on X, and that with W̃ = 0 and one layer it is a logistic regression on the symmetric-normalised neighbour mean plus self — the one-hop feature of the previous lesson's forward exercise.
-3. Boundary probe: a graph with no edges (A = 0) — Â = I, the GCN is an MLP; and a complete graph — Â has rank one, every node's hidden state equals the global mean after one layer; what each says about when the graph term helps.
-4. Claim to refute: "A deeper GCN sees more of the graph, so a 6-layer GCN should beat a 2-layer one on Elliptic." Refute with the dilution/over-smoothing argument (the complete-graph limit in miniature) and Distill's sweep; name the mechanism.
-5. Research-shaped: reproduce the Distill finding on a seeded synthetic graph (two communities, node features correlated with class): F1 of 1-, 2-, 4-layer GCNs; report the peak.
-6. FORWARD (E7): train a 2-layer GCN on Elliptic steps 1–34 (or the lab's subset) and plot illicit F1 per test step 35–49 — the reader sees the curve fall to zero at step 43 before any explanation → lands on `elliptic-illicit-nodes` (and module 7's drift).
-7. Mixed review (E3): run RWR (guilt-by-association) from the labelled illicit nodes of a snapshot and feed ξ as an extra input column to a logistic regression; compare with the GCN's F1 on the same split — which "aggregation" won and why.
+1. [warm-up] Compute Â for a 4-node graph by hand and one forward pass of a GCN layer with a 2×2 W on 2-dimensional node features.
+2. [boundary probe] A node with no neighbours: what does Â H W compute for it, and why does the self-loop in A + I matter; then a star of degree 3,000 — compare sum, mean and the symmetric normalisation at the hub.
+3. [claim to refute] "Adding a third and fourth GCN layer lets the model see 4 hops, so it must be at least as good as the 2-layer model." Refute: dilution (each layer averages over a wider ball; own signal washes out) and the empirical sweep; name the mechanism, not just the number.
+4. [derivation skipped] Show that two GCN layers without nonlinearity compute Â² X W0 W1, so the model is a logistic regression on 2-hop-averaged features, and that the nonlinearity is what makes the first layer's output not just a smoothed X.
+5. [research-shaped] On the Elliptic subset, train logistic regression on the 94 local features, on the 94 + 72 aggregates, and on the 94 + a 2-layer GCN embedding concatenated; report illicit F1 for each and state the margin that would reproduce the paper's "embeddings help LR" finding.
+6. FORWARD → `elliptic-illicit-nodes`: compute micro-F1 and illicit-class F1 for a classifier that predicts "licit" for every node on a 2%-illicit test set — the reader meets the accuracy trap in a graph setting one lesson before it is the subject.
+7. [mixed review] Using `guilt-by-association`: rewrite one power-iteration step of the fraud walk as a GCN layer with fixed weights (which W, which normalisation, which nonlinearity), and say which of the two is a model and which is a feature.
 
 ## ARC
-- Inherits: MLP machinery (neural-tabular-detectors); RWR and Q (guilt-by-association); egonet aggregates (graph-features-and-communities).
-- Contributes: the learned-aggregation detector — the GCN layer, invariance, depth, Skip-GCN's LR floor, training on a temporal graph — and the honest comparison with hand aggregates.
-- Hands off: the Elliptic application (next); the lab's GCN checkpoints; the sequence models of module 7 as the temporal sibling; EvolveGCN's drift to module 7.
-- Spine step 6: the graph around the transaction.
+- Spine step 6 "The graph around the transaction": "Fraud is organised: the cardholders, merchants, devices and accounts around a transaction carry signal no per-row feature sees, found by testing whether fraud clusters, summarising and partitioning the neighbourhood, propagating known fraud through the graph as a random walk with restart, or learning the neighbourhood with a graph network."
+- Inherits: hand aggregates and their size dependence, A^k as paths (`neighbourhood-and-centrality`); the walk's iteration and sparse Q (`guilt-by-association`); the MLP pipeline (`neural-tabular-detectors`).
+- Contributes: message passing, the GCN layer in matrix form, the skip argument, depth and sampling, and the honest comparison with a forest on hand aggregates.
+- Hands off: the Elliptic protocol and its three facts to `elliptic-illicit-nodes`; the two-layer GCN with a finite-difference referee to `graph-propagation-lab`; "representation learning instead of hand features" to module 7's sequence models.

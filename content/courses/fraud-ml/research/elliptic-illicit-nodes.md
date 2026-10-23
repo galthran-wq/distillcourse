@@ -1,61 +1,72 @@
-# Illicit-node classification on the Elliptic Bitcoin graph — research brief (module 6 APPLICATION)
+# Illicit-node classification on the Elliptic Bitcoin graph — research brief
 
-Lesson: `elliptic-illicit-nodes` (module: graphs, core, planned). NEW. Module-final application (L16): a paper's central result read and (in part) reproduced.
-Goal: Evaluate the Elliptic benchmark — random forest, MLP, GCN, Skip-GCN, EvolveGCN on 49 time steps — and explain the collapse of every model at the dark-market shutdown.
+Lesson: `elliptic-illicit-nodes` (module: graphs, type: core, status: planned). NEW — full re-synthesis, no draft exists, so no REVISION block. Module-final APPLICATION lesson.
+Goal: Evaluate the Elliptic benchmark — random forest, MLP, GCN, Skip-GCN, EvolveGCN on 49 time steps — and explain the collapse of every model at the dark-market shutdown
+Opening (verbatim, the lesson must start with it): On 203,769 Bitcoin transactions, 2% labelled illicit, a random forest on the given features beats a two-layer graph network, every model's overall F1 sits above 0.93, and at the 43rd fortnight all of them fall to zero. What in the dataset, the features and the time split produces each of those three facts?
 
-## Sources
-- Weber et al. 2019 (primary, read in full): Sec. 1 (AML costs; 1.7B unbanked; remittance 7% vs SDG 3%; 1MDB $11B; Danske ~$200B); Sec. 1.1 (FinCEN May 2019 guidance; KYC / know your customer's customer; public pseudonymous graph); Sec. 2.1.1–2.1.3 dataset (203,769 nodes, 234,355 edges, 166 features = 94 local + 72 one-hop aggregates, 49 steps of ~2 weeks each as single connected components, no cross-step edges; 2% illicit, 21% licit, rest unlabelled; Fig. 1); Sec. 2.2 label heuristics (address reuse, consolidation lowers fees, exchanges licit, illicit favours fewer inputs; mixers ignored); Sec. 3 AML as anomaly detection, > 90% industry false positives; Sec. 3.1–3.3 methods; Sec. 4 experiments (70:30 temporal split, 34/15 steps; hyperparameters; Table 1 full grid of LR/RF/MLP × AF/LF/+NE with illicit P/R/F1 and micro-F1; Table 2 GCN vs EvolveGCN; findings: RF best; AF > LF; +NE helps LR and RF(LF); Skip-GCN > GCN; the dark-market shutdown at step 43 — all methods near-zero illicit F1, even an RF retrained each step with ground truth; robustness to emerging events as the open challenge); Sec. 5 discussion (RF vs GCN; hybrids); Sec. 6 Chronograph/UMAP; Sec. 7 summary.
-- Altman Sec. 2 (Elliptic cited as prior work) and Sec. 4 (the same temporal-snapshot protocol; Table 2–3 HI→LI transfer: PNA 0.00 on LI-Small until fine-tuned to 27.38 — a drift-like transfer failure); Fig. 6 cross-bank sharing (private 4.9–8.7% vs shared 20.8–22.1% F1).
-- Canonical-datasets brief (dataset card); graph-neural-networks (the ladder); guilt-by-association (RWR as a competing score); graph-features-and-communities (the 72 aggregates as egonet features).
-- Dal Pozzolo 2014 Sec. 7.2.5 and Gama (forward): drift strategies; the collapse as the module-7 hook.
-- Module 2: illicit-F1 vs micro-F1 is the accuracy trap; AP/P@k as the alternative the paper does not report.
+## Sources to consult
+- Weber et al. 2019 — Sec. 1–1.1 (AML framing, >90% industry false-positive rates, know-your-customer's-customer), Sec. 2.1.1–2.1.3 (203,769 nodes, 234,355 edges, 4,545 illicit (2%), 42,019 licit (21%), the rest unlabelled; 166 features = 94 local + 72 one-hop aggregates; 49 time steps of ≈2 weeks, no cross-step edges, each a connected component confirmed within < 3 hours; Fig. 1 class balance per step), Sec. 2.2 (label heuristics; address clustering; mixers ignored), Sec. 3 (task framing, RF for accuracy and LR for explainability), Sec. 4 (temporal 70:30 split, steps 1–34 train / 35–49 test; Table 1 full grid; Table 2 EvolveGCN; Fig. 2 per-step illicit F1 and the step-43 collapse; even RF retrained up to T−1 with ground truth does not recover), Sec. 5 (why RF wins; hybrid ideas), Sec. 6 (Chronograph, UMAP) — research/texts/antimoney-.txt (the staged txt's reference list ends at [9]).
+- Altman et al. 2023 Sec. 1, 3.1, 7 (real AML labels radically incomplete; card fraud's customer feedback vs laundering's absence of ground truth; temporal 60-20-20 split with growing snapshots; account ids excluded as features) — research/texts/realisticsyn-.txt.
+- Handbook Ch4 (why accuracy and micro-averaged metrics fail under imbalance) — reproducible-Chapter_4_PerformanceMetrics_ThresholdBased.md (Ref only).
+- Dal Pozzolo 2018 Sec. VI-D (synthetic abrupt drift: juxtapose two months, CP_k loss) — research/texts/creditcard-tnnls.txt (forward pointer to module 7).
 
-## Key points
-1. The artifact: dataset, split, features, models, metric — stated as the paper states them; micro-F1 0.93–0.98 for everyone beside illicit-F1 0.45–0.80: the accuracy trap in a graph.
-2. The ladder with its attribution: RF(AF) 0.788 > MLP 0.653 > Skip-GCN 0.705? — order by F1: RF 0.788, Skip-GCN 0.705, EvolveGCN 0.720, MLP(AF+NE) 0.689, GCN 0.628, LR 0.53; aggregated features (AF) beat local (LF) for every model (the one-hop aggregates ARE a graph method); GCN embeddings concatenated (+NE) help the linear model most; Skip-GCN > GCN says the node's own features were informative; RF wins because the 72 hand aggregates already capture the neighbourhood and trees handle the heterogeneous-size loss better than one layer of mean aggregation.
-3. The temporal split and why a random split would leak (edges within steps only; later steps share patterns); weighted cross-entropy 0.3/0.7 as the imbalance handling; what the paper does not report (AP, P@k) and what the lesson computes on a reproduction (RF and GCN on the public data: illicit-F1 per step plus AP per step with the module-2 harness).
-4. Step 43: the dark-market shutdown — every model's illicit F1 falls to ~0 and the RF retrained with oracle labels does not recover: the labelled illicit population changed (a prior and concept shift), the features that identified it (volume, consolidation) stopped identifying the new illicit mix; the honest reading: no amount of graph modelling fixes a regime change; module 7's problem stated by the module-6 artifact.
-5. What Elliptic cannot tell: labels from heuristics, 77% unlabelled, no feature names, no cross-step edges — the evaluation measures node classification inside snapshots, not laundering detection across time; AMLworld's complete labels and cross-bank finding (private 5–9% vs shared 21–22%) as the contrast.
-6. The reproduction (the reader can run): RF(AF) and a 2-layer GCN (numpy from the lab, or a library) on the public data; per-step F1 curve; the lesson shows ours beside the paper's Fig. 2.
+## EXPLANATION PLAN
+### The problem as the newcomer meets it
+The reader has the module's four tools (features, components, walk, GCN) and one real public graph on which they have all been compared: a published benchmark of Bitcoin transactions labelled licit, illicit or unknown over 49 fortnights. Three facts in the opening look contradictory to a newcomer: a learned graph model loses to a forest on fixed features; every model looks near-perfect on the standard F1; and every model stops working at one point in time, including a forest retrained with perfect hindsight. What the newcomer lacks is not a new method but the reading: what the features are (and that 72 of them already summarise the graph), what micro-F1 averages over, what the time split means when the test steps are disconnected graphs, and what a dark-market shutdown does to p(y | x).
 
-## Set pieces & gems
-- Micro-F1 0.96–0.98 vs illicit-F1 0.45–0.80.
-- RF 0.956 precision / 0.788 F1 beating the GCN's 0.628.
-- Step 43: all curves to zero; even oracle retraining fails.
-- Skip-GCN at zero weights = LR (the reason it beats GCN).
-- 438M-node full Bitcoin graph vs 203k in the set.
-- "Know your customer's customer" phone calls vs a public ledger.
-- AMLworld's HI-trained PNA scoring 0.00 on LI-Small until fine-tuned.
+### Chain of sub-problems
+1. **The artifact.** — 203,769 transaction nodes, 234,355 directed edges (BTC flow), 2% illicit, 21% licit, 77% unlabelled; 166 features: 94 local (time step, inputs/outputs, fee, volumes, average counts) and 72 aggregated one-hop statistics (max, min, std, correlation of neighbours' local features) — note that the time step is itself feature 1; 49 steps, each a connected component of transactions confirmed within three hours, with *no edges between steps*. Labels from a heuristic entity categorisation (exchanges licit, dark markets illicit; mixers ignored). Because: every result below follows from these four facts.
+2. **Why the forest beats the GCN.** — The 72 aggregates are already a one-hop message passing with fixed max/min/std/corr aggregators; the GCN's learned aggregation starts from them and adds a degree-normalised mean; its output layer is a logistic regression; a forest is an ensemble of thresholds that exploits the tabular aggregates directly. Table 1: RF(AF) 0.956 / 0.670 / 0.788 vs GCN 0.812 / 0.512 / 0.628 vs Skip-GCN 0.705; aggregates help every model (AF > LF); GCN embeddings concatenated help LR and RF a little (RF(AF+NE) 0.796). Because: Skip-GCN > GCN says the inputs were already informative — the graph's signal had been hand-extracted, which is lesson 5's "when it does not win".
+3. **Why every model looks near-perfect.** — Micro-averaged F1 0.93–0.98 beside illicit F1 0.45–0.80: micro-F1 counts every node and the 98% licit majority dominates it; the paper reports illicit-class precision / recall / F1 as primary. Because: this is module 2's accuracy trap in a graph setting — the lesson computes both for the all-licit predictor (exercise 6 of lesson 5) and reads the gap.
+4. **What the time split tests.** — Train on steps 1–34, test on 35–49; the test graphs share no edge with training; so the GCN is trained inductively and every model is tested on the future. Because: a random node split would leak the future and let a GCN read labels across the split; the module's temporal rule from module 2 applies to graphs.
+5. **The collapse at step 43.** — Fig. 2: illicit F1 per test step for RF, GCN, Skip-GCN, EvolveGCN; at step 43 all fall to near zero; a dark market closed; even an RF retrained after every test step with ground truth does not recover reliably. Read it with the module-7 vocabulary in advance: the illicit population changed — p(y | x) moved — and no amount of graph or retraining on old labels helps when the new illicit transactions look like nothing before. Because: the benchmark's own authors name robustness to emerging events the open challenge; the course's answer is the next module.
+6. **EvolveGCN and what time buys.** — GCN weights evolved by a GRU across steps: 0.720 vs 0.705 — consistent, small. Because: temporal weight evolution cannot see a market that did not exist in training.
+7. **What this graph cannot test.** — Labels from entity heuristics, not investigations; most Bitcoin transactions unlabelled, and real laundering labels radically incomplete; no customer, no card, no delay block, no alert budget — the AML contrast with card fraud (customer feedback gives near ground truth for cards; nothing equivalent for laundering). Because: an application lesson names the departures.
+8. **How do we know it works.** — The closing reading: on this graph the module's cheapest tool (hand aggregates + forest) wins, the walk's exposure would be one more column, and the GCN is the right tool when aggregates are not designed — and all of them are blind to the event that matters most.
 
-## Pitfalls
-- Keep the ladder's numbers exact; the illicit F1 is the headline, micro-F1 the trap.
-- The dark-market explanation is the paper's one sentence; the mechanism (prior + concept shift) is the course's reading — label it as such.
-- No GNN training details beyond what the lesson needs (graph-neural-networks has them).
+### Set pieces and worked examples to recreate
+- The dataset card: 203,769 / 234,355 / 2% / 21% / 166 = 94 + 72 / 49 steps, no cross-step edges (Weber Sec. 2.1).
+- Table 1's full grid LR / RF / MLP × AF / LF / +NE and GCN / Skip-GCN; Table 2 EvolveGCN 0.720 vs 0.705 (Weber Sec. 4).
+- Micro-F1 0.96–0.98 vs illicit F1 0.45–0.80 (Weber Table 1).
+- Fig. 2: per-step illicit F1 with the step-43 collapse and the RF retrained to T−1 (Weber Sec. 4).
+- Hyperparameters: RF 50 trees / 50 max features; GCN 2 layers, 100 units, 1,000 epochs, Adam 0.001, weighted CE 0.3/0.7 (Weber Sec. 4).
+- The scale: full Bitcoin ≈438M nodes / 1.1B edges vs 203k (Weber Sec. 2.2).
+- Industry AML false-positive rates above 90% as the motivating cost (Weber Sec. 3).
+- Card fraud vs AML ground truth (Altman Sec. 7).
+
+### Pitfalls and terms to define
+- "Illicit F1" vs "micro-F1" — define both before quoting any number; the newcomer reads 0.97 as the model's quality.
+- "Time step" here is a disconnected graph, not a day of a continuous stream — say so; the module-7 drift vocabulary (p(y|x) change) is used once in advance with a Ref forward, not defined here.
+- The time step is a feature (feature 1): a model can learn "late steps are more licit"; name the leak risk.
+- Labels are heuristic (entity categories), not investigations; "illicit" is a category of the counterparty, not a confirmed crime.
+- The staged text's reference list is truncated at [9]; the writer cites the arXiv paper.
+- Do not claim the GCN "fails" — it beats LR and ties RF(LF); the claim is that hand aggregates plus a forest win here.
+
+### Recalled, not re-taught
+- Hand aggregates and their size dependence (`neighbourhood-and-centrality`); the GCN layer and Skip-GCN (`graph-neural-networks`); exposure as a column (`guilt-by-association`): Refs.
+- The accuracy trap and AP vs F1 (`alert-budget-metrics`); temporal validation (`delayed-labels-prequential`): Refs.
+- Label completeness and AMLworld's transitive taint (`canonical-datasets`): Ref at sub-problem 7.
 
 ## FIGURE PLAN
-- source: antimoney-fig2-f1-dark-market — stem `elliptic-f1-collapse`; the reader must see the per-step illicit-F1 curves of RF, GCN, Skip-GCN and EvolveGCN over bars of illicit counts, all dropping together at step 43; centered at the heart of the lesson (the measured result; the collapse is the evidence). Key image. Crop to the figure, excluding the tables.
-- draw: Illicit-F1 vs micro-F1 for the fourteen models of Table 1 as a paired dot plot — the trap in one picture. From Table 1.
-- draw: The 94 local + 72 one-hop features as a labelled grid: local block, aggregate block (max/min/std/corr over neighbours), with a node and its neighbours drawn beside — the "AF are graph features" point.
-- draw: `<FigureSequence>` (3 frames) of the temporal split: 49 snapshots as disconnected components, train 1–34 shaded, test 35–49, step 43 marked in the last frame.
-- draw: Our reproduction: RF and GCN illicit-F1 per test step as two lines (computed on the public data) placed under the sourced figure for comparison.
-- draw: AMLworld cross-bank F1 as three bars (private/private, private/shared, shared/shared) averaged — from Altman Fig. 6 / App. F; the "what Elliptic cannot test" contrast. (The realisticsyn-fig6 capture is available if a sourced version is preferred; a clean three-bar drawing suffices.)
+- source: antimoney-fig2-f1-dark-market — stem `elliptic-step43-collapse`; the reader must see the real per-step illicit-F1 curves of RF, GCN, Skip-GCN and EvolveGCN over steps 35–49 falling together at step 43 against the bars of illicit counts; centered under sub-problem 5 (measured result; a redraw would imitate the collapse). **Key image.**
+- draw: the dataset card as a figure — a strip of 49 disconnected graphs on a time axis, the 70:30 cut at step 34, the 2% / 21% / 77% label shares as a bar — single <Figure>; inspired by Weber Fig. 1 (recomputed from the public set).
+- draw: the leaderboard as grouped bars: illicit F1 for LR / MLP / RF × LF / AF and GCN / Skip-GCN / EvolveGCN, with micro-F1 drawn as a second, flat row above them — single <Figure>; from Tables 1–2.
+- draw: the "aggregates are already message passing" picture: a node, its neighbours' local features, the four fixed aggregators (max, min, std, corr) producing the 72 columns, beside the GCN's learned W — single <Figure>.
+- draw: micro-F1 vs illicit F1 for the all-licit predictor and for RF(AF), as two 2×2 confusion matrices with the counts — single <Figure>.
+- draw: the temporal split as a train/test strip with "no edges across" marked, next to a random node split with cross-split edges in red — single <Figure>.
 
 ## EXERCISE PLAN
-1. Warm-up: from Table 1 compute the illicit-class precision and recall implied by RF(AF)'s F1 and verify 0.788 from 0.956 / 0.670.
-2. Boundary probe: a model that predicts "licit" for every node — compute its micro-F1 on the test split (≈ 0.97) and its illicit-F1 (0); then the model that predicts "illicit" for all.
-3. Claim to refute: "The GCN underperforms because the graph carries no information; the random forest ignores the graph and wins." Refute: AF are one-hop graph aggregates and AF > LF for every model; name the aggregation the RF consumed that the GCN's mean lost.
-4. Research-shaped: reproduce RF(AF)'s per-step illicit F1 on the public data with a temporal split and locate the step at which it collapses; compare with the paper's Fig. 2.
-5. Derivation the lesson skipped: show that if the illicit nodes after step 43 come from a new population whose feature distribution overlaps the licit one, no classifier trained before 43 can exceed the overlap-limited F1 — and that retraining with labels recovers only to the extent the new population separates (why the oracle RF fails too).
-6. FORWARD (E7): compute, for each test step, a "day-distinguishability" score — train a classifier to tell step 42's nodes from step 43's and report its AUC — the reader measures the shift before the mechanism is named → lands on `concept-drift`'s day-distinguishability and detectors.
-7. Mixed review (E3): run fraud-personalised RWR (guilt-by-association) from the labelled illicit nodes of steps 1–34 inside each test snapshot (no cross-step edges, so restart only from that snapshot's known illicit nodes) and compare its AP with the GCN's per step; state why RWR needs within-snapshot seeds here.
+1. [warm-up] From Table 1's precision and recall, recompute illicit F1 for RF(AF) and GCN and confirm the printed values.
+2. [boundary probe] A test step with zero illicit nodes (as after a market closes): what are illicit precision, recall and F1 for any predictor, what is micro-F1, and what does Fig. 2's "near zero" mean there?
+3. [claim to refute] "Micro-F1 above 0.96 for every model shows the task is nearly solved." Refute with the all-licit predictor's micro-F1 on a 2%-illicit step; name which metric the budget would use (precision at k per step).
+4. [research-shaped] On the Elliptic subset, reproduce the direction of Table 1's AF > LF for a logistic regression and a random forest; report illicit F1 for both feature sets and state the margin that counts as reproducing.
+5. [derivation skipped] Show why a model trained on steps 1–34 can use the time-step feature to lower its illicit rate on later steps (the class balance per step falls), and propose the ablation that removes the leak.
+6. FORWARD → `concept-drift`: pool the illicit nodes of steps 40–42 and 43–45, train a classifier to tell the two groups apart on the 94 local features and report its AUC; the reader has measured the shift that caused the collapse before the next module names it.
+7. [mixed review] Using `communities-and-components`: run union-find on step 43's edges, report the component containing the most illicit nodes and its size, and say what a ring-based alert would have found that the node classifiers did not.
 
 ## ARC
-- Inherits: the graph, features, propagation and the GCN (this module); the dataset card; the harness.
-- Contributes: the module cashed out on a public graph with a paper's result reproduced — the ladder attributed, the trap named, and the collapse that the module cannot fix.
-- Hands off: the lab (next); drift (module 7) as the problem the collapse poses; AMLworld's sharing finding to the capstone design.
-- Spine step 6: the graph around the transaction.
-
-## APPLICATION (L16)
-- Artifact: Weber et al. 2019 and the public Elliptic dataset (Kaggle); the reproduction runs RF and a 2-layer GCN on it.
-- Module results used: egonet aggregates as graph features (graph-features-and-communities), RWR as a competing score (guilt-by-association), the GCN layer and Skip-GCN's LR floor (graph-neural-networks), homophily as the propagation assumption (fraud-as-a-graph); module 2's metrics for what the paper leaves out.
-- Departures from the idealisation: heuristic labels, 77% unlabelled, no cross-step edges, no feature names, F1 at a fixed 0.5 with no budget, a single run without error bars — and the step-43 regime change that no graph method survives.
+- Spine step 6 "The graph around the transaction": "Fraud is organised: the cardholders, merchants, devices and accounts around a transaction carry signal no per-row feature sees, found by testing whether fraud clusters, summarising and partitioning the neighbourhood, propagating known fraud through the graph as a random walk with restart, or learning the neighbourhood with a graph network."
+- Inherits: every tool of the module; the metrics and temporal split of module 2; label completeness (`canonical-datasets`).
+- Contributes: the module's results checked on the one public labelled transaction graph, the three facts explained, and the first sight of a change no graph method survives.
+- Hands off: the Elliptic subset, the split and the weighted loss to `graph-propagation-lab`; the step-43 collapse as the opening evidence of module 7 (`concept-drift`, `drift-strategies-on-worldline`); the "no edges across steps" protocol to `pipeline-capstone-lab`'s graph feature.
+- APPLICATION spec: the artifact is the published Elliptic benchmark (dataset, protocol, Tables 1–2, Fig. 2). Module results used: hand aggregates as fixed message passing and their size dependence (`neighbourhood-and-centrality`), the GCN layer and the skip argument (`graph-neural-networks`), exposure as a column (`guilt-by-association`), components as rings (`communities-and-components`), the accuracy trap and temporal validation (modules 2). Departures from the idealisation: heuristic entity labels rather than investigations; 77% unlabelled and real AML labels radically incomplete; disconnected fortnights rather than a continuous stream; no customer, no delay block, no budget, no adversary model; single runs without error bars.

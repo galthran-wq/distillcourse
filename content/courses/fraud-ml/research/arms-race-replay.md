@@ -1,61 +1,75 @@
-# The arms race and the feedback loop replayed on the simulator — research brief (module 8 APPLICATION)
+# The arms race and the feedback loop replayed on the simulator — research brief
 
-Lesson: `arms-race-replay` (module: adversary, core, planned). NEW. Module-final application (L16): a computational study the reader can run — two papers' central experiments re-enacted on the handbook simulator.
-Goal: Evaluate Dalvi's oscillating repeated game and Dal Pozzolo's feedback-versus-delayed-sample comparison by reproducing both as a computational study on the handbook simulator, and state where the simulator departs from the papers.
+Lesson: `arms-race-replay` (module: adversary, type: core, status: planned). NEW — full re-synthesis, no draft exists, so no REVISION block. Module-final APPLICATION (a computational study).
+Goal: Evaluate the oscillating repeated game and the feedback-versus-delayed-sample comparison by reproducing both as a computational study on the handbook simulator, and state where the simulator departs from the papers
+Opening (verbatim, the lesson must start with it): On the simulator, a fraudster who learns the detector's amount threshold and spends just under it, and a detector that retrains only on what its investigators returned, can both be replayed. What does the replay show about how fast each side moves, and where does the simulator fall short of the two papers it imitates?
 
-## Sources
-- Dalvi et al. 2004 Sec. 6.3 and Fig. 3 (the repeated game: fixed-form adversary re-learns NB each round; utility oscillates with period 2 over 15 rounds; mechanism — good words lose and regain their log-odds) and Sec. 6.1 (the three cost models) — the design to transplant.
-- Dal Pozzolo et al. 2018 Sec. V, VI-B, VI-C Table III, VI-D (synthetic abrupt drift by juxtaposing two months; CP_k loss 7.7% AW vs 12.5% W^D), VI-E Table IV (importance weighting), Algorithm 1 — the design to transplant.
-- Handbook Ch3.2 (the simulator: three scenarios; scenario 1 amount > 220 learned as 218.67 by a depth-2 tree; scenario 2 terminals compromised 28 days; scenario 3 customers ×5 for 14 days) and the course's reduced generator (shipped in the module-2 lab) — the instrument; Ch2.3 (alerts and feedback; the DDM retrained daily).
-- Provost's comment (criminals pay initial bills, then ramp; vans after location models) and Dal Pozzolo 2014 Sec. 5 (test small then replicate) — the behavioural templates for the adaptive scenario.
-- Gama Sec. 5 (closed loop breaks replay evaluation) and Sec. 4.2 (prequential evaluation on the stream) — the evaluation discipline for the study.
-- Baesens Ch1 p.10 ("a deployed detector degrades its own detection power as fraudsters adapt") — the thesis in one line.
-- Module-2 harness (CP@100, P@k, prequential folds) — the referee.
+## Sources to consult
+- Handbook Ch3.2 (the simulator: 100×100 grid, mean_amount ~ U(5,100), std = mean/2, mean_nb_tx_per_day ~ U(0,4), Poisson counts, amounts N(mean, std) redrawn U(0, 2·mean) if negative, radius r; the three scenarios — amount > 220, two terminals a day compromised for 28 days, three customers a day with a third of transactions at ×5 for 14 days; scenario counts 978 / 9,099 / 4,604 with overlaps) — `research/texts/reproducible-Chapter_3_GettingStarted_SimulatedDataset.md`; Ch3.3 baseline features and the terminal risk with delay — `…_BaselineFeatureTransformation.md`; Ch3 BaselineModeling and shared_functions get_train_test_set / card_precision_top_k — `…_BaselineModeling.md`, `reproducible-Chapter_References_shared_functions.md`.
+- Dalvi et al. 2004, Sec 6.3 and Fig. 3 (the repeated game: fixed-form adversary re-learns naive Bayes each round; utility alternates with period 2), Sec 4 (greedy MCC under unit costs) — `research/texts/adversarialc-.txt`.
+- Dal Pozzolo et al. 2018, Sec V Algorithm 1, Sec VI-B settings (k = 100 cards, δ = 7, M = 8, Q = 15, 10 repetitions, Friedman rank sums), Sec VI-C Table III (F, D-window W^D, pooled W, AW), Sec VI-D (synthetic abrupt drift by juxtaposing two months), Sec VI-A (card ID out of the feature vector) — `research/texts/creditcard-tnnls.txt`.
+- Bolton & Hand 2002, Provost pp. 249–250 (the self-revealing fraud that ends in a complaint; the model that starts losing effectiveness at once) — `research/texts/statisticalf-.txt`.
+- Lucas & Jurgovsky 2020, Sec 3.3 Fig. 6 — `research/texts/creditcard-.txt` (the aggregation picture, cross-check).
 
-## Key points
-1. The study's design stated up front: one simulator stream (60 days), one detector (a depth-limited tree or small GBM retrained on a cadence), two experiments — (A) an adaptive fraudster on scenario 1; (B) the feedback loop with k = 100, δ = 7 — and one referee (CP@100 and P@100 per day with the harness).
-2. Experiment A (Dalvi transplanted): the fraudster's one knob is the amount; after each retraining the fraudster observes the detector's learned split (complete information, as in the paper) and sets amounts just below it (219 against 220, then lower as the split moves); the detector retrains on the newly labelled frauds and the split moves down; the fraudster's take falls (the edit cost) and at some amount the fraud is not worth it (the ΔU_A rule); plot the split and the take per round — the oscillation/decay shape; the cost model's role (a fraudster who can also change terminals — scenario 2's knob — evades a model that only sees amounts: the graph/terminal features of modules 3 and 6 are what he cannot cheaply edit).
-3. Experiment B (Dal Pozzolo transplanted): daily loop; F_t from the top-100 alerts' cards; D_{t−7} after the delay; four learners (D only, F only, pooled W, averaged AW) scored on day t; the ranking of P_k per day over 40 days; the training set's fraud share and mean amount for F vs D plotted over days — the drift the model causes with no change in the stream; the importance-weighting check (weights from a logistic model of P(s=1|x)) on F — no gain, as in Table IV; optionally the amount > 500 sanity selection where weighting works.
-4. Reading the two together: in A the stream changes because of the model; in B the training set changes because of the model while the stream does not; both are "drift" a detector on an exogenous schedule mistakes for the world changing; the retraining cadence is a parameter of both races.
-5. Departures (L16): the simulator's fraudster has one or two knobs and no cost model beyond the lost take; alerts are raised by ranking at day's end (the paper's own simplification); labels arrive exactly at δ; the simulator has no investigator error; the NB closed-form log-odds of Dalvi are replaced by a tree's split — the knapsack degenerates to "move below the split"; the oscillation in A is a decay unless the detector forgets (Forget strategy) — which the study shows by switching strategies.
-6. What the reader runs: the notebook study is shipped complete in the lesson (not a lab); every number in the prose is produced by the shipped code with a fixed seed.
+## EXPLANATION PLAN
+### The problem as the newcomer meets it
+The two previous lessons each rest on a paper with confidential data: a spam corpus and a Belgian card stream. The reader has the mechanisms — a knapsack the adversary solves, a selection the model performs — but no way to watch them run. The simulator from module 1 is small, scripted and public, and its fraud scenario 1 is literally a threshold on the amount, which is the simplest classifier a fraudster could learn. This lesson is a study: give the simulator's fraudster one knob, give the detector a retraining cadence and a budget, run both loops for a few months of simulated days, and read the curves against the two papers' figures. The honest part is the last section: what a one-knob fraudster and a scripted simulator cannot show.
+Terms the newcomer already has: everything (this is an application lesson); new names are only the study's own parameters (cadence c, knob margin m).
 
-## Set pieces & gems
-- 219 vs 220: the fraudster reads the split.
-- The decay of the fraudster's take per round — the edit cost made visible.
-- F's fraud share rising day after day while the stream's rate is flat.
-- The weighting that works on amount > 500 and not on alerts, reproduced.
-- Switching the detector to Forget turns the decay back into an oscillation.
+### Chain of sub-problems
+1. **A fraudster who learns the detector.** Obvious attempt: give the simulator's scenario-1 fraudster the full knapsack of Dalvi. Why it fails: the simulator's features are amount, time and the module-3 aggregates; there is no cost model for editing them. Answer: one knob. The fraudster observes which of their payments were alerted over the last c days, estimates the detector's amount split (the depth-2 tree's threshold, 218.67 on the reference data), and sets the next fraud amounts to split − m. Because: this is Dalvi's Add-Words attack with a single feature and unit cost — the greedy case — and it is the structuring story of Bolton & Hand in card form.
+2. **A detector that retrains.** Answer: a decision tree (depth 2, then 6) retrained every c days on the last K days of labelled data, with the module-2 geometry (delay δ = 7, known cards removed), scored by CP@100 on the simulator's daily stream. Because: the reader has built this harness in `cost-aware-evaluation-lab`; the tree makes the learned split readable, which is what makes the fraudster's observation plausible.
+3. **Does the utility oscillate.** Protocol: rounds of length c; in each round the detector fits on the previous round's labels, the fraudster then moves the amount under the learned split. Expected reading (to be run, not assumed): detection of scenario-1 fraud alternates between near-complete (the split catches last round's amounts) and near-zero (the fraudster has moved under it), with a period of two rounds — the handbook's scenario 1 has no other signal than the amount, so the tree can only chase. Because: Dalvi's mechanism — the feature the adversary edits loses its evidential value after retraining and regains it when abandoned — needs only one feature to appear.
+4. **What breaks the oscillation.** Obvious attempt: retrain faster (c = 1). Why it fails: the fraudster observes alerts within the same day and moves as fast; the period shortens, the amplitude does not. Answer: features the knob does not reach — the customer's own 30-day mean amount and the terminal risk (module 3). With them in the tree, a fraud at split − m on a customer whose mean is 40 still sits five standard deviations out. Because: the adversary-aware idea in practice is to measure what the adversary cannot cheaply edit (Akoglu's graph-robustness argument is the same point in module 6).
+5. **The feedback-only detector.** Protocol: on day t, score with the current model, alert the top k = 100 cards, label all of those cards' recent transactions (feedbacks F_t), label day t − δ entirely (delayed D_{t−δ}); train four models as in the paper — F (feedbacks only, Q days), W^D (delayed only, M days), W (pooled), AW (F and D models averaged, α = 0.5); report CP@100 per day and ranks. Settings as the paper's: δ = 7, M = 8, Q = 15. Because: the simulator makes the quantities the paper could only describe observable — the fraud share of F_t, its amount distribution against the stream's.
+6. **What the replay shows about the feedback set.** Expected reading: F_t's fraud share is tens of percent and its mean amount sits far above the stream's; the F model's CP@100 is high on the days its scenarios persist and collapses when scenario 2's 28-day terminals expire, because it has never seen a genuine high-amount payment; AW tracks the better of the two. The paper's Table III ordering (AW > W > W^D on CP_k; F worst on AUC) is the thing to check, with ranks over days. Because: the simulator's labels are complete, so the replay also shows how much of the paper's gap is the bias and how much the freshness.
+7. **Drift in the same harness.** Juxtapose two non-consecutive simulated months (a new seed for the scenario-2 terminals) and measure the relative CP@100 loss of AW vs W^D after the junction, the paper's 7.7% vs 12.5% device. Because: the module-7 claim (adaptation helps under sudden change) and this module's claim (fresh feedbacks help) are the same experiment seen twice.
+8. **Where the simulator departs.** Stated as a section, not an aside: the fraudster has one knob and no cost model; alerts are raised by daily ranking, not online within the day; labels are complete and instant where the paper's trickle in; genuine behaviour is stationary (Gaussian amounts around a fixed mean) so there is no real drift to confound; the simulator's scenario 3 (×5 amounts) is a fraudster who does not adapt. Because: a study that does not say what it cannot show is advertising.
 
-## Pitfalls
-- Everything here is simulated; say so in every figure caption; no claims about real fraudsters beyond the papers' quoted anecdotes.
-- Keep the two experiments separate in code and prose; the "reading together" section is the only place they meet.
-- The harness's CP@100 needs card ids and days — the simulator has both; do not use ULB here.
+### Set pieces and worked examples to recreate
+- The depth-2 tree reading the simulator's rule: threshold 218.67 against the true 220, leaf counts 236 frauds / 66,498 genuine. (Handbook Ch3 BaselineModeling)
+- Dalvi Fig. 3's period-2 alternation as the target shape; the simulator's version is a CP@100-per-round curve. (Dalvi Sec 6.3)
+- The paper's experimental settings to copy exactly: k = 100 cards, δ = 7, M = 8, Q = 15, 10 repetitions, Friedman ranks. (Dal Pozzolo 2018 Sec VI-B)
+- Table III's ordering (AW 0.77 vs W 0.61 on P_k; F worst AUC 0.87, R best 0.96) as the pattern to look for, not the numbers to expect. (Sec VI-C)
+- The synthetic abrupt-drift protocol and its 7.7% vs 12.5%. (Sec VI-D)
+- Reference dataset scale for runtime planning: 5,000 customers, 10,000 terminals, 183 days, 1.75M transactions, 0.84% fraud, ~10,000 tx/day, ~85 frauds/day. (Handbook Ch3.2)
+- The amount > 500 covariate-shift sanity check, rerunnable on the simulator as a control. (Sec VI-E)
+
+### Pitfalls and terms to define
+- The study must be seeded and its numbers reported as the writer's own runs, with ranges over seeds; no number from the papers is reused as if it were the simulator's.
+- "Round" (the game's unit) and "day" (the stream's unit) must be kept apart; c days make one round.
+- The simulator's scenario 1 is a unit test (amount > 220), not realistic fraud; say so when the oscillation appears, or the reader will take the period-2 as a fact about fraud.
+- The feedback share and the known-card removal interact: alerted cards are blocked, so F_t's cards leave the stream; forgetting this inflates later CP@100.
+- Runtime: a depth-6 tree retrained daily over 183 days with 4 models is minutes; a random forest is not — state the choice.
+
+### Recalled, not re-taught
+- `adversarial-classification`: the knapsack and the oscillation mechanism — one clause each.
+- `alert-feedback-selection-bias`: F, D, the two-model average.
+- `cost-aware-evaluation-lab` / `delayed-labels-prequential`: the harness and geometry.
+- `canonical-datasets` / `transaction-simulator`: the three scenarios.
+- `transaction-aggregates`: the customer and terminal features used in step 4.
 
 ## FIGURE PLAN
-- draw: `<FigureSequence>` (5 frames) of experiment A: (1) round 0 — the tree's split at 218.67 and the fraudster's amounts above it, (2) the fraudster moves to 215, frauds pass, (3) retraining moves the split to 212, (4) round 3, (5) the take per round falling below the worth-it line. Key image.
-- draw: Split position and fraudster's take per round as two lines over 10 rounds, with the Forget-strategy variant as a second pair showing oscillation — computed.
-- draw: Experiment B's training-set drift: F's fraud share and mean amount per day vs D's and the stream's, three lines each — computed.
-- draw: P_k per day for D, F, W, AW over 40 days with the Friedman rank sums in a side table — computed; the AW > W ordering visible.
-- draw: The two races on one timeline: retraining ticks (daily), the fraudster's adaptation ticks (after each observed split), the label-arrival ticks (δ) — the three clocks of the loop in one picture.
-- draw: Importance weighting on two selections (amount > 500 vs alerts): P_k with and without weights as paired bars — computed; the module's contrast pair reproduced.
+- draw: <FigureSequence> (4 frames): one round of the one-knob game — the tree's split on the amount axis, the fraud amounts just above it, the retrain moving the split, the fraudster moving under it. Key image.
+- draw: CP@100 on scenario-1 fraud per round for c = 1, 3, 7, showing the alternation and its period; computed from the writer's runs.
+- draw: The same curve with the customer-mean and terminal-risk features added — the alternation flattening. Computed.
+- draw: Daily fraud share and mean amount of F_t against the stream's, over 60 simulated days. Computed; the picture the paper could not draw.
+- draw: CP@100 per day for F, W^D, W and AW over the replay with the scenario-2 terminal expiries marked; and a rank-sum bar chart beside it. Computed; inspired by Table III and Fig. 5.
+- draw: The juxtaposed-month protocol as a timeline with the junction and the two models' relative loss. Inspired by Sec VI-D.
+- draw: A two-column "simulator vs paper" departure table rendered as a figure: fraudster model, alert timing, label completeness, drift, scenario 3.
 
 ## EXERCISE PLAN
-1. Warm-up: from the shipped study's round table, compute the fraudster's cumulative take over ten rounds under the static and the daily-retrained detector.
-2. Boundary probe: a fraudster with zero edit cost (any amount is as good) — show the detector's split converges to the genuine amount distribution's edge and precision collapses; then infinite edit cost (the paper's "not worth it" case) — the static detector suffices; locate the cost at which retraining starts to pay.
-3. Claim to refute: "Retraining more often always helps against an adaptive fraudster." Refute from experiment A: with complete information the fraudster adapts after every retraining; faster cadence lowers the split faster and loses more genuine transactions (false positives) — name the quantity (the detector's own cost of moving the split) the claim ignores, and the strategy (Forget / keep old frauds) that changes the dynamic.
-4. Research-shaped: rerun experiment B with k = 300 and report NCP_k vs k (the paper's Table VI shape) on the simulator.
-5. Derivation the lesson skipped: in experiment A with a depth-1 tree, derive the split's position after round r as a function of the fraudster's margin m (amount = split − m) and the retraining window, and show it decreases geometrically toward the genuine distribution's upper quantile when the window forgets old frauds and stalls when it keeps them.
-6. FORWARD (E7): in experiment B, change the alert policy from "top 100 by score" to "top 100 by score × amount" (an expected-fraud-amount rule) and watch F's composition and P_k change — the reader has changed the decision policy and sees the training data follow → lands on `score-to-action`.
-7. Mixed review (E3): apply a Page–Hinkley detector (concept-drift) to the daily error stream of experiment A's static detector and report the alarm round; state which drift type the alarm diagnoses and why the diagnosis is wrong (the model caused it).
+1. [warm-up] With c = 3 and a fraudster who needs one round to observe, write the sequence of detector splits and fraud amounts for six rounds starting from the true 220 and m = 2; report which rounds detect.
+2. [boundary probe] Set m = 0 (the fraudster spends exactly at the learned split): with a tree that splits on ">" versus "≥", does detection alternate or hold — and why is the degenerate case a statement about the tree, not the fraudster?
+3. [claim to refute] "On the simulator the AW strategy beats W because feedbacks are biased, exactly as in the paper." Refute by running the control: labels are complete and instant on the simulator, so the F/D gap measures freshness and card clustering, not verification latency; name what the simulator cannot test.
+4. [research-shaped] Reproduce the 7.7% vs 12.5% device: juxtapose two months with different scenario-2 seeds, report the relative CP@100 loss of AW and W^D over the ten days after the junction with ranges over five seeds.
+5. [derivation skipped] Show that in the one-knob game with retraining every c days and observation lag one round, the period of the alternation is exactly two rounds whatever c is, and derive what changes it (a second feature the knob cannot move).
+6. [mixed review, E3] Recompute the replay's CP@100 with the β-corrected probabilities of `undersampling-calibration` and the Bayes-minimum-risk rule of `example-dependent-cost` instead of a top-k cut: does the fraudster's margin m change the decision, and by how much?
+7. FORWARD → `model-risk-monitoring`: compute the stability index of the score distribution between the first and the last round of the one-knob game; the reader finds the index turns red before CP@100 collapses — the monitor the next module builds.
 
 ## ARC
-- Inherits: the game and the knapsack (adversarial-classification); feedbacks, delayed samples and the F/D strategy (alert-feedback-selection-bias); drift strategies and detectors (module 7); the simulator and harness.
-- Contributes: the module cashed out as a runnable study — both loops reproduced, the "drift the model causes" reading, and the cadence as a race parameter.
-- Hands off: the decision policy as the lever that shapes the training data (score-to-action); the retraining loop and alert ledger of the capstone.
-- Spine step 8: the adversary and the feedback loop.
-
-## APPLICATION (L16)
-- Artifact: a computational study (shipped notebook) re-enacting Dalvi 2004's repeated game (Fig. 3) and Dal Pozzolo 2018's Table III/IV comparison on the handbook simulator.
-- Module results used: minimum-cost camouflage and the worth-it rule (adversarial-classification); feedback vs delayed samples, the failure of importance weighting, the averaged strategy (alert-feedback-selection-bias); CP@100/P@k and prequential scoring (module 2); Static/Update/Forget strategies (module 7).
-- Departures from the idealisation: a one-knob fraudster without a cost model, complete information by construction, end-of-day ranking alerts, labels exactly at δ, no investigator error, a tree split in place of per-feature log-odds — each named with what it changes (decay vs oscillation; the degenerate knapsack).
+- Spine step 8 "The adversary and the feedback loop": "The adversary reads the detector and edits the cheapest features until the score crosses the threshold, and the detector labels only what it chose to show the investigators — so the training data is biased by the model itself, and the correction is to know which samples it selected."
+- Inherits: the knapsack and the period-2 mechanism (`adversarial-classification`); F, D and the two-model average (`alert-feedback-selection-bias`); the evaluation harness (`cost-aware-evaluation-lab`); the simulator and its scenarios (`canonical-datasets`); the module-3 aggregates.
+- Contributes: both papers' central results made runnable on public data, with their departures stated; the observation that features the adversary cannot edit are what breaks the oscillation.
+- Hands off: `model-risk-monitoring` (the index that turns red first); `label-maturation` (the ledger of which rows were feedbacks); `pipeline-capstone-lab` (the daily loop, checkpoints daily-alert-queue, label-arrival, feedback-delayed-retrain).
+- APPLICATION spec: the artifact is a seeded computational study on the handbook simulator. Protocol A (arms race): reference dataset (5,000 customers, 10,000 terminals, 183 days, r = 5); detector = depth-2 then depth-6 decision tree on the 14 baseline features, retrained every c ∈ {1, 3, 7} days on the last K = 30 days with δ = 7 and known-card removal; fraudster = scenario-1 generator whose amounts become (learned split − m), m ∈ {2, 10}, where the learned split is estimated from the fraudster's own alerted/unalerted payments of the previous round; output CP@100 on scenario-1 fraud per round, 5 seeds. Protocol B (feedback loop): k = 100 cards/day, δ = 7, M = 8, Q = 15; models F, W^D, W, AW (α = 0.5) as depth-6 trees (or balanced-bootstrap forests if runtime allows), retrained daily; output daily CP@100, Friedman rank sums, F_t's fraud share and amount distribution; plus the juxtaposed-month drift run. Module results used: the knapsack as the greedy single-feature case; complete selection bias and the F/D average; CP@100 and the prequential geometry from module 2. Departures from the idealisation: one-knob adversary with no cost model; daily ranking instead of online alerts; complete, instant labels; stationary genuine behaviour; a non-adaptive scenario 3.
