@@ -249,10 +249,9 @@ from a sender balance of 0 and send money anyway, and the identity
 "before − amount = after" holds for 4% of genuine transfers and 11% of
 genuine cash-outs. For fraud rows it holds 99.5% of the time. The fraud
 agents keep an exact ledger and empty accounts to the unit; the ordinary
-agents do neither. So the cancellation story explains 32 rows, and the
-model of the datasets lesson has to be corrected: the balance columns
-carry the label because the generator writes clean books only for its
-fraud agents.
+agents do neither. The model of the datasets lesson has to be corrected:
+the balance columns carry the label because the generator writes clean
+books only for its fraud agents.
 
 ### The rule flag: sixteen rows
 
@@ -353,7 +352,7 @@ Every test day holds more than 240 frauds, so its ceiling is 1.
 <Figure
   src="./figures/ladder.svg"
   alt="Paired horizontal bar charts for seven feature sets, average precision on the left and precision in a day's top 100 on the right. Type and amount: 0.013 and 0.229, blue. Plus hour of day: 0.069 and 0.345, blue. Plus receiver's earlier rows: 0.126 and 0.441, amber. Plus twin cash-out: 0.529 and 0.882, amber. Plus sender's balance before: 0.999 and 1.00, amber. Below a dashed line, in grey: after-balances alone 0.988 and 0.99; isFlaggedFraud alone 0.002 and 0.043. Floor for a random ranking: 0.0015. Legend: blue fields the generator replays, amber marks of the fraud script, grey written after the decision"
-  caption="Every large step up the ladder is a mark of the script; the perfect score arrives with the emptied account."
+  caption="Every large step up the ladder reads the script or the generator; the perfect score arrives with the sender's balance before."
 />
 
 The seed-to-seed spread is under 0.04 in average precision on every rung
@@ -371,9 +370,13 @@ except the twin rung, where it is 0.05. Read against the two tests:
   earlier in their hour. It reads a row of the same step, so it fails the
   point-in-time test: the rung measures how much the file order gives
   away, not a feature.
-- **The sender's balance before** lets the forest test whether the
-  amount equals it: the emptied account of the footprint, which
-  separates the classes by itself.
+- **The sender's balance before** carries two patterns. The forest can
+  test whether the amount equals it: the emptied account of the
+  footprint, the script's mark, which separates the classes by itself.
+  It can also read a balance of 0 as genuine: 1,308,541 genuine
+  TRANSFER and CASH_OUT rows start from 0, the 47% of the ledger
+  section, against 41 of the 8,213 fraud rows. That pattern is the
+  generator's bookkeeping for its ordinary agents, the third kind.
 - **The after-balances** reach 0.99 without any of the rungs above,
   through the identity "before − amount = after", which the generator
   keeps only for its fraud agents.
@@ -388,18 +391,16 @@ to find that column.
 
 ## The feature matrix
 
-The matrix keeps what passes both tests and drops what fails the first.
-A column that passes the first test but reads the generator is decided
-by what it would carry to real data. The hour of day would carry a real
-contrast, since fraudsters keep hours of their own, so it keeps its
-place, marked. `step`, the day and the previous hour's traffic would
-carry nothing, since all they separate here is the empty days, so they
-are dropped. Each kept column states what it reads, so that the marked
-one can be taken out when a score is judged.
+A column that fails the point-in-time test is dropped, and a column that
+passes both tests is kept. That leaves one case open: a column knowable
+at scoring that reads the generator. It is decided by what it would
+carry to a real service. If what it reads has a real counterpart, it is
+kept and marked, and a score on this file is also reported without the
+marked columns; if all it reads is the generator, it is dropped.
 
 <Figure
   src="./figures/matrix.svg"
-  alt="A table in three groups. Kept, in green: rows TRANSFER and CASH_OUT only, the only types fraud occurs in; log amount, a field of the transaction; amount divided by the sender's balance before, known at scoring, 1 means the account is emptied; receiver's earlier rows, count and sum, as-of over earlier steps, the one entity with a past; receiver never seen before, the same count equal to 0. Kept, marked as the generator's, in amber: hour of day, step mod 24, fraud has no clock here, real fraud has hours. Dropped, in grey: newbalanceOrig, newbalanceDest and balance errors, written by the outcome after scoring; isFlaggedFraud, the rule layer's decision, 16 rows; twin, a same-amount TRANSFER earlier this hour, same-step file order is not time order; oldbalanceDest, 0 for every merchant and every new account; nameOrig and nameDest as values, identifiers; step, day and traffic in the hour, only the empty days, a step never recurs; sender windows and the sender's hour arc, 99.85% of senders appear once"
+  alt="A table in three groups. Kept, in green: rows TRANSFER and CASH_OUT only, the only types fraud occurs in; log amount, a field of the transaction; receiver's earlier rows, count and sum, as-of over earlier steps, the one entity with a past; receiver never seen before, the same count equal to 0. Kept, marked as the generator's, in amber: amount divided by the sender's balance before, 1 means the account is emptied, missing at a balance of 0, which 47% of genuine rows have; hour of day, step mod 24, fraud has no clock here, real fraud has hours. Dropped, in grey: newbalanceOrig, newbalanceDest and balance errors, written by the outcome after scoring; isFlaggedFraud, the rule layer's decision, 16 rows; twin, a same-amount TRANSFER earlier this hour, same-step file order is not time order; oldbalanceDest, 0 for every merchant and every new account; nameOrig and nameDest as values, identifiers; step, day and traffic in the hour, only the empty days, a step never recurs; sender windows and the sender's hour arc, 99.85% of senders appear once"
   caption="The PaySim feature matrix: each column kept, marked or dropped by the two tests."
 />
 
@@ -411,10 +412,6 @@ one can be taken out when a score is judged.
   this file it is exact because the script uses two types.
 - **The amount**, on a log scale because it runs from cents to tens of
   millions.
-- **The drain ratio**, amount ÷ `oldbalanceOrg`, set to missing when the
-  balance is 0. It passes the point-in-time test and reads a pattern real
-  fraud shows. Its near-perfect separation is the script's, so results
-  are reported with and without it.
 - **The receiver's history**: the count and the sum of its rows at
   earlier steps, and an indicator for a count of 0. This is <Ref
   lesson="transaction-aggregates" id="the-rule">the windowed aggregate</Ref>
@@ -423,30 +420,27 @@ one can be taken out when a score is judged.
 
 ### What is kept and marked
 
-- **The hour of day.** It is a field of the transaction and passes the
-  first test; on this file it reads the clockless script against the
-  copied genuine night. On real data the same column reads when
-  fraudsters act against when customers act, so a pipeline built here
-  should carry it on. It is marked because a model judged on this file
-  should be judged without it too.
+- **The drain ratio**, amount ÷ `oldbalanceOrg`, missing when the
+  balance is 0. Its value 1 is the emptied account, a mark real account
+  takeover shares. Its missing value is the zero-balance senders of the
+  ladder's fifth rung, which a real service would refuse. A ratio cannot
+  shed its missing value, so the column is marked.
+- **The hour of day.** Here it reads the clockless script against the
+  copied night; on real data it reads fraudsters' hours against
+  customers', as the calendar section found.
 
 ### What is dropped
 
-- the after-balances and anything computed from them, and
-  `isFlaggedFraud`: written after the decision;
-- the twin, 1 for a CASH_OUT with a TRANSFER of the same amount earlier
-  in its step: it reads a row of the same step, so it fails the first
-  test, whatever its rung on the ladder;
+- the after-balances and anything computed from them, `isFlaggedFraud`
+  and the twin: they fail the point-in-time test;
 - `oldbalanceDest`: 0 for every merchant by construction and for every
   new account, so it repeats the receiver's count with more noise;
 - the account names as values: <Ref lesson="transaction-aggregates"
   id="the-identifier-as-a-lookup-table">an identifier fed to a model
   becomes a lookup table</Ref>; they are used only to group rows;
-- `step`, the day and the previous hour's traffic: knowable at scoring,
-  but all they separate is the copied calendar's empty stretches, where
-  whatever happens is fraud. A step or a day names one hour or one date
-  of this month that never recurs, so nothing a model learns about it
-  applies to a later transaction, where the hour of day recurs daily;
+- `step`, the day and the previous hour's traffic: all they separate is
+  the copied calendar's empty days, and a step or a day never recurs, so
+  nothing learned about one applies to a later transaction;
 - every sender window and sender profile: empty for 99.85% of rows.
 
 <Example title="the matrix rows of one fraud">
@@ -527,11 +521,14 @@ fraud ignores the clock while genuine traffic follows a copied calendar
 with empty days, and that the script leaves four marks plus a ledger
 that balances only for fraud. You can sort any column with two tests,
 knowable at scoring and not the generator's, and you can build the
-resulting matrix: TRANSFER and CASH_OUT only, log amount, drain ratio,
-receiver history computed as of each earlier step, the hour kept but
-marked, and the twin dropped because same-step order is not time. A
-model scored on it with the hour and the drain ratio removed measures what the file can teach; with them, it
-measures the script.
+resulting matrix: TRANSFER and CASH_OUT only, log amount, receiver
+history computed as of each earlier step, the twin dropped because
+same-step order is not time, and two columns kept but marked: the hour,
+and the drain ratio, whose value 1 is the script's emptied account and
+whose missing value is the generator's zero-balance senders, nearly half
+the genuine rows. A model scored on it with the hour and the drain ratio
+removed measures what the file can teach; with them, it measures the
+script and the generator.
 
 <Ref lesson="point-in-time-feature-lab">The point-in-time feature
 lab</Ref> builds the module's pipeline as code: windowed and conditional

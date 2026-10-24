@@ -7,7 +7,7 @@
 # timestamp — and a shipped reference pipeline hides one leak for the
 # learner to find.
 #
-# Three lessons stated the rules: a card's windows hold only its strictly
+# Two lessons stated the rules: a card's windows hold only its strictly
 # earlier payments, a feature built from labels reads only the labels that
 # had arrived by the row's moment, and a stored value is attached as of the
 # row's timestamp, never as of today. None of it is code yet, and a training
@@ -403,9 +403,10 @@ def conditional_aggregates(card, t, amount, tx_type, country, width):
     # END SOLUTION
 
 # %%
-# The seven-payment card conditioned on (type, country), 24 hours: rows 3
-# (first cash withdrawal), 4 (first payment in Germany) and 7 (back in
-# Luxembourg, no POS there in the last day) have empty conditional windows.
+# The seven-payment card conditioned on (type, country), 24 hours: besides
+# row 1, which has no past at all, rows 3 (first cash withdrawal), 4 (first
+# payment in Germany) and 7 (back in Luxembourg, no POS there in the last
+# day) have empty conditional windows.
 _n, _s = conditional_aggregates(np.zeros(7, int), SEVEN.t.to_numpy(), SEVEN.amount.to_numpy(),
                                 SEVEN.type.to_numpy(), SEVEN.country.to_numpy(), DAY)
 assert _n.tolist() == [0, 1, 0, 0, 1, 2, 0]
@@ -1186,13 +1187,21 @@ plt.show()
 #
 # <details><summary>Hint 3 — last resort</summary>
 #
+# One "never before" indicator, written out: the card has paid in this
+# country zero times in the previous 30 days.
+#
 # ```python
-# g = pd.MultiIndex.from_arrays([card, log.TERMINAL_ID.to_numpy()]).factorize()[0]
-# X["NEW_TERMINAL_30DAY"] = (past_window_sum(g, t, np.ones(len(g)), 30 * DAY) == 0).astype(float)
-# X["NEW_TERMINAL_ONLINE"] = X.NEW_TERMINAL_30DAY * (log.TX_TYPE == "ONLINE").to_numpy()
+# t, card = log.TX_TIME_SECONDS.to_numpy(), log.CUSTOMER_ID.to_numpy()
+# g = pd.MultiIndex.from_arrays([card, log.TX_COUNTRY.to_numpy()]).factorize()[0]
+# X["NEW_COUNTRY_30DAY"] = (past_window_sum(g, t, np.ones(len(g)), 30 * DAY) == 0).astype(float)
 # ```
-# plus the same indicator for the country, the amount over the 30-day mean,
-# and the hour's distance from the circular mean divided by `c`.
+#
+# On its own it moves the hold-out score from 0.837 to 0.841: it is the
+# pattern, not the answer. The same construction works on any key Hint 2
+# names. One more thing to decide before adding columns: a logistic
+# regression adds its inputs, so from a column for A and a column for B it
+# cannot form "A *and* B". If the signal is a conjunction, a column has to
+# hold the conjunction.
 # </details>
 
 # %% [markdown]
