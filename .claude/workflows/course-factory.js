@@ -6,7 +6,7 @@ export const meta = {
     { title: 'Canon', detail: 'perplexity deep research: the mainstream sources; then the taught courses and their coursework', model: 'opus' },
     { title: 'Read', detail: 'scope → readers (big books shard by ToC) → merge; readers capture image candidates and the source\'s own assignments', model: 'sonnet' },
     { title: 'Synthesize', detail: 'course.yaml (chapters + the labs the canon\'s assignments justify) + research dossier', model: 'fable' },
-    { title: 'Lessons', detail: 'write(opus) → figures (drawn + sourced, in parallel) → demo → QA(opus) → fix → re-QA(opus), per lesson; a lab lesson goes to lab-author instead of the writer' },
+    { title: 'Lessons', detail: 'write(opus) → figures (drawn + sourced, in parallel) → demo → QA(opus) → (fix → re-QA(opus)) ×2, per lesson; a lab lesson goes to lab-author instead of the writer' },
   ],
 }
 
@@ -132,6 +132,8 @@ const FIGLIST_SCHEMA = {
     },
   },
 }
+
+const FIX_ROUNDS = 2
 
 const QA_SCHEMA = {
   type: 'object',
@@ -388,18 +390,21 @@ if (phaseArg === 'lessons') {
     })
     // The recorded verdict must describe the lesson as it stands: when a fix
     // agent ran, re-QA and record the post-fix verdict, not the stale one.
+    // Two rounds, because under the newcomer test one was never enough: the
+    // first fix exposes the next gap in the same explanation.
     let finalQa = qa
     let revised = false
-    if (qa && !qa.ready && qa.fixes.length > 0) {
+    for (let round = 1; round <= FIX_ROUNDS && finalQa && !finalQa.ready && finalQa.fixes.length > 0; round++) {
+      const tag = round === 1 ? '' : ` #${round}`
       await (isLab
-        ? run(labPrompt(lesson.slug, qa.fixes), { label: `fix: ${lesson.slug}`, phase: 'Lessons', model: 'opus' })
+        ? run(labPrompt(lesson.slug, finalQa.fixes), { label: `fix${tag}: ${lesson.slug}`, phase: 'Lessons', model: 'opus' })
         : run(
-          `${at}Revise the lesson ${slug}/${lesson.slug}: apply these required QA fixes — ${JSON.stringify(qa.fixes)} — following your lesson-writer briefing (revision mode, same hard limits). Validate after.`,
-          { label: `fix: ${lesson.slug}`, phase: 'Lessons', agentType: 'lesson-writer', model: 'opus' },
+          `${at}Revise the lesson ${slug}/${lesson.slug}: apply these required QA fixes — ${JSON.stringify(finalQa.fixes)} — following your lesson-writer briefing (revision mode, same hard limits). Where a fix points at an argument that is not actually forced, rewrite that section from the problem up rather than patching the sentence. Update the lesson's ledger entry to match. Validate after.`,
+          { label: `fix${tag}: ${lesson.slug}`, phase: 'Lessons', agentType: 'lesson-writer', model: 'opus' },
         ))
       revised = true
       finalQa = await run(qaPrompt, {
-        label: `re-qa: ${lesson.slug}`, phase: 'Lessons', model: 'opus', schema: QA_SCHEMA,
+        label: `re-qa${tag}: ${lesson.slug}`, phase: 'Lessons', model: 'opus', schema: QA_SCHEMA,
       })
     }
     written.push({ slug: lesson.slug, type: lesson.type, qaReady: finalQa ? finalQa.ready : null, revised })
