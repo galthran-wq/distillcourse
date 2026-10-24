@@ -1,0 +1,990 @@
+You want to know how well the model will do on next week's payments. But a payment's label arrives a week or more after the payment, so the latest labelled data ends a week before today, and some of the cards in next week's data are ones the bank already blocked. How do you cut the history into training and test sets so that the test number predicts what next week will show?
+
+Take a concrete today. In <Ref lesson="canonical-datasets"
+id="the-transaction-simulator-a-world-whose-rules-are-known">the
+transaction simulator</Ref>, where day 0 is 1 April 2018,
+today is day 129, 8 August. The bank wants to put a decision tree into
+service this morning and tell the investigators what to expect: how many
+of the hundred cards they call each day will turn out to be compromised.
+<Ref lesson="alert-budget-metrics" id="three-numbers-for-three-questions">The
+metrics under an alert budget</Ref> gave the number to predict, card
+precision at 100 ($CP@100$), and computed it for a depth-2 tree: 0.241.
+That number came from a particular cut of the history, a training week of
+days 115 to 121, a test week of days 129 to 135, and a gap of seven days
+between them. Nothing so far has said why the cut looks like that.
+
+<Remark title="a backtest">
+The simulator's file does not stop at day 129: it holds the weeks after
+it too, labels included. So you can stand at day 129, make the cut using
+only what the bank held that morning, and then check the model against
+what days 129 onward actually brought. That check is a *backtest*, and
+every test number in this lesson is one: a measurement on weeks that,
+from where the bank stands, have not happened yet.
+</Remark>
+
+The method a course in classical machine learning gives for this is to
+shuffle the labelled rows, hold out a fifth of them, or run $k$-fold
+cross-validation, and average. It rests on one assumption: the rows are
+exchangeable, drawn independently from one distribution, so that any
+subset is as good a test as any other. Each of the three facts in the
+opening breaks that assumption in its own way. Payments arrive in time
+order, and neighbouring payments share a card, a terminal and a date.
+Labels have arrival dates of their own. And the bank acts on what it
+learns, so some payments in the data would never have been scored.
+
+## A shuffled split tests a model that cannot exist
+
+The test number has a job: to predict what the deployed model will
+achieve. So the first step is to write down exactly what the deployed
+model does, and then see where the shuffle departs from it.
+
+### What deployment does
+
+On the night of day 128 the model is trained on the labelled payments the
+bank holds. From day 129 on it scores every payment as it arrives, and
+each morning the investigators call the hundred cards with the highest
+scores. The model never sees a payment from after the one it is scoring,
+and never sees a label the bank has not yet received. An honest test has
+to put the model in the same position.
+
+### What the shuffle does instead
+
+In the backtest, shuffle the 21 days from 115 to 135 and draw a fifth of the payments as
+the test set. Consider one leaked card from the simulator's third
+scenario, whose details are used remotely for 14 days. Its owner makes
+about two payments a day and a third of them are fraud, so the card
+carries about nine frauds spread over two weeks. Each of them lands in the
+test set with probability 0.2. When one of them does, each of its eight
+siblings is in the training set with probability 0.8: on average six or
+seven of them, and about half of those from days after the test fraud.
+The chance that none of the eight is in training is $0.2^8$, about one in
+400,000.
+
+<Figure
+  src="./figures/random-split-leak.svg"
+  alt="Two panels over days 115 to 135. Top, shuffled split: a leaked card's nine frauds and a compromised terminal's thirteen frauds as dots, most blue (training) and a few amber (test) scattered among them; a blue bracket over the card's training frauds on days 126 to 133 reads trained on days after the test fraud of day 124. Bottom, split in time: the same dots inside three shaded bands, blue training for days 115 to 121, a dashed grey delay band for days 122 to 128 where the dots are hollow, and amber test for days 129 to 135"
+  caption="Shuffled, every test fraud has labelled siblings in training, many of them later. Split in time, training ends before the test begins."
+/>
+
+A compromised terminal is worse. The simulator's terminals receive just
+under one payment a day, 0.96 on average, and every payment at a
+compromised terminal is fraud for 28 days, so each such terminal carries
+about $0.96 \times 28 \approx 27$ frauds, and a shuffled test
+fraud from it sits among two dozen labelled frauds at the same terminal on
+the days around it. The question the shuffled test asks is therefore "can
+the model recognise a payment from a compromise it has already seen
+labelled, including its future?" The deployed model has to answer a
+harder question: payments from compromises that started yesterday, or
+start tomorrow, with no labelled example yet.
+
+Time also changes the stream itself. Fraud is time-evolving, the trait of
+<Ref lesson="financial-crime-typology"
+id="rarity-is-one-difficulty-out-of-five">the typology</Ref> by which
+fraudsters change what they do once a pattern gets caught, so next week
+is not distributed like the average of the last three. A shuffle averages
+over exactly the differences the test is supposed to expose.
+
+<KeyFact>
+A test number predicts deployment only if the split reproduces
+deployment's information: training on payments and labels that existed
+when the model was trained, testing on payments that come after them. On
+a stream that means cutting in time; no shuffle of the rows does it.
+</KeyFact>
+
+## Where the training set must end: the delay block
+
+Cutting in time answers which side of the line a payment falls on. It
+does not say where the line goes. The obvious answer is to train on
+everything up to the night before the test, days up to 128, and test on
+days 129 to 135. The labels say otherwise.
+
+### The label clock
+
+<Ref lesson="fraud-detection-system"
+id="what-the-model-gets-back-two-kinds-of-label-on-two-clocks">The layered
+system</Ref> defined the verification latency $\delta$: a day's payments
+count as fully labelled $\delta$ days later, so on day $t$ the bank
+receives the labels of the payments of day $t - \delta$. With
+$\delta = 7$, the labels of day 121 arrive on day 128, in time for the
+model trained that night. The labels of day 122 arrive on day 129, a day
+too late. A model scoring day $d$ can therefore use labels only up to day
+$d - \delta - 1$, which for the first test day is day 121.
+
+<Figure
+  src="./figures/label-clock.svg"
+  alt="A row of day cells from 113 to 137. Days 115 to 121 are filled blue under a bracket labelled training block; days 122 to 128 are filled light grey under a bracket labelled delay block; days 129 to 135 are amber outlines under a bracket labelled test block; days 113 and 114 are faint and labelled dropped. A dashed vertical line before day 129 reads start of day 129: the model goes live. A legend reads payment and label known, payment known but label not yet, payments to be scored"
+  caption="What the bank holds on the morning of day 129. The last seven days of payments exist, but their labels do not yet."
+/>
+
+The payments of days 122 to 128 are in the database: the bank processed
+them, and they count toward the history of every card and terminal. Only
+their labels are missing.
+
+### Why not train up to day 128 anyway
+
+The simulator labels every payment the moment it is generated, as <Ref
+lesson="canonical-datasets"
+id="what-the-calendar-shows-and-what-it-leaves-out">the canonical
+datasets</Ref> noted, so the file does hold labels for days 122 to 128.
+Training on them would give the test model information the deployed
+model never had. It is also the most useful information there is,
+because those frauds belong to compromises that are still running in the
+test week. On day 129 the simulator has 56 compromised terminals, two
+drawn on each of the last 28 days. The 14 drawn on days 122 to 128, a
+quarter of them, have their only labelled frauds in those seven days. Of
+the 42 leaked cards active on day 129, the 21 drawn on days 122 to 128,
+half of them, are in the same position. A model trained through day 128
+has labelled frauds from 21 leaked cards and 14 terminals that the
+deployed model has never seen labelled. The effect is not peculiar to the simulator: on real card data a
+classifier is noticeably more accurate on payments that closely follow
+its training period, so a test placed right after training overstates
+what a system without those labels achieves.
+
+So the training set ends $\delta$ days before the test begins, and the
+days in between are used for nothing that needs a label.
+
+<Definition title="train, delay and test blocks">
+Cut a stream of daily payments into consecutive blocks: a *training
+block* of $\delta_{train}$ days, a *delay block* of $\delta_{delay}$ days
+and a *test block* of $\delta_{test}$ days. The model is fitted on the
+labelled payments of the training block and scored on the test block. The
+delay block is as wide as the verification latency, $\delta_{delay} =
+\delta$; its payments may enter the history features of later payments,
+but none of its labels is used for fitting, for scoring or for
+evaluation.
+</Definition>
+
+On the simulator all three widths are seven days. The training block,
+days 115 to 121, holds 67,240 payments, 598 of them fraud.
+
+### What the delay block is and is not
+
+- **The delay block is not a validation set.** It is the part of the
+  history whose labels do not exist yet on deployment day; using its
+  labels for anything, tuning included, brings back the leak it removes.
+- **Its payments are not discarded.** A card's spending over the last
+  seven days, computed for a test payment on day 130, includes that
+  card's payments of days 123 to 129, and that is legitimate: the bank
+  saw those payments. A feature built from labels, such as a terminal's
+  recent fraud rate, is a different matter, and <Ref
+  lesson="point-in-time-features">point-in-time features</Ref> shifts it
+  by the same delay.
+- **One week is a simplification.** Real labels trickle in: an
+  investigator's call labels a card the same day, a dispute arrives days
+  or weeks later, and most of the feedback is in after about a week. The
+  width of the delay block is a modelling parameter. Set it shorter than
+  the bank's real latency and the test is optimistic; longer, and the
+  model is trained on staler data than it needs to be.
+
+Blocks older than the training block are dropped here. One week of
+training is a choice made to keep the example small, and how much history
+to keep on a stream that moves is a separate question, taken up with <Ref
+lesson="drift-strategies-on-worldline">drift strategies</Ref>.
+
+## Which test payments would really be scored: removing known cards
+
+The test block now starts at day 129. On the raw file it holds between 74
+and 91 frauds a day. Many of them are payments on cards whose fraud the
+bank had already labelled. <Ref lesson="fraud-detection-system"
+id="investigators-fast-labels-on-the-alerted-cards">The layered
+system</Ref> blocks a card as soon as it is found compromised, so in the
+bank those payments never take place. The simulator does not block
+anything: it keeps generating payments, and fraud, on a leaked card for
+all fourteen of its days. Scoring them credits the model with frauds the
+bank never sees, and they are the easiest ones, because the card's own
+recent payments already look like fraud.
+
+<Ref lesson="alert-budget-metrics"
+id="a-detected-card-is-a-blocked-card">Card precision at k</Ref> already
+removed the cards the model itself detects during the test week. The
+cards the bank knew about from labels are the other half of the same
+correction, and they need a date.
+
+### Which cards count as known on a given day
+
+A card is known on test day $d$ if a fraud of it was labelled by the
+morning of day $d$, when that day's scoring starts. By the label clock
+the labels of day $d - \delta$ arrive during day $d$, too late for that
+morning, so a known card is one with a fraud on some day up to
+$d - \delta - 1$. That date moves with the test day. On day 129 the
+known cards are those with a fraud by day 121; by day 135 the labels of
+days 122 to 127 have arrived as well, and the known set has grown.
+
+<Figure
+  src="./figures/known-card-removal.svg"
+  alt="Two panels, scoring day 129 and scoring day 135. Each shows five cards a to e as horizontal bars of 14 compromised days starting on days 116, 120, 124, 126 and 130, a blue shaded region of known labels up to day 121 in the first panel and up to day 127 in the second, and an amber vertical line at the scoring day. In the first panel cards a and b are faded and listed as removed, c and d are scored; in the second, c and d are faded and removed, e is scored"
+  caption="The removal date is the test day minus the delay minus one, so the set of known cards grows through the week."
+/>
+
+The five cards in the figure are the ones of <Ref
+lesson="alert-budget-metrics" id="exercises">the exercise on the removal
+date</Ref> that closed the metrics lesson. On day 129, cards a and b
+started before day 122 and are known; c and d are compromised and still
+unknown, so they are scored. On day 135, c and d have been known since
+their first labels arrived, and only e is left to find. That exercise
+counted a card as known from a first fraud on or before day $d - 7$,
+which lets a label that lands during day $d$ count that same morning;
+the rule here is one day stricter, and the five cards fall the same way
+under both. The bug that exercise exposed is to fix the date at the end of training: that rule
+keeps c and d in the test on day 135, two cards whose labels the bank
+received in the middle of the test week.
+
+<Definition title="known-card removal">
+Before evaluating a model on test day $d$, remove every payment of day $d$
+made by a card that has a fraud on some day up to $d - \delta - 1$.
+</Definition>
+
+On the simulator's test week the removal takes the daily frauds from 74–91
+down to 41–60: 385 frauds among 58,264 payments, 0.66%, against 0.89%
+in the training block. The lower base rate of the test week is the
+removal at work, not a quieter stream. Seven days of 74 to 91 frauds come
+to roughly 580, so the removal takes out about a third of the raw test
+fraud: that is the share sitting on cards the bank already knew. It does
+not take out every continuing compromise. <Ref
+lesson="canonical-datasets" id="exercises">The canonical datasets</Ref>
+estimated that most of a test week's fraud continues compromises begun
+before the week, terminal compromises included, and the bank blocks
+cards, not terminals: a fraud at a compromised terminal leaves the test
+only if the card that paid there has a labelled fraud of its own. The
+leaked card of the first figure is one of the removed ones. Its frauds of days 120 and 121
+were labelled by the morning of day 129, so its frauds in the test week
+leave the test.
+
+<KeyFact>
+A test day loses two kinds of card: the ones the bank knew from labels by
+day $d - \delta - 1$, and the ones the model itself detected on earlier
+test days. Both removals copy something the bank does, and a test that
+skips either counts frauds no investigator would ever be shown.
+</KeyFact>
+
+### Why the card's identity stays out of the features
+
+The same reasoning rules out a tempting feature. Give a model the card
+number as an input, and on historical data it learns that certain card
+numbers are fraudulent: a card with frauds on several days of the
+training data teaches the model its own identity. In a backtest the model
+then flags that card's later frauds and is credited for them. In the
+bank, the card was blocked at its first detection and those later frauds
+do not exist. The card number is still needed to compute the card's
+history features, so it stays in the data and leaves the feature vector.
+Dropping it and removing known cards guard against one leak from two
+sides: the first stops the model from learning which cards were already
+caught, the second stops the test from rewarding it.
+
+## Choosing a depth without touching the test week: hold-out validation
+
+The split now gives an honest test number for a model whose settings are
+fixed. A decision tree has a setting that matters a great deal, its
+maximum depth, and the bank has to choose it before day 129. The
+obvious places to look both fail.
+
+### Neither the training week nor the test week can choose
+
+Train trees of depth 2, 3, … , 10, 20 and 50 on days 115 to 121 and
+score them on their own training week. Every metric rises with depth, and
+the tree of depth 50, which grows until its leaves are pure, reaches
+ROC-AUC 1.000 and average precision 1.000: it fits its training week
+perfectly. Scored on the test week, average precision rises from 0.496 at
+depth 2 to a peak of 0.588 at depth 6, then falls to 0.309 at depth 50.
+The training curve keeps climbing exactly where the test curve turns
+down, which is overfitting as classical machine learning describes it.
+
+<Figure
+  src="./figures/depth-sweep.svg"
+  alt="Three small line charts against maximum tree depth 2 to 50: ROC-AUC, average precision and CP@100. A grey training-week line rises steadily to 1.0, 1.0 and 0.58. An amber test-week line peaks at depth 6 (AUC 0.817, AP 0.588) or 5 to 6 (CP@100 0.280), marked with a dot, then falls, except that test AUC rebounds from 0.739 at depth 20 to 0.788 at depth 50. A blue validation-week line stays close to the test line; dashed blue verticals mark its picks: depth 50 for ROC-AUC, depth 3 for average precision, depth 50 for CP@100"
+  caption="Training performance only rises. The validation week tracks the test week, but its pick depends on the metric: AP chooses 3, AUC and CP@100 choose 50."
+/>
+
+<Task>
+In each panel, find the amber dot (the test week's best depth) and the
+dashed blue line (the depth the validation week would choose). In which
+panel are they close, and in which panel does the test curve rise at the
+very depth the validation week picks?
+</Task>
+
+The test week cannot choose either. On day 129 it has not happened yet.
+And even in a backtest, where its labels exist, picking the best of eleven
+depths on the test week and then reporting that week's number reports the
+largest of eleven noisy estimates, optimistic by construction. The test
+week has to stay untouched until the choice is made.
+
+### A validation week that stands where the test week stands
+
+What the bank does have on day 129 is labelled history up to day 121.
+Inside it, the deployment geometry can be rebuilt one step earlier: a
+*validation block*, the latest week with complete labels, days 115 to
+121, playing the part of the test week; a training block that ends
+$\delta$ days before it, days 101 to 107; and a delay block in between,
+days 108 to 114. The whole arrangement is the deployment one shifted back
+by $\delta_{delay} + \delta_{valid} = 14$ days. This is *hold-out
+validation*: the validation week is held out of training, and its
+estimate stands in for the test week's.
+
+<FigureSequence
+  name="holdout"
+  alt="Two frames on a common axis of weekly blocks from day 80 to day 156, with a dashed line at day 129 marked today. Frame 1: one row, deployment, with training on days 115 to 121 in blue, a dashed grey delay block on days 122 to 128 and the test block on days 129 to 135 in amber; older weeks are faint outlines. Frame 2 adds a second row, hold-out validation, with training on days 101 to 107, delay on days 108 to 114 and validation on days 115 to 121 in green, and an arrow reading shifted back by delay plus validation, 14 days"
+  caption="Hold-out validation repeats the deployment geometry inside the labelled past."
+/>
+
+<Task>
+In the second frame, check that every label the validation row uses is
+known on the morning of day 129. Which block of the deployment row does
+the validation week coincide with?
+</Task>
+
+The validation week gets the same treatment as the test week, including
+the removal: on validation day $v$ the known cards are those with a fraud
+by day $v - \delta - 1$, the cards the bank knew then, not the larger set
+it knows today. Each detail is copied because each difference in design
+would be a systematic reason for the two numbers to part: a validation
+week placed straight after its training would be optimistic, as the delay
+block showed, and one cleaned with today's known cards would be harder
+than the test week ever is. With the geometry copied, no difference in
+design is left. One difference remains that no design can remove: the
+two rows look at different weeks, with different compromises and a
+different amount of fraud. How far that week-to-week variation moves a
+score is measured in the last section. For the depth-2 tree:
+
+| | ROC-AUC | Average precision | $CP@100$ |
+|---|---|---|---|
+| Validation week (days 115–121) | 0.775 | 0.524 | 0.243 |
+| Test week (days 129–135) | 0.763 | 0.496 | 0.241 |
+
+The validation row only chooses the depth. The tree that goes into
+service is not the one fitted on days 101 to 107: once the depth is
+fixed, a tree of that depth is retrained on the deployment's training
+block, days 115 to 121, because the deployed model should learn from the
+freshest labelled week the bank holds. That refitted tree is the one
+scored on the test week, so the test row above is the depth-2 tree of
+<Ref lesson="alert-budget-metrics" id="three-numbers-for-three-questions">the
+metrics lesson</Ref>, and every test number below belongs to a refit.
+
+Repeat this for every depth and choose by each metric. Average precision
+picks depth 3 (validation AP 0.538), whose refitted tree scores test AP
+0.562, a little
+under the test-week best of 0.588. ROC-AUC picks depth 50 (0.820) and so
+does $CP@100$ (0.259, tied with depth 20); on the test week the depth-50
+tree has the worst average precision of all eleven and a $CP@100$ of
+0.243 against a best of 0.280.
+
+These are two different failures. Across depths, the validation $CP@100$
+values span 0.243 to 0.259, a spread of 1.6 cards a day, and <Ref
+lesson="alert-budget-metrics" id="what-each-disagreement-means">the
+metrics lesson</Ref> already found that one week of seven days cannot
+separate models closer than about two cards a day: the $CP@100$ pick is
+noise.
+
+The AUC pick has a part that repeats and a part that does not. On both
+weeks AUC jumps between depth 20 and depth 50 (0.775 to 0.820 on
+validation, 0.739 to 0.788 on test) at the very depth where average
+precision hits its lowest; that jump is systematic. Where it lands is
+not. On the validation week the full tree's 0.820 clears the best of the
+moderate trees, 0.804 at depth 7; on the test week its 0.788 falls short
+of depth 6's 0.817. Two questions follow: why the full tree earns a high
+AUC with the worst AP, and why its rank against the moderate trees
+changes from one week to the next.
+
+## What AUC sees in the fully grown tree
+
+The tree of depth 50 outputs only two scores, 0 and 1, because its leaves
+are pure on the training data; <Ref lesson="alert-budget-metrics"
+id="how-much-of-the-curve-a-hundred-alerts-can-reach">the metrics
+lesson</Ref> drew its ROC curve as a single corner. With two scores, both
+metrics reduce to formulas in two numbers.
+
+### Two scores, one corner
+
+Let $T$ be the recall of the block scored 1 and $F$ its false-positive
+rate. By <Ref lesson="alert-budget-metrics"
+id="what-the-team-sees-at-each-fraud">the tie convention</Ref>, the ROC
+curve runs from $(0, 0)$ to the corner $(F, T)$ and on to $(1, 1)$ in
+straight lines. Its area is a triangle plus a trapezoid:
+
+$$
+\mathrm{AUC} = \frac{F\,T}{2} + \frac{(1 - F)(T + 1)}{2}
+= \frac{1 + T - F}{2} .
+$$
+
+Average precision, by the same convention, reaches every fraud in the
+top block at that block's precision $P_1$, and every other fraud at the
+precision of the whole list, the base rate $\pi$:
+
+$$
+\mathrm{AP} = T\,P_1 + (1 - T)\,\pi .
+$$
+
+<Example title="what the full-depth tree does on the test week">
+Its test-week numbers are AUC 0.788 and AP 0.309, with $\pi = 385 /
+58{,}264 = 0.0066$.
+
+**Recall.** $F$ is small, so as a first pass $\mathrm{AUC} \approx (1 +
+T)/2$, giving $T \approx 2 \times 0.788 - 1 = 0.576$.
+
+**Precision of the top block.** $0.309 = 0.576\,P_1 + 0.424 \times
+0.0066$, so $P_1 \approx (0.309 - 0.0028)/0.576 = 0.53$.
+
+**False alerts.** The top block holds $0.576 \times 385 \approx 222$
+frauds; at precision 0.53 it holds about $222 \times 0.47/0.53 \approx
+195$ genuine payments, so $F \approx 195/57{,}879 = 0.0034$. Putting $F$
+back into the AUC formula moves $T$ to $0.576 + 0.0034 \approx 0.579$,
+which changes nothing below.
+
+**Reading.** The tree flags about 420 payments in the week, 60 a day,
+half of them fraud, and finds 58% of the fraud. AUC scores that as a high
+corner at the far left of the plot: $\tfrac12(1 + 0.58 - 0.003)$. AP sees
+the other 42% of the frauds tied at score 0 with nearly 58,000 genuine
+payments, contributing $0.42 \times 0.0066 \approx 0.003$, and is left
+with $0.58 \times 0.53$.
+</Example>
+
+AUC of a two-score model, $\tfrac12(1 + T - F)$, is the average of the
+recall on frauds and the true-negative rate on genuine payments. It pays
+for any gain in $T$ at a small $F$ and is indifferent to the frauds left
+in the bottom block: they are all tied there, so there is nothing to
+order. AP is capped near $T\,P_1$, because the frauds the top block
+misses are reached at the base rate. A depth-6 tree, with up to 64 leaves
+and as many scores, puts the frauds it does not score highest into
+intermediate leaves reached at precisions far above the base rate, which
+is why its test AP is 0.588 where the full-depth tree's is 0.309. That
+answers the first question. A top block that finds 58% of the fraud at a
+false-positive rate of 0.003 is worth an AUC of 0.79 whatever happens to
+the other 42%; AP is charged for them.
+
+<Exercise>
+On the validation week the depth-50 tree scores AUC 0.820 and AP 0.324.
+Take the validation week's fraud share as 0.0066 and its size as about
+58,000 payments. Find $T$ and $P_1$ as in the example, and say what
+raised the validation AUC above the test week's 0.788 while AP stayed
+near 0.32.
+
+<Solution>
+**Recall.** First pass: $T \approx 2 \times 0.820 - 1 = 0.640$.
+
+**Precision of the top block.** $0.324 = 0.640\,P_1 + 0.360 \times
+0.0066$, so $P_1 \approx (0.324 - 0.0024)/0.640 \approx 0.50$.
+
+**Correction.** With about $0.0066 \times 58{,}000 \approx 383$ frauds,
+the top block holds $0.64 \times 383 \approx 245$ frauds and, at
+precision 0.50, about 245 genuine payments: $F \approx 245/57{,}600
+\approx 0.0043$, and $T \approx 0.644$.
+
+**Reading.** On the validation week the tree's top block finds 64% of the
+fraud instead of 58%, at about the same precision, one half. AUC rises
+by half the gain in recall, $0.06/2 = 0.03$, from 0.79 to 0.82. AP stays
+near $T \times P_1 \approx 0.32$, because the extra recall arrives at the
+same precision and the missed frauds still sit at the base rate. A
+selection by AUC sees the 0.03 and nothing else.
+</Solution>
+</Exercise>
+
+### Why the ranking changes from week to week
+
+The exercise answers the second question. The full tree's AUC is almost
+a function of one number, its top-block recall $T$, and $T$ belongs to
+the week: it is the share of that week's fraud that resembles the
+training frauds closely enough to land in a pure fraud leaf. It was 0.64
+on the validation week and 0.58 on the test week. Half that difference,
+0.03, is what moved the full tree from above the moderate trees to below
+them. Nothing about the bottom block entered either verdict.
+
+So the AUC pick fails twice over. It is **blind**: it chose the full tree
+for its top block and never saw the 42% of the fraud left tied with
+nearly all the genuine payments, which is where AP and $CP@100$ lose. And
+it is **unreliable**: its margin on the validation week, 0.820 against
+0.804, is half the 0.032 by which the full tree's own AUC moved between
+the two weeks. Judged by AUC itself, the pick is wrong on the week it was
+made for: 0.788 against 0.817 at depth 6.
+
+<KeyFact>
+A metric that cannot see part of the list ranks models only on the part
+it sees. When two candidates differ mainly in the part it cannot see, as
+the full tree and the depth-6 tree differ in the frauds below the top
+block, its ranking follows how that week's visible part happened to
+fall.
+</KeyFact>
+
+## How far one validation week can be trusted: repeated hold-out and prequential folds
+
+On the hold-out week, depth 3 scores AP 0.538 and depth 4 scores 0.535.
+Whether that difference means anything depends on how much a validation
+estimate moves for reasons unrelated to depth, and one validation week
+gives one number with no spread. The bank needs an interval.
+
+### Repeated hold-out: a spread from one week
+
+The obvious way to get one is to repeat the hold-out on resampled
+training data: draw four random samples of 70% of the training week,
+train a tree on each, score each on the same validation week, and report
+the mean and the standard deviation of the four scores. This is
+*repeated hold-out validation*. For the depth-2 tree it gives AP $0.519
+\pm 0.0065$ and $CP@100$ $0.245 \pm 0.0018$, the second number being the
+standard deviation over the four folds.
+
+<FigureSequence
+  name="folds"
+  alt="Three frames on the same axis of weekly blocks from day 80 to day 156 with a dashed line at day 129 marked today. Frame 1, repeated hold-out: four rows, all with training on days 101 to 107 drawn 70% filled, delay on days 108 to 114 and validation on days 115 to 121 in green. Frame 2, prequential: four rows, each shifted one week further into the past, validating on days 115 to 121, 108 to 114, 101 to 107 and 94 to 100. Frame 3 adds four amber rows below, test weeks 1 to 4, training on days 115 to 121, 122 to 128, 129 to 135 and 136 to 142 and testing on days 129 to 135, 136 to 142, 143 to 149 and 150 to 156"
+  caption="Repeated hold-out varies the training sample within one week; prequential folds vary the week."
+/>
+
+<Task>
+In the first frame, count the different validation weeks the four folds
+are scored on; then do the same in the second. Which of the two frames
+resembles the bottom half of the third, where the real result is measured
+week after week?
+</Task>
+
+That interval answers a narrower question than the bank's. It measures
+how much the model changes when one training week is resampled, scored
+on one validation week. Next week's uncertainty comes mostly from
+elsewhere: next week holds different compromises, a different number of
+frauds (the remaining frauds per day already ranged from 41 to 60 within
+one test week), a different mix of the three scenarios. The four
+repeated folds share all of that, so their spread contains none of it.
+They also train on 70% of the data, which costs a little accuracy:
+validation AP 0.519 against 0.524 for the full week.
+
+### Prequential folds: a spread across weeks
+
+The variation that matters is across weeks, so the folds should differ
+by week. Keep the full deployment geometry and shift it back one block
+per fold: fold 1 validates on days 115 to 121 as before, fold 2 trains on
+days 94 to 100 and validates on 108 to 114, and so on to fold 4, which
+validates on days 94 to 100.
+
+<Definition title="prequential validation">
+Given a test block that starts on day $d_0$, a delay $\delta$, and block
+widths $\delta_{train}$ and $\delta_{valid} = \delta_{test}$, fold
+$j = 1, \dots, J$ validates on the block of $\delta_{valid}$ days ending
+on day $d_0 - \delta - 1 - (j-1)\delta_{valid}$. If that block's first
+day is $s$, the fold trains on the $\delta_{train}$ days ending on day
+$s - \delta - 1$, so that $\delta$ full days lie between the two blocks,
+and it applies known-card removal with each validation day's own date. The
+estimate is the mean over the $J$ folds, and its uncertainty is their
+standard deviation.
+</Definition>
+
+The name comes from "predictive sequential": every fold predicts a stretch
+of the stream from what came before it. The same word is used in <Ref
+lesson="stream-learning-and-adaptation">stream learning</Ref> for a
+finer scheme that tests on each payment and then trains on it; both
+test only on data that comes after the training, and that lesson
+separates the two.
+
+For the depth-2 tree, prequential validation gives AP $0.550 \pm 0.022$
+and $CP@100$ $0.256 \pm 0.014$. The standard deviations are 3.4 times
+and 8 times those of repeated hold-out. To see which spread is right,
+run the same geometry forward: retrain the depth-2 tree each week and
+test it on the four real weeks from day 129 to day 156. Its AP over those
+four weeks is $0.542 \pm 0.031$ and its $CP@100$ $0.265 \pm 0.020$.
+
+<Figure
+  src="./figures/spread.svg"
+  alt="Two bar charts of standard deviations for the depth-2 tree. Average precision: repeated hold-out 0.0065 (grey), prequential 0.022 (green), four test weeks 0.031 (amber). CP@100: repeated hold-out 0.0018, prequential 0.014, four test weeks 0.020"
+  caption="The real result moves from week to week by about 0.03 in AP and 0.02 in CP@100. Prequential folds see most of that movement; repeated hold-out sees a fraction."
+/>
+
+The first test week's AP of 0.496 is itself one draw from that spread,
+about 1.5 standard deviations below the four-week mean, which is why
+a single hold-out estimate of 0.524 and a single test number of 0.496
+could disagree by 0.03 without anything being wrong.
+
+<KeyFact>
+Two candidates whose prequential means differ by less than about one
+standard deviation of the folds are not separated by them. And since the
+prequential spread still runs below the forward one, 0.022 against 0.031
+in AP, that standard deviation is a floor on the real uncertainty, not a
+margin of safety.
+</KeyFact>
+
+### What prequential selection picks
+
+Run the prequential folds for every depth and pick the best mean by each
+metric, then compare with the depth that did best over the four forward
+test weeks.
+
+| Metric | Prequential pick | Four-week test optimum | Test value at the pick | Test value at the optimum |
+|---|---|---|---|---|
+| ROC-AUC | depth 50 (0.823) | depth 4 | 0.797 | 0.813 |
+| Average precision | depth 3 (0.573) | depth 4 | 0.579 | 0.601 |
+| $CP@100$ | depth 5 (0.268) | depth 5 | 0.284 | 0.284 |
+
+Averaging over four weeks fixed the $CP@100$ pick: the noise that sent
+the single hold-out week to depth 50 averages out, and the folds now pick
+the depth the test weeks prefer. Average precision lands one depth away
+from the optimum, 0.022 below it. Its folds put depth 3 at 0.573 and
+depth 4 at 0.554, a difference smaller than either depth's fold spread
+(0.027 and 0.038), so they could not have told the two apart. Its verdict
+on the full tree is another matter: 0.342 against 0.573 is about nine
+standard deviations, and the forward weeks agree (0.334).
+
+ROC-AUC still picks depth 50, for the reasons of the previous section
+rather than because it found a better tree. Its folds give the full tree
+$0.823 \pm 0.013$ against $0.804 \pm 0.017$ at depth 5, a margin of about
+one standard deviation: not separated. The margin rests on the full
+tree's top-block recall, about $2 \times 0.823 - 1 \approx 0.65$ over
+the four validation weeks against $2 \times 0.797 - 1 \approx 0.59$ over
+the four forward weeks, and averaging four weeks cannot remove a
+difference between the stretch before day 129 and the stretch after it.
+Judged by AUC itself on the forward weeks, the pick loses, 0.797 against
+0.813 at depth 4. On the other two metrics it loses badly: four-week test
+AP 0.334 against 0.601, and $CP@100$ 0.258 against 0.284, about 2.6 fewer
+compromised cards found every day.
+
+<KeyFact>
+The validation design and the selection metric are separate decisions.
+Prequential folds make the estimate honest and its spread realistic; they
+do not stop AUC from choosing the tree whose top block it likes. Select
+by the metric the deployment is judged on, on folds that copy the
+deployment.
+</KeyFact>
+
+The price is computation: four trees per candidate depth instead of one,
+44 trees for the eleven depths. On a real stream with a longer training
+block that factor matters, and <Ref lesson="gbm-model-selection">model
+selection for boosted trees</Ref> weighs it against what the folds buy.
+
+<Aside>
+**In scikit-learn.** None of the library's built-in splitters builds these
+folds. `KFold` and `ShuffleSplit` shuffle or cut without regard to time;
+`TimeSeriesSplit` cuts in order, but by row count, its `gap` counts rows
+rather than days, and it knows nothing about cards. The library accepts
+any explicit list of `(train_indices, validation_indices)` pairs as its
+`cv` argument, so the folds are built by hand, with the delay and the
+removal applied, and passed to `GridSearchCV`. Two settings follow from
+the geometry. `refit=False`, because the model that goes into service is
+trained afresh on the latest training block with the chosen depth, not
+on the union of the folds' training weeks. And card precision needs a
+custom scorer that receives each payment's card and day, which the
+standard scorer signature does not carry.
+</Aside>
+
+You can now cut a payment history the way deployment sees it: a training
+block, a delay block as wide as the label latency, a test block, with
+the cards the bank already knew removed from each test day by that day's
+own date. You can place a validation week where the test week stands,
+repeat it across weeks to get a spread that matches what next week will
+show, and explain why a depth chosen by AUC loses on the metrics the
+investigators live by. Every model so far was trained on the stream as
+it is. <Ref lesson="undersampling-calibration">The next lesson</Ref>
+trains on a stream from which most genuine payments have been thrown
+away, and asks what that does to the probabilities the model outputs.
+
+## Exercises
+
+<Exercise>
+A bank's history is cut into weekly blocks $B_1, \dots, B_{14}$, and the
+model goes into service at the start of $B_{15}$. Labels arrive one week
+late, and every block width is one week. Write down the training, delay
+and test blocks of the deployment, then the training, delay and
+validation blocks of four prequential folds. Which blocks are used by no
+fold, and why is $B_{14}$ among them?
+
+<Solution>
+**Deployment.** The test block is $B_{15}$. Its delay block is $B_{14}$,
+and its training block is $B_{13}$.
+
+**Folds.** The most recent block with complete labels at the start of
+$B_{15}$ is $B_{13}$, so fold 1 validates on $B_{13}$, with delay
+$B_{12}$ and training $B_{11}$. Each further fold shifts back one block:
+
+| Fold | Training | Delay | Validation |
+|---|---|---|---|
+| 1 | $B_{11}$ | $B_{12}$ | $B_{13}$ |
+| 2 | $B_{10}$ | $B_{11}$ | $B_{12}$ |
+| 3 | $B_{9}$ | $B_{10}$ | $B_{11}$ |
+| 4 | $B_{8}$ | $B_{9}$ | $B_{10}$ |
+
+**Unused.** $B_1$ to $B_7$ (older than any fold needs) and $B_{14}$.
+$B_{14}$'s labels have not arrived at the start of $B_{15}$: it is the
+deployment's delay block, so no validation can use its labels. A block
+can be training in one fold, delay in another and validation in a third,
+as $B_{11}$ is; each fold is a separate model, and within each fold the
+geometry is the deployment's.
+</Solution>
+</Exercise>
+
+<Exercise>
+Push the delay to its two edges on the simulator, keeping 7-day training
+and test blocks and a test week of days 129 to 135. (a) Take
+$\delta = 0$: labels arrive at the end of the payment's own day. Where
+do the blocks sit, which cards does the removal rule take out on day
+$d$, and which of the simulator's three scenarios mostly survive in the
+test? (b) Take $\delta = 30$. Where do the blocks sit now, what does the
+removal rule take out, and what happens to the number of frauds left to
+find and to the ceiling of $CP@100$? (c) Is a $CP@100$ measured at
+$\delta = 30$ comparable with one measured at $\delta = 7$?
+
+<Solution>
+**(a)** With $\delta = 0$ the delay block vanishes: training on days 122
+to 128, testing on 129 to 135. On day $d$ the removal takes out every
+card with a fraud on a day up to $d - 1$. A leaked card is then removed
+from the day after its first fraud, so of scenario 3 only the first-day
+frauds of the three cards drawn each day survive, about two frauds a day.
+A card that pays at a compromised terminal is almost always a card with
+no earlier fraud, since such a card was not stolen and is hit only by
+paying there, so most of scenario 2's fifty-odd frauds a day survive, as
+do the large-amount frauds of scenario 1 on cards with no earlier fraud.
+The test becomes mostly a test of recognising terminal fraud and the
+first payment of a new compromise.
+
+**(b)** With $\delta = 30$ the training block ends 30 days before the
+test: training on days 92 to 98, delay on days 99 to 128. On day $d$ the
+known cards are those with a fraud by day $d - 31$. A leaked card is
+compromised for 14 days, so a card known by then stopped producing fraud
+more than two weeks earlier; a terminal-hit card is removed only if it
+had an earlier, unrelated hit a month before. The removal takes out
+almost nothing, the daily frauds stay close to the raw 74 to 91, the
+compromised cards per day rise with them, and so does the ceiling
+$\min(1, \gamma_t/100)$.
+
+**(c)** No. At $\delta = 30$ the test has more fraud to find, and easier
+fraud (continuing compromises the bank has not yet blocked), while the
+model is trained on data a month old. A higher $CP@100$ there does not
+mean a better model; it means the bank learns too late to block anything
+itself. Card precisions are comparable only at the same $\delta$, which
+should be the bank's real latency.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague proposes repeated hold-out with ten random 70% subsamples
+instead of four prequential folds: "Ten folds give a standard deviation
+of the mean about a fifth of the four prequential folds', so the estimate
+is tighter and better." Using the depth-2 numbers of this lesson, refute
+the claim and name the step that fails.
+
+<Solution>
+**What ten subsamples tighten.** The ten models are trained on resamples
+of the same training week and scored on the same validation week.
+Their spread, about 0.0065 in AP for any number of folds, measures how
+much the model moves when the training rows are resampled, and the
+standard deviation of their mean shrinks as $0.0065/\sqrt{10} \approx
+0.002$, against $0.022/\sqrt{4} = 0.011$ for the four prequential folds:
+the colleague's arithmetic is right. That is a precise estimate of one
+quantity: this model family's score on days 115 to 121.
+
+**What the bank needs.** The quantity to predict is next week's score,
+and next week is a different week. Over four real test weeks the
+depth-2 tree's AP moved with a standard deviation of 0.031, about five
+times the repeated hold-out spread and fifteen times the standard
+deviation of a ten-fold mean. An interval of $\pm 0.004$ around 0.519
+would have excluded the first test week's 0.496 and the four-week mean
+of 0.542 alike.
+
+**The failing step.** "Tighter interval, so better estimate" assumes the
+folds vary in the same way the target varies. They share the validation
+week, so they cannot vary the way weeks do; more of them only shrinks
+the interval around the wrong quantity. Prequential folds vary the week,
+and their spread of 0.022 is the right order. They also train on full
+weeks, where the subsamples throw away 30% of each.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the validation geometry instead of taking it from the figure.
+Deployment tests on days $d_0, \dots, d_0 + \delta_{test} - 1$ with a
+delay $\delta$. (a) Show that the latest validation block of width
+$\delta_{valid}$ whose labels are all known on the morning of day $d_0$
+starts on day $d_0 - \delta - \delta_{valid}$, so that the whole
+geometry is shifted back by $\delta_{delay} + \delta_{valid}$. (b) Does
+the shift change if the training block is two weeks wide instead of one?
+(c) On validation day 117 of the simulator, which cards should be
+removed: those with a fraud by day 109, or those with a fraud by day
+121? What goes wrong with the other choice?
+
+<Solution>
+**(a)** On the morning of day $d_0$ the labels are known for days up to
+$d_0 - \delta - 1$. The validation block must lie inside that range, and
+the most recent choice ends on its last day, $d_0 - \delta - 1$. With
+width $\delta_{valid}$ it starts on $d_0 - \delta - \delta_{valid}$. The
+validation block is to its own model what the test block is to the
+deployed one, so its delay block and training block sit at the same
+offsets before it. Every block therefore moves back by $d_0 - (d_0 -
+\delta - \delta_{valid}) = \delta + \delta_{valid}$, which is
+$\delta_{delay} + \delta_{valid}$; on the simulator, $7 + 7 = 14$ days.
+
+**(b)** No. The shift is fixed by where the validation block must end,
+which depends only on $\delta$ and $\delta_{valid}$. A two-week training
+block starts a week earlier in both rows; the offset between the rows
+is unchanged.
+
+**(c)** Those with a fraud by day $117 - 7 - 1 = 109$. That was the bank's
+knowledge on day 117, and the validation week has to copy the test
+week, where the rule uses each day's own date. Removing every card known
+by day 121 would remove, from day 117, cards the bank had not yet
+identified and was still being defrauded on: the frauds the model could
+legitimately have found. The validation week would become harder than
+the test week in a way the test week never is, and its estimate would be
+pessimistic, mostly so on its first days.
+</Solution>
+</Exercise>
+
+<Exercise>
+Price the AUC pick and design the experiment that explains it. (a) Over
+the four forward test weeks, the depth chosen by prequential AUC (50) has
+AP 0.334 and $CP@100$ 0.258; the depth chosen by prequential AP (3) has AP
+0.579 and $CP@100$ 0.281. How many compromised cards a week does the AUC
+pick lose against the AP pick at 100 calls a day? With the value of
+$V = \text{€}360$ per compromised card called used in the metrics
+lesson's exercise on pricing card precision, what is that per week? (b)
+This lesson attributes AUC's preference to the depth-50 tree's pure
+leaves. Design an experiment on the same folds that would confirm or
+refute that explanation, and state what result counts as each.
+
+<Solution>
+**(a)** The difference in $CP@100$ is $0.281 - 0.258 = 0.023$, that is
+2.3 compromised cards per hundred calls, per day: about $2.3 \times 7
+\approx 16$ cards a week. At €360 a card, about €5,800 a week, with the
+calls costing the same in both cases since the team makes a hundred
+either way.
+
+**(b)** The explanation predicts that the depth-50 tree wins AUC because
+it has only two scores, so that AUC becomes $\tfrac12(1 + T - F)$ and
+rewards its high-recall top block. A control that keeps the depth but
+removes the purity: rerun the prequential sweep over depths with
+`min_samples_leaf` set to 1 (pure leaves allowed), 20, 100 and 500. With
+a floor on leaf size the deep trees can no longer isolate single frauds;
+their leaves are mixed, they output many distinct scores, and the
+two-score formula no longer applies.
+
+- **Confirms:** with `min_samples_leaf` of 100 or more, the AUC curve
+  over depths flattens or peaks at moderate depth, and AUC's pick moves
+  to within one prequential standard deviation of AP's pick, while with
+  `min_samples_leaf = 1` it stays at 50.
+- **Refutes:** AUC still picks the deepest tree with mixed leaves, by
+  more than a standard deviation. Then the preference comes from how the
+  deep trees order the bulk of the list, not from the two-score corner,
+  and the explanation has to be revised.
+
+Report the AP and $CP@100$ of each pick on the forward test weeks
+alongside, since the practical question is whether the cap also closes
+the gap measured in (a).
+</Solution>
+</Exercise>
+
+<Exercise>
+Carry the geometry over to laundering, using <Ref
+lesson="financial-crime-typology"
+id="where-the-laundering-label-comes-from">the typology's account of
+its label</Ref>. The label is a suspicious transaction report, filed
+months to years after the transfers, and most laundering is never
+reported. (a) How wide is the delay block, and what does it do to the
+training data a validation fold can use? (b) What is a "known account"
+for the removal rule, and when does it count as known? (c) The test
+block's negatives are accounts with no report. What does that do to any
+precision measured on it, whatever the geometry? (d) For which crime in
+the typology is the geometry still workable, and why?
+
+<Solution>
+**(a)** The delay must cover the time to a report, months to years, so
+the delay block is that wide and the training block ends that long
+before the test. The model is trained on activity a year or more old,
+against a crime whose able practitioners drop a method once it is
+detected. Few folds fit in any history a bank keeps, each separated by
+the same long delay, so the prequential spread rests on a handful of
+weeks or months.
+
+**(b)** An account is known once a report was filed on it and the bank
+acted on it, typically by closing or restricting it. It counts as known
+from the day that report entered the bank's records, which is the
+day-$d$-minus-delay rule with the report's own date in place of a
+fixed latency. Removing it copies the bank: it no longer processes
+transfers on an exited account.
+
+**(c)** An unreported account is not a clean account. The test's
+"genuine" class contains an unknown amount of laundering, so a flag on
+such an account counts as a false positive when it may be a correct
+detection. Any precision is measured against what was reported, not
+against what happened, and the geometry cannot repair that: it fixes
+when labels are available, not whether they are complete.
+
+**(d)** Money mules. Their report arrives within months, because rapid
+in-and-out flows and daily sums trip transaction monitoring, so a delay
+block of a few months is enough and a year of history holds several
+folds. The geometry is workable where the label clock is short enough
+for the stream not to have moved on by the time the labels arrive.
+</Solution>
+</Exercise>
+
+<Exercise>
+A published study has five weeks of card payments, numbered days 0 to 34,
+with investigators' labels arriving within two weeks of each payment. It
+uses weeks 1 and 2 only as a pool for computing each payment's history
+features, trains on weeks 3 and 4, and tests on week 5. (a) Name what is
+wrong with this split as an estimate of deployment, and show it with the
+label clock on the first test day. (b) Rebuild a defensible split from
+the same five weeks with a 14-day delay, and say what it costs. (c) What
+else does the description leave unsaid that this lesson would require?
+
+<Solution>
+**(a)** There is no delay block. On day 28, the first test day, labels
+are known only for days up to $28 - 14 - 1 = 13$: weeks 1 and 2.
+Weeks 3 and 4 were trained on with labels that would arrive during, or
+after, the test week. The test number is optimistic in the way this
+lesson measured on the simulator: the model has labelled examples of
+compromises that continue into the test week.
+
+**(b)** With $\delta = 14$, the training labels must come from days 0 to
+13. Weeks 3 and 4 become the delay block, and week 5 stays the test. The
+training rows then have to come from weeks 1 and 2, which were the
+feature pool. One option is to train on week 2 only, with its history
+features computed from week 1, and to compute the test payments'
+features over weeks 3 and 4, whose payments the bank did see. The
+training set shrinks from two weeks to one, and the model's training
+data are three weeks older than the test. No room is left for a
+validation fold, so the depth or any other setting must be fixed in
+advance or tuned on other data.
+
+**(c)** Known-card removal: the test week should drop, day by day, the
+cards whose fraud was labelled by day $d - 15$, and the cards the model
+itself detected on earlier test days. Without it, week 5 contains
+payments on cards the bank had blocked.
+</Solution>
+</Exercise>
+
+<Exercise>
+Take a leaf of a tree trained on the training week. It receives 2,000
+training payments, 20 of them fraud, so the tree says "fraud with
+probability 0.01" for any payment that lands there. Now retrain on the
+same week with every fraud kept and only one genuine payment in ten,
+and suppose the leaf keeps the same region of feature space. (a) What
+fraction of fraud does the leaf now hold, in expectation? (b) On the
+validation week, the payments landing in the leaf are fraud about 1% of
+the time. Compare. (c) Write the leaf's new value for a true fraud share
+$p$ and a keep rate $\beta$ for genuine payments, and evaluate it for
+$p = 0.05$ and $p = 0.5$ at $\beta = 0.1$. (d) Does this change which
+payments the tree ranks highest?
+
+<Solution>
+**(a)** All 20 frauds stay; of the 1,980 genuine payments, about 198
+stay. The leaf now holds $20/(20 + 198) \approx 0.092$ fraud.
+
+**(b)** The retrained tree says 0.092 for payments that are fraud 1% of
+the time on the validation week: more than nine times too high.
+
+**(c)** Out of $n$ payments, $pn$ frauds stay and $\beta(1-p)n$ genuine
+ones do, so the leaf reports
+$$
+p_s = \frac{p}{p + \beta(1 - p)} .
+$$
+For $p = 0.05$: $0.05/(0.05 + 0.095) \approx 0.34$. For $p = 0.5$:
+$0.5/(0.5 + 0.05) \approx 0.91$. The distortion is largest in relative
+terms for the rare-fraud leaves and squeezes everything toward 1.
+
+**(d)** For a fixed set of leaves, no. $p_s$ increases with $p$, so the
+leaves keep their order, and with it the ranking and card precision.
+What changes is the probability attached to each payment. Whether that
+probability can be turned back into the real one is the question of <Ref
+lesson="undersampling-calibration">the undersampled posterior and its
+correction</Ref>, which derives this formula and its inverse.
+</Solution>
+</Exercise>
+
+<References>
+1. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 3, "Baseline fraud detection system", section "Defining the training and test sets" (training on 25–31 July, test on 8–14 August with a one-week delay period; the delay as feedback delay and one week as a simplification; removal, for each test day, of cards known compromised at the test day minus the delay; 67,240 training transactions with 598 frauds, 58,264 test transactions with 385 frauds); Ch. 4.4, "Precision top-k metrics" (74 to 91 frauds a day in the test period, 41 to 60 after removal of known compromised cards); Ch. 5.2, "Validation strategies" (blocks of training, delay and test; training versus test performance over tree depths 2 to 50; hold-out validation shifted back by the delay and validation periods; repeated hold-out on four 70% subsamples; prequential validation over four folds; the four-week prequential test; integration in scikit-learn with `prequentialSplit`, a card-precision scorer and `GridSearchCV` with `refit=False`). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+2. A. Dal Pozzolo, G. Boracchi, O. Caelen, C. Alippi, G. Bontempi, "Credit Card Fraud Detection: A Realistic Modeling and a Novel Learning Strategy," *IEEE Transactions on Neural Networks and Learning Systems* 29(8), 2018, pp. 3784–3797 — Sec. II (cards blocked after a detected fraud), Sec. III (verification latency of $\delta$ days, $\delta = 7$ in the illustration), Sec. VI-A (the card identifier removed from the feature vectors because a classifier would learn it and give too optimistic a performance on historical data). https://doi.org/10.1109/TNNLS.2017.2736643
+3. J. Jurgovsky, M. Granitzer, K. Ziegler, S. Calabretto, P.-E. Portier, L. He-Guelton, O. Caelen, "Sequence Classification for Credit-Card Fraud Detection," *Expert Systems with Applications* 100, 2018, pp. 234–245 — Sec. 4.1, "Delayed ground truth" (test period starting more than a week after training because investigators' labels arrive about a week late; accuracy on transactions closely following training as an overly optimistic appraisal). https://doi.org/10.1016/j.eswa.2018.01.037
+4. J. Gama, I. Žliobaitė, A. Bifet, M. Pechenizkiy, A. Bouchachia, "A Survey on Concept Drift Adaptation," *ACM Computing Surveys* 46(4), 2014, Article 44 — Sec. 4.2, "Experimental design" (cross-validation not applicable to evolving streams because it mixes temporal order; hold-out and prequential, interleaved test-then-train, evaluation). https://doi.org/10.1145/2523813
+5. V. Van Vlasselaer, C. Bravo, O. Caelen, T. Eliassi-Rad, L. Akoglu, M. Snoeck, B. Baesens, "APATE: A Novel Approach for Automated Credit Card Transaction Fraud Detection Using Network-Based Extensions," *Decision Support Systems* 75, 2015, pp. 38–48 — Sec. 4 (five weeks of transactions labelled within two weeks; out-of-time test set of the last week; the first two weeks as a pool for computing features of the following two training weeks). https://doi.org/10.1016/j.dss.2015.04.013
+6. scikit-learn developers, *scikit-learn User Guide*, Sec. 3.1, "Cross-validation: evaluating estimator performance" (`KFold`, `ShuffleSplit`, `TimeSeriesSplit` and its `gap` in samples; explicit iterables of train/test index pairs as the `cv` argument). https://scikit-learn.org/stable/modules/cross_validation.html
+</References>
