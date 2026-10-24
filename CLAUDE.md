@@ -74,6 +74,10 @@ Rules that override defaults:
   `npm run validate` runs it in check mode: a lab whose checkpoints are not
   green fails validation like broken MDX, and `uv` is a validate dependency
   wherever a lab lesson exists — missing, it is an error in both modes.
+  Both modes skip a lab whose fingerprint (its sources, the driver, the
+  mirror URLs) matches its last green run, stamped in `labs-dist/stamps/`;
+  `make deploy` runs `build-labs` on the host before the image build, and the
+  image validates with `--no-labs` — the one place labs are not executed.
   Output is `labs-dist/` (git-ignored), split
   into `public/` (student notebook, manifest, data — the mirror's half) and
   `private/` (expected outputs, labels, rubrics — the checkpoint API's half);
