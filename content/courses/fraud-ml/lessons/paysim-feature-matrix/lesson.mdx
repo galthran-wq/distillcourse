@@ -1,0 +1,794 @@
+A six-million-row mobile-money log on Kaggle carries 8,213 rows marked fraud. Before building features on it: what did the simulator that produced it actually replay from the real service, how did the fraud flag get there, and which patterns in the data are signal and which are artefacts of the generator?
+
+The module so far has built features from an entity's own past: <Ref
+lesson="transaction-aggregates" id="the-rule">windowed counts and sums
+over strictly earlier rows</Ref>, <Ref lesson="behavioural-profiles">a
+usual hour and a usual amount for each card</Ref>, and <Ref
+lesson="point-in-time-features"
+id="two-ways-a-training-row-can-know-too-much">the rule that a row holds
+only what was knowable at its moment</Ref>. The obvious next step is to
+run that pipeline on the most downloaded fraud log there is: take each
+sender account as the entity, compute its windows and its hour arc, add
+the balance columns the file provides, and train. A model given those
+columns scores close to perfect.
+
+The difficulty is that nobody observed these rows. <Ref
+lesson="canonical-datasets" id="paysim-a-replayed-mobile-money-log">PaySim</Ref>
+is the output of a program, and every column was written by some part of
+it. A column can carry the behaviour the generator
+copied, or the bookkeeping it does for its own agents, or the script that
+writes the fraud label, and a model cannot tell which. A feature built on
+the third kind scores well and teaches nothing about mobile-money fraud.
+So the file has to be read first, column by column, against what the
+generator does.
+
+## Which entity in the log has a past
+
+A history feature needs an entity that appears again and again. Before
+computing any window, check which columns name such an entity, and what
+wrote each of the others.
+
+### What each column was written by
+
+<Ref lesson="canonical-datasets" id="what-was-replayed">The
+generator's agents</Ref> draw a type, an amount and a counterparty so
+that each hour's totals match the real log's aggregate file, and the
+Kaggle run adds fraud agents. Each simulated hour is a *step*. Two more
+inputs were taken from the real log: a *repetitions file*, how often a
+client may act again, and an *initial-balance file*, the distribution of
+the balances clients start with.
+
+<Figure
+  src="./figures/generator.svg"
+  alt="Left, three blue input boxes copied from the real log: the aggregate file (per day, hour and type: count, mean and standard deviation of amount), the repetitions file (how often a client may act again) and the initial-balance file. Arrows lead into a central box, the step loop, 744 hourly steps in which clients draw a type, an amount and a counterparty. Below it an amber box, fraud agents added for the Kaggle run: take over an account, TRANSFER, then CASH_OUT; below that a dashed box, the rule layer, which stops some large transfers. Right, the eleven columns of one log row: step, type and amount in blue; nameOrig, the two origin balances, nameDest and the two destination balances in grey; isFraud in amber, pointed at by the fraud agents; isFlaggedFraud dashed, pointed at by the rule layer"
+  caption="Each column of a PaySim row has one author: the replayed hourly totals, the agents' own bookkeeping, the fraud script, or the rule."
+/>
+
+The dataset description on the Kaggle page, *the release* from here on,
+defines eleven columns:
+
+| column | what it holds |
+|---|---|
+| `step` | the hour of the simulation, 1 to 743 (the release says 744) |
+| `type` | CASH_IN, CASH_OUT, DEBIT, PAYMENT or TRANSFER |
+| `amount` | in an undisclosed local currency |
+| `nameOrig`, `nameDest` | the sending and receiving account; `C` for a customer, `M` for a merchant |
+| `oldbalanceOrg`, `newbalanceOrig` | the sender's balance before and after |
+| `oldbalanceDest`, `newbalanceDest` | the receiver's balance before and after |
+| `isFraud` | 1 on rows made by a fraudulent agent |
+| `isFlaggedFraud` | 1 on rows the simulated service's rule flagged |
+
+Only `step`, `type` and `amount` were checked against the real log, and
+only as hourly totals. The names and balances are the agents'
+bookkeeping, which no one compared with real accounts. The last two
+columns were written by programs that act on the rows: the fraud script
+and the rule.
+
+### Senders appear once
+
+The pipeline of the module would group by `nameOrig`, the account that
+pays. Count how often each sender appears:
+
+| rows per sender | senders |
+|---|---|
+| 1 | 6,344,009 |
+| 2 | 9,283 |
+| 3 | 15 |
+
+Of the 6,362,620 rows, 9,266 have a sender seen at an earlier step, about
+1 in 700. The generator creates its clients step by step from the hourly
+totals, and the repetitions file lets almost none of them act again.
+
+Receivers are different. Every PAYMENT goes to a merchant, and the
+2,150,401 merchant accounts appear about once each, with both balances
+recorded as 0 on every row. The other receivers are 571,961 customer
+accounts that collect TRANSFER, CASH_OUT, CASH_IN and DEBIT rows: half of
+them receive 4 or more rows in the month, and 41% of the TRANSFER and
+CASH_OUT rows go to a receiver that already has 7 or more earlier rows.
+
+<KeyFact>
+In PaySim the sender, the entity every card feature of the module is
+built on, has no past: for 99.85% of rows its windows are empty. The
+only entity with a history is the receiving customer account.
+</KeyFact>
+
+The profiles fail with the windows. <Ref lesson="behavioural-profiles"
+id="how-much-history-the-arc-needs">The hour arc needs at least seven
+earlier payments</Ref> and no sender has more than two. <Ref
+lesson="behavioural-profiles"
+id="an-old-part-a-new-part-and-a-t-statistic">The break-point
+statistic</Ref> compares the card's last 24 payments, an old part
+against a new part, and <Ref lesson="behavioural-profiles"
+id="choosing-the-peers">a peer group</Ref> is the accounts that behaved
+most like the card over a reference period before the one being scored; a
+sender with one row has neither 24 payments nor a reference period.
+
+## The calendar: copied traffic, and a fraud script with no clock
+
+The second thing a history feature reads is time: windows are counted in
+hours and days, and a profile reads the hour of the transaction. Before
+trusting either, look at how genuine and fraud rows are spread over the
+743 steps.
+
+### Thirty-one days, seventeen of them nearly empty
+
+Days run from step 1; day 31 holds steps 721 to 743. Genuine traffic
+reaches tens of thousands of rows an hour on 14 days and is thin or
+absent on the other 17: days 3 to 5 and days 18 to 31. In 320 of the 743
+hours there is no genuine row at all. The real log shows the same gap and
+the same quiet second half in <Ref lesson="canonical-datasets"
+id="what-was-replayed">the fidelity overlay</Ref>: the generator copied
+them. Fraud runs at 216 to 320 rows a day, every day.
+
+<Figure
+  src="./figures/steps.svg"
+  alt="A log-scale line chart of rows per hourly step across 31 days. The blue genuine line peaks near 40,000 rows an hour with a daily rhythm on days 1 to 2 and 6 to 17, dips to a few isolated points on days 3 to 5, and is scattered and mostly absent on days 18 to 31, which are shaded. The amber fraud line stays near 10 rows an hour across the whole month"
+  caption="Genuine traffic follows the copied calendar, including its empty days; fraud runs at about 11 rows an hour regardless."
+/>
+
+The daily fraud rate therefore swings with the genuine traffic, not with
+the fraud. It is 0.05% to 0.09% on the busy days, 29% on day 3 (310
+frauds among 1,070 rows) and 100% on day 31, whose 272 rows are all
+fraud. Any feature that knows the step, the day, or how busy the system
+was in the previous hour can learn the empty days: in an empty hour,
+whatever happens is fraud.
+
+### Hour of day
+
+The same reading applies within a day. Take the hour as `step` mod 24.
+That is an assumption: it puts midnight at step 0, which the release does
+not state, but the trough it produces falls where a night would.
+
+<Figure
+  src="./figures/hour.svg"
+  alt="Bars of the share of genuine rows in each hour of day, step mod 24: near zero from hour 2 to 7, rising to 6–7% from hour 10, peaking at 10% at hour 19, falling to 2% at hour 23. An amber line for the share of fraud rows stays between 3.4% and 4.6% at every hour. Notes: the fraud rate is 22% around hour 4 and 0.05% at hour 19"
+  caption="Genuine traffic sleeps; the fraud script does not. The fraud rate per hour is the ratio of the flat line to the bars."
+/>
+
+Genuine rows have a night: 967 of them fall in hour 4 over the whole
+month against 647,472 in hour 19. Fraud rows do not: every hour holds
+between 274 and 375. So the fraud rate is about 22% at hours 4 and 5 and
+0.05% at hour 19, a factor of 400 produced by a script that ignores the
+clock.
+
+A time-of-day feature on real data measures when fraudsters act relative
+to when customers act, and fraudsters have hours of their own. Here the
+fraud has none, so the same feature measures only the copied genuine
+rhythm. It will carry signal on this file, and that signal says nothing
+about when mobile-money fraud happens.
+
+## The footprint of the fraud script
+
+The label, `isFraud`, is set on every row a fraud agent writes. The
+release describes those agents in one sentence: they take control of
+customers' accounts, transfer the funds to another account, and cash
+them out. The <Ref lesson="canonical-datasets"
+id="where-the-fraud-label-came-from">datasets lesson</Ref> took that
+description at its word.
+
+### Two types, split evenly
+
+<Figure
+  src="./figures/fraud-by-type.svg"
+  alt="Horizontal bars of rows per type: CASH_OUT 2,237,500, PAYMENT 2,151,495, CASH_IN 1,399,284, TRANSFER 532,909, DEBIT 41,432. Beside them, fraud rows in amber: CASH_OUT 4,116, 0.18% of the type; TRANSFER 4,097, 0.77% of the type; zero for PAYMENT, CASH_IN and DEBIT"
+  caption="Fraud occurs in exactly two types, in nearly equal numbers: one TRANSFER and one CASH_OUT per fraud."
+/>
+
+All 8,213 fraud rows are TRANSFER (4,097) or CASH_OUT (4,116). The even
+split is what a two-step script produces, and it matches the estimate of
+<Ref lesson="canonical-datasets" id="exercises">the datasets lesson's
+exercise</Ref>: within the two types the fraud rate is 0.30%, 0.77% among
+transfers and 0.18% among cash-outs. The other three types carry no fraud
+and can be dropped before any model is fitted.
+
+### One fraud, two rows
+
+<FigureSequence
+  name="footprint"
+  alt="Three frames of two log rows from step 130, both marked isFraud = 1. Row 1,118,023 is a TRANSFER of 21,531.00 from C2122951913, balance 21,531.00 to 0.00, to C878866926, balance 0.00 to 0.00. Row 1,118,024 is a CASH_OUT of 21,531.00 from C820901487, balance 21,531.00 to 0.00, to C70120540, balance 0.00 to 21,531.00. Frame 1 highlights the transfer's sender, whose balance before equals the amount. Frame 2 highlights the transfer's receiver, 0 before and after and never seen before. Frame 3 reveals the cash-out row and highlights its sender, also emptied, with a note that the two rows are linked only by amount, hour and file order"
+  caption="A fraud in PaySim: a transfer that empties one account, and in the next row a cash-out of the same amount from a different account."
+/>
+
+<Task>
+Step through the three frames and write down, for each, which column
+shows the mark. Then predict whether C820901487, the cash-out's sender,
+ever received the transfer's money: does it appear as a receiver
+anywhere in the file?
+</Task>
+
+The two rows are consecutive in the file, in the same hour, for the same
+amount. Each mark generalises across the file:
+
+- **The sender is emptied.** In 8,034 of the 8,213 fraud rows (97.8%) the
+  amount equals the sender's balance before the transaction. The script
+  moves at most 10 million in one row, so a larger balance leaves in
+  several rows of exactly 10 million, and 145 of the remaining 179 are
+  such transfers. Among the 2,762,196 genuine TRANSFER and CASH_OUT rows, the
+  amount equals the balance in none.
+- **The transfer's receiver is new and stays empty.** 4,093 of the 4,097
+  fraud transfers (99.9%) go to an account that has never received a row
+  before, against 12.5% of genuine transfers, and 99.3% of them show the receiver's
+  balance as 0 before and 0 after. C878866926 receives a genuine row 50
+  hours later, and its balance there again starts at 0: the 21,531 never
+  arrived.
+- **The cash-out comes from somewhere else.** 4,075 fraud transfers are
+  followed, in the very next row, by a fraud CASH_OUT of the same amount.
+  The cash-out's sender is never the transfer's receiver: no account
+  receives a fraud transfer and then sends a fraud cash-out. C820901487
+  appears in no row as a receiver: it pays out 21,531 that no row ever
+  sent it. The money the script moves cannot be followed through the
+  account columns.
+
+So the script's story, transfer to an account and cash out from it, is
+written into the type, the amounts and the order of the rows, and not
+into the account names.
+
+### A ledger that balances only for fraud
+
+<Ref lesson="canonical-datasets"
+id="where-the-fraud-label-came-from">The datasets lesson</Ref> explained
+why the balance columns separate the classes: the simulated service
+cancels the frauds it detects, the balances after a cancelled row record
+a reversal, and only fraud rows are ever cancelled. That is the release's
+reason for banning the four columns. A cancelled row leaves the sender's
+balance where it was, the amount going out and coming back, so if
+cancellation were the whole mechanism, the separation would sit in rows
+where the sender's balance does not move.
+
+Count those rows. Among fraud rows with a nonzero starting balance, the
+sender's balance after equals the balance before in exactly 16: the 16
+transfers marked in `isFlaggedFraud`, each followed by a cash-out of 0.
+Cancellation accounts for those 32 rows. It cannot account for the other
+8,000 or so, which were processed in full and still separate.
+
+They separate because the two kinds of agent keep their books
+differently. For any row, a sender's balance after should be the balance
+before minus the amount. The generator does not keep that arithmetic for
+its ordinary clients: among genuine TRANSFER and CASH_OUT rows, 47% start
+from a sender balance of 0 and send money anyway, and the identity
+"before − amount = after" holds for 4% of genuine transfers and 11% of
+genuine cash-outs. For fraud rows it holds 99.5% of the time. The fraud
+agents keep an exact ledger and empty accounts to the unit; the ordinary
+agents do neither. So the cancellation story explains 32 rows, and the
+model of the datasets lesson has to be corrected: the balance columns
+carry the label because the generator writes clean books only for its
+fraud agents.
+
+### The rule flag: sixteen rows
+
+`isFlaggedFraud` is described as the service's control on massive
+transfers: an attempt to transfer more than 200,000 in a single
+transaction. In the file, 409,110 transfers exceed 200,000, 2,740 of them
+fraud. Sixteen rows are flagged, and they are the sixteen cancelled fraud
+transfers of the previous subsection. The column records which transfers the simulated
+rule layer stopped, a decision made after the transaction was submitted.
+
+## Two tests for a column: knowable at scoring, and not the generator's
+
+The footprint has shown two different ways for a column to separate the
+classes on this file without being usable: it can be written after the
+decision, like the rule flag and the after-balances, or it can read the
+script, like the emptied account.
+
+### The point-in-time test: the balance columns, and what counts as earlier
+
+<Ref lesson="point-in-time-features"
+id="two-ways-a-training-row-can-know-too-much">A point-in-time correct
+feature</Ref> uses only the fields of the transaction, earlier rows, and
+labels that had arrived. On this file two parts of that definition need
+deciding: which balance columns are fields of the transaction, and which
+rows are earlier. The release bans the four balance columns together;
+the definition separates them.
+
+- `newbalanceOrig` and `newbalanceDest` record the state after the
+  transaction was processed, cancellation included. They are the outcome,
+  and a detector scores before the outcome exists. They fail, and so does
+  any difference built from them, such as the ledger check of the
+  previous section.
+- `oldbalanceOrg` and `oldbalanceDest` are the state before the
+  transaction, which a mobile-money service holds when the request
+  arrives. They pass.
+- `isFlaggedFraud` is the rule layer's decision about this transaction.
+  It fails for the same reason as the after-balances.
+
+The step is the only clock the file has. Within a step the rows stand in
+file order, which the release never states to be time order, and the
+step-through shows what that order is: the script writes a transfer and
+its cash-out as consecutive rows. A feature that reads another row of
+the same step may be reading a row that had not happened yet, so it
+fails. **Earlier means an earlier step.**
+
+Labels raise no point-in-time issue at all, because the generator writes
+them complete and at once: <Ref lesson="canonical-datasets"
+id="the-reading-grid">label completeness</Ref> is 1 and there is no
+delay. No feature in the matrix below is built from labels, so the shift
+by δ that a <Ref lesson="point-in-time-features"
+id="the-delayed-terminal-risk-a-window-that-ends-δ-days-ago">delayed
+terminal risk</Ref> needs never comes up.
+
+### The artefact test
+
+A column that passes the first test can still read the generator. The
+second test asks, for each pattern a feature exploits, who put it there:
+
+- the real log, through the replayed hourly totals (the type mix, the
+  amount distributions, the calendar);
+- the fraud script, doing something fraud plausibly does (moving money
+  out by transfer and cash-out, emptying an account, paying a new
+  account);
+- the generator's own mechanics, doing something no service would show
+  (a fraud clock that ignores the hour, a ledger kept only for some
+  agents, links between rows that exist only in file order).
+
+The first kind is behaviour the file copied. The second is signal on
+this file and an idea worth testing elsewhere, with its strength set by
+the script: the script empties accounts to the unit every time, real
+account takeover does not. The third kind is an artefact, and a model
+that relies on it has learned the program.
+
+### What each column buys
+
+The two tests can be checked against a model. Keep only TRANSFER and
+CASH_OUT rows, train on days 1 to 9 (1,226,487 rows, 2,437 frauds; the
+quiet days 3 to 5 are among them) and test on days 10 to 17 (1,389,335
+rows, 2,152 frauds, a base rate of 0.15%), all busy days. The model is a random forest of 200
+trees, fitted on every fraud and a random 5% of genuine rows to keep it
+fast, three seeds. Each rung of the ladder adds one group of features to
+the one before; the last two rungs use a group alone. The scores are
+average precision and <Ref lesson="alert-budget-metrics"
+id="precision-at-k-the-metric-cut-where-the-team-cuts">precision in
+each day's top 100</Ref>, computed on rows because the file has no cards.
+Every test day holds more than 240 frauds, so its ceiling is 1.
+
+| features | average precision | precision in the day's top 100 |
+|---|---|---|
+| type, amount | 0.013 | 0.23 |
+| \+ hour of day | 0.069 | 0.35 |
+| \+ receiver's earlier rows (count, sum, never seen before) | 0.13 | 0.44 |
+| \+ twin cash-out (a same-amount TRANSFER earlier in the hour) | 0.53 | 0.88 |
+| \+ sender's balance before, and whether the amount equals it | 0.999 | 1.00 |
+| after-balances and ledger checks alone | 0.99 | 0.99 |
+| `isFlaggedFraud` alone | 0.002 | 0.04 |
+
+<Figure
+  src="./figures/ladder.svg"
+  alt="Paired horizontal bar charts for seven feature sets, average precision on the left and precision in a day's top 100 on the right. Type and amount: 0.013 and 0.229, blue. Plus hour of day: 0.069 and 0.345, blue. Plus receiver's earlier rows: 0.126 and 0.441, amber. Plus twin cash-out: 0.529 and 0.882, amber. Plus sender's balance before: 0.999 and 1.00, amber. Below a dashed line, in grey: after-balances alone 0.988 and 0.99; isFlaggedFraud alone 0.002 and 0.043. Floor for a random ranking: 0.0015. Legend: blue fields the generator replays, amber marks of the fraud script, grey written after the decision"
+  caption="Every large step up the ladder is a mark of the script; the perfect score arrives with the emptied account."
+/>
+
+The seed-to-seed spread is under 0.04 in average precision on every rung
+except the twin rung, where it is 0.05. Read against the two tests:
+
+- **Type and amount**, the replayed fields, reach about 8 times the base
+  rate in average precision. That is the part of the signal the copied
+  service supplies.
+- **The hour** multiplies average precision by five. By the previous
+  section, that gain is the flat fraud clock against the copied genuine
+  night.
+- **The receiver's history** adds the fresh accounts the script pays.
+- **The twin** links the two rows of a fraud by amount and hour. Only
+  about 36 of 2,233,384 genuine cash-outs share an amount with a transfer
+  earlier in their hour. It reads a row of the same step, so it fails the
+  point-in-time test: the rung measures how much the file order gives
+  away, not a feature.
+- **The sender's balance before** lets the forest test whether the
+  amount equals it: the emptied account of the footprint, which
+  separates the classes by itself.
+- **The after-balances** reach 0.99 without any of the rungs above,
+  through the identity "before − amount = after", which the generator
+  keeps only for its fraud agents.
+- **The rule flag** finds 16 frauds out of 8,213 and is useless as a feature,
+  however clean its 16 hits look.
+
+<KeyFact>
+On PaySim a perfect score is a diagnosis, not a result: it means one
+column holds a mark of the script or the generator, and the next step is
+to find that column.
+</KeyFact>
+
+## The feature matrix
+
+The matrix keeps what passes both tests and drops what fails the first.
+A column that passes the first test but reads the generator is decided
+by what it would carry to real data. The hour of day would carry a real
+contrast, since fraudsters keep hours of their own, so it keeps its
+place, marked. `step`, the day and the previous hour's traffic would
+carry nothing, since all they separate here is the empty days, so they
+are dropped. Each kept column states what it reads, so that the marked
+one can be taken out when a score is judged.
+
+<Figure
+  src="./figures/matrix.svg"
+  alt="A table in three groups. Kept, in green: rows TRANSFER and CASH_OUT only, the only types fraud occurs in; log amount, a field of the transaction; amount divided by the sender's balance before, known at scoring, 1 means the account is emptied; receiver's earlier rows, count and sum, as-of over earlier steps, the one entity with a past; receiver never seen before, the same count equal to 0. Kept, marked as the generator's, in amber: hour of day, step mod 24, fraud has no clock here, real fraud has hours. Dropped, in grey: newbalanceOrig, newbalanceDest and balance errors, written by the outcome after scoring; isFlaggedFraud, the rule layer's decision, 16 rows; twin, a same-amount TRANSFER earlier this hour, same-step file order is not time order; oldbalanceDest, 0 for every merchant and every new account; nameOrig and nameDest as values, identifiers; step, day and traffic in the hour, only the empty days, a step never recurs; sender windows and the sender's hour arc, 99.85% of senders appear once"
+  caption="The PaySim feature matrix: each column kept, marked or dropped by the two tests."
+/>
+
+### What is kept, and why
+
+- **The type gate.** Only TRANSFER and CASH_OUT rows enter, which lifts
+  the base rate from 0.13% to 0.30% and removes 3.6 million rows that
+  cannot be fraud here. It is a scope, decided before modelling, and on
+  this file it is exact because the script uses two types.
+- **The amount**, on a log scale because it runs from cents to tens of
+  millions.
+- **The drain ratio**, amount ÷ `oldbalanceOrg`, set to missing when the
+  balance is 0. It passes the point-in-time test and reads a pattern real
+  fraud shows. Its near-perfect separation is the script's, so results
+  are reported with and without it.
+- **The receiver's history**: the count and the sum of its rows at
+  earlier steps, and an indicator for a count of 0. This is <Ref
+  lesson="transaction-aggregates" id="the-rule">the windowed aggregate</Ref>
+  on the one entity that has a past, with no window limit: a 30-day
+  window would cover almost the whole file.
+
+### What is kept and marked
+
+- **The hour of day.** It is a field of the transaction and passes the
+  first test; on this file it reads the clockless script against the
+  copied genuine night. On real data the same column reads when
+  fraudsters act against when customers act, so a pipeline built here
+  should carry it on. It is marked because a model judged on this file
+  should be judged without it too.
+
+### What is dropped
+
+- the after-balances and anything computed from them, and
+  `isFlaggedFraud`: written after the decision;
+- the twin, 1 for a CASH_OUT with a TRANSFER of the same amount earlier
+  in its step: it reads a row of the same step, so it fails the first
+  test, whatever its rung on the ladder;
+- `oldbalanceDest`: 0 for every merchant by construction and for every
+  new account, so it repeats the receiver's count with more noise;
+- the account names as values: <Ref lesson="transaction-aggregates"
+  id="the-identifier-as-a-lookup-table">an identifier fed to a model
+  becomes a lookup table</Ref>; they are used only to group rows;
+- `step`, the day and the previous hour's traffic: knowable at scoring,
+  but all they separate is the copied calendar's empty stretches, where
+  whatever happens is fraud. A step or a day names one hour or one date
+  of this month that never recurs, so nothing a model learns about it
+  applies to a later transaction, where the hour of day recurs daily;
+- every sender window and sender profile: empty for 99.85% of rows.
+
+<Example title="the matrix rows of one fraud">
+Take the two rows of the step-through, both at step 130.
+
+**Row 1,118,023, TRANSFER of 21,531.00.** Type gate: in. Log amount:
+$\ln 21{,}531 = 9.98$. Drain ratio: $21{,}531 / 21{,}531 = 1$. Receiver
+C878866926: no row at any step before 130, so count 0, sum 0, never seen
+before = 1. Hour: $130 \bmod 24 = 10$.
+
+**Row 1,118,024, CASH_OUT of 21,531.00.** Type gate: in. Log amount 9.98.
+Drain ratio 1. Receiver C70120540: two earlier rows, a CASH_OUT of
+31,693.59 at step 34 and a CASH_IN of 286,883.55 at step 42, so count 2,
+sum 318,577.14, never seen before = 0. Hour 10.
+
+The transfer is caught by the drain ratio and the new receiver, the
+cash-out by the drain ratio alone: the twin would also catch it, through
+the transfer one row above in the same step, which is the order the
+matrix refuses to read. With the hour and the drain ratio removed, the
+transfer still stands out by its new receiver,
+while the cash-out has nothing left but its amount and a receiver with an
+ordinary history. That reduced matrix measures what this file can teach a
+detector.
+</Example>
+
+### Building it as of each row
+
+The receiver counts are an <Ref lesson="point-in-time-features"
+id="the-last-value-up-to-the-rows-timestamp">as-of computation</Ref>:
+each row gets the receiver's rows at strictly earlier steps, the rule
+of the point-in-time test. With the rows sorted by step, in pandas:
+
+```python
+g = df.groupby(["nameDest", "step"]).agg(n=("amount", "size"), s=("amount", "sum"))
+prior = g.groupby(level="nameDest").cumsum() - g          # strictly earlier steps
+df = df.join(prior.rename(columns={"n": "dest_n", "s": "dest_sum"}), on=["nameDest", "step"])
+```
+
+The common shortcut, `df.groupby("nameDest").size()` joined back to every
+row, is <Ref lesson="transaction-aggregates"
+id="three-ordinary-table-operations-that-break-the-rule">the whole-table
+group-by</Ref>: it hands each row the receiver's count for the whole
+month, future rows included.
+
+## What this file can test, and what it cannot
+
+Even the cleaned matrix inherits what the file lacks. It departs from
+the detection loop in five ways:
+
+- **No label delay and no feedback loop.** `isFraud` is complete and
+  instant; no label depends on which rows a detector alerted. A delay
+  block or a known-account removal can only be imposed by hand.
+- **No adversary.** The script runs the same way whatever a detector
+  does, so a model that learned its marks is never punished for it.
+- **No sender history.** The entity the course's card features rest on
+  appears once.
+- **A calendar with holes.** Base rates per day range from 0.05% to 100%;
+  a metric averaged over all days is dominated by the empty ones, so
+  evaluation belongs on the busy days.
+- **A different run.** The 2016 run that was checked against the real
+  log had about 24 million rows and no fraud. The Kaggle file is a later
+  quarter-scale run with fraud agents added, and none of its marks was
+  validated against anything.
+
+What the file can test is a pipeline: type gating, as-of joins on the
+receiver, the separation of before- and after-state, and the habit of
+treating a perfect score as a reason to look for the column that leaks.
+What it cannot test is everything that depends on behaviour over time:
+evaluation under delay, drift, an adversary, or how well a card-style
+profile ranks real customers.
+
+<Conclusion>
+You can now read PaySim as the output of a program: which columns
+replay the real service's hourly totals, which are the agents'
+bookkeeping, and which were written by the fraud script and the rule
+layer. You can show from the file that senders have no history, that
+fraud ignores the clock while genuine traffic follows a copied calendar
+with empty days, and that the script leaves four marks plus a ledger
+that balances only for fraud. You can sort any column with two tests,
+knowable at scoring and not the generator's, and you can build the
+resulting matrix: TRANSFER and CASH_OUT only, log amount, drain ratio,
+receiver history computed as of each earlier step, the hour kept but
+marked, and the twin dropped because same-step order is not time. A
+model scored on it with the hour and the drain ratio removed measures what the file can teach; with them, it
+measures the script.
+
+<Ref lesson="point-in-time-feature-lab">The point-in-time feature
+lab</Ref> builds the module's pipeline as code: windowed and conditional
+aggregates, the delayed terminal risk, the periodic flag and the as-of
+join, with a leak hidden in a reference implementation for you to find.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+Load the file and reproduce three numbers from scratch: the fraud count
+per type, the overall fraud rate, and the share of fraud rows whose
+sender balance after the transaction is 0. Then compute the same share
+for genuine TRANSFER and CASH_OUT rows. Is "the sender ends at 0" the
+signature of the emptied account? If not, which column comparison is,
+and how do the two classes compare on it?
+
+<Solution>
+**Counts.** `df.groupby("type")["isFraud"].agg(["size", "sum"])` gives
+TRANSFER 532,909 rows with 4,097 frauds, CASH_OUT 2,237,500 with 4,116,
+and 0 frauds among PAYMENT (2,151,495), CASH_IN (1,399,284) and DEBIT
+(41,432). The fraud rate is $8{,}213 / 6{,}362{,}620 = 0.129\%$.
+
+**Ending at 0.** `newbalanceOrig == 0` holds for 98.1% of fraud rows and
+for 90.1% of genuine TRANSFER and CASH_OUT rows. Nearly every row of both
+classes ends at 0, so the comparison barely separates them: it reads
+the generator's habit of leaving accounts at 0, mostly from genuine rows
+that started at 0 (47% of them) and sent money anyway.
+
+**The signature.** The emptied account is `oldbalanceOrg == amount`: the
+whole balance sent. It holds for 97.8% of fraud rows and for none of the
+2,762,196 genuine TRANSFER and CASH_OUT rows. It also passes the
+point-in-time test, since it uses the balance before the transaction;
+`newbalanceOrig` does not.
+</Solution>
+</Exercise>
+
+<Exercise>
+Restrict the file to TRANSFER and CASH_OUT rows. (a) What is the base
+rate before and after the restriction? (b) On day 10 (392,945 rows, of
+which 171,830 TRANSFER or CASH_OUT, 282 frauds), give the precision of
+100 rows drawn at random, with and without the restriction, and the
+highest precision any detector can reach in its top 100. (c) Do the same
+for day 3 (1,070 rows, 429 of them TRANSFER or CASH_OUT, 310 frauds) and
+day 31 (272 rows, all fraud). (d) What do (b) and (c) say about averaging
+precision at 100 over all 31 days?
+
+<Solution>
+**(a)** Before: $8{,}213 / 6{,}362{,}620 = 0.129\%$. After: $8{,}213 /
+2{,}770{,}409 = 0.296\%$, since no fraud is removed.
+
+**(b)** Random precision is the day's base rate: $282 / 392{,}945 =
+0.072\%$ on all rows, $282 / 171{,}830 = 0.164\%$ on the two types. The
+ceiling is <Ref lesson="alert-budget-metrics"
+id="reading-a-day-against-its-ceiling">$\min(1, \gamma_t / k)$</Ref>
+with $\gamma_t = 282$ frauds and $k = 100$: 1 either way. The gate more
+than doubles the floor and leaves the ceiling where it was.
+
+**(c)** Day 3: random precision $310/1{,}070 = 29\%$ on all rows and
+$310/429 = 72\%$ on the two types; ceiling 1. Day 31: every row is fraud,
+so any ranking, random included, scores 1.
+
+**(d)** On the busy days the floor within the two types is about 0.15%;
+on the 17 quiet days it runs from about 1% to 9% (days 4, 5 and 18 to 30),
+then 72% on day 3 and 100% on day 31, and a few hundred frauds sit among a
+few thousand rows, so even a weak ranking fills its top 100 with them. A
+mean over 31 days therefore mixes 14 days that measure the detector with
+17 that mostly measure the calendar. Evaluate on the busy days, or report
+each day against its floor and ceiling.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague proposes `isFlaggedFraud` as a free feature: "every row it
+flags is fraud, so its precision is 100%." Check the claim against the
+file, refute it as a feature, and name the step of the argument that
+fails.
+
+<Solution>
+**What is true.** 16 rows are flagged and all 16 are fraud: precision
+16/16.
+
+**What the number hides.** Recall is $16 / 8{,}213 = 0.19\%$. The stated
+rule, a transfer above 200,000, does not describe the column: 409,110
+transfers exceed 200,000, 2,740 of them fraud, and only 16 are flagged. In
+all 16 the sender's balance after equals the balance before: they are the
+transfers the simulated service cancelled. As a feature it marks 16 rows
+and leaves the other 8,197 frauds tied with the genuine rows; in the
+ladder of the chapter it scores average precision 0.002 against a floor of
+0.0015.
+
+**The step that fails.** "A column that agrees with the label is an
+observation of the transaction." This one is the rule layer's decision
+about the transaction, recorded after the request was processed. It
+fails the point-in-time test like the after-balances. In a real pipeline
+the rules' outputs are known at scoring only for rules that run before
+the model, and then they describe what the rules caught, which the model
+is meant to go beyond.
+</Solution>
+</Exercise>
+
+<Exercise>
+Test whether the hour of day carries the fraud's behaviour or the
+generator's. (a) From the hourly counts, fraud rows in hours 0 to 8 total
+3,050 and genuine rows 148,878 (out of 6,354,407 genuine rows). Compute
+the recall and the precision of the rule "flag every row in hours 0 to
+8", and compare with the base rate. (b) Explain where that precision
+comes from, using only the two hourly distributions. (c) Describe an
+analysis that would tell a time-of-day signal produced by a clockless
+script from one produced by fraudsters who prefer the night, and say what
+the file gives for it.
+
+<Solution>
+**(a)** Recall $3{,}050 / 8{,}213 = 37\%$. Precision $3{,}050 /
+(3{,}050 + 148{,}878) = 2.0\%$, about 15 times the base rate of 0.13%.
+
+**(b)** Hours 0 to 8 are 9 of 24 hours, so a fraud count spread evenly
+over the day would put $9/24 = 37.5\%$ of fraud there, which is what the
+file shows. Genuine traffic puts only $148{,}878 / 6{,}354{,}407 = 2.3\%$
+of its rows there. The precision is the ratio of a uniform distribution
+to a sleeping one; nothing about the fraud is concentrated at night.
+
+**(c)** Compare the fraud rows' own distribution over hours with the
+uniform one, ignoring the genuine rows: fraudsters who prefer the night
+produce a fraud count that rises at night, a clockless script produces a
+flat one. The file gives 274 to 375 fraud rows in every hour with no rise
+at night: hours 0 to 8 hold 37% of the fraud, the share a uniform clock
+gives. Here the hour feature learns
+"customers sleep, the script does not". On real data, where fraud has its
+own rhythm, the same feature would learn a different and smaller contrast.
+</Solution>
+</Exercise>
+
+<Exercise>
+The hour arc needs at least 7 earlier payments of the same account, and
+<Ref lesson="transaction-aggregates" id="the-rule">a windowed count</Ref>
+needs at least one earlier row to be nonzero. (a) Using the sender counts
+of the chapter (6,344,009 senders with 1 row, 9,283 with 2, 15 with 3),
+derive the share of rows whose sender has at least one earlier row, and
+the share for which the arc is defined. (b) Suppose instead that every
+account made a Poisson number of transactions with mean $r$ over the
+month, spread uniformly in time. Show that a row's expected number of
+earlier rows by the same account is $r/2$, and find the $r$ for which a
+row has 7 or more earlier rows about half the time. (c) What does (b) say
+about the repetition counts the generator would have needed for the
+module's sender features to work?
+
+<Solution>
+**(a)** A sender with $c$ rows contributes $c - 1$ rows that have an
+earlier row (ignoring two rows in the same step). That is
+$9{,}283 \times 1 + 15 \times 2 = 9{,}313$ rows, $9{,}313 / 6{,}362{,}620
+= 0.146\%$; the exact count with same-step ties excluded is 9,266. No
+sender has 8 rows, so the arc is defined for none.
+
+**(b)** Given that an account has a row at time $u$ in a month of length
+1, the other rows of a Poisson process are still Poisson with mean $r$,
+uniform in time (the conditioning on one point does not change the rest).
+Those before $u$ number Poisson($ru$). Averaging over $u$ uniform on
+$[0, 1]$, the expected count is $\int_0^1 r u \, du = r/2$. A row has at
+least 7 earlier rows about half the time when its own time and $r$ make
+$ru \approx 7$; for a row in the middle of the month, $u = 1/2$, that is
+$r \approx 14$ rows a month per account. (A Poisson(7) count is at least 7 with probability
+0.55.)
+
+**(c)** For half the rows to have an arc, accounts would need around 14
+transactions a month, a few a week (<Ref
+lesson="transaction-aggregates"
+id="a-window-has-to-fill-before-it-means-anything">the simulator's
+customer 0</Ref> makes about 65), against 1.0015 rows per sender here. The repetitions file was
+copied from the real log as a scheduling probability; the generator never
+built accounts with that kind of habit, so no amount of feature work on
+the sender can recover one.
+</Solution>
+</Exercise>
+
+<Exercise>
+The receiver account C923916676 appears in five rows of the file:
+
+| row | step | type | amount | isFraud |
+|---|---|---|---|---|
+| 3,700,998 | 277 | CASH_OUT | 183,170.25 | 0 |
+| 5,016,884 | 353 | CASH_OUT | 125,713.71 | 0 |
+| 5,632,533 | 395 | DEBIT | 2,844.92 | 0 |
+| 5,786,176 | 400 | CASH_OUT | 1,191,669.35 | 1 |
+| 5,795,489 | 401 | CASH_OUT | 142,433.82 | 0 |
+
+(a) Compute the receiver's earlier-row count for each row as of its step.
+(b) Compute what the whole-file group-by count joined back by
+`nameDest` assigns to each row, and say for which rows the two differ and
+what information the second contains that the first cannot. (c) For fraud
+TRANSFER rows the whole-file count and the as-of count lead to almost the
+same separation. Why, and why is the shortcut still wrong?
+
+<Solution>
+**(a)** Counting rows at strictly earlier steps: 0, 1, 2, 3, 4.
+
+**(b)** The group-by count is 5 on every row. It differs from the as-of
+count on every row, most at the first (5 against 0). Each row's value
+includes the receiver's later rows: the fraud row at step 400 is told
+about the row at step 401, and the row at step 277 about all four that
+follow. This is the first of the <Ref lesson="transaction-aggregates"
+id="three-ordinary-table-operations-that-break-the-rule">three broken
+table operations</Ref>, a statistic over the whole table read by every
+row; the as-of version is <Ref lesson="point-in-time-features"
+id="the-last-value-up-to-the-rows-timestamp">the join that reads each
+row's own moment</Ref>.
+
+**(c)** A fraud transfer's receiver is new: its as-of count is 0, and its
+whole-file count is 1 plus whatever genuine rows reach it later, usually
+few. Both numbers are small, so the leak barely moves the separation on
+those rows. It is still wrong because the training rows of genuine
+receivers carry counts that include the future, a deployed system could
+not compute them, and the model's thresholds are fitted to values that
+<Ref lesson="point-in-time-features"
+id="three-pipelines-on-one-simulator-run">do not exist in service</Ref>.
+</Solution>
+</Exercise>
+
+<Exercise>
+Cluster the TRANSFER rows without using the label. For each row form
+three coordinates: the amount, the sender's balance change
+(`oldbalanceOrg − newbalanceOrig`) and the receiver's balance change
+(`newbalanceDest − oldbalanceDest`); apply a signed log,
+$\operatorname{sign}(x)\ln(1 + |x|)$, standardise each coordinate, and run
+k-means with $k = 8$ (5 initialisations, seed 0). (a) Report the size and
+fraud share of the purest cluster, and compare with the fraud share among
+all transfers. (b) Which coordinate makes the cluster pure, and what does
+the matrix of the chapter say about it? (c) If the purest cluster were
+handed to investigators as the day's alerts, what would decide whether it
+is a usable detector?
+
+<Solution>
+**(a)** One cluster holds 4,159 transfers, 4,014 of them fraud: 96.5%,
+against $4{,}097 / 532{,}909 = 0.77\%$ among all transfers. It captures
+98% of the fraud transfers. With $k = 3$ or $5$ the fraud lands in one
+cluster of about 8,100 rows at 50% fraud.
+
+**(b)** The receiver's balance change: 0 for 99.3% of fraud transfers and
+almost never for genuine ones, together with a sender change equal to the
+amount. Both use after-balances, which the matrix drops: the cluster is
+the generator's ledger rediscovered without labels.
+
+**(c)** Its precision at the team's budget on unseen days, its recall of
+the fraud a supervised model misses, and whether the coordinates it rests
+on can be computed at scoring time. A cluster defined by the
+after-balances fails the last condition whatever its purity. A cluster as
+a detector, scored by how far a row sits from normal rather than by a
+label, is where <Ref lesson="anomaly-detection-framing">the anomaly
+detection framing</Ref> starts, and the same questions decide its value
+there.
+</Solution>
+</Exercise>
+
+<References>
+1. E. A. Lopez-Rojas, A. Elmir, S. Axelsson, "PaySim: A Financial Mobile Money Simulator for Fraud Detection," *Proceedings of the 28th European Modeling and Simulation Symposium (EMSS)*, 2016, pp. 249–255 — Sec. 3 (the five transaction types), Sec. 4.1–4.4 (the agent-based design, the aggregated transaction file per day and hour with its example line, the repetitions file, the initial-balance container, the step as a day/hour combination), Sec. 4.5 (the log of balance deltas for every party), Sec. 5 (744 steps, run PS41840 kept by sum of squared errors, Table 1, Figs. 1–5, the busier first 14 days), Abstract and Sec. 6 (fraud injection outside the paper's scope). https://msc-les.org/proceedings/emss/2016/EMSS2016_249.pdf
+2. E. A. Lopez-Rojas, *Synthetic Financial Datasets For Fraud Detection* (PaySim1), Kaggle dataset, CC BY-SA 4.0 — the description: the quarter-scale run made for Kaggle, 744 steps of one hour, the column definitions, `isFraud` from fraudulent agents that take over accounts and empty them by transfer and cash-out, `isFlaggedFraud` for transfers over 200,000, and the note that detected frauds are cancelled. Every count in this chapter was computed from the released CSV (6,362,620 rows, 493,534,783 bytes). https://www.kaggle.com/datasets/ealaxi/paysim1
+3. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 2.4 (the scarcity of public transaction data and the case for simulation) and Ch. 3.2 (what a simulator must define to be useful: entities with profiles, time, and scripted fraud scenarios). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+4. E. Altman, J. Blanuša, L. von Niederhäusern, B. Egressy, A. Anghel, K. Atasu, "Realistic Synthetic Financial Transactions for Anti-Money Laundering Models," *NeurIPS 2023 Datasets and Benchmarks Track* — Abstract (a synthetic dataset's ground-truth labels are complete, where real laundering mostly goes undetected) and Sec. 2 (earlier generators that need private real data to mimic, PaySim among them). https://arxiv.org/abs/2306.16424
+5. FITE7410 Financial Fraud Analytics, The University of Hong Kong, 2022–23, Assignment 1, Part I, with a published student answer — the exploratory analysis of the PaySim file (class balance, fraud only in TRANSFER and CASH_OUT, uniform fraud over steps, step mod 24, per-account transaction counts over the whole file). https://github.com/Danny-CHLee/Fraud-Analytics-HKU
+</References>
