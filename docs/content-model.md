@@ -17,6 +17,9 @@ content/courses/<course-slug>/
   research/            # the factory's dossier (see README)
     images.yaml        # index of real-image candidates found while reading
     images/            # their captures: whole pages / downloaded files
+    taught/<lesson>.md # ledger of what each drafted lesson explained (terms
+                       #   as defined, notation, running examples, what it
+                       #   left open) — written by the lesson's writer
   lessons/<lesson-slug>/
     lesson.mdx         # the chapter; NO frontmatter (directory name = slug)
     figures/           # SVGs and sourced raster images used by <Figure>
@@ -59,7 +62,7 @@ Per lesson:
 | `type` | `core \| worked-practice \| synthesis \| review \| extra \| lab`. `extra` = advanced off-path chapter (a "starred section"): shown with an `extra` badge, and no non-extra lesson may list it as a prerequisite (lint: `extra-prereq`) — the core path must survive skipping every extra. `lab` = notebook assignment closing a module (see [Lab lessons](#lab-lessons)). |
 | `status` | `planned → drafted → reviewed → published`. Skills may only set `drafted`; `reviewed`/`published` are manual human sign-offs. Production renders `published` only; dev and `CONTENT_PREVIEW=1` builds also render `drafted` and `reviewed`. |
 | `goal` | exactly one objective, starts with a Bloom verb |
-| `opening` | declarative first sentence stating the problem the lesson solves; lesson.mdx must open with it verbatim (no teasers, no rhetorical questions) |
+| `opening` | the problem the lesson solves, in plain words for a reader who knows only the prerequisites — a concrete situation and what makes it hard, never the lesson's conclusion (pedagogy L3); lesson.mdx must open with it verbatim (no teasers) |
 | `est_minutes` | positive integer ≤60 (schema); 5–45 is the linted guidance band (warn only) |
 | `prerequisites` | lesson slugs; forms an acyclic knowledge graph |
 | `concepts.introduces / reinforces` | concept ids; spiral revisits visible here |
@@ -124,10 +127,16 @@ section of `<Exercise>` blocks with collapsible `<Solution>`s; a final
 
 The validator checks the shell, not the prose: unknown components,
 unparseable MDX, demo-name mismatches, a `<Figure src>` with no file behind
-it, a broken/truncated image, and an uncredited sourced image are errors; a
+it, a broken/truncated image, an uncredited sourced image, and a `$…$` span
+that holds prose rather than math (`stray-math`: a dollar amount written as
+a bare `$` pairs with the next one and KaTeX swallows the text between) are
+errors; a
 lesson not starting with its `opening`, missing exercises, missing
 references, an exercise without a solution, a low-resolution or oversized
-image, and an unused credits entry are warnings.
+image, an unused credits entry, and a canon author's surname or a citation
+marker ("et al.", "handbook") in the lesson body outside `<References>` and
+`<Quote>` (`source-in-prose`, read from `research/sources.yaml`) are
+warnings.
 
 ## Lab lessons
 

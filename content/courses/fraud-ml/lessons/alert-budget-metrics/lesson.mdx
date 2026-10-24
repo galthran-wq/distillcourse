@@ -1,0 +1,1045 @@
+A model has scored the day's 8,300 payments and the investigators can open 100 of them. Accuracy says nothing useful when 99% of payments are genuine, and the usual summary of a ranking, the area under the ROC curve, averages over thresholds the team will never use. What number should you compute from the ranked list so that a better number means more fraud caught within the hundred?
+
+The day in that question is a real one from the transaction simulator of
+<Ref lesson="canonical-datasets" id="the-transaction-simulator-a-world-whose-rules-are-known">the
+canonical datasets</Ref>, the generator whose fraud scenarios are known.
+A depth-2 decision tree, the one that lesson read against its answer key,
+is trained on the week of 25 to 31 July 2018 and scores the week of 8 to
+14 August, days 129 to 135 of the simulation. That test week holds 58,264
+payments, about 8,300 a day, and 385 frauds on cards the bank had not
+already caught: about 55 a day, two thirds of one percent.
+
+<Ref lesson="economics-of-detection" id="why-hit-rate-is-not-a-target">The
+economics of detection</Ref> showed that the team works the top $k$ of a
+ranking, and that the share of those $k$ that turn out to be fraud, the
+hit rate, is the number that matters when $k$ is fixed. It did not settle
+how to score a model before deployment, from a labelled test week, so
+that the score predicts that hit rate. Classical machine learning offers
+threshold metrics (accuracy, precision, recall, F1) and the ROC curve with
+its area; each answers some question about the scored list, and none asks
+the team's.
+
+## A threshold metric judges a cut nobody chose
+
+The first instinct is to turn the scores into decisions and count
+mistakes: alert on every payment whose score is at or above a threshold
+$\tau$, typically $0.5$, and report the error rate or the accuracy.
+
+### The ten-payment toy
+
+Ten payments, two of them fraud, scored by some model. Sorted by score,
+the first fraud sits at rank 1 with score 0.90, three genuine payments
+follow at 0.45, 0.40, then the second fraud at 0.35, and six genuine
+payments trail with 0.20, 0.20, 0.20, 0.10, 0.10 and 0.00. Each threshold
+cuts this list in one place.
+
+<Figure
+  src="./figures/toy-thresholds.svg"
+  alt="Ten payments in a column sorted by score from 0.90 to 0.00, ranks 1 and 4 marked fraud in amber and the rest genuine in grey; three blue horizontal lines cut the column above rank 1 (tau = 1, no alerts, error 0.2), between ranks 1 and 2 (tau = 0.5, one alert, error 0.1) and between ranks 4 and 5 (tau = 0.3, four alerts, both frauds caught, error 0.2)"
+  caption="Three thresholds on the same ranking. The detector that catches nothing and the one that catches both frauds have the same error rate."
+/>
+
+At $\tau = 1$ nothing is alerted and both frauds are missed: two errors in
+ten, an error rate of 0.2. At $\tau = 0.5$ one payment is alerted, the
+first fraud, and the second is missed: error 0.1. At $\tau = 0.3$ four
+payments are alerted, both frauds and two genuine payments: error 0.2
+again. The rule that does nothing ties with the rule that catches every
+fraud, and both lose to the rule that catches half: the failure
+<Ref lesson="economics-of-detection"
+id="accuracy-prices-every-mistake-the-same">accuracy pricing every
+mistake the same</Ref> predicted.
+
+The toy has four genuine payments per fraud; a simulator day has about
+8,250 genuine payments for 55 frauds, 150 per fraud. There the do-nothing
+rule makes 55 errors in 8,305 payments: accuracy
+$8{,}250/8{,}305 \approx 0.993$. A detector that alerts on a hundred
+payments and catches 29 of the 55 frauds, about what the tree used below
+achieves, makes 71 false alerts and 26 misses, 97 errors: accuracy
+$0.988$. By accuracy, catching half the day's fraud is worse than
+catching none.
+
+### Every threshold metric picks its own winner
+
+The next attempt is a threshold metric that does not let the genuine
+payments drown the frauds. The table lists, for each threshold that
+changes the alerts, the recall (share of frauds alerted), the precision
+(share of alerts that are fraud), and two metrics built to resist
+imbalance: F1 (the harmonic mean of precision and recall) and the
+balanced error rate (the average of the miss rate on frauds and the
+false-alarm rate on genuine payments).
+
+| Threshold $\tau$ | Alerts | Recall | Precision | F1 | Balanced error |
+|---|---|---|---|---|---|
+| 0.90 | 1 | 0.5 | 1.00 | 0.67 | 0.25 |
+| 0.45 | 2 | 0.5 | 0.50 | 0.50 | 0.31 |
+| 0.40 | 3 | 0.5 | 0.33 | 0.40 | 0.38 |
+| 0.35 | 4 | 1.0 | 0.50 | 0.67 | 0.13 |
+| 0.20 | 7 | 1.0 | 0.29 | 0.44 | 0.31 |
+| 0.10 | 9 | 1.0 | 0.22 | 0.36 | 0.44 |
+| 0.00 | 10 | 1.0 | 0.20 | 0.33 | 0.50 |
+
+Precision picks $\tau = 0.9$, the balanced error $\tau = 0.35$, and F1
+ties the two. None of these metrics is wrong: each scores one cut of the
+list, and which cut is best depends on what the cut is for. A threshold
+metric is meaningful once the objective has fixed the threshold ("catch
+as much fraud as possible while keeping precision above 60%"), and only
+then.
+
+The fraud team's objective fixes its cut by count, not by score: the
+hundred most suspicious cards, whatever their scores. Tomorrow's top
+hundred may start at 0.8 or at 0.3. So the model has to be judged as a
+ranking, by how much fraud it puts near the top, and the threshold drops
+out.
+
+## ROC-AUC: a ranking metric averaged over cuts the team never makes
+
+The standard way to judge a ranking without choosing a threshold is the
+ROC curve, which you know from classical machine learning: sweep $\tau$
+from the top of the list to the bottom and plot, at each cut, the recall
+$\mathrm{TPR}$ against the false-positive rate $\mathrm{FPR}$, the share
+of genuine payments alerted. Its area, ROC-AUC, is the probability that a
+randomly chosen fraud is scored above a randomly chosen genuine payment.
+It uses every cut at once, which looks like exactly what is needed.
+
+### Reading AUC off the toy
+
+The toy has $2 \times 8 = 16$ (fraud, genuine) pairs. The fraud at rank 1
+is above all 8 genuine payments, the fraud at rank 4 above the 6 at ranks
+5 to 10. So 14 of 16 pairs are in the right order and $\mathrm{AUC} =
+14/16 = 0.875$.
+
+The curve gives the same number. Walking down the list, the cuts give the
+points $(\mathrm{FPR}, \mathrm{TPR})$ = $(0, 0)$, $(0, 0.5)$,
+$(0.125, 0.5)$, $(0.25, 0.5)$, $(0.25, 1)$ and then along the top to
+$(1, 1)$. The area under that staircase is $0.25 \times 0.5$ for the
+first quarter of the axis plus $0.75 \times 1$ for the rest: $0.125 +
+0.75 = 0.875$.
+
+Now move the first fraud from rank 1 to rank 2 and the second from rank 4
+to rank 3. Each fraud is above 7 genuine payments: $14/16$ again. Equal
+areas can hold different tops of the list, as <Ref
+lesson="economics-of-detection" id="exercises">the three rankings of ROC
+area 0.625</Ref> showed: the area averages over every cut, and a team
+works at one.
+
+### How much of the curve a hundred alerts can reach
+
+A day has about 8,250 genuine payments and the team opens 100. Even if
+all hundred were genuine, the false-positive rate could not exceed
+$100 / 8{,}250 \approx 0.012$. Any point of the ROC curve to the right of
+$\mathrm{FPR} = 0.012$ describes a cut that would send more than a
+hundred alerts a day: on the simulator, 98.8% of the horizontal axis is
+out of the team's reach.
+
+The simulator is generous. On <Ref lesson="fraud-detection-system"
+id="a-hundred-cases-a-day-the-models-output-is-a-ranking">the Belgian
+stream</Ref>, about 400,000 payments a day for a team of about a hundred
+cards, the reachable strip is under 0.1% of the axis wide. ROC-AUC
+integrates over the whole axis with equal weight, so 99.9% of what it
+measures is behaviour the team will never see.
+
+<FigureSequence
+  name="roc-sliver"
+  alt="Three frames. First, two ROC curves on the unit square: an amber detector A with AUC 0.81 that rises steeply at the left and then flattens, and a blue detector B with AUC 0.87 that rises more slowly but ends higher, crossing A at a false-positive rate near 0.2. Second, the strip of false-positive rates from 0 to 0.012 is shaded green at the left edge, a sliver of the square, labelled reachable. Third, the green strip is magnified into a second panel with the false-positive axis from 0 to 0.012, where A's curve sits above B's throughout, ending at recall 0.45 against 0.22"
+  caption="Two detectors whose ROC curves cross. The one with the larger area is the worse one in the only strip a hundred alerts a day can reach."
+/>
+
+<Task>
+Step to the third frame and read the two recalls at the right edge of the
+zoomed panel. Which detector would you deploy for a team of a hundred,
+and which one does the AUC prefer?
+</Task>
+
+The two curves are drawn for illustration, but crossing curves are
+common. On the simulator's test week the depth-2 tree has AUC 0.763 and
+a tree grown to full depth on the same training week 0.788; whether the
+deeper tree is also better in the strip a hundred alerts reach, the area
+cannot say.
+
+The full-depth tree's leaves are pure on the training data, so it outputs
+only two scores, 0 and 1. Payments with the same score are tied and no
+threshold can separate them, so there is one cut between the two scores:
+the curve is a single corner joined to $(0, 0)$ and $(1, 1)$ by straight
+lines, and most of its area comes from the straight segment on the right
+that no team can reach. The depth-2 tree's four leaves give four scores
+and a curve of four corners. A curve with few corners is not a plotting
+error; it is a model with few distinct scores.
+
+### Precision sees the base rate; the ROC axes do not
+
+Why does the ROC curve hide the reachable strip so well? Both of its axes
+are rates within one class: recall is a share of the frauds, the
+false-positive rate a share of the genuine payments. Neither depends on
+how many of each there are, the property <Ref
+lesson="economics-of-detection"
+id="the-same-detector-on-different-streams">the economics of
+detection</Ref> stated as "error rates travel between streams". At 55
+frauds against 8,250 genuine payments, a false-positive rate of 0.012 is
+99 false alerts, almost twice as many as there are frauds to find. On the
+ROC axis, 0.012 is indistinguishable from zero.
+
+<Ref lesson="economics-of-detection"
+id="bayes-rule-and-why-the-error-rates-cannot-rescue-precision">The
+economics of detection</Ref> wrote precision through Bayes' rule, from
+the two error rates and the base rate; counted on one day it is
+
+$$
+\text{precision} = \frac{\mathrm{TP}}{\mathrm{TP} + \mathrm{FP}} ,
+$$
+
+with $\mathrm{TP}$ at most 55 on a simulator day and $\mathrm{FP} =
+\mathrm{FPR} \times 8{,}250$. A cut that sends $a$ alerts in total
+therefore has precision at most $55/a$. Inside the budget, $a \le 100$,
+that bound leaves precision free to take any value from 1 down; past the
+budget it falls fast. Beyond 825 alerts, a false-positive rate of about 0.1, precision is below $55/825 \approx
+0.07$, and at the bottom of the list it reaches the fraud share $m/n
+\approx 0.0066$, with $m$ frauds among $n$ payments.
+
+### Where the hundred alerts land on the PR plot
+
+Plot precision against recall at every cut: the *precision-recall curve*,
+or PR curve. The budget does not shrink its horizontal axis: a hundred
+alerts can reach any recall the ranking reaches within its top hundred,
+all the way to 1 on a day with 55 frauds. The budget shows up vertically
+instead. A cut of at most a hundred alerts has $\mathrm{TP} +
+\mathrm{FP} \le 100$ and $\mathrm{TP} = 55 \times \text{recall}$, so its
+precision is at least $0.55 \times \text{recall}$: every cut the team can
+make lies on or above the line from $(0, 0)$ to $(1, 0.55)$. Every cut
+beyond the hundred, the 98.8% of the ROC axis the team cannot use, sits
+below that line, and the nine tenths of the ROC axis beyond
+$\mathrm{FPR} = 0.1$ are squeezed into the band of precision under 0.07,
+just above the floor $m/n$. The PR plot gives the reachable cuts most of
+its height: it is the zoom of the third frame, done by arithmetic.
+
+### Dominance survives the change of axes
+
+To say that the zoom does not change which curve is on top, "on or
+above" needs a meaning at a recall where a curve has several points. Take
+rankings without tied scores. Recall moves only when a fraud is reached,
+so the recalls a ranking reaches are $1/m, 2/m, \dots, 1$. At recall
+$j/m$ it has a run of cuts, from the one that has just reached the $j$-th
+fraud down to the one just before the next fraud, each with one more
+false alert than the one before; on the toy, recall 0.5 is held by the
+cuts after ranks 1, 2 and 3, at precision 1, 1/2 and 1/3. The first of
+the run is the best point, with the fewest false alerts: $\mathrm{FP}(j)$,
+the number of genuine payments ranked above the $j$-th fraud. On the
+PR plot it is the top of the stack at recall $j/m$; on the ROC plot it is the corner where the staircase steps
+up to $j/m$, at $\mathrm{FPR} = \mathrm{FP}(j)/(n-m)$.
+
+- A's PR curve is *on or above* B's when, at every recall $j/m$, A's best
+  precision is at least B's.
+- A's ROC curve is on or above B's when, at every false-positive rate,
+  A's recall is at least B's. For two staircases that is the same as A
+  stepping up to each recall $j/m$ no later than B:
+  $\mathrm{FP}_A(j) \le \mathrm{FP}_B(j)$ for every $j$.
+
+<Theorem title="dominance is the same in ROC and PR space">
+Fix a test set with $m > 0$ frauds and $n - m > 0$ genuine payments. For
+two rankings A and B of it without tied scores, A's ROC curve lies on or
+above B's everywhere if and only if A's PR curve lies on or above B's
+everywhere.
+
+<Proof>
+At recall $j/m$ the best point has $\mathrm{TP} = j$ and
+$\mathrm{FP}(j)$ false alerts, so its precision is $j/(j +
+\mathrm{FP}(j))$, which strictly decreases as $\mathrm{FP}(j)$ grows.
+Hence A's best precision at $j/m$ is at least B's exactly when
+$\mathrm{FP}_A(j) \le \mathrm{FP}_B(j)$. Requiring this for every $j$
+gives PR dominance on one side and, by the second definition, ROC
+dominance on the other.
+</Proof>
+</Theorem>
+
+So ROC and PR can disagree only about curves that cross, as in the figure
+and the two trees. There the two summaries weight the crossing
+differently: ROC-AUC weights every false-positive rate the same, while
+anything computed from the PR curve is dominated by the reachable corner,
+because that is where precision varies.
+
+## Average precision: the precision at each fraud, averaged
+
+The PR curve is the right picture; the next problem is to summarise it in
+one number. The obvious summary is its area, computed the way the ROC
+area is, with straight lines between points.
+
+### Walking down the toy's list
+
+Cut the toy after each rank and record recall and precision. After rank 1:
+one fraud of two found, one alert, so recall 0.5 and precision 1. Ranks
+2 and 3 are genuine: recall stays 0.5, precision drops to 1/2, then 1/3.
+At rank 4 the second fraud arrives: recall 1, precision 2/4 = 0.5. Below
+that only genuine payments remain, and precision sinks to 2/7, 2/9 and
+finally 2/10, the fraud share of the whole list.
+
+Precision went down and then up again, 0.5 → 0.33 → 0.5: unlike a ROC
+curve, a PR curve is not monotone. A straight line drawn between PR
+points describes no cut that exists: no threshold produces the precision
+halfway along the segment from (0.5, 1/3) to (1, 0.5). And because
+several points share a recall, the area depends on which of them the
+line starts from. On the toy, with precision 1 up to recall 0.5 in both cases, joining (0.5, 1) to (1, 0.5) gives an
+area of 0.875; joining (0.5, 1/3) to (1, 0.5) gives 0.708. Neither is a
+property of the ranking.
+
+### What the team sees at each fraud
+
+A summary that needs no interpolation comes from the walk itself. Each
+time the team, working down the list, reaches a fraud, it has a precision
+so far: the share of what it has opened that was fraud. Average that
+precision over the frauds.
+
+<Example title="average precision of the toy">
+The frauds sit at ranks 1 and 4.
+
+**First fraud, rank 1.** One alert opened, one fraud: precision 1.
+
+**Second fraud, rank 4.** Four alerts opened, two frauds: precision 2/4.
+
+**Average.** $(1 + 0.5)/2 = 0.75$.
+
+The same number as a sum over the cuts, weighting each cut's precision
+$P_n$ by the recall it added, $R_n - R_{n-1}$: the cuts after ranks 1
+and 4 each add recall 0.5, every other cut adds nothing, so the sum is
+$0.5 \times 1 + 0.5 \times 0.5 = 0.75$.
+</Example>
+
+<FigureSequence
+  name="ap-steps"
+  alt="Three frames on precision-recall axes for the ten-payment toy, with the points of each cut as black dots: rank 1 at recall 0.5 precision 1, ranks 2 and 3 below it at 0.5 and 0.33 (labelled the dip), rank 4 at recall 1 precision 0.5, and ranks 5 to 10 below it down to 0.2; a dashed line marks the fraud share 0.2. First frame shades an amber rectangle of width 0.5 and height 1, labelled fraud 1 at rank 1. Second adds a rectangle of width 0.5 and height 0.5, labelled fraud 2 at rank 4. Third adds the total AP = 0.5 + 0.25 = 0.75"
+  caption="Average precision as rectangles: one per fraud, width one over the number of frauds, height the precision when that fraud is reached."
+/>
+
+<Task>
+In the second frame, find the points the rectangles ignore: ranks 2, 3 and
+5 to 10. Why does none of them change the shaded area?
+</Task>
+
+<Definition title="average precision">
+Rank a list of $n$ items containing $m$ frauds, and let $r_1 < r_2 <
+\dots < r_m$ be the ranks of the frauds. The *average precision* of the
+ranking is
+$$
+\mathrm{AP} = \frac{1}{m}\sum_{j=1}^{m} \frac{j}{r_j}
+= \sum_{n'} (R_{n'} - R_{n'-1})\,P_{n'} ,
+$$
+where $j/r_j$ is the precision when the $j$-th fraud is reached, and the
+second form runs over the cuts of the list, with $P_{n'}$ and $R_{n'}$ the
+precision and recall at cut $n'$.
+</Definition>
+
+The two forms are equal because $R_{n'} - R_{n'-1}$ is $1/m$ at the cut
+that reaches a fraud and $0$ at every other cut. The second form is the
+step-wise area under the PR curve, rectangles and never trapezoids;
+libraries that report "area under the PR curve" by the trapezoid rule
+compute something else.
+
+The definition assumes every fraud has a rank of its own, $r_1 < r_2 <
+\dots$. A model that gives several payments the same score breaks that:
+nothing orders the payments inside the tied block, so the frauds in it
+have no ranks to put into $j/r_j$. In the threshold table the toy's three
+genuine payments at 0.20 enter together, which is why the alerts jump
+from 4 to 7: no threshold opens one of them without the other two.
+
+<KeyFact>
+**Ties.** A block of tied scores is one cut. Every fraud in the block is
+reached at that cut's precision, (frauds down to the end of the block) /
+(payments down to the end of the block), and adds $1/m$ times that
+precision to the AP. The ROC curve treats the block the same way: one
+cut, joined to the previous one by a straight segment, which counts each
+tied (fraud, genuine) pair as half a correct pair.
+</KeyFact>
+
+A model that gives all ten toy payments one score has a single block,
+reached at precision $2/10$, so its AP is $\tfrac12(0.2 + 0.2) = 0.2$,
+the fraud share of the list.
+
+By the first form, AP is 1 exactly when all frauds come before all
+genuine payments, $r_j = j$. A fraud found late contributes its small
+precision $j/r_j$: on a simulator day of 55 frauds, a fraud at rank 5,000
+adds at most a fifty-fifth of $55/5{,}000 = 0.011$.
+
+<Exercise>
+Compute AP for the second toy ranking of the previous section, frauds at
+ranks 2 and 3, whose AUC is also 0.875. Write the precision at each fraud
+before averaging. Then list the corners of its ROC staircase and find the
+range of false-positive rates over which its curve and the first
+ranking's differ.
+
+<Solution>
+**AP.** At the fraud at rank 2, precision $1/2$; at the fraud at rank 3,
+precision $2/3$. $\mathrm{AP} = (0.5 + 0.667)/2 \approx 0.583$, against
+0.75 for the first ranking.
+
+**Where the curves differ.** The second ranking's cuts give $(0, 0)$,
+$(0.125, 0)$, $(0.125, 0.5)$, $(0.125, 1)$, then along the top to
+$(1, 1)$. The first ranking's corners were $(0, 0.5)$, $(0.25, 0.5)$,
+$(0.25, 1)$. Both curves are at recall 1 from $\mathrm{FPR} = 0.25$ on, so
+they differ only on the first quarter of the axis: below $0.125$ the
+first ranking is at 0.5 and the second at 0; between $0.125$ and $0.25$
+the second is at 1 and the first at 0.5. Each lead is a rectangle of
+$0.125 \times 0.5$, so the areas are equal.
+
+AP prefers the first ranking because its first fraud comes at the very
+top, where precision is weighted fully: the lead below $\mathrm{FPR} =
+0.125$ is the one a short budget reaches.
+</Solution>
+</Exercise>
+
+In the panel below you reorder ten payments, two of them fraud, and
+watch the ROC staircase (left), the AP rectangles (right) and the
+precision of the top 3 (P@3). It starts with the frauds at ranks 1 and
+10: AUC 0.50, what a coin would score, yet the first payment opened is a
+fraud and AP is 0.60.
+
+<Task>
+First find an order whose ROC-AUC is at least 0.75 while its AP is below
+0.5; any such order also clears the panel's first target. Then find an
+order with the start's AUC of 0.50 and no fraud in the top 3. Before you
+drag, decide where the first fraud may sit for each target.
+</Task>
+
+<Demo name="RankingBudgetExplorer" caption="Ten payments, two of them fraud, in an order you drag. ROC-AUC, average precision and the precision of the top 3 recompute on every move." />
+
+### Why the first target has only two answers
+
+With frauds at ranks $r_1 < r_2$ among ten payments, the fraud at $r_1$
+is above $9 - r_1$ genuine payments and the one at $r_2$ above $10 -
+r_2$, so $\mathrm{AUC} = (19 - r_1 - r_2)/16$, and $\mathrm{AP} =
+\tfrac12(1/r_1 + 2/r_2)$.
+
+- **AP below 0.5** needs $1/r_1 + 2/r_2 < 1$. A fraud at rank 1 makes the
+  first term 1 on its own, so the top payment must be genuine.
+- **AUC at least 0.75** needs 12 correct pairs of 16, so $r_1 + r_2 \le
+  7$.
+
+Only two orders satisfy both: frauds at 2 and 5 (AP 0.45) and at 3 and 4
+(AP 0.42), each with AUC 0.75. Both put two frauds within the top five,
+yet both score lower AP than the start, whose second fraud is at the very
+bottom: AP is ruled by where the first frauds land, AUC by how many pairs
+are in order anywhere. For the second target, frauds at ranks 4 and 7 sit
+above 5 and 3 genuine payments, 8 of 16 pairs, with nothing in the top 3.
+
+### What a ranking with no information scores
+
+To read an AP you need its floor. A model that gives every payment the
+same score is one tied block, so every fraud is reached at the precision
+of the whole list and its AP is exactly the fraud share $m/n$, as the
+constant toy model's 0.2 showed. A random order does slightly better on
+average, by a term of order $(\ln n)/n$ from the lucky case of a fraud
+landing at the very top (the exercise on the floor of average precision
+derives it); on the test week that term is 0.0002 against a fraud share
+of 0.0066. In practice, an uninformative ranking scores the base rate
+$\pi$.
+
+On the test week the depth-2 tree's AP of 0.496 is 75 times the floor of
+about 0.007, the full-depth tree's 0.309 is 47 times it: AP reverses the
+AUC order of the two trees. The full-depth tree's two scores make two
+tied blocks. Every fraud it does not score 1 sits in the block at 0 with
+nearly every genuine payment, a block that ends at the bottom of the
+list, so that fraud is reached at exactly the base rate. The depth-2
+tree's four blocks reach more of its frauds near the top.
+
+Because the floor is the base rate, AP, like precision, belongs to the
+stream it was measured on. On real Belgian e-commerce payments, about one
+fraud in 400, five standard models, each trained on one week and scored
+on a later one (logistic regression, the depth-2 and the full-depth
+decision tree, a random forest, and boosted trees, XGBoost), reach APs
+from 0.003 to 0.035 against a floor of 0.002.
+
+<Figure
+  src="./figures/worldline-pr-floor.png"
+  alt="Precision–recall plot, recall 0 to 1 across, precision 0 to 1 up. Five model curves and a dashed random line all lie in the bottom tenth of the plot: after a spike at recall near 0, logistic regression peaks near 0.2 and every curve is below 0.1 from recall about 0.15 on, sinking to near 0 by recall 1. Legend: AP random 0.002, logistic regression 0.035, depth-2 decision tree 0.024, unlimited-depth decision tree 0.003, random forest 0.015, XGBoost 0.035"
+  caption="Five standard models, each trained on one week of real Belgian e-commerce payments, about one fraud in 400. Every curve hugs the floor: the best APs are 0.035 against 0.002 for random ordering, and precision stays under 0.1 for nearly all of the recall range."
+  float="right"
+  width="m"
+/>
+
+<KeyFact>
+AP has a floor equal to the base rate, not 0.5 as AUC does. Read an AP as a
+multiple of the fraud share of its test set: 0.035 at one fraud in 400 is
+seventeen times the floor, a strong model; 0.035 at one in 150 is five
+times it, a weak one beside the simulator trees' 47 and 75.
+</KeyFact>
+
+## Precision at k: the metric cut where the team cuts
+
+AP still averages over every fraud in the list, including the ones at
+rank 5,000, and the team stops at rank 100. A model can raise its AP by
+moving frauds from rank 3,000 to rank 1,000, which changes nothing the
+team will ever open. The metric that looks only where the team looks is
+the hit rate of <Ref lesson="economics-of-detection"
+id="why-hit-rate-is-not-a-target">the economics of detection</Ref>, the
+share of fraud in the top $k$, now computed on a labelled test set.
+
+### One day of the simulator
+
+The budget renews every morning, so the list is cut per day. Pooling the
+week into one list of 58,264 and cutting it at seven days' budget, 700
+payments, would let a day with many high-scoring frauds fill most of
+those 700 and starve a quiet day.
+
+The team ranks cards, but the test week labels payments, and AP and AUC
+count payments too. Cut on payments first, the daily metric differs from
+them only in where it stops counting, so whatever it shows is the effect
+of the cut; the move to cards is a separate change.
+
+<Definition title="precision at k">
+For day $t$, rank the day's payments by score and let $A_t$ be the top
+$k$. The *precision at $k$* of day $t$ is
+$$
+P@k(t) = \frac{\#\{\text{frauds in } A_t\}}{k} ,
+$$
+and over a test period of days $\mathcal{D}$ the reported value is the
+mean of the daily values, $P@k = \frac{1}{|\mathcal{D}|}\sum_{t \in
+\mathcal{D}} P@k(t)$.
+</Definition>
+
+On day 129 the depth-2 tree's top hundred payments hold 26 frauds:
+$P@100(129) = 0.26$. Over the week the daily values are 0.26, 0.35, 0.26,
+0.33, 0.30, 0.35 and 0.19, with mean 0.291: about 29 frauds found per
+hundred payments opened, in the team's own units. A random hundred would
+hold less than one, since the fraud share is 0.0066.
+
+### Reading a day against its ceiling
+
+Day 129 has only 55 frauds. Even a perfect ranking puts at most 55 of them
+into the top hundred, so $P@100(129)$ cannot exceed 0.55. In general, with
+$\gamma_t$ frauds on day $t$,
+
+$$
+P@k(t) \le \min\Big(1, \frac{\gamma_t}{k}\Big) .
+$$
+
+<Figure
+  src="./figures/topk-week.svg"
+  alt="Seven pairs of bars for days 129 to 135: an outlined bar of each day's frauds (55, 60, 56, 56, 59, 58, 41) and inside it an amber bar of the frauds among the top 100 payments (26, 35, 26, 33, 30, 35, 19); P@100 printed under each day (0.26 to 0.19); a dashed line at 100 marks the budget"
+  caption="Every day the outline is below the budget line, so P@100 can never reach 1; the tree finds about half of what is there."
+/>
+
+Read against that ceiling, the tree's 0.26 on day 129 is 26 of 55
+reachable frauds and its 0.19 on day 135 is 19 of 41, both close to half:
+the low last day is a quiet day, not a worse model. A mean $P@k$ mixes
+the model's quality with the calendar's supply of fraud, which is
+harmless when two models are compared on the same days and misleading
+when one month's number is compared with another's.
+
+<KeyFact>
+The ceiling splits a mean $P@k$'s distance from 1 into two parts. On the
+test week the mean ceiling is $385/700 = 0.55$, so of the depth-2 tree's
+gap from 0.29 to 1, about 0.26 is the model's (0.29 up to 0.55) and 0.45
+is the calendar's (0.55 up to 1), which no model can close. On a stream
+with more than $k$ frauds every day the ceiling is 1 and the whole gap is
+the model's.
+</KeyFact>
+
+<Aside>
+**Fixing recall instead of $k$.** A related metric integrates the PR curve
+only up to a fixed recall, usually 0.2, so its maximum is 0.2. It keeps
+the focus on the top of the list without choosing $k$, which helps when
+the budget is unknown or differs between teams. It fixes the share of
+fraud to be found and asks at what precision it was found, where $P@k$
+fixes the number of alerts; on a day with many frauds the first fifth may
+lie far beyond rank 100, and on a quiet day well inside it, so the two
+can disagree.
+</Aside>
+
+## Card precision at k: the team calls cards
+
+$P@k$ still counts the wrong things, because its unit is the payment. <Ref
+lesson="fraud-detection-system"
+id="a-hundred-cases-a-day-the-models-output-is-a-ranking">The layered
+system</Ref> established that an investigator calls a cardholder and
+settles all the card's recent payments in that one call, and that on
+real card data a compromised card produces about three frauds a day.
+Three high-scoring frauds on one card are one call and one detection, and
+in a top-hundred list of payments they occupy three slots.
+
+### Collapsing a day to cards
+
+The ranking needs no repair: <Ref lesson="fraud-detection-system"
+id="ranking-then-cutting-at-the-capacity">the layered system</Ref>
+already sorts the day's cards by their highest score and hands the top
+$k$ to the investigators. What the metric lacks is a label per card,
+since the test week labels payments. The card's label that day is the
+highest label among its payments: the card counts as compromised on day
+$t$ if any of its payments that day is fraud.
+
+<FigureSequence
+  name="card-collapse"
+  alt="Two frames. First: eight payments ranked by score with their card letter, A at 0.95, 0.90 and 0.85 all fraud, B at 0.80 genuine, C at 0.70 fraud, D at 0.60 genuine, C at 0.40 fraud, E at 0.30 genuine; a blue bracket around the top three reads P@3 = 1 but all three are card A, one call. Second: the same day as five cards with their maximum score and label, A 0.95 fraud, B 0.80 genuine, C 0.70 fraud, D 0.60 genuine, E 0.30 genuine; the bracket around the top three reads three calls A, B, C, two compromised cards found, CP@3 = 2/3"
+  caption="Ranked as payments, the top three are one card and one call. Ranked as cards, three calls find two compromised cards."
+/>
+
+<Task>
+In the first frame, count the calls the team makes if it works the top
+three payments, and how many of its three calls it has left. Then in the
+second frame, check which payment of card C sets the card's score.
+</Task>
+
+<Definition title="card precision at k">
+For day $t$, give each card active that day the maximum score and the
+maximum label of its payments that day, rank the cards by score, and let
+$C_t$ be the top $k$ cards. The *card precision at $k$* of day $t$ is
+$$
+CP@k(t) = \frac{\#\{\text{compromised cards in } C_t\}}{k} ,
+$$
+averaged over the days of the test period like $P@k$.
+</Definition>
+
+In the figure, $P@3 = 1$ describes one call that finds one card; $CP@3 =
+2/3$ describes three calls that find two, which is what the team gets.
+The ceiling carries over with $\gamma_t$ now counting compromised cards:
+$CP@k(t) \le \min(1, \gamma_t/k)$.
+
+On the simulator's day 129 the depth-2 tree's top hundred cards hold 24
+of the day's 50 compromised cards: $CP@100(129) = 0.24$. Over the week
+the mean is 0.286, close to the $P@100$ of 0.291, because in both of <Ref
+lesson="canonical-datasets" id="three-scripted-frauds">the simulator's</Ref>
+main scenarios a compromised card rarely makes more than one fraud a day.
+Scenario 2, compromised terminals, makes most of the frauds (9,099 of
+14,681): every payment at a compromised terminal is fraud, whoever's card
+pays there, and a customer spreads about two payments a day over some 75
+nearby terminals, so a card almost never pays there twice in a day. Such
+a card was not stolen; "compromised" means only that one of its payments
+that day was fraud, and it has another fraud only on a later day it
+returns to that terminal within the terminal's 28 days. Scenario 3,
+leaked credentials, turns a third of a leaked card's payments into fraud
+for 14 days: at about two payments a day, less than one fraud a day.
+
+<Exercise>
+A day has these payments, as (card, score, label): (P, 0.92, fraud),
+(Q, 0.88, genuine), (P, 0.81, fraud), (R, 0.77, genuine), (S, 0.65,
+fraud), (Q, 0.60, genuine), (T, 0.55, genuine), (S, 0.20, fraud). With
+$k = 2$ and $k = 3$, compute $P@k$ and $CP@k$. Write the card table
+(maximum score, maximum label) before ranking.
+
+<Solution>
+**Card table.** P: 0.92, fraud. Q: 0.88, genuine. R: 0.77, genuine.
+S: 0.65, fraud. T: 0.55, genuine. Ranked: P, Q, R, S, T.
+
+**$k = 2$.** Payments: top two are (P, 0.92, fraud) and (Q, 0.88, genuine),
+$P@2 = 1/2$. Cards: P and Q, one compromised, $CP@2 = 1/2$.
+
+**$k = 3$.** Payments: the third is (P, 0.81, fraud), so $P@3 = 2/3$.
+Cards: P, Q, R, one compromised, $CP@3 = 1/3$.
+
+The payment metric rises from two to three alerts because it counts card
+P's second fraud as a new detection; the card metric falls because the
+third call goes to card R, which is genuine. Card S, the other
+compromised card, sits at card rank 4 and is found only with $k = 4$.
+</Solution>
+</Exercise>
+
+### On real card data
+
+On the Belgian stream about 300 cards are compromised every day and the
+team calls a hundred, so even a perfect ranking reaches at most a third of them. A random hundred cards hold about
+a quarter of one compromised card, $CP@100 \approx 0.0025$; the logistic
+regression of <Ref lesson="fraud-detection-system"
+id="ranking-then-cutting-at-the-capacity">the layered system</Ref>,
+whose top hundred holds about 15 compromised cards, has $CP@100 \approx
+0.15$, and a depth-2 tree about 0.10.
+
+<Figure
+  src="./figures/worldline-cards-vs-k.png"
+  alt="Line chart of daily counts from 25 July to 14 August 2018, split by two vertical lines into training, delay and test periods. Compromised cards per day run between about 250 and 430 throughout; in the test period a second line, the compromised cards left once already-known cards are removed, runs between about 200 and 370. Along the bottom of the test period a flat line shows the compromised cards a depth-2 tree finds in its top 100, about 5 to 12 a day."
+  caption="Real card data: about 200 to 400 compromised cards a day against roughly ten found in a depth-2 tree's top 100. With 100 alerts a day the precision ceiling is 1 every day, so the whole gap between the bottom line and 100 is the model's. The legend's 'fraudulent' series are cards, not payments."
+/>
+
+<KeyFact>
+$P@k$ and $CP@k$ part where cards repeat near the top. If no card has two
+payments among the day's top $k$, the top $k$ cards are the cards of the
+top $k$ payments, and $CP@k$ can exceed $P@k$ only through a card whose
+fraud scored below one of its genuine payments. Every repeat in the top
+$k$ spends a payment slot on a card already counted: on the simulator,
+with about one fraud per compromised card a day, the two differ by
+0.005; on real data, with about three, one card can fill three of the
+hundred payment slots.
+</KeyFact>
+
+## A detected card is a blocked card
+
+The week's $CP@100$ of 0.286 was computed day by day, each day scored as
+if the previous days had not happened. They did happen. A card the team
+found on day 129 is blocked on day 129, so its payments on day 130 never
+take place. Yet in the simulator a card stays compromised over many
+days, fourteen for a leaked card, and each day the tree ranks it in the
+top hundred, the day-by-day metric credits a new detection of a card the
+team blocked at the first call.
+
+### Removing cards the team has already found
+
+The repair follows the team: carry the set of cards detected so far
+through the test week, and before scoring day $t$ remove every payment of
+a card detected on an earlier day. The day's ranking is then built only
+from cards the team could still call, and $\gamma_t$ counts only
+compromised cards not yet found.
+
+<Figure
+  src="./figures/card-removal.svg"
+  alt="For each test day 129 to 135, a blue bar of compromised cards still to find when each day is scored alone (50, 54, 51, 54, 55, 54, 38) beside an amber bar after removing cards detected on earlier days (50, 50, 49, 47, 46, 44, 31); under them the daily CP@100 without removal in blue (0.24, 0.35, 0.26, 0.32, 0.30, 0.34, 0.19) and with removal in amber (0.24, 0.32, 0.27, 0.25, 0.23, 0.26, 0.12); headers give the means 0.286 and 0.241"
+  caption="Removing the cards found on earlier days shrinks the pool of compromised cards and the daily card precision."
+/>
+
+Day 129 is unchanged: nothing has been found yet. From day 130 on, the
+pool is smaller by the cards the tree caught earlier that are still
+compromised, and the daily card precision falls with it: 0.32 instead of
+0.35 on day 130, 0.12 instead of 0.19 on day 135. The mean falls from
+0.286 to 0.241: about 4.5 of the 28.6 cards a day credited to the tree
+had already been blocked. Written without qualification, $CP@k$ means
+the version with removal.
+
+The test days had already been through one such cleaning: the week's 385
+frauds exclude the payments of cards the bank knew to be compromised from
+the training period; the raw week held 74 to 91 frauds a day. Which cards
+count as known at a given test day depends on when their labels arrived,
+a question about the label delay that <Ref
+lesson="delayed-labels-prequential">the next lesson</Ref> answers.
+
+<Example title="removal on two days">
+A two-day test with $k = 2$. Day 1: cards U (0.9, compromised), V (0.8,
+genuine), W (0.4, compromised). Day 2: U (0.95, compromised, still
+active), W (0.85, compromised), X (0.5, genuine).
+
+**Without removal.** Day 1: top two U, V, one compromised: $CP@2 = 0.5$.
+Day 2: top two U, W, both compromised: $CP@2 = 1$. Mean 0.75.
+
+**With removal.** Day 1 as before; U is detected and blocked. Day 2:
+remove U; the top two of W, X hold one compromised card: $CP@2 = 0.5$.
+Mean 0.5.
+
+Removing U also opens a slot, which here goes to a genuine card.
+</Example>
+
+### Normalising by the day's ceiling
+
+Removal sharpens the ceiling problem, because the pool shrinks as the
+week goes on: by day 135 only 31 compromised cards remain and
+$CP@100(135)$ cannot exceed 0.31. For backtesting, where days from
+different periods are compared, the daily value can be divided by its
+ceiling:
+
+$$
+NCP@k(t) = \frac{CP@k(t)}{\min(1, \gamma_t/k)} ,
+$$
+
+the *normalised card precision*, the share of the reachable maximum that
+the model achieved. If a day has 50 compromised cards and the hundred calls
+find 40, then $CP@100 = 0.4$ and $NCP@100 = 0.4/0.5 = 0.8$. On day 135
+the tree's 0.12 becomes $0.12/0.31 \approx 0.39$.
+
+Two limits come with it. $\gamma_t$ is known only once day $t$'s labels
+have arrived, so $NCP@k$ cannot be computed on the live system; it is a
+backtesting number, and the running dashboard shows $CP@k$. And on a day
+with no compromised card left the ceiling is zero and $NCP@k$ is
+undefined.
+
+## Three numbers for three questions
+
+With ROC-AUC, average precision and card precision at $k$ in hand, it is
+tempting to let $CP@k$ replace the other two. The five standard models,
+trained on the simulator's week of 25 to 31 July and scored on its test
+week, show why that is premature.
+
+<Figure
+  src="./figures/three-rankings.svg"
+  alt="Three columns ranking the same five models on the simulator's test week. ROC-AUC: logistic regression 0.871, random forest 0.867, boosted trees 0.862, unlimited-depth tree 0.788 (blue), depth-2 tree 0.763 (amber). Average precision: random forest 0.658, boosted trees 0.639, logistic regression 0.606, depth-2 tree 0.496, unlimited-depth tree 0.309. CP@100: logistic regression 0.291, random forest 0.287, boosted trees 0.273, unlimited-depth tree 0.243, depth-2 tree 0.241. Lines connect each model across the columns; the two trees' lines cross between ROC-AUC and AP and cross back between AP and CP@100"
+  caption="The same five models ranked three ways. Each metric has a different leader, and the two trees swap places twice."
+/>
+
+### What each disagreement means
+
+**The two trees.** AUC prefers the full-depth tree by 0.025, propped up
+by the straight segment of its ROC curve through the unreachable region;
+AP prefers the depth-2 tree by 0.187, because the full-depth tree's
+frauds tied at 0 are reached at the base rate. $CP@100$ separates them by
+0.002, a fifth of a card a day, which is a tie: the budget of a hundred
+cards sees neither advantage.
+
+**The top three.** AUC puts logistic regression first, AP the random
+forest, $CP@100$ logistic regression again. Their $CP@100$ values differ by
+at most 0.018, under two cards a day, on a week of seven days with about
+45 findable cards each. A gap that size is within what a different week
+could reverse, which <Ref lesson="delayed-labels-prequential">the next
+lesson</Ref> measures when it repeats the evaluation over several weeks.
+
+Each metric answers its own question:
+
+- **ROC-AUC**: how well does the model separate fraud from genuine over
+  the whole list? Ignoring the base rate and the budget makes it
+  comparable across streams and with the published literature, and blind
+  to the strip the team works in.
+- **Average precision**: how much fraud sits at the top of the list,
+  without choosing $k$? It is the summary to use when the budget may
+  change.
+- **$CP@k$**: of the $k$ cards the team calls tomorrow, how many are
+  compromised and not already blocked? It is the team's own number, and
+  it is noisy, capped by the day's supply of fraud, and valid only for
+  the $k$ it was computed at.
+
+<KeyFact>
+Report all three. When they disagree, $CP@k$ at the team's $k$ decides
+the deployment, and AP breaks a tie when the budget is uncertain.
+</KeyFact>
+
+<Conclusion>
+You can now compute what the team would get from a scored test week:
+rank each day's cards by their highest score, cut at $k$, remove the
+cards found on earlier days, and average the daily card precision against
+its ceiling. You can read average precision against the base rate, and
+explain why the ROC curve spends 99% of its axis on cuts a hundred alerts
+a day cannot reach.
+
+Every simulator number here came from a test week starting seven days
+after training ends, with already-known compromised cards removed. Why
+that gap is needed, which cards count as known on a given test day, and
+how to cut a history so that a validation number predicts the next week
+are the problems of <Ref lesson="delayed-labels-prequential">the next
+lesson</Ref>.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+A day has 20 payments, 4 of them fraud, at ranks 1, 3, 8 and 15 of the
+model's ranking. Compute its average precision, its precision at 5, and
+its ROC-AUC as the share of correctly ordered (fraud, genuine) pairs.
+
+<Solution>
+**AP.** Precision at each fraud: rank 1, $1/1$; rank 3, $2/3$; rank 8,
+$3/8$; rank 15, $4/15$. $\mathrm{AP} = (1 + 0.667 + 0.375 + 0.267)/4
+\approx 0.577$.
+
+**P@5.** The top five hold the frauds at ranks 1 and 3: $2/5 = 0.4$.
+
+**AUC.** There are $4 \times 16 = 64$ pairs. A fraud is above every
+genuine payment ranked below it. Rank 1: 16 genuine below. Rank 3: ranks
+4 to 20 hold 17 payments, two of them frauds (8 and 15), so 15. Rank 8:
+ranks 9 to 20 hold 12, one a fraud, so 11. Rank 15: ranks 16 to 20, 5.
+Total $16 + 15 + 11 + 5 = 47$, $\mathrm{AUC} = 47/64 \approx 0.734$.
+
+The fraud at rank 15 adds 5 correctly ordered pairs to the AUC but only
+$4/15$, divided by 4, to the AP: AP discounts late frauds and AUC does
+not.
+</Solution>
+</Exercise>
+
+<Exercise>
+Push the ceiling to its edges. (a) Show that $CP@k(t) \le \min(1,
+\gamma_t/k)$ for any ranking, and give a ranking that attains it. (b)
+What does $CP@100$ report on a day with $\gamma_t = 0$, and what does
+$NCP@100$ report? How should a seven-day mean treat such a day? (c) Now
+let $k$ grow to the number of active cards. What does $CP@k$ become, and
+what does it then measure about the model?
+
+<Solution>
+**(a)** The top $k$ cards contain at most $k$ cards, and at most
+$\gamma_t$ of all cards are compromised, so the count of compromised cards
+in the top $k$ is at most $\min(k, \gamma_t)$; dividing by $k$ gives
+$\min(1, \gamma_t/k)$. A ranking that puts every compromised card above
+every genuine one attains it.
+
+**(b)** With no compromised card, the top $k$ hold none and $CP@100 = 0$
+whatever the model does. The ceiling is $\min(1, 0) = 0$, so $NCP@100 =
+0/0$, undefined. In a $CP@k$ mean the day lowers every model's level
+equally and changes no comparison on the same days; in an $NCP@k$ mean
+it cannot be included at all. It carries no information about the model:
+drop it from both means and report a count of fraud-free days.
+
+**(c)** With $k$ equal to the number of active cards, every card is in
+the top $k$, so $CP@k = \gamma_t / k$, the share of compromised cards,
+for every model. The budget decides which part of the ranking is scored,
+and a budget that covers everything scores nothing, just as the PR curve
+ends at the fraud share for every model.
+</Solution>
+</Exercise>
+
+<Exercise>
+Equal ROC areas with different tops were met on ten payments in <Ref
+lesson="economics-of-detection" id="exercises">the three rankings of
+area 0.625</Ref>. Take it to the scale of a budget. On a test set of
+1,000 payments with 100 frauds, construct two rankings with the same AUC
+whose top 100 hold 60 frauds and 0 frauds. Then compute the AP of each,
+and say in which range of false-positive rates their ROC curves differ.
+
+<Solution>
+**Ranking Y (0 frauds in the top 100).** Put 100 genuine payments at
+ranks 1 to 100, the 100 frauds at ranks 101 to 200, the remaining 800
+genuine below. Each fraud is above 800 genuine payments:
+$\mathrm{AUC} = 100 \times 800 / (100 \times 900) = 8/9 \approx 0.889$.
+
+**Ranking X (60 frauds in the top 100).** It needs the same total of
+80,000 correctly ordered pairs. Put 60 frauds at ranks 1 to 60; each is
+above all 900 genuine payments, 54,000 pairs. The other 40 frauds must
+supply 26,000 pairs, 650 each, so each must have 650 genuine payments
+below it. Place 250 genuine payments at ranks 61 to 310, the 40 frauds at
+311 to 350, and the last 650 genuine at 351 to 1,000. Total 80,000,
+$\mathrm{AUC} = 8/9$. Top 100: ranks 1 to 60 fraud, 61 to 100 genuine,
+$P@100 = 0.6$.
+
+**AP.** In Y the $j$-th fraud sits at rank $100 + j$, so $\mathrm{AP}_Y =
+\frac{1}{100}\sum_{j=1}^{100} \frac{j}{100+j} \approx 0.31$. In X the
+first 60 frauds are reached at precision 1, and the $j$-th of the last 40
+at rank $250 + j$: $\mathrm{AP}_X = \frac{1}{100}\big(60 +
+\sum_{j=61}^{100} \frac{j}{250+j}\big) \approx 0.70$, more than twice
+Y's.
+
+**Where the curves differ.** Y's cut at 100 sits at $\mathrm{FPR} =
+100/900 \approx 0.11$ with recall 0, X's at $\mathrm{FPR} = 40/900
+\approx 0.044$ with recall 0.6. X is far above Y at small false-positive
+rates; Y passes X between $\mathrm{FPR} \approx 0.11$ and $0.28$, where Y
+has found all its frauds and X still has 40 to place, and beyond 0.28
+both are at recall 1. The areas balance inside the first 28% of the axis.
+A budget of 100 reaches at most $\mathrm{FPR} = 0.11$, where X leads.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the floor of average precision. A list of $n$ payments with $m$
+frauds is put in uniformly random order. (a) Show that, conditional on a
+given fraud landing at rank $r$, the expected precision there is
+$\big[1 + (m-1)(r-1)/(n-1)\big]/r$. (b) Deduce that the expected AP is
+$$
+\mathbb{E}[\mathrm{AP}] = \frac{H_n}{n} + \frac{m-1}{n-1}\Big(1 - \frac{H_n}{n}\Big),
+\qquad H_n = \sum_{r=1}^n \frac{1}{r},
+$$
+and check it on the ten-payment toy. (c) Show that AP $= 1$ if and only if
+all frauds precede all genuine payments.
+
+<Solution>
+**(a)** Fix one fraud at rank $r$. The $r-1$ items above it are a
+uniformly random subset of the other $n-1$ items, of which $m-1$ are
+frauds, so the expected number of frauds above it is
+$(r-1)(m-1)/(n-1)$. The precision at rank $r$ counts those plus the fraud
+itself, over $r$ items: $\big[1 + (m-1)(r-1)/(n-1)\big]/r$.
+
+**(b)** AP is the average over frauds of the precision at each fraud's
+rank, so its expectation is the expected precision at the rank of one
+fraud. That rank is uniform on $1, \dots, n$, so
+$$
+\mathbb{E}[\mathrm{AP}] = \frac{1}{n}\sum_{r=1}^{n}\Big[\frac{1}{r} + \frac{m-1}{n-1}\cdot\frac{r-1}{r}\Big]
+= \frac{H_n}{n} + \frac{m-1}{n-1}\Big(1 - \frac{H_n}{n}\Big),
+$$
+using $\sum_r (r-1)/r = n - H_n$. For $n$ large, $H_n \approx \ln n$, and
+the expectation is the fraud share $(m-1)/(n-1) \approx m/n$ plus a term
+of order $(\ln n)/n$.
+
+**Toy check.** $n = 10$, $m = 2$, $H_{10} \approx 2.929$:
+$0.2929 + \tfrac{1}{9}(1 - 0.2929) \approx 0.371$. Enumerating all 45
+placements of the two frauds and averaging $(1/r_1 + 2/r_2)/2$ gives the
+same 0.371, well above the fraud share 0.2, because on a list of ten a
+fraud lands at rank 1 one time in five and then contributes a full 1. On the test week
+($n = 58{,}264$, $m = 385$) the formula gives 0.0068 against a fraud
+share of 0.0066.
+
+**(c)** Each term $j/r_j \le 1$ because the $j$-th fraud cannot sit
+above rank $j$. The average is 1 exactly when every term is 1, that is
+$r_j = j$ for all $j$: the frauds occupy ranks 1 to $m$.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague says that dividing by the day's ceiling cannot change which
+of two models is better on the same days, since the ceiling does not
+depend on the model. Test the claim with removal on days 129 and 130 of
+the depth-2 tree's week. With removal the tree had $\gamma_t$ = 50, 50
+and $CP@100$ = 0.24, 0.32; without removal day 130 had $\gamma_{130} =
+54$, so 4 of the cards the tree found on day 129 were still compromised
+on day 130. A second model B also finds 24 compromised cards on day 129,
+but none of those 4, and finds 34 on day 130. Compare the two models by
+mean $CP@100$ and by mean $NCP@100$ over the two days, decide which
+comparison the team should believe, and state the condition under which
+the colleague would be right.
+
+<Solution>
+**Day 129.** Nothing has been removed yet, so both models face
+$\gamma_{129} = 50$: $CP = 0.24$, $NCP = 24/50 = 0.48$ for both.
+
+**Day 130.** The tree removed the 4 still-compromised cards it found, so
+its pool is 50 and its $NCP = 32/50 = 0.64$. B found none of them, so
+they are still in B's pool: $\gamma_{130} = 54$ and $NCP = 34/54 \approx
+0.63$.
+
+**Means.** By $CP$: tree $0.28$, B $0.29$. By $NCP$: tree $0.56$, B
+$0.555$. The two metrics rank the models in opposite orders.
+
+**Which to believe.** $CP$ counts cards actually found: B found 58
+distinct compromised cards over the two days, the tree 56. The tree's
+$NCP$ edge comes from a denominator made smaller by what the tree itself
+did on day 129. The colleague's claim holds without removal, where
+$\gamma_t$ is the same for every model; with removal it fails from the
+second day on. A normalisation is neutral between models only if its
+denominator does not depend on what the models did.
+</Solution>
+</Exercise>
+
+<Exercise>
+Price the difference between 0.286 and 0.241 with the value formula of
+<Ref lesson="economics-of-detection" id="the-value-of-the-next-call">the
+economics of detection</Ref>, $U = V \cdot (\text{compromised cards
+called}) - C_a k$. Take $k = 100$ calls a day, $C_a = \text{€}5$ per call,
+and $V = \text{€}360$ saved per compromised card called (three further
+frauds of €120 each that the call prevents). (a) A business case for the
+depth-2 tree quotes the weekly value implied by 0.286. Is that the value
+it may claim, and by how much does it overstate or understate a week?
+(b) Below what card precision does working a hundred calls lose money?
+
+<Solution>
+**(a)** No: the claimable figure is the one from 0.241. The extra 4.5
+cards a day in 0.286 were blocked on an earlier day, and a second call
+to a blocked card saves no $V$; its cost $C_a$ is already charged in
+both figures, which count all hundred calls. The overstatement is the
+value of those 4.5 cards alone: $4.5 \times 7 \times \text{€}360 =
+\text{€}11{,}340$ a week, about a fifth of the honest value $(24.1
+\times 360 - 500) \times 7 = \text{€}57{,}232$.
+
+**(b)** $U > 0$ requires $100 \cdot CP \cdot V > 100\,C_a$, so
+$CP > C_a/V = 5/360 \approx 0.014$, about one and a half compromised
+cards per hundred calls: the economics lesson's stopping rule read as an
+average, met by the hundred calls as a whole even if the last calls in
+the list do not meet it.
+</Solution>
+</Exercise>
+
+<Exercise>
+The simulator's leaked cards stay compromised for 14 days, and suppose a
+fraud's label reaches the bank 7 days after the payment. Training covered
+days 115 to 121; the test week is days 129 to 135. Five compromised cards
+have their first fraud on days a: 116, b: 120, c: 124, d: 126 and e: 130,
+and each stays compromised for 14 days from then. Before scoring a test
+day, cards "already known" are removed. Compare two rules: (1) remove
+cards with a fraud during the training days; (2) remove cards whose first
+fraud label had reached the bank by the morning of the test day. For days
+129 and 135, list the compromised cards each rule leaves in the test.
+
+<Solution>
+**Which cards are compromised.** Card a is compromised on days 116 to
+129, b on 120 to 133, c on 124 to 137, d on 126 to 139, e on 130 to 143.
+Day 129: a, b, c, d. Day 135: c, d, e.
+
+**Rule (1).** Cards with a fraud during days 115 to 121: a and b. Day
+129 keeps c and d. Day 135 keeps c, d and e.
+
+**Rule (2).** A card is known on day $t$ if its first fraud was on or
+before day $t - 7$. Day 129: first frauds on or before day 122, so a and
+b are removed, c and d kept, the same as rule (1). Day 135: first frauds
+on or before 128, so a, b, c and d are known; only e is kept.
+
+On day 135 the fixed rule still scores the model on c and d, whose labels
+the bank received on days 131 and 133, during the test week itself. The
+right removal date is not the end of training but "the test day minus
+the label delay", moving with each test day: the construction <Ref
+lesson="delayed-labels-prequential">the lesson on delayed labels and
+prequential validation</Ref> builds, together with the gap between
+training and test that the delay forces.
+</Solution>
+</Exercise>
+
+<References>
+1. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 4.2, "Threshold-based metrics" (the ten-transaction example, its threshold table, MME, BER, G-mean and F1; threshold metrics meaningful only once the objective fixes the threshold); Ch. 4.3, "Threshold-free metrics" (ROC and AUC as the probability of correct pair order; the capacity argument, 100 checks a day over 58,264 test transactions, FPR above 0.01 unreachable, 0.1% in real systems; the PR curve, its non-monotonicity, AP as the step sum, the random baseline, no linear interpolation, the PR curve as a zoom of the low-FPR region; the AUC/AP reversal of the two trees); Ch. 4.4, "Precision top-k metrics" (P@k per day and its ceiling, the depth-2 tree's seven test days, card precision by maximum score and label per card, removal of detected cards from 0.286 to 0.241); Ch. 4.5, "Real-world data" (PR curves and daily detected cards on Worldline data); Ch. 4.6, "Summary" (report AUC, AP and CP@k together); Ch. 3, "Baseline fraud detection system" (the five models' test-week AUC, AP and CP@100); Ch. 3, "Real-world data" (Belgian e-commerce 2018, about 300 compromised cards a day; CP@100 of about 0.0025 at random and 0.15 for logistic regression). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+2. A. Dal Pozzolo, G. Boracchi, O. Caelen, C. Alippi, G. Bontempi, "Credit Card Fraud Detection: A Realistic Modeling and a Novel Learning Strategy," *IEEE Transactions on Neural Networks and Learning Systems* 29(8), 2018, pp. 3784–3797 — Sec. III (alerts as the top $k$; alert precision $P_k$, card precision $CP_k$ counting a card once, normalised $NCP_k$ with its worked example, $NCP_k$ for backtesting only because $\gamma_t$ is known late), Sec. IV-B (why AUC and cost matrices ignore investigator capacity). https://doi.org/10.1109/TNNLS.2017.2736643
+3. A. Dal Pozzolo, O. Caelen, Y.-A. Le Borgne, S. Waterschoot, G. Bontempi, "Learned Lessons in Credit Card Fraud Detection from a Practitioner Perspective," *Expert Systems with Applications* 41(10), 2014, pp. 4915–4928 — Sec. 5.1 (AUC by the Mann–Whitney rank statistic), Sec. 5.2 (detection as ranking; AP as the sum of precision over recall increments of $1/p$; precision within the first alerts). https://doi.org/10.1016/j.eswa.2014.02.026
+4. Y. Lucas, J. Jurgovsky, "Credit Card Fraud Detection Using Machine Learning: A Survey," arXiv:2010.06479, 2020 — Sec. 1.2.2, "Parametric evaluation" (ROC axes as within-class rates and hence insensitive to imbalance; precision built from both classes; P@K, AUCPR and the early-retrieval area AUCPR@0.2, Fig. 2). https://arxiv.org/abs/2010.06479
+5. J. Jurgovsky, M. Granitzer, K. Ziegler, S. Calabretto, P.-E. Portier, L. He-Guelton, O. Caelen, "Sequence Classification for Credit-Card Fraud Detection," *Expert Systems with Applications* 100, 2018, pp. 234–245 — Sec. 4.4, "Metrics" (AUCPR@0.2 as a replacement for precision at a chosen K, maximum 0.2). https://doi.org/10.1016/j.eswa.2018.01.037
+6. J. Davis, M. Goadrich, "The Relationship Between Precision-Recall and ROC Curves," *Proceedings of the 23rd International Conference on Machine Learning (ICML)*, 2006, pp. 233–240 — Sec. 3 (one-to-one correspondence of ROC and PR curves; a curve dominates in ROC space if and only if it dominates in PR space), Sec. 4 (why linear interpolation between PR points is wrong).
+7. T. Saito, M. Rehmsmeier, "The Precision-Recall Plot Is More Informative than the ROC Plot When Evaluating Binary Classifiers on Imbalanced Datasets," *PLoS ONE* 10(3), 2015, e0118432 (ROC unchanged by the class ratio while the PR baseline falls with it; the PR plot on imbalanced data). https://doi.org/10.1371/journal.pone.0118432
+</References>

@@ -15,6 +15,7 @@ export { Input } from "./Input";
 export { TextArea } from "./TextArea";
 export { TextInput } from "./TextInput";
 export { Switch } from "./Switch";
+export { ReorderList } from "./ReorderList";
 export { TargetList } from "./TargetList";
 export type { Target } from "./TargetList";
 export { BitsBar } from "./BitsBar";

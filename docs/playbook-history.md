@@ -6,7 +6,7 @@ constitution. Provenance: the 52-episode CrashCourse US History dissection
 Wineburg/SHEG sourcing research, Reading Like a Historian quasi-experiment,
 second-order-concepts tradition, refutation-text and quantitative-literacy
 research). We adopt the reference course's STRUCTURE and discipline, never
-its voice: the register stays L9-dry.
+its voice: the register stays L9 — plain, direct, no slop.
 
 ## Numbers in history (sharpens L12)
 

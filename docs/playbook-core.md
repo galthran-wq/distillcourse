@@ -51,7 +51,7 @@ as a law of the genre, not a house style.
    | number | comparison / denominator / consequence in the same sentence | L12; playbook-history |
    | term | defined at first use, ≤3 new per section | L9, L11c |
    | place / event | anchored (locator, date, what-happened clause) | L11a–b |
-   | source | provenance stated where provenance is content | L8a |
+   | source | named only in References; a `<Quote>` carries its own | L8a |
 
 8. **Serial continuity.** A spine the course argues along; every unit names
    what it inherits and what it hands off. Voita: roadmap sentences and

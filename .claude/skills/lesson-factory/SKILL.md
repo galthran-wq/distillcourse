@@ -1,24 +1,17 @@
 ---
 name: lesson-factory
-description: Launch the course-factory workflow's lesson phase — iterate over planned lessons (write on the session model, build specced demos, author labs through lab-author, opus QA, one fix cycle each) inside the course's worktree branch. Use after the human has curated the course structure and research briefs.
+description: Launch the course-factory workflow's lesson phase — iterate over planned lessons (write on Opus, build specced demos, author labs through lab-author, opus QA, one fix cycle each) inside the course's worktree branch. Use after the human has curated the course structure and research briefs.
 argument-hint: "<course-slug> [count]"
 disable-model-invocation: true
-allowed-tools: Read, Glob, Grep, Workflow, EnterWorktree, Bash(npm run validate:*), Bash(uv --version), Bash(git *)
+allowed-tools: Read, Glob, Grep, Workflow, Agent, EnterWorktree, Bash(npm run validate:*), Bash(uv --version), Bash(git *)
 ---
 
 # Lesson Factory
 
 The second button: turns curated structure + research briefs into lessons.
 
-## 0. MODEL GATE — check first
-
-Same rule as /course-architect: the orchestrating session model MUST be
-**Claude Fable 5** (`claude-fable-5`) or a Mythos-class successor. Lesson
-writing inherits the session model, so this gate protects lesson quality
-directly. Any other model: **STOP** and output only:
-
-> Lesson production requires Fable. Switch the session model (/model) and
-> re-run /lesson-factory.
+The workflow pins each stage's model itself — writers, lab authors and QA on
+Opus — so any session model can orchestrate it.
 
 ## Workflow
 
@@ -36,13 +29,24 @@ directly. Any other model: **STOP** and output only:
    will not have caught it — it builds only labs already at `drafted`, and
    even then a missing `uv` is a warning there, not an error.
 
-3. **Launch:** Workflow
+3. **Pilot first.** When the course has no `drafted` lesson yet, or the
+   factory (the workflows, the lesson-author / lab-author / course-qa
+   skills, docs/pedagogy.md or the playbooks) has changed since the
+   course's last drafted lesson, the run covers ONLY the first module that
+   still has planned lessons: set `count` to that module's planned
+   lessons, whatever the human asked for, and say so. After it, stop and
+   ask the human to read the module before the rest of the course is
+   written. A mistake in the factory then costs one module, not a course;
+   the next run, once the human has read the pilot, takes the count they
+   ask for.
+
+4. **Launch:** Workflow
    `{name: "course-factory", args: {phase: "lessons", slug: "<slug>", count: <n if given>, root: "<absolute worktree path>"}}`.
    `root` is mandatory: workflow subagents inherit the session's launch
    directory, not your worktree — without it they write into the wrong
    checkout (usually master).
    Per planned lesson, sequentially (prerequisite order): lesson-writer agent
-   (session model, grounded in the research brief) → figure-artist agents in
+   (Opus, grounded in the research brief) → figure-artist agents in
    parallel: drawn figures, and the brief's `source:` visuals cut from the
    captures the reading swarm already took, verified and credited →
    demo-builder execution where a demo is specced → course-qa on opus with a
@@ -53,11 +57,23 @@ directly. Any other model: **STOP** and output only:
    against the rubric's lab section. Labs are slow — a single one is a
    multi-hour authoring loop; `count` applies to them like any lesson.
 
-4. **On completion:** run `npm run validate <slug>`; report per-lesson
+5. **On completion:** run `npm run validate <slug>`; report per-lesson
    outcomes (written / QA verdict / revised), remaining planned lessons, and
    remind the human: review in `npm run dev`, flip statuses to `reviewed`
    themselves, and merge the branch when ready — a lab is reviewed by
    solving a few of its cells in Colab, not by reading its brief.
+
+## Re-running one stage without the workflow
+
+Re-writing, re-figuring or re-checking a few lessons does not need a
+workflow run: launch the stage's agent directly with the Agent tool — the
+`lesson-writer` agent (model opus) with the write or revise instruction the
+workflow would give it, a QA agent executing the course-qa skill on one
+lesson, a fix agent with the QA fix list. That is simpler than resuming a
+stopped workflow, which replays only the unchanged prefix of its calls and
+re-runs everything after the first changed one. Keep the course order: a
+lesson is written only after the lessons before it are final and their
+ledger entries (`research/taught/`) exist.
 
 ## Hard limits
 

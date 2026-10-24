@@ -1,8 +1,8 @@
 export const meta = {
   name: 'course-revision',
-  description: 'Revise already-drafted lessons against their briefs REVISION blocks, then figures, demo, QA→fix',
-  whenToUse: 'After a structure re-synthesis leaves drafted lessons that must be brought up to the new plan. Args: {slug, root, count?, from?}.',
-  phases: [{ title: 'Revise', detail: 'per lesson: rewrite → figures → demo → QA → fix' }],
+  description: 'Revise already-drafted lessons against the constitution and their briefs (REVISION blocks where present), then figures, demo, QA → fix',
+  whenToUse: 'After a structure re-synthesis or a constitution change leaves drafted lessons that must be brought up to the new plan. Args: {slug, root, count?, from?}.',
+  phases: [{ title: 'Revise', detail: 'per lesson: rewrite → figures → demo → QA → fix', model: 'opus' }],
 }
 
 const PLAN_SCHEMA = {
@@ -91,20 +91,26 @@ if (skippedLabs.length) log(`${skippedLabs.length} drafted lab(s) skipped — re
 // One chain per lesson; pipeline() keeps each lesson's steps in order while
 // letting the next lesson start as soon as a slot frees. Shared-file writers
 // (the figure landers) are told to re-read before appending, since two
-// landers can overlap.
+// landers can overlap. The rewrite itself is serialized in course order: each
+// writer reads the ledger entries the earlier lessons' writers just produced,
+// so lesson N may not start before lesson N-1's rewrite has finished.
+let writerTurn = Promise.resolve()
 const done = await pipeline(
   todo,
-  (lesson) =>
-    agent(
+  (lesson) => {
+    const turn = writerTurn.then(() => agent(
       [
         `${at}REVISE the already-drafted lesson: course-slug ${slug}, lesson-slug ${lesson.slug}. Follow your lesson-writer briefing (lesson-author skill, revision mode: keep what complies, rewrite what does not).`,
-        `The course was just re-synthesized under constitution v2. Before writing, read: docs/pedagogy.md (especially L2a/b depth and starred sections, L8a a/b citation discipline, L9a/b no narration of the obvious, L10 throughline, L12 evidence budget, L15 callouts carry load, E6/E7 exercise floor and the forward-reaching exercise, D1 demo teeth), docs/playbook-core.md, docs/playbook-math.md (the difficulty floor), the course \`spine\` in course.yaml, and the lesson's brief content/courses/${slug}/research/${lesson.slug}.md — its ARC block, FIGURE PLAN, EXERCISE PLAN and, above all, its REVISION block.`,
-        `The REVISION block's "Gain" and "Lose" lists are the specification for this pass: apply every item. In particular — add the L10 arc paragraph, section seams and the hand-off named in ARC; rebuild the exercise set against the EXERCISE PLAN and the E6 floor (at most one mechanical warm-up; ≥2 of boundary probe / claim to refute / skipped derivation / research-shaped task) with exactly one FORWARD exercise whose solution names the later lesson with a <Ref>; cut the callouts the block names as tautologies (L15) and the citation theatre (L8a); deepen toward the lesson's est_minutes with real derivations, worked examples and boundary cases rather than padding; put genuinely optional material in \`## ★\` sections the core path survives skipping.`,
+        `Before writing, read docs/pedagogy.md — L0 above all (teach a newcomer: the problem before the answer, every arrangement derived from what forces it with its "because", one step at a time), then L3 (the opening is the problem in plain words), L8a (no source named anywhere in the body or the exercises — References only), L9 (plain and direct, lively where it helps, no slop), L10 (no talk about the lesson or the course), L12, L15, E6/E7, D1 — plus docs/playbook-core.md, the course \`spine\` and this lesson's \`opening\` in course.yaml, and the lesson's brief content/courses/${slug}/research/${lesson.slug}.md: its ARC block, FIGURE PLAN, EXERCISE PLAN and its REVISION block if it has one.`,
+        `Judge the current lesson.mdx as the newcomer would meet it — someone who knows the course prerequisites and every earlier lesson and nothing else; anything an earlier lesson already explained is cut to a <Ref> plus a reminder clause. Where it reads as a recap (conclusions first, arrangements listed without their reasons, terms before their explanation, sources named), rewrite those sections from the problem up rather than patching sentences; keep the worked examples, figures and exercises that already serve the explanation. The REVISION block's "Gain" and "Lose" lists, when present, are part of the specification: apply every item. The exercise set must clear the E6 floor with exactly one FORWARD exercise whose solution names the later lesson with a <Ref>; exercises state their figures directly, never "from source X's figures". Length follows need: an hour to an hour and a half is fine when every part is needed.`,
         `Figures: author the plain-SVG figures the FIGURE PLAN calls for yourself, and leave {/* fig <Name>: ... */} handoff comments for component figures and {/* img <file-stem>: ... */} handoffs for sourced images — a later agent in this same run builds and lands them. Do NOT write a <Figure src> for an image file that does not exist yet.`,
-        `Hard limits: touch only this lesson's directory (lesson.mdx, its figures/) — no course.yaml edits (it is already drafted and its key_image stays), no other lessons, no docs. Finish with \`npm run validate ${slug} ${lesson.slug}\` and report what you gained, what you cut, and the new exercise mix.`,
+        `Rewrite this lesson's ledger entry content/courses/${slug}/research/taught/${lesson.slug}.md per the lesson-author skill — later lessons are revised against it. Hard limits: touch only this lesson's directory (lesson.mdx, its figures/) and its ledger entry — no course.yaml edits (it is already drafted and its key_image stays), no other lessons, no docs. Finish with \`npm run validate ${slug} ${lesson.slug}\` and report what you gained, what you cut, and the new exercise mix.`,
       ].join('\n\n'),
-      { label: `revise: ${lesson.slug}`, phase: 'Revise', agentType: 'lesson-writer' },
-    ),
+      { label: `revise: ${lesson.slug}`, phase: 'Revise', agentType: 'lesson-writer', model: 'opus' },
+    ))
+    writerTurn = turn.catch(() => {})
+    return turn
+  },
   async (_prev, lesson) => {
     const figs = await agent(
       `${at}Figure scan for lesson ${slug}/${lesson.slug}: read content/courses/${slug}/lessons/${lesson.slug}/lesson.mdx and the FIGURE PLAN in content/courses/${slug}/research/${lesson.slug}.md, and return everything still to build.\n\nTwo kinds. kind="component": <Figure name="..."> / <FigureSequence name="..."> references whose PascalCase name is NOT registered in apps/frontend/components/figures/index.ts (kebab-case names are plain SVG files already on disk — ignore those); the spec comes FIRST from the writer's {/* fig <Name>: ... */} comment — copy it verbatim — enriched from the FIGURE PLAN and surrounding prose. kind="sourced": every {/* img <file-stem>: ... */} handoff comment in the MDX and every \`source:\` entry in the FIGURE PLAN whose image file is not yet in the lesson's figures/ dir; the spec must carry what the reader must see, the research/images.yaml candidate id WITH its capture path under content/courses/${slug}/research/images/ when the pool has one — and when it does not, say "no pool candidate" plus whatever source pointer the handoff names, so the builder knows to hunt.`,
@@ -157,7 +163,7 @@ const done = await pipeline(
     return lesson
   },
   async (lesson) => {
-    const qaPrompt = `${at}Execute this repo's course-qa skill, non-interactively: read .claude/skills/course-qa/SKILL.md and follow it exactly for course-slug ${slug}, lesson-slug ${lesson.slug} (read-only, full rubric — including the new X1-X3 exercise-difficulty, K1-K3 callout/citation and demo-teeth checks). Then produce structured output: ready=true only if no REQUIRED fixes remain; fixes = prioritized required fixes (max 5).`
+    const qaPrompt = `${at}Execute this repo's course-qa skill, non-interactively: read .claude/skills/course-qa/SKILL.md and follow it exactly for course-slug ${slug}, lesson-slug ${lesson.slug} (read-only, full rubric — the newcomer test U1-U8 first). Then produce structured output: ready=true only if no REQUIRED fixes remain; fixes = prioritized required fixes (max 5).`
     const qa = await agent(qaPrompt, {
       label: `qa: ${lesson.slug}`, phase: 'Revise', model: 'opus', schema: QA_SCHEMA,
     })
@@ -166,7 +172,7 @@ const done = await pipeline(
     if (qa && !qa.ready && qa.fixes.length > 0) {
       await agent(
         `${at}Revise the lesson ${slug}/${lesson.slug}: apply these required QA fixes — ${JSON.stringify(qa.fixes)} — following your lesson-writer briefing (revision mode, same hard limits). Validate after.`,
-        { label: `fix: ${lesson.slug}`, phase: 'Revise', agentType: 'lesson-writer' },
+        { label: `fix: ${lesson.slug}`, phase: 'Revise', agentType: 'lesson-writer', model: 'opus' },
       )
       fixed = true
       finalQa = await agent(qaPrompt, {

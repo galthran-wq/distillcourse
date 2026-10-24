@@ -2,10 +2,67 @@
 
 Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
 
+## Newcomer test (L0) — scored first, blocks on its own
+
+Clarity is the first metric. Before scoring anything else, take the reader
+the course is written for: someone who knows roughly everything in the
+course prerequisites and in every earlier lesson of the course (their
+ledger entries under `research/taught/`, the full text where the ledger
+points), and nothing else — not the sources, not the field's jargon, not where this
+lesson is going. Read the lesson start to finish as that person and judge
+how easily they would master what it presents.
+
+- **U1 (required)**: list every point where that reader gets lost, each
+  with the quoted sentence: a term, symbol or fact used before it is
+  explained; a conclusion stated before the problem it answers; an
+  arrangement, procedure, metric or convention given without what forces
+  it (a "this is how it is done" with no "because"); a leap between two
+  sentences the reader cannot bridge; a sentence that compresses a whole
+  argument into one clause. Every item is a required fix. More than a few
+  in the first two sections is a "needs rewrite" verdict on its own: the
+  lesson is a recap — readable only by someone who already knows it.
+- **U2 (required)**: problem first, at both scales. The lesson opens with
+  its problem in plain words — not with its answer compressed (L3) — and
+  each `##` section opens with the question it answers or the difficulty
+  it resolves, not with its conclusion. Quote each section's first
+  sentence that fails.
+- **U3 (required)**: no talk about the lesson or the course in place of
+  the material — "this lesson is the first move of the course", "the
+  diagram every later lesson annotates", roadmaps of results (L10a).
+- **U4 (required)**: no source named in the body — prose, callouts,
+  environment titles, captions, exercises, solutions (L8a). Every
+  `source-in-prose` warning from validate is a required fix, and so is any
+  book, paper or author the linter missed ("the APATE paper", "the
+  handbook's figures"). Only a `<Quote>` of a primary text and a named
+  object studied as such (dataset, law, standard, eponymous algorithm)
+  pass.
+- **U6 (required)**: no repetition. That reader already has every earlier
+  lesson: a passage that explains again what an earlier lesson explained
+  is a required fix — it becomes a `<Ref>` plus a clause of reminder
+  (L0e, L11d). Quote the passage and name the lesson that already taught
+  it.
+- **U7 (required)**: the lesson's own ledger entry
+  (`research/taught/<lesson>.md`) exists and records what the lesson
+  actually explains — terms, notation, running cases, what is left open.
+  Later lessons are written and checked against it; a missing or wrong
+  entry is a required fix.
+- **U8 (required)**: each thing said once within the lesson (L0f). Quote
+  every first sentence that restates its heading, every section that ends
+  by summing itself up, every paragraph that re-says the one before it,
+  every preview of what a later section will show. Name the sections that
+  could lose a fifth of their words without losing an idea. The closing
+  must be a `<Conclusion>` before `## Exercises`, and the only summary.
+- **U5 (advisory)**: length is judged by need, not by the clock: an hour
+  to an hour and a half is fine when every part is needed; name any
+  section the newcomer would not miss, and flag a lesson carrying two
+  problems that each need full treatment as a proposed split.
+
 ## Opening & register
-1. The first paragraph states precisely what problem the lesson solves, in
-   declarative sentences. Flag any rhetorical question or teaser here as
-   FAIL (L3).
+1. The opening is the lesson's PROBLEM in plain words for the newcomer —
+   a concrete situation, what must be decided, what makes it hard — using
+   no term the lesson has yet to define and giving away no conclusion
+   (L3). A teaser or suspense line is a FAIL; a direct question stating
+   the task is fine.
 2. Formalism never precedes the concrete instance that grounds it (L4): find
    the first formula and check what stands before it.
 
@@ -51,10 +108,8 @@ Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
   `<Remark>`, `<Aside>`: does it carry a synthesis, a boundary, or a
   forward consequence the body lacks? A restatement of the preceding result
   is a required fix (cut or upgrade). Quote the worst offender.
-- **K2 (required)**: no citation-for-its-own-sake — every inline source
-  pointer buys the reader an alternative proof, a stronger statement, the
-  origin of the notation, or something checkable. Borrowed proofs are
-  attributed in the environment title, not in prose.
+- **K2 (required)**: sources appear in `<References>` only (L8a; scored
+  as U4 — mark this item "see U4").
 - **K3 (required)**: no narration of the obvious ("in expectation
   notation…", "recreated below", "does the work") and no idiom-for-flavour.
   Quote every instance.
@@ -80,9 +135,14 @@ Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
     1,000 words. Flag violations with quotes.
 
 ## Prose craft & references
-11. Dry engineering register (L9): declarative facts throughout. Flag every
-    rhetorical question, tease, narrative framing, or chatty aside with the
-    quoted sentence; jargon defined at first use; no filler.
+11. Register (L9): plain and direct, lively where it helps, and no slop.
+    Flag every instance of filler, hype, intensifiers, empty transitions,
+    restating summaries, idiom in place of mechanism, invented personas,
+    teasers, and self-answering rhetorical questions, with the quoted
+    sentence. Do NOT flag a question that states a section's problem, a
+    concrete case worked in front of the reader, or "you" used to explain
+    — those serve L0. Flag the opposite failure too: prose so compressed
+    that steps are missing (that is a U1 item).
 12. References are real, relevant, and chapter-precise (L8) — spot-check that
     each cited work exists and covers the claimed material.
 
@@ -96,10 +156,11 @@ Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
 
 ## Arc (L10 — throughline)
 
-- **A1 (required)**: the paragraph after the opening places the lesson in the
-  course's argument — inherits / open question / contribution — consistent
-  with the `spine` in course.yaml. A content-map paragraph ("The route: …")
-  alone fails this.
+- **A1 (required)**: after the opening, the problem is developed — why it
+  matters, the obvious approach, where it fails — and where it grows out of
+  an earlier lesson, one plain sentence with a `<Ref>` says so. A paragraph
+  about the course's argument or a roadmap of results in its place fails
+  (L10a).
 - **A2 (required)**: sample three `##` seams: each section's first sentence
   ties to the running question or the previous section. A cold definition or
   fresh-start fact fails the seam. Where the section's material breaks the
@@ -107,8 +168,9 @@ Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
   break it (L10b reversal) — an itinerary seam in front of
   expectation-breaking material is a WEAK; a manufactured reversal in front
   of neutral material is a FAIL.
-- **A3 (required)**: the last content section ends with the hand-off — what is
-  established, what the next lesson takes up — and it matches the spine.
+- **A3 (required)**: the last content section ends with the hand-off — what
+  the reader can now do or explain, and which problem the next lesson takes
+  up — and it matches the spine.
 - **A4 (advisory)**: section headings are claims where the material allows
   ("Tobacco set the Chesapeake's demography"), not bare topics ("Tobacco").
 - **A5 (required)**: sample two body sections and apply the L10e cover
@@ -121,12 +183,7 @@ Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
 
 ## Attribution (L8a)
 
-- **T1 (required)**: no mid-prose citations of the course's secondary
-  surveys or syntheses ("The American Yawp describes…", "Johnson's history
-  opens with…") — narrative facts are stated directly and sourced in
-  References. Inline naming passes only where provenance is content: primary
-  artifacts read or quoted, measurements whose method carries the argument,
-  named theses under discussion.
+- **T1 (required)**: scored as U4 — mark this item "see U4".
 
 ## Anchoring (L11)
 
@@ -179,9 +236,10 @@ Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
 
 A lab is a 3–5 hour Jupyter assignment; the MDX is a brief and the teaching
 happens in the notebook. On a lab lesson this section REPLACES the chapter
-items above, except four that still apply to `lesson.mdx`: 1 (opening), 12
-(references, where the brief cites), A1 (placement in the course's argument),
-A3 (hand-off to what follows). Score the remaining chapter items N-A in one
+items above, except those that still apply to `lesson.mdx`: U1–U4 (the
+newcomer test, over the brief and the notebook's markdown cells), 1
+(opening), 12 (references, where the brief cites), A1 (the problem
+developed), A3 (hand-off to what follows). Score the remaining chapter items N-A in one
 line, not item by item. Register is scored here, as B6, over the brief and
 the notebook's markdown cells together.
 

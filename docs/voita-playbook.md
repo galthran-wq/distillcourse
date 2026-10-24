@@ -7,9 +7,9 @@ universal invariants (two-corpus convergence + learning-science audit), and
 overlays. This file is distilled from a statistical dissection of one of
 the two reference corpora (Lena Voita, "NLP Course For You": five lesson
 pages, the landing page, and a corpus of figures, analyzed July 2026).
-Everything below is stated as OUR rule, ready to apply. One deliberate
-divergence from the reference: its friendly conversational voice is not
-adopted — our register stays dry and declarative (pedagogy L9).
+Everything below is stated as OUR rule, ready to apply. Its friendly,
+explaining voice is close to ours (pedagogy L9: plain and direct, lively
+where that helps, never slop); what we do not adopt is its chattiness.
 
 ## Course-level principles
 
@@ -49,9 +49,10 @@ adopted — our register stays dry and declarative (pedagogy L9).
 
 ## Writing principles (register-neutral; voice stays dry per L9)
 
-1. **Roadmap sentence.** After the opening statement, one sentence lists
-   what the lesson establishes, in order. The reader always knows where
-   they are in the arc.
+1. **The problem leads.** After the opening, the problem is developed —
+   why it matters, the obvious approach, where it fails — before any answer
+   (pedagogy L0, L3). No roadmap of results: a list of what the lesson will
+   establish, in terms the reader has not met, is a recap.
 2. **Headings carry content.** A heading is a claim ("Additivity forces the
    logarithm") or a precise question ("How many bits does a letter of
    English carry?") — never a topic label ("Background").
@@ -80,14 +81,15 @@ adopted — our register stays dry and declarative (pedagogy L9).
    "label: payoff" ("The range of entropy: 0 to log₂ n"). The reference
    course does this in 44% of headings; it makes the outline read as the
    argument.
-9. **Inline links at first mention.** A named result, source, or tool is
-   linked where it first appears, with the name as link text — in addition
-   to, never instead of, the References block.
+9. **Inline links at first mention — tools and objects, never sources.**
+   A tool, dataset, standard or law the lesson works with is linked where it
+   first appears. Authors, books and papers are never named in the body
+   (pedagogy L8a): they live in the References block.
 
 ## How a lesson is ordered
 
-1. Open with the problem and an explicit statement of what the lesson
-   establishes. Handle prerequisites by linking the earlier lesson plus at
+1. Open with the problem, in the reader's terms (pedagogy L0, L3) — not
+   with a statement of what the lesson establishes. Handle prerequisites by linking the earlier lesson plus at
    most two sentences of recap — never re-teach them.
 2. Present the general framework before any concrete method, then slot each
    method into it as a special case. When several methods exist, order them

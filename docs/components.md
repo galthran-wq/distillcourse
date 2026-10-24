@@ -30,6 +30,9 @@ theorems (history, philosophy, speech, music) use `<Remark>` and plain prose
 - `<Task>…</Task>` — green; an instruction the reader executes right now,
   naming the observable ("compute H(0.75); it should land near 0.811").
 At most one of each per section (voita-playbook, callout roles).
+- `<Conclusion>…</Conclusion>` — accent; the lesson's closing (L10c), once,
+  right before `## Exercises`: what the reader can now do, and the problem
+  left open. The only place the lesson sums itself up.
 
 ## Exercises
 

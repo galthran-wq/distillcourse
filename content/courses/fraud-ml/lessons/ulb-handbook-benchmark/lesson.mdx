@@ -1,0 +1,843 @@
+Five standard classifiers — logistic regression, a shallow tree, an unpruned tree, a random forest and a boosted ensemble — are trained on a simulated week and on a week of real card payments, each scored three ways. Which one is best? The answer depends on the metric and the data, and the module's results should say exactly why.
+
+Half of this comparison is already familiar. <Ref lesson="alert-budget-metrics"
+id="three-numbers-for-three-questions">The alert-budget metrics</Ref>
+ranked the same five models on the simulator's test week and found a
+different leader under each of ROC-AUC, average precision (AP) and card
+precision at 100 ($CP@100$). The other half is a week of real Belgian
+e-commerce payments, the stream of <Ref lesson="fraud-detection-system"
+id="a-hundred-cases-a-day-the-models-output-is-a-ranking">the layered system</Ref>, about 400,000
+payments and 300 compromised cards a day. There nearly every model
+changes place, and every number drops.
+
+The obvious way to read fifteen numbers is a league table: average each
+model's rank, or take the winner of the most familiar metric, and ship
+it. That throws away what the table holds. A reversal between two models
+is a measurement: either two metrics are reading different parts of the
+ranked list, or the two streams let a model learn different things. The
+work is to account for every reversal with a result from this module, or
+with a fact about the data that can be checked, and to see what is left
+over.
+
+## What the comparison holds fixed, and what it does not
+
+A ranking reversal can only be pinned on a cause if everything else was
+held still. Three things are held still here, on both streams.
+
+### One cut of the history
+
+The split is the one <Ref lesson="delayed-labels-prequential"
+id="where-the-training-set-must-end-the-delay-block">the delayed-labels
+lesson</Ref> derived: a training week, a delay week whose labels are not
+yet known, and a test week from which each day's payments on cards
+already known to be compromised are removed. On the simulator that is
+25 to 31 July 2018 for training, 67,240 payments with 598 frauds, and 8
+to 14 August for testing, 58,264 payments with 385 frauds after removal,
+a base rate of 0.66%. On the real stream the training week holds
+2,858,663 payments with 6,605 frauds (0.23%), and after removal the test
+week's base rate is about 0.2%.
+
+### Fifteen inputs, built the same way
+
+Every model sees the same fifteen numbers for each payment:
+
+- the **amount**, and whether the payment fell on a weekend or at night;
+- for the **card**: its number of payments and their average amount over
+  the last 1, 7 and 30 days;
+- for the **terminal**: its number of payments and its fraud rate over
+  windows of 1, 7 and 30 days, the rate counting only labels the bank
+  already held when the payment was scored. How that is done without
+  leaking future labels is the problem of <Ref
+  lesson="point-in-time-features">point-in-time features</Ref>.
+
+Nothing else enters: no merchant category, no country, no card
+identifier.
+
+### Five models at their library defaults
+
+- **Logistic regression**, a linear score on the fifteen inputs.
+- **A depth-2 tree**: three splits, four leaves; a payment's score is the
+  fraud share of its leaf in training.
+- **An unpruned tree**: depth unlimited, split until every leaf holds
+  training payments of one class only, so its scores are 0 and 1.
+- **A random forest**: 100 unpruned trees, each grown on a bootstrap
+  sample of the training week with a random subset of inputs tried at
+  each split; the score is the average of the trees' outputs.
+- **XGBoost**: 100 boosted trees of depth up to 6, each fitted to the
+  errors left by the ones before it.
+
+No hyperparameter is tuned and nothing is rebalanced.
+
+### What changes between the streams
+
+Within one stream, two rows of the results differ only by the model.
+Between the streams, the stream itself changes, and in more than one way
+at once:
+
+| | simulator | real stream |
+|---|---|---|
+| payments a day | about 8,300 | about 400,000 |
+| test-week base rate | 0.66% | about 0.2% |
+| frauds per compromised card, per day | about 1.1 | about 3 |
+| compromised cards a day, after removal | about 40 to 55 | 200 to 350 |
+
+A fifth difference does not fit in a table: how far the fifteen inputs
+separate fraud from genuine payments. It is measured below, from the
+leaves of the depth-2 tree.
+
+## The simulator: half the fraud in two leaves
+
+On the simulator's test week every one of the five models reaches 47 to
+100 times the base rate in AP: logistic regression's 0.606 is 92 times
+0.66%, the unpruned tree's 0.309 is 47 times. The simulator's two
+reversals are already settled: the unpruned tree's two scores win AUC
+and lose AP (<Ref lesson="delayed-labels-prequential"
+id="what-auc-sees-in-the-fully-grown-tree">what AUC sees in the fully
+grown tree</Ref>), and the three leaders sit within two cards a day of
+each other on $CP@100$ (<Ref lesson="alert-budget-metrics"
+id="what-each-disagreement-means">what each disagreement means</Ref>).
+What is not settled is why the high multiples are possible at all, for
+models that learn their training week by heart as much as for those
+that do not.
+
+### What the training week says
+
+Which of the five learned the training week by heart is a question the
+training week itself can answer: a model that has memorised its labels
+scores near perfectly on the data it was fitted to, and keeps on a later
+week only as much of that score as the memorised patterns recur. Scored on the week they were trained on:
+
+| | training AUC | training AP | training $CP@100$ | test AUC | test AP | test $CP@100$ |
+|---|---|---|---|---|---|---|
+| logistic regression | 0.892 | 0.663 | 0.419 | 0.871 | 0.606 | 0.291 |
+| depth-2 tree | 0.802 | 0.586 | 0.394 | 0.763 | 0.496 | 0.241 |
+| unpruned tree | 1.000 | 1.000 | 0.576 | 0.788 | 0.309 | 0.243 |
+| random forest | 1.000 | 1.000 | 0.576 | 0.867 | 0.658 | 0.287 |
+| XGBoost | 1.000 | 0.995 | 0.574 | 0.862 | 0.639 | 0.273 |
+
+The three models that can carve the training week into pure regions,
+the unpruned tree, the forest of unpruned trees and a hundred boosted
+trees, score perfectly on it: these three are the memorisers. Logistic
+regression loses 0.021 of AUC from training to test, the depth-2 tree
+0.039, the memorisers 0.13 to 0.21. Yet on the test week the forest and
+XGBoost still come within 0.01 of logistic regression's AUC and beat it
+on AP. Much of what they memorised recurred, so the regions their trees were cut around in training must
+still have been fraudulent a fortnight later. Which regions those are, a
+tree small enough to read shows.
+
+### What the depth-2 tree found
+
+<Figure
+  src="./figures/tree-sim.svg"
+  alt="Depth-2 decision tree fitted on one simulator training week. Root: terminal 7-day fraud rate above 0.55. On the no side, a split on amount above 218.67 gives leaf 1 with 236 frauds among 66,734 payments, 0.35% fraud, and leaf 2 with 127 of 129, 98.4% fraud, shaded amber. On the yes side, a split on terminal 30-day rate at most 0.66 gives leaf 3 with 13 of 144, 9.0% fraud, and leaf 4 with 222 of 233, 95.3% fraud, shaded amber. Footer: leaves 2 and 4 hold 349 of 598 frauds at 95% fraud or more; 236 frauds stay in leaf 1"
+  caption="The simulator's depth-2 tree, with training-week counts: two leaves hold 58% of the week's frauds at 95% fraud or more."
+/>
+
+The root split finds terminals at which more than half of the payments
+in a recent week, one whose labels the bank already held, were fraud:
+the terminals that <Ref
+lesson="canonical-datasets" id="three-scripted-frauds">the simulator's
+second scenario</Ref> compromises for 28 days, during which every
+payment there is fraud. The other branch splits on the amount at 218.67,
+the first scenario's rule that every payment above 220 is fraud, found
+slightly below 220 for the reason <Ref lesson="canonical-datasets"
+id="three-scripted-frauds">the datasets lesson</Ref> traced: a few
+frauds of the other scenarios lie just under 220, and taking them costs
+leaf 2 its two genuine payments.
+
+Leaf 2 is not only the first scenario's, though. That scenario adds about
+five frauds a day, some 37 in a week, and leaf 2 holds 127. The third
+scenario, a leaked card used for a third of its owner's payments,
+multiplies those payments' amounts by 5, which pushes about half of them
+above 220 (<Ref lesson="canonical-datasets"
+id="three-scripted-frauds">reading a detector against the answer
+key</Ref>). So most of leaf 2's frauds are leaked-card payments made
+large, and the other half of the third scenario, the multiplied payments
+still under 220, falls in leaf 1.
+
+On the test week the same leaves hold:
+
+| leaf | payments | frauds | fraud share |
+|---|---|---|---|
+| 1 | 57,968 | 182 | 0.31% |
+| 2 | 50 | 47 | 94% |
+| 3 | 106 | 19 | 18% |
+| 4 | 140 | 137 | 98% |
+
+Leaves 2 and 4 together hold 184 of the week's 385 frauds in 190
+payments: 48% of the fraud at 97% precision. The other half sits in leaf
+1, at 0.31%, below the week's base rate.
+
+<Example title="reading a day's card precision off the leaves">
+A depth-2 tree scores each payment with its leaf's training fraud share,
+so a day's cards fall into four tied blocks, ranked by leaf. On day 129,
+the first test day, a card's score is its best payment's leaf:
+
+- **Leaves 2 and 4**: 25 cards, 21 of them compromised.
+- **Leaf 3**: 22 cards, 2 compromised.
+- **Leaf 1**: 3,370 cards, 27 compromised.
+
+The team calls 100 cards. The first two blocks fill 47 slots and bring
+23 compromised cards. The remaining 53 slots are drawn from leaf 1's
+tied block, in which 27 of 3,370 cards are compromised, so they are
+expected to bring $53 \times 27/3{,}370 \approx 0.4$ more. Expected
+$CP@100$ for the day: $(21 + 2 + 0.4)/100 \approx 0.23$. The measured
+value is 0.24; the difference is how the tied cards of leaf 1 happened
+to be ordered.
+
+**Reading.** Almost all of the day's card precision comes from the two
+fraud leaves. The 53 cards drawn from leaf 1 bring less than half a
+compromised card between them.
+</Example>
+
+<FigureSequence
+  name="day-blocks"
+  alt="Three frames of a horizontal bar of 100 card slots for day 129, with the budget k = 100 marked at the right end. Frame 1: an amber block of 25 slots, leaves 2 and 4, 21 compromised; tally 21. Frame 2: a blue block of 22 slots added, leaf 3, 2 compromised; tally 23. Frame 3: a grey block of 53 slots fills the bar, leaf 1, 0.4 compromised expected; tally 23.4, expected CP@100 about 0.23, measured 0.24"
+  caption="One simulator day: the hundred cards fill from the tree's leaves in order, and the two fraud leaves supply nearly all the compromised cards."
+/>
+
+<Task>
+Step through the frames and note how many compromised cards each block
+adds. Then predict what would happen to $CP@100$ if the two fraud leaves
+held twice as many cards a day: the answer should be close to doubling,
+because the last block adds almost nothing.
+</Task>
+
+<Exercise>
+On day 135, the last test day, the blocks hold: leaves 2 and 4, 18
+cards, 17 compromised; leaf 3, 13 cards, 2 compromised; leaf 1, 3,144
+cards, 19 compromised. (a) Compute the expected $CP@100$ for the day,
+counting every compromised card. (b) The course's $CP@100$ for that day,
+which drops cards already found on days 129 to 134, is 0.12. Which
+cards does that removal take out, and why does it cost this day more
+than a third of its value?
+
+<Solution>
+**(a)** The first two blocks fill 31 slots with 19 compromised cards. The
+other 69 come from leaf 1: $69 \times 19/3{,}144 \approx 0.4$. Expected
+$CP@100 \approx (17 + 2 + 0.4)/100 \approx 0.19$, which is the value the
+day shows when detected cards are not removed.
+
+**(b)** It removes cards the tree already put in its top hundred on an
+earlier test day and that were compromised then. On the simulator those
+are cards that keep paying at a compromised terminal (a terminal stays
+compromised for 28 days) and leaked cards (compromised for 14 days).
+They sit in the fraud leaves again on later days, so the removal takes
+cards out of exactly the blocks that supply the precision. The removed
+set grows through the week, so the removal costs nothing on day 129 and
+0.07 to 0.08 a day from day 132 on. On day 135 it costs 0.07, seven
+cards, no more than on days 132 to 134; what makes that a large share is
+how little the day had: its fraud leaves and leaf 3 brought only 19
+compromised cards, so seven removed ones take 0.19 down to 0.12.
+</Solution>
+</Exercise>
+
+<KeyFact>
+On the simulator, two leaves of a four-leaf tree hold half of the test
+week's frauds at 97% precision. Two history features and the amount
+nearly separate the scripted frauds, and the regions they mark stay
+fraudulent from one week to the next, so even a model that memorised its
+training week scores 47 to 100 times the base rate in AP there.
+</KeyFact>
+
+## The real stream: the same five models, lower and reshuffled
+
+From the simulator one would expect the order to survive the move to
+real data, shifted down by a lower base rate. It does not survive.
+
+<Figure
+  src="./figures/real-rankings.svg"
+  alt="Three columns ranking the five models on the real test week. ROC-AUC: XGBoost 0.899 (amber), logistic regression 0.788, random forest 0.780 (blue), depth-2 tree 0.626, unlimited-depth tree 0.545; random 0.5. Average precision: XGBoost 0.035, logistic regression 0.035, depth-2 tree 0.024, random forest 0.015, unlimited-depth tree 0.003; random 0.002. CP@100: logistic regression 0.150, random forest 0.104, XGBoost 0.090, depth-2 tree 0.077, unlimited-depth tree 0.017; random 0.0025. Lines connect each model across columns; XGBoost falls from first to third between AP and CP@100, random forest falls below the depth-2 tree in AP and rises above it in CP@100"
+  caption="The real week ranked three ways. XGBoost leads AUC and AP and is third on CP@100; the random forest drops below the depth-2 tree on AP only."
+/>
+
+### Every number against its floor
+
+Each metric has its own score for a ranking with no information: 0.5
+for AUC, the base rate for AP (<Ref lesson="alert-budget-metrics"
+id="what-a-ranking-with-no-information-scores">the floor of average
+precision</Ref>), and for $CP@100$ the share of a day's cards that are
+compromised, about 0.0025 here. Against those floors every model has
+learned something, and the one that has learned least is the unpruned
+tree. (The depth-2 tree's 0.077 is the week's average; the "about 0.10"
+quoted for it in the alert-budget lesson was read off its daily chart.)
+
+AP divided by the base rate puts both streams on one scale: how many
+times better than chance the model concentrates fraud at the top.
+
+<Figure
+  src="./figures/ap-multiples.svg"
+  alt="Dot plot on a log axis of average precision divided by the test week's base rate, from 1 to 200 times. For each model a blue dot marks the simulator and an amber dot the real stream, joined by a grey line: logistic regression 92 times and 18 times; depth-2 tree 75 and 12; unlimited-depth tree 47 and 1.5; random forest 100 and 8; XGBoost 97 and 18. A dashed line at 1 times is labelled chance"
+  caption="AP as a multiple of the base rate. Every model falls from 47–100× to 18× or less; the unpruned tree falls to 1.5×, the forest from first to fourth."
+/>
+
+A lower base rate alone cannot produce this fall. At a cut with recall
+$\mathrm{TPR}$ and false-positive rate $\mathrm{FPR}$, precision as a
+multiple of the base rate is
+$$
+\frac{\text{precision}}{\pi} = \frac{\mathrm{TPR}}{\pi\,\mathrm{TPR} + (1-\pi)\,\mathrm{FPR}} ,
+$$
+and its denominator shrinks as $\pi$ falls whenever
+$\mathrm{TPR} > \mathrm{FPR}$. So a model with the same ROC curve on a
+rarer stream has a higher multiple at every cut, and a higher AP
+multiple. The multiples drop instead, by a factor of 5 to 30: the inputs
+separate real fraud less well than scripted fraud.
+
+The drop is uneven. Logistic regression falls by a factor of 5, the
+depth-2 tree by 6, the forest by 13 and the unpruned tree by 30.
+XGBoost, perfect on the simulator's training week like the other two,
+falls by 5, no more than logistic regression. A perfect training score
+on the simulator therefore does not predict the drop, and neither does
+combining a hundred trees: the forest and XGBoost both do that.
+
+### What separates the two ensembles: a hypothesis
+
+What does differ is the size of the leaves. The unpruned tree and each
+tree of the forest split until every leaf is pure, so a leaf around a
+fraud can hold a handful of training payments. A tree of depth 6 has at
+most 64 leaves for 2.9 million training payments, some 45,000 a leaf
+on average, so a score built from such leaves leans on many training
+payments at once. The real training week fits this:
+there only the unpruned tree and the forest score perfectly, and
+XGBoost's depth-6 trees stop short of a pure fit. The
+**hypothesis** is that the two worst-hit models rank first the payments
+that fall in small regions cut around a few training frauds, and that on
+real payments such regions are rarely fraud again. The unpruned tree's
+collapse, derived below, is what the hypothesis predicts for a single
+tree; for the forest it is a candidate mechanism, not a measurement.
+
+### The unpruned tree falls to chance
+
+The unpruned tree still outputs two scores, so the two formulas of the
+delayed-labels lesson apply: with $T$ the recall of the block scored 1,
+$F$ its false-positive rate, $P_1$ its precision and $\pi$ the base
+rate,
+$$
+\mathrm{AUC} = \tfrac12 (1 + T - F), \qquad \mathrm{AP} = T\,P_1 + (1-T)\,\pi .
+$$
+
+<Example title="what the unpruned tree's top block holds on real payments">
+On the real week $\mathrm{AUC} = 0.545$, $\mathrm{AP} = 0.003$ and
+$\pi \approx 0.002$. The AP is printed to one significant figure, so
+instead of solving for exact values, bound them.
+
+**Recall of the top block.** $T - F = 2 \times 0.545 - 1 = 0.09$, and
+$F \ge 0$, so $T \ge 0.09$.
+
+**Precision of the top block.** Rearrange the AP formula:
+$T\,(P_1 - \pi) = \mathrm{AP} - \pi \approx 0.001$. With $T \ge 0.09$,
+$P_1 - \pi \le 0.001/0.09 \approx 0.011$, so $P_1 \le 0.013$. Even if
+the printed 0.003 were 0.0035, $P_1$ would stay under 0.02.
+
+**Reading.** On the simulator the same model's top block was 53% fraud
+(the delayed-labels lesson's inversion). On real payments at most one in
+75 payments the tree scores 1 is fraud. Each of its pure leaves was cut
+around a few training frauds; on the simulator a later payment landing
+in such a region is usually fraud of the same scenario, on the real
+stream it is almost always genuine.
+</Example>
+
+<Figure
+  src="./figures/dtinf-blocks.svg"
+  alt="Two horizontal bars showing where the unlimited-depth tree puts the test frauds. Simulator: a blue segment of about 58% of the bar is the top block scored 1, the rest tied at 0; precision of the top block 0.53. Real payments: an amber segment of at least 9% is the top block, the rest tied at 0; precision of the top block at most 0.013"
+  caption="The unpruned tree's top block: half fraud on the simulator, at most 1.3% fraud on real payments."
+/>
+
+The team calls cards, not payments, so the bound must be turned into a
+share of cards before it can be held against $CP@100$. The hundred cards
+are drawn from the tied top block: it holds at least 0.09 of the day's
+roughly 800 test frauds at no more than 1.3% fraud, so at least 5,500
+payments a day, far more than a hundred cards.
+
+A card's score is the highest of its payments' scores, so a card is in
+the block if any one of its payments is. A compromised card makes about
+three fraud payments a day, each a chance to land there; a genuine card
+makes about three payments a day too (400,000 payments over some 120,000
+cards, the count at which 300 compromised cards are the 0.0025 share),
+each a chance as well. Assume each payment lands independently of the
+card's other payments, and that each chance is small. Then a compromised card is about three times as likely to be
+in the block as one of its fraud payments, a genuine card about three
+times as likely as one of its genuine payments, and the two factors
+cancel: the block's share of compromised cards is about its share of
+fraud payments, at most 1.3%, or 2% allowing for the rounding of AP.
+The owner's own payments on a compromised card are extra chances and
+can only raise that share. So the bound allows one or two compromised
+cards among the hundred. The measured $CP@100$, 0.017, is 1.7 cards:
+consistent with the bound, at its upper edge, not a value it pins down.
+
+The independence assumption fits this tree. Its pure leaves are small
+regions cut around a few training frauds each, so a card's three frauds
+fall in different regions and each lands or misses on its own. Had a
+card's frauds landed together, with each genuine card contributing one
+payment, the card share would be about a third of the payment share
+(the card-share exercise at the end derives it), under one card in a
+hundred, and the measured 0.017 would contradict the bound. The
+unpruned tree's three real numbers tell one story: it memorised the
+training week, and the memory does not transfer.
+
+### The forest: an average of memorisers
+
+A random forest averages a hundred unpruned trees, and averaging blunts
+memorisation: instead of two scores it produces a graded list, and on
+the simulator that was enough to give it the best AP of the five, 0.658.
+Even there, its list ends in a large tied block. Re-running the
+simulator split shows 48,229 of the 58,264 test payments (83%) scored
+exactly 0, every tree voting genuine, and 83 of the 385 frauds among
+them.
+
+On the real stream its AP falls below the depth-2 tree's, 0.015 against
+0.024, while its AUC (0.780 against 0.626) and $CP@100$ (0.104 against
+0.077) stay above. Where on the list does the forest lose AP?
+
+The two-score bounds cannot say: they work for the unpruned tree because
+two scores turn AUC and AP into two equations in $T$ and $P_1$, and the
+forest's scores are graded. The real week's precision–recall curves can
+(<Ref lesson="alert-budget-metrics"
+id="what-a-ranking-with-no-information-scores">the floor of average
+precision</Ref> showed all five hugging the floor). Over the first 10% of recall the forest's
+precision runs from about 6% down to 4%, while the depth-2 tree, after
+a short spike from its best leaf, holds about 9%, and logistic
+regression runs from 20% down to 12%. The forest loses its AP at the
+top of its list, among the payments it is most sure of.
+
+Why its top is diluted is the leaf-size hypothesis, not a measurement:
+the highest averaged scores would go to payments that many trees placed
+in small leaves cut around training frauds, regions that on real
+payments are rarely fraud. Testing it would need the real test payments
+themselves, which are confidential.
+
+The $CP@100$ gap needs no hypothesis. It is 0.027, under three cards a
+day, on a stream whose weekly $CP@100$ varies by 0.03 to 0.07 (<Ref
+lesson="imbalance-techniques-revisited" id="six-ensembles-two-streams">the
+ensembles on two streams</Ref>). One week does not establish that the
+forest calls more compromised cards than the shallow tree.
+
+### XGBoost: a lead where the team never works
+
+XGBoost leads the real AUC column by 0.11 over every other model, ties
+logistic regression on AP at 0.035, and is third on $CP@100$, 0.090
+against 0.150.
+
+The AUC lead can be located exactly. A hundred cards a day among about
+400,000 payments is a false-positive rate below 0.1% (<Ref
+lesson="alert-budget-metrics"
+id="how-much-of-the-curve-a-hundred-alerts-can-reach">how much of the
+curve a hundred alerts can reach</Ref>). The part of the ROC area that
+lies over $\mathrm{FPR} \in [0, 0.001]$ is at most $0.001 \times 1 =
+0.001$, whatever the model. So at most 0.001 of XGBoost's 0.111 lead
+over logistic regression can come from the operating points the team
+uses; the rest is earned at false-positive rates no budget reaches.
+
+Where the lead comes from is a separate question, and the published
+numbers do not answer it. A plausible mechanism is the one <Ref
+lesson="imbalance-techniques-revisited"
+id="boosting-without-rebalancing-near-best-not-the-pick">boosting without
+rebalancing</Ref> described: each round fits the errors of the last, so
+frauds the ensemble scores low keep pulling on the next trees until they
+rise. That would lift frauds out of the bottom of the list, which is
+what AUC counts, without filling the top hundred cards. What is
+measured is the top hundred itself: XGBoost's holds 6 compromised cards
+a day fewer than logistic regression's, above the two-card line and
+about one weekly standard deviation, suggestive rather than settled.
+
+## What the shallow tree found on real payments
+
+The multiples said the real inputs separate fraud less well. The
+depth-2 tree, fitted on the real training week, shows by how much and
+where.
+
+<Figure
+  src="./figures/tree-real.svg"
+  alt="Depth-2 decision tree fitted on one real training week. Root: terminal 30-day fraud rate above 0.075. On the no side, a split on terminal 30-day rate above 0.035 gives leaf 1 with 4,740 frauds among 2,841,713 payments, 0.17% fraud, and leaf 2 with 554 of 9,230, 6.0% fraud. On the yes side, a split on card payments today above 13.5 gives leaf 3 with 1,055 of 7,323, 14.4% fraud, and leaf 4 with 256 of 397, 64.5% fraud, shaded amber. Footer: best leaf holds 256 of 6,605 frauds, 4%, at 64%; 4,740 frauds, 72%, stay in leaf 1 at 0.17%"
+  caption="The real stream's depth-2 tree, with training-week counts: the best leaf holds 4% of the frauds at 64%, and 72% of the frauds stay in a leaf at 0.17%."
+/>
+
+### A compromised terminal and a burst
+
+The root split finds terminals at which more than 7.5% of the payments
+in a 30-day window of already-labelled days were fraud. Among those, the tree splits on the
+card's number of payments in the last 24 hours, at 13.5. The best leaf is
+a payment at a terminal with recent fraud, on a card that has already
+paid more than 13 times today: a thief using a card as fast as possible
+before it is blocked, the card-history signal of <Ref
+lesson="financial-crime-typology"
+id="card-fraud-a-label-that-does-arrive">the typology</Ref>. No split
+uses the amount; the simulator's amount rule was a script.
+
+### How much of the fraud the leaves reach
+
+| | fraud in the best leaves | precision there | fraud left in the largest leaf | its fraud share |
+|---|---|---|---|---|
+| simulator, training | 349 of 598 (58%) | 95% or more | 236 (39%) | 0.35% |
+| real, training | 256 of 6,605 (4%) | 64% | 4,740 (72%) | 0.17% |
+
+On the real week nearly three frauds in four end in a leaf that holds
+99.4% of the payments at a fraud share below the stream's 0.23%. This
+measures the overlap that <Ref lesson="imbalance-techniques-revisited"
+id="the-real-stream">the rebalancing lesson</Ref> could only infer, as a
+sign, from AP's lower multiple on real data. The tie
+convention turns the four training leaves into AUC 0.64 and AP 0.063.
+On the test week the same tree scores AUC 0.626, close to its training
+value, and AP 0.024. The AUC barely moves: it is low because most frauds
+are tied at the bottom with everything else, in training and in testing
+alike, not because the tree overfits. The AP falls by more than half, so
+the precision of the top leaves does not carry over to the test week in
+full, part of the drop being the lower base rate after known-card
+removal.
+
+## Accounting for every reversal
+
+The question from the start was whether each reversal can be pinned on
+something checkable. Here is each one with its cause, and how firmly
+the cause is held: derived from a result of this module, measured on
+the data, or only a mechanism that fits the numbers.
+
+| reversal | cause | how firmly |
+|---|---|---|
+| simulator: unpruned tree above depth-2 tree on AUC, below on AP, tied on $CP@100$ | two scores; AUC credits the top block's corner, AP charges the tied 42% at the base rate; the budget sees neither | derived: <Ref lesson="delayed-labels-prequential" id="what-auc-sees-in-the-fully-grown-tree">two scores, one corner</Ref> |
+| simulator: logistic regression, forest and XGBoost each lead one metric | gaps under two cards a day | derived: <Ref lesson="alert-budget-metrics" id="what-each-disagreement-means">the noise line</Ref> |
+| simulator: training week ranks the three memorisers first | they fit the labels they were trained on | measured: training table |
+| real: every multiple of the floor falls | the inputs separate real fraud less; 4% of frauds in the best leaf against 58% | measured: the two depth-2 trees |
+| real: unpruned tree and forest drop most, XGBoost no more than logistic regression | the two worst-hit models rank first payments in small leaves cut around a few training frauds; depth-6 leaves hold many payments | hypothesis |
+| real: unpruned tree near chance | its top block is at most 1.3% fraud | derived: the two-score bounds |
+| real: forest below the depth-2 tree on AP | its precision is lower at the top of its list (about 5% against 9%) | measured: the PR curves |
+| | why its top is diluted: the same leaf-size mechanism | hypothesis |
+| | its $CP@100$ edge over the depth-2 tree is inside the weekly spread | derived: <Ref lesson="imbalance-techniques-revisited" id="six-ensembles-two-streams">weekly spread</Ref> |
+| real: XGBoost first on AUC, third on $CP@100$ | at most 0.001 of its AUC lead lies in the reachable strip | derived: <Ref lesson="alert-budget-metrics" id="how-much-of-the-curve-a-hundred-alerts-can-reach">the reachable region</Ref> |
+| | where the rest of the lead comes from: boosting lifting low-scored frauds | hypothesis |
+
+### So which model should the bank ship?
+
+The obvious answer is logistic regression: it leads $CP@100$, the
+deciding metric, on both streams. The benchmark cannot support even
+that. Its gaps at the top come from one week and sit within or near the
+noise on both streams, and every model ran at default settings. Tuned
+on prequential folds and scored over four weeks, a depth-6 tree reaches
+$CP@100$ 0.232 on the same real stream (<Ref
+lesson="imbalance-techniques-revisited" id="the-real-stream">the real
+stream</Ref>) and XGBoost 0.235 against its 0.090 here (<Ref
+lesson="imbalance-techniques-revisited"
+id="six-ensembles-two-streams">the ensembles on two streams</Ref>):
+tuning and a longer test period together move a model's number further
+than any gap in this table. And the models do not cost the same: on the simulator the depth-2
+tree trains in 0.08 seconds, logistic regression in 1.6, the forest in
+2.1 and XGBoost in 7.0; on the real stream the forest and XGBoost took
+about a hundred times as long as logistic regression on a 20-core
+server.
+
+What the benchmark delivers is the referee: a split that reproduces
+deployment, three metrics with their floors, and a way to tell a metric
+artefact from a difference in what the models learned. The champion is
+chosen with the referee, by $CP@100$ on prequential folds over tuned
+candidates, which is the problem of <Ref
+lesson="gbm-model-selection">model selection for boosted trees</Ref>.
+
+## Where the benchmark departs from deployment
+
+Every number above carries the simplifications of the setup that
+produced it, and each is a problem a later part of the course takes up.
+
+<Figure
+  src="./figures/departures.svg"
+  alt="Checklist table, what each benchmark puts in front of the models, with columns simulator week and real week. Rarity: 0.66%, three times real (amber) and 0.2% (green). Class overlap: weak, scripted (amber) and present (green). Label delay: fixed 7 days on both (amber). Drift: not tested on both (grey). Adversary: absent and not tested (grey). Alert feedback: absent and not modelled (grey). Entity history: 12 aggregates on both (amber). Scoring speed: training time only on both (grey). Re-runnable: yes (green) and no (grey)"
+  caption="What each half of the benchmark keeps from deployment, simplifies or leaves out."
+/>
+
+- **The delay is one fixed week.** Real labels trickle in over days and
+  weeks; the split treats every label as arriving exactly seven days
+  later, the simplification <Ref lesson="delayed-labels-prequential"
+  id="what-the-delay-block-is-and-is-not">the delayed-labels lesson</Ref>
+  flagged.
+- **The labels are used as if unselected.** On a real card stream part of
+  the labels comes through investigators calling the cards an earlier model
+  had alerted, <Ref lesson="fraud-detection-system"
+  id="the-fast-labels-are-a-sample-the-model-chose">a sample the model
+  chose</Ref>; the benchmark trains on them as a plain sample. The
+  simulator has no investigators at all, and its labels are complete and
+  instant.
+- **Nothing changes and nobody adapts.** One training week and one test
+  week cannot show drift, and the simulator's three scripts never react
+  to what is caught.
+- **One week, one run, defaults.** No spread across weeks, no tuning,
+  fifteen inputs.
+- **The real half cannot be re-run.** The payments are confidential; its
+  numbers can be read and checked against each other, as the bounds
+  above did, but not reproduced.
+
+<Conclusion>
+You can now read a benchmark table as a set of measurements rather than
+a league: put each number against its floor, locate where on the list
+each metric reads, invert a two-score model's AUC and AP into the
+precision of its top block, read a shallow tree's leaves for how much of
+the fraud the inputs isolate, and attribute every reversal to a metric,
+to noise, or to the stream, saying which causes are measured and which
+are hypotheses. On the simulator half the fraud sits in two leaves; on
+real payments the best leaf holds 4% of it, and the models whose top
+scores are pure leaves or averages of them, the unpruned tree and the
+forest, lose most, while XGBoost, as perfect on the simulator's training
+week, loses no more than logistic regression; that leaf size separates
+them is a hypothesis.
+
+The evaluation code behind all of it, the delay-aware split with
+known-card removal, average precision, card precision with detected-card
+removal, savings and the probability correction, is what <Ref
+lesson="cost-aware-evaluation-lab">the evaluation lab</Ref> builds and
+uses to settle a choice of tree depth on the simulator.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+Express each real-stream model's $CP@100$ as a multiple of the random
+0.0025, and each simulator model's as a multiple of the simulator's
+random 0.017 (simulator $CP@100$: logistic regression 0.291, depth-2 tree
+0.241, unpruned tree 0.243, forest 0.287, XGBoost 0.273). (a) Rank the
+real models by their AP multiple and by their $CP@100$ multiple; which
+pairs swap? (b) AP multiples fall from the simulator to the real stream;
+what do $CP@100$ multiples do, and why?
+
+<Solution>
+**Real multiples.** $CP@100$: logistic regression $0.150/0.0025 = 60$,
+forest 42, XGBoost 36, depth-2 tree 31, unpruned tree 7. AP (floor
+0.002): logistic regression and XGBoost 17.5, depth-2 tree 12, forest
+7.5, unpruned tree 1.5.
+
+**(a)** By AP: logistic regression = XGBoost, depth-2 tree, forest,
+unpruned tree. By $CP@100$: logistic regression, forest, XGBoost, depth-2
+tree, unpruned tree. Two pairs swap: the forest and the depth-2 tree, and
+the forest and XGBoost; logistic regression and XGBoost come apart from
+a tie.
+
+**(b)** Simulator multiples: logistic regression $0.291/0.017 \approx
+17$, forest 17, XGBoost 16, unpruned and depth-2 trees 14. The real
+multiples are higher, 7 to 60 against 14 to 17, the opposite of AP. The
+random $CP@100$ is the share of a day's cards that are compromised:
+about 1 in 60 on the simulator, 1 in 400 on the real stream. And the
+simulator's ceiling is low: with about 50 findable cards a day, no
+model can reach more than about 0.5, so its multiple is capped near 30;
+the
+real stream has more compromised cards than slots, ceiling 1. A multiple
+of the floor measures distance from chance on one stream; across streams
+it mixes the model with the floor and the ceiling.
+</Solution>
+</Exercise>
+
+<Exercise>
+Break the claim: "On the real stream XGBoost is the best of the five
+models, because its AUC exceeds every other model's by at least 0.11."
+Give the argument that limits how much of an AUC difference the team can
+see, compute the limit, and name the step in the claim that fails.
+
+<Solution>
+**The limit.** The team calls 100 cards a day among about 400,000
+payments. Even counting every payment of those cards as an alert, the
+false-positive rate stays below 0.1%. The ROC curve lies under height 1,
+so the area over $\mathrm{FPR} \in [0, 0.001]$ is at most $0.001$ for any
+model. The difference between two models' areas over that strip is
+therefore at most 0.001. XGBoost's lead over logistic regression is
+0.111; at least 0.110 of it lies at false-positive rates no budget of a
+hundred cards reaches.
+
+**What the reachable strip shows.** $CP@100$ measures exactly the strip,
+in cards: logistic regression 0.150, XGBoost 0.090, six cards a day in
+logistic regression's favour; AP ties them at 0.035.
+
+**The failing step.** "Higher AUC, so better" assumes AUC weighs the
+operating points by how much they matter. It weighs every
+false-positive rate equally, and 99.9% of that axis is out of the team's
+reach. On these numbers XGBoost is not shown to be the best at the
+budget; on one week, it is not shown to be the worst of the three either,
+since six cards a day is about one weekly standard deviation.
+</Solution>
+</Exercise>
+
+<Exercise>
+Take a simulator with only the first scenario: every payment over 220 is
+fraud and every other payment genuine, about five such frauds a day,
+each on a different card. (a) What does the unpruned tree learn, and
+what test AUC and AP should it reach? (b) What is the highest $CP@100$
+any model can reach on this stream, and what is its normalised card
+precision? (c) The unpruned tree fell to chance on real payments. Which
+property of the real stream did that collapse need, and why is it absent
+here?
+
+<Solution>
+**(a)** One split, amount above 220 (from the data, at the midpoint
+between the largest genuine and smallest fraud amount in training),
+already gives pure leaves, so the unpruned tree stops there or adds
+splits that change nothing. Every test fraud lands in the fraud leaf and
+no genuine payment does, except one between the learned threshold and
+220, if any. AUC and AP are 1 or within a hair of it.
+
+**(b)** With about five compromised cards a day and 100 slots, a perfect
+ranking finds all five: $CP@100 \le 5/100 = 0.05$. The normalised card
+precision divides by the ceiling $\min(1, \gamma_t/k) = 0.05$ and is 1.
+A perfect model with a $CP@100$ of 0.05 is a stream property, not a
+model property.
+
+**(c)** Overlap. A pure leaf transfers to new data when the region it
+was cut around stays pure. Here the fraud region is a half-line in one
+input and holds no genuine payment in any week, so memorising it costs
+nothing. On real payments the regions cut around training frauds are
+full of genuine payments in the next week, which is what the bound
+$P_1 \le 0.013$ measured. Memorisation is harmless exactly when the
+classes do not overlap, and the simulator's first scenario is the
+extreme of that.
+</Solution>
+</Exercise>
+
+<Exercise>
+Estimate the real depth-2 tree's $CP@100$ from its leaves, and say what
+would count as agreement with the measured 0.077. (a) A tied block holds
+payments of which a share $s$ are fraud. Every compromised card in it
+contributes $c$ fraud payments and no genuine one; every genuine card
+contributes one genuine payment. Show that the share of the block's
+cards that are compromised is
+$$
+q = \frac{s/c}{s/c + 1 - s} .
+$$
+(b) Apply it to leaf 3 ($s = 0.144$) with the stream's $c = 3$, and to
+leaf 4 ($s = 0.645$). (c) Leaf 4 holds about 57 payments a day, all on
+cards that have already paid more than 13 times that day. What does that
+say about how many of the 100 slots it fills, and which leaf fills the
+rest? (d) Bound the expected $CP@100$ and compare. List the assumptions.
+
+<Solution>
+**(a)** Take a block of $n$ payments: $sn$ fraud payments on $sn/c$
+compromised cards, $(1-s)n$ genuine payments on as many genuine cards.
+The compromised share of cards is $\frac{sn/c}{sn/c + (1-s)n}$, and $n$
+cancels.
+
+**(b)** Leaf 3: $q = 0.048/(0.048 + 0.856) \approx 0.053$. Leaf 4:
+$q = 0.215/(0.215 + 0.355) \approx 0.38$.
+
+**(c)** A card enters leaf 4 only from its 14th payment of the day, and
+every later payment of that day joins it, so 57 payments are a handful
+of cards, each contributing several. Leaf 4 fills a few slots; leaf 3,
+about 1,000 payments a day, fills nearly all the rest as one tied block.
+
+**(d)** If leaf 4 supplies up to about 10 cards at 38% and leaf 3 the
+remaining 90 at 5.3%, the expected count is about
+$10 \times 0.38 + 90 \times 0.053 \approx 8.6$ cards, $CP@100 \approx
+0.09$; with fewer leaf-4 cards it falls towards 0.05. The measured 0.077
+lies inside 0.05 to 0.09, which counts as agreement. A value of 0.2 or
+0.02 would not: it would mean the training-week leaf shares did not
+describe the test week. **Assumptions**: the training week's leaf shares
+hold in the test week (the test week's base rate is lower after removal,
+which pushes the estimate down); compromised cards carry three frauds
+and no genuine payment in a leaf; genuine cards one payment each;
+detected-card removal ignored.
+</Solution>
+</Exercise>
+
+<Exercise>
+Price the simulator benchmark in money (<Ref lesson="example-dependent-cost"
+id="the-decision-that-minimises-expected-cost">the per-payment
+rule</Ref>). On the test week the fraud amounts total €33,301. Re-running
+the split and flagging each payment when $C_a \le \mathrm{Amt} \cdot
+\text{score}$ with $C_a = €5$ gives:
+
+| model | flags | frauds caught | cost | savings |
+|---|---|---|---|---|
+| logistic regression | 787 | 235 | €10,754 | 67.7% |
+| depth-2 tree | 224 | 187 | €12,117 | 63.6% |
+| unpruned tree | 409 | 218 | €10,630 | 68.1% |
+| random forest | 573 | 246 | €8,824 | 73.5% |
+
+(a) The unpruned tree has the lowest AP of the four and the second-best
+savings. Explain. (b) Its scores of 1 are not probabilities: its top
+block is 53% fraud. Would calibrating them change its decisions much? (c)
+Should savings pick between the unpruned tree and logistic regression?
+
+<Solution>
+**(a)** Savings price one cut, AP the whole order. The tree's top block,
+422 payments in the week at 53% fraud, is a good cut: the rule flags its
+409 payments of at least €5 (score 1 means $\mathrm{Amt} \ge €5$ clears
+the rule) and catches 218 frauds. AP also charges the 42% of frauds tied
+at 0, which no cut of this model can reach; savings charge them only as
+missed amounts, which every model also misses in part.
+
+**(b)** With the calibrated 0.53 the rule flags a top-block payment when
+$\mathrm{Amt} \ge 5/0.53 \approx €9.4$ instead of €5. Only top-block
+payments between €5 and €9.4 change, a small share of a block whose
+amounts are mostly far larger; the decisions barely move. The block's
+other payments score 0 either way.
+
+**(c)** No. The difference is €124 in the week, less than two average
+frauds (about €86 each); one large fraud more or less in the test week
+reverses it. Savings rest on few large frauds and depend on $C_a$ and the
+rule, so the choice is made by $CP@100$ on prequential folds, with
+savings reported beside it for the chosen model, as the cost lesson
+concluded.
+</Solution>
+</Exercise>
+
+<Exercise>
+A team selects among the five models by $CP@100$ on the training week,
+where the unpruned tree and the forest score 0.576, XGBoost 0.574,
+logistic regression 0.419 and the depth-2 tree 0.394. Diagnose the
+procedure, and say what it would have cost on the simulator's test week
+had it picked the unpruned tree.
+
+<Solution>
+**Diagnosis.** A model with pure leaves scores every training fraud 1:
+its training ranking is its memory of the labels, not a prediction. The
+training week cannot choose (<Ref lesson="delayed-labels-prequential"
+id="neither-the-training-week-nor-the-test-week-can-choose">the
+delayed-labels lesson</Ref>); the ranking it produces puts the three
+memorisers first by construction.
+
+**Cost.** The unpruned tree's test $CP@100$ is 0.243 against logistic
+regression's 0.291: about five compromised cards a day fewer, well beyond
+the two-card line below which another week could reverse a gap, and its AP is half of
+logistic regression's (0.309 against 0.606). On the real stream the
+unpruned tree and the forest are again both perfect on the training
+week, so the procedure faces the same tie and nothing in it breaks the
+tie: it picks a model with $CP@100$ 0.017 or one with 0.104, against
+0.150 for logistic regression, about 13 or about 5 compromised cards a
+day lost. A procedure whose outcome turns on how a tie is broken is not
+choosing.
+
+**Fix.** Select on a validation week placed where the test week stands,
+or on prequential folds.
+</Solution>
+</Exercise>
+
+<Exercise>
+On the simulator the five models trained in 1.57 s (logistic
+regression), 0.079 s (depth-2 tree), 0.76 s (unpruned tree), 2.06 s
+(forest) and 6.96 s (XGBoost), for $CP@100$ of 0.291, 0.241, 0.243, 0.287
+and 0.273. (a) Compute $CP@100$ per second of training for each. (b) How
+many compromised cards a day does the depth-2 tree give up against
+XGBoost, and at what fraction of its training time? (c) The depth-2 tree
+was never tuned. What would you try first to close its gap, and why does
+the comparison need prequential folds to be fair?
+
+<Solution>
+**(a)** Depth-2 tree $0.241/0.079 \approx 3.1$; unpruned tree 0.32;
+logistic regression 0.19; forest 0.14; XGBoost 0.039.
+
+**(b)** $0.273 - 0.241 = 0.032$, about three cards a day, just past the
+two-card line, at $0.079/6.96 \approx 1/88$ of
+XGBoost's training time.
+
+**(c)** Its depth. In the depth sweep of <Ref
+lesson="delayed-labels-prequential" id="what-prequential-selection-picks">the
+delayed-labels lesson</Ref> the prequential pick by $CP@100$ was depth 5, with a four-week test $CP@100$ of 0.284, above
+every default model here. A fair comparison tunes every candidate on the
+same prequential folds and reports a spread over several weeks, because a
+three-card gap on one week, barely past the two-card line, is one draw
+that the next week may shrink or reverse. That comparison, with training
+cost counted, is what <Ref lesson="gbm-model-selection">model selection
+for boosted trees</Ref> carries out, and on real data it finds a tuned
+shallow tree matching XGBoost on card precision at a fraction of the
+compute.
+</Solution>
+</Exercise>
+
+<References>
+1. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 2.4, "Machine learning for credit card fraud detection" (the challenges: imbalance, drift, real-time, categorical features, sequential modelling, class overlap, performance measures, lack of public data); Ch. 3.3, "Baseline feature transformation" (the weekend and night flags, the card and terminal windows, the delayed terminal risk); Ch. 3.4, "Baseline fraud detection system" (training 25–31 July 2018 with 67,240 transactions and 598 frauds, the delay week and known-card removal, 58,264 test transactions with 385 frauds; the depth-2 tree, its 236-fraud leaf and the 218.67 threshold against 220; the five models' test and training AUC, AP and CP@100; execution times); Ch. 3.5, "Real-world data" (Belgian e-commerce 2018, about 400,000 transactions, 1,000 frauds and 300 compromised cards a day; the real depth-2 tree, Fig. 2, with its splits and leaf counts; the five models' test results, Fig. 3; perfect training scores for the unlimited tree and the forest; training times on a 20-core server); Ch. 4.5, "Real-world data" (ROC and PR curves of the five models, XGBoost's AUC 0.899 against 0.78 and 0.788, APs from 0.002 to 0.035, the forest's AP below the depth-2 tree's, daily detected cards). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+2. Fraud Detection Handbook, *simulated-data-transformed* (the simulator's transactions with the baseline features, one file per day, 1 April to 30 September 2018), GitHub — used to re-run the simulator split: leaf counts on the test week, per-day card blocks, the forest's zero-score block, and the savings at the per-payment rule. https://github.com/Fraud-Detection-Handbook/simulated-data-transformed
+3. L. Breiman, "Random Forests," *Machine Learning* 45(1), 2001, pp. 5–32 — Sec. 1–3 (trees grown on bootstrap samples with a random choice of inputs at each split, unpruned, combined by vote). https://doi.org/10.1023/A:1010933404324
+4. T. Chen, C. Guestrin, "XGBoost: A Scalable Tree Boosting System," *Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining*, 2016, pp. 785–794 — Sec. 2 (additive trees, each fitted to the gradient of the loss at the current ensemble). https://doi.org/10.1145/2939672.2939785
+</References>
