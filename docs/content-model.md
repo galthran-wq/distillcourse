@@ -127,7 +127,10 @@ section of `<Exercise>` blocks with collapsible `<Solution>`s; a final
 
 The validator checks the shell, not the prose: unknown components,
 unparseable MDX, demo-name mismatches, a `<Figure src>` with no file behind
-it, a broken/truncated image, and an uncredited sourced image are errors; a
+it, a broken/truncated image, an uncredited sourced image, and a `$…$` span
+that holds prose rather than math (`stray-math`: a dollar amount written as
+a bare `$` pairs with the next one and KaTeX swallows the text between) are
+errors; a
 lesson not starting with its `opening`, missing exercises, missing
 references, an exercise without a solution, a low-resolution or oversized
 image, an unused credits entry, and a canon author's surname or a citation

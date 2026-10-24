@@ -128,6 +128,31 @@ describe("lintCourse", () => {
     expect(warn?.message).toContain("et al.");
   });
 
+  it("fails a $…$ span that swallowed prose between two dollar amounts (stray-math)", () => {
+    const dir = brokenCopy((d) =>
+      rewrite(
+        join(d, "lessons/intro-surprise/lesson.mdx"),
+        "## Information and probability\n",
+        "## Information and probability\n\nA pays B $100 of illicit funds, B pays $50 to C, and $p = 1/2$.\n",
+      ),
+    );
+    const errors = lintDir(dir).filter((d) => d.rule === "stray-math");
+    expect(errors).toHaveLength(1);
+    expect(errors[0].level).toBe("error");
+    expect(errors[0].message).toContain("$100 of illicit funds");
+  });
+
+  it("passes escaped dollar amounts and a dollar inside a formula (stray-math)", () => {
+    const dir = brokenCopy((d) =>
+      rewrite(
+        join(d, "lessons/intro-surprise/lesson.mdx"),
+        "## Information and probability\n",
+        "## Information and probability\n\nA pays B \\$100, B pays \\$50, worth $2 \\times \\text{\\textdollar}25$.\n",
+      ),
+    );
+    expect(lintDir(dir).filter((d) => d.rule === "stray-math")).toEqual([]);
+  });
+
   it("warns when an Exercise has no Solution (exercise-solution)", () => {
     const dir = brokenCopy((d) => {
       const path = join(d, "lessons/intro-surprise/lesson.mdx");

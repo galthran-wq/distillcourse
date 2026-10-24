@@ -215,7 +215,11 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
      one; a bare `>` blockquote is for what is not a sourced passage.
    - End with `<References>`: real, verified sources with chapter-level
      pointers (L8). Never invent a citation.
-   - Math in KaTeX (`$...$`, `$$...$$`). Never write title/goal/est_minutes
+   - Math in KaTeX (`$...$`, `$$...$$`). A dollar amount in prose is `\$100`,
+     never a bare `$`; inside a formula it is `\text{\textdollar}100` (a `\$`
+     there ends the formula). A line inside a formula never starts with `+`,
+     `-`, `>` or `#` — markdown reads it as a list or a quote. `stray-math`
+     catches what slips through. Never write title/goal/est_minutes
      into the MDX — the layout renders them.
    - Scannability (playbook Writing principles 6–9, enforced by QA): typed
      emphasis (bold = payoff word / run-in label; italic = first-use term,

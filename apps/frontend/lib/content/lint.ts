@@ -157,6 +157,42 @@ function sourceMentions(root: Root, sourceNames: string[]): string[] {
   return [...counts].map(([name, n]) => (n > 1 ? `${name} ×${n}` : name));
 }
 
+/**
+ * Inline math spans that are not math: a `$` meant as a dollar sign pairs
+ * with the next one and swallows the prose between them, which KaTeX then
+ * sets as one italic run with its spaces gone ("100ofillicitfunds,Bpays").
+ * Three signatures, each of which real math never shows: the closing `$`
+ * runs straight into a digit (the next amount, "$22M"); the span opens on
+ * whitespace or a lone punctuation mark (the pairing has slipped by one, so
+ * the prose between two formulas became the formula); or three plain words
+ * in a row outside \text{}. Returns each span's line and its opening.
+ */
+function strayMath(root: Root, mdx: string): string[] {
+  const found: string[] = [];
+  const walk = (node: {
+    type: string;
+    value?: unknown;
+    position?: { start: { line: number; offset?: number }; end: { offset?: number } };
+    children?: unknown[];
+  }) => {
+    if (node.type === "inlineMath" && typeof node.value === "string" && node.position) {
+      const value = node.value;
+      const after = mdx[node.position.end.offset ?? 0] ?? "";
+      const prose = value.replace(/\\(text\w*|math\w*|mbox|operatorname)\{[^}]*\}/g, " ");
+      if (
+        /\d/.test(after) ||
+        /^(\s|[.,;:](\s|$))/.test(value) ||
+        /(?<!\\)\b[a-z]{2,}\s+[a-z]{2,}\s+[a-z]{2,}\b/.test(prose)
+      ) {
+        found.push(`line ${node.position.start.line}: $${value.replace(/\s+/g, " ").slice(0, 40)}…`);
+      }
+    }
+    for (const child of node.children ?? []) walk(child as typeof node);
+  };
+  walk(root);
+  return found;
+}
+
 function lintLessonMdx(
   entry: LoadedLesson,
   lessonSlugs: Set<string>,
@@ -459,6 +495,14 @@ function lintLessonMdx(
       rule: "opening-first",
       file,
       message: `lesson does not start with the opening statement from course.yaml`,
+    });
+  }
+  for (const span of strayMath(root, entry.mdx)) {
+    diags.push({
+      level: "error",
+      rule: "stray-math",
+      file,
+      message: `${span} — a $…$ span that holds prose, not math: write a dollar amount as \\$ (e.g. \\$100), and check a line inside a formula does not start with > or -`,
     });
   }
   const cited = sourceMentions(root, sourceNames);
