@@ -8,13 +8,9 @@ two error rates. Catching 99% of fraud and clearing 99% of genuine
 payments sounds like a detector that is right 99 times in 100, so its
 alerts should be fraud about 99 times in 100.
 
-That instinct fails on all three questions of the opening. The share of
-alerts that are fraud turns out to be about one in eleven. The error rates
-say nothing about money, and the two kinds of error cost different amounts
-to different people. And the number of alerts worth working is a staffing
-decision that neither error rate answers. Each question needs one more
-quantity the error rates leave out: the share of fraud in the stream, the
-price of each outcome, and the size of the team.
+Before anything is built on that instinct it should be tested, and the
+first question is the place to test it: take a stream of payments, run the
+detector over it, and count what actually lands in the alert queue.
 
 ## What share of the alerts are fraud: the base rate decides
 
@@ -129,11 +125,11 @@ legitimate customer. A detector's error rates travel between streams; its
 precision does not.
 
 <KeyFact>
-At one fraud in a thousand, a detector that is 99% right on each class
-produces about 9 frauds per 100 alerts. Error rates travel between streams
-and precision does not. At a fixed base rate only the ratio
-$\mathrm{TPR}/\mathrm{FPR}$ moves precision, and with recall already near 1
-that means the false-positive rate.
+A precision figure is a property of the stream it was measured on, not of
+the detector. Tested on a sample enriched to one fraud in ten, the 99%/99%
+detector scores about 92% precision; deployed on a stream of one in a
+thousand it delivers about 9%. Two precisions can be compared only at the
+same base rate.
 </KeyFact>
 
 <Exercise>
@@ -189,12 +185,6 @@ $c_{TP} = c_{TN} = 0$. For card fraud both halves of that special case are
 wrong: an alert costs money even when it is right, and a miss costs far
 more than a false alert.
 
-<Figure
-  src="./figures/cost-matrix.svg"
-  alt="Two 2-by-2 cost matrices side by side, rows fraud and genuine, columns alert and no alert. Both put the alert cost C_a in the two alert cells and 0 for a genuine payment not alerted; the left charges a missed fraud a fixed price c, the right charges it the payment's amount; the no-alert column is shaded blue in both and labelled as where doing nothing lives"
-  caption="Two conventions for the four cells. They agree on everything except the price of a miss."
-/>
-
 ### What an alert costs: the call, and sometimes the customer
 
 An alert flags a payment, and an investigator phones the holder of the
@@ -213,15 +203,16 @@ keeps the confusion matrix, the costs and the precision on one unit, the
 payment; the budget section moves to cards and says how the two prices
 relate.
 
-That price holds only while the alert is a question. If the system acts on
-its own, by blocking the card, a false positive costs the customer a card
-that stops working, and the bank a customer who may move their spending
-elsewhere. Scale makes this decisive. On a base of a million accounts, a
-daily false-alarm rate of 1% shuts down 10,000 genuine customers a day.
-That is why, as in <Ref lesson="fraud-detection-system"
+That price holds only while the alert is a question. If the model blocks
+the card on its own, a false positive is no longer an investigator's call:
+it is a customer whose card stops working at the till, and a bank that may
+lose that customer's spending. That is the cost behind <Ref
+lesson="fraud-detection-system"
 id="why-a-block-has-to-be-nearly-always-right">the argument for blocking
-rules</Ref>, automatic action is kept for the rare patterns that are
-almost always fraud, and everything else becomes a call.
+rules</Ref>, where a 1% false-alarm rate refused thousands of genuine
+customers a day, and it is why automatic action is kept for the rare
+patterns that are almost always fraud while everything else becomes a
+call.
 
 ### What a miss costs: the amount, or more
 
@@ -248,6 +239,12 @@ a genuine payment alone, $c_{TN} = 0$.
 cost</Ref> takes the amount convention and derives the decision rule it
 implies, payment by payment.
 
+<Figure
+  src="./figures/cost-matrix.svg"
+  alt="Two 2-by-2 cost matrices side by side, rows fraud and genuine, columns alert and no alert. Both put the alert cost C_a in the two alert cells and 0 for a genuine payment not alerted; the left charges a missed fraud a fixed price c, the right charges it the payment's amount; the no-alert column is shaded blue in both and labelled as where doing nothing lives"
+  caption="Two conventions for the four cells. They agree on everything except the price of a miss."
+/>
+
 <KeyFact>
 The two errors are paid by different people in different currencies: a
 missed fraud by the bank in reimbursed money (and by the next payments on
@@ -271,8 +268,8 @@ figure above: $c_{FN}$ on every fraud, nothing else. With the amount
 convention that is the total amount of fraud in the stream.
 
 That baseline is also a ceiling. If 0.1% of 100 million payments are
-fraud at £10 each, doing nothing loses £1 million, and no detector on
-that stream can save more than £1 million, since a perfect one would
+fraud at €10 each, doing nothing loses €1 million, and no detector on
+that stream can save more than €1 million, since a perfect one would
 only remove the fraud loss and would still pay for its alerts. The
 *value* of a detector is the cost of doing nothing minus its own cost:
 
@@ -570,8 +567,10 @@ still to be stolen.
 
 ### Two curves that cross
 
-Acting at the probe saves the most but almost never
-fires, because a €1 payment looks like any other. Waiting for certainty
+If the bank could act at the probe, a catch there would save the most,
+the whole €1,000. But a €1 payment looks like any other, so the model
+gives it only $P(\text{fraud}) = 0.05$, and the expected saving of acting
+there is just €50, the smallest in the table apart from the zeros. Waiting for certainty
 means waiting for the complaint, when nothing is left to save: a fraud
 that reveals itself is detected for free and worth nothing to detect. The
 expected saving peaks in between, and where depends on how fast the
@@ -590,17 +589,6 @@ expensive response: a call now, or a block. Cards with high but not
 extreme scores go on a watch list, where the next payment on the card
 triggers a call at a lower score than a fresh card would need, so that
 their evidence can mature without a call spent on each.
-
-<KeyFact>
-The money still at stake is largest when the evidence is weakest, and the
-evidence is strongest when nothing is left, so the expected saving of a
-catch peaks in between: on the stolen card, €420 after the second large
-payment against €50 at the probe and nothing at the complaint. A metric
-that counts
-only whether a fraud was caught, and not after how many payments, cannot
-see the difference between a detector that saves the card and one that
-confirms the loss.
-</KeyFact>
 
 You can now answer the three questions of the opening for any detector.
 The share of alerts that are fraud follows from the error rates and the
