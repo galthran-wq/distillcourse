@@ -203,8 +203,10 @@ its own decision, so the total is minimised row by row.
 ### Two expected costs, four cells
 
 The calibration lesson compared $C_a$ with $p\,c_{FN}$. That comparison
-assumed two cells without saying so; written with all four, the expected
-cost of each action on a payment with probability $p$ is
+charged an alert $C_a$ whether the payment was fraud or not, and charged
+nothing for a genuine payment left alone ($c_{TN} = 0$). With each of the
+four cells free, the expected cost of each action on a payment with
+probability $p$ is
 $$
 \mathbb{E}[\text{cost} \mid \text{flag}] = p\,c_{TP} + (1-p)\,c_{FP},
 \qquad
@@ -264,9 +266,6 @@ For a €10,000 payment, 0.5 is a thousand times too strict. At the other
 edge, a payment worth less than the call has $p^* > 1$ and is
 never flagged: even a certain fraud of €4 costs less to reimburse than to
 catch.
-
-With one price $c$ for every miss, the same comparison gives the
-horizontal line $p \ge C_a/c$ of the calibration lesson.
 
 <KeyFact>
 Every fixed threshold $\tau$ on the probability is the cost-minimising
@@ -373,7 +372,7 @@ A fixed threshold survives an uncorrected model at the price of retuning
 one number: the correction is increasing, so every cut on $p_s$ is some
 cut on $p'$. The per-payment rule has no such number to retune, since each
 amount would need its own matched cut, and computing those is applying
-the correction. On the day, skipping it takes savings from 64% to −96%.
+the correction.
 </KeyFact>
 
 ## Costs in the fit, or only in the decision
@@ -483,20 +482,19 @@ the amount twice.
 ### What a published comparison on processor data shows
 
 One comparison measures all of these routes on real card data. A large
-European card processor's 120 million transactions from January 2012 to
-June 2013 held 40,000 labelled frauds, 0.025%. The study worked on a
-subset of 236,735 transactions selected where fraud concentrates, at
-1.50% fraud and €895,154 of fraud losses, split 50/25/25 into training,
-validation and test sets; the test quarter holds 71,226 transactions,
-1.45% fraud and €262,167 of fraud, the baseline its savings are measured
-against. Eight detectors were fitted on the same four feature sets, each
-named by the kinds of feature it combines: raw transaction fields (raw),
-aggregates of the card's recent payments (agg1, and agg2 for aggregates
-restricted to the same merchant type or country) and periodic,
-time-of-day features (per). The detectors were a decision tree, logistic
-regression and a random forest, each also with the
-per-payment rule applied to calibrated probabilities, and the
-cost-sensitive logistic regression and tree.
+European card processor's stream ran at 0.025% fraud over 120 million
+transactions; the study worked on a subset chosen where fraud
+concentrates, split 50/25/25 into training, validation and test sets.
+The test quarter holds 71,226 transactions, 1.45% fraud and €262,167 of
+fraud, the baseline its savings are measured against. Eight detectors
+were compared: a decision tree, logistic regression and a random forest,
+each also with the per-payment rule applied to calibrated probabilities,
+and the cost-sensitive logistic regression and tree.
+
+Each detector was fitted on four feature sets, named by what they
+combine: raw transaction fields (raw), aggregates of the card's recent
+payments (agg1, and agg2 for aggregates restricted to the same merchant
+type or country) and periodic, time-of-day features (per).
 
 <Figure
   src="./figures/bahnsen-savings-by-algorithm.png"
@@ -521,13 +519,13 @@ tree against €168,000 for the random forest with the rule. In earlier
 studies on the same data, neither undersampling nor oversampling
 improved savings.
 
-Two departures from what this course demands keep these numbers
-indicative. The partition is a single split with no delay block of the
-kind <Ref lesson="delayed-labels-prequential">the delayed-labels
-lesson</Ref> requires, so the levels carry the optimism of a test that
-does not reproduce deployment; and the subset was chosen for its fraud
-density, which moves the baseline. The
-ordering, decision first and fit second, is the part that transfers.
+These numbers are indicative. A test that reproduces deployment runs
+forward in time with a delay block between training and test, as in
+<Ref lesson="delayed-labels-prequential">the delayed-labels
+lesson</Ref>; this partition is a single split without one, so the
+levels carry its optimism. And the subset was chosen for its fraud
+density, which moves the baseline. The ordering, decision first and fit
+second, is the part that transfers.
 
 ## Savings beside average precision and card precision
 
@@ -536,39 +534,52 @@ alert-budget metrics</Ref> ended with three numbers: ROC-AUC, average
 precision and card precision at $k$. Savings answers a question none of
 them asks. The three depend only on the order of the payments; savings
 depends on the amounts, on the decision rule, on the calibration and on
-the chosen $C_a$. A model can rank more frauds near the top and still
-save less, if the frauds it promotes are small. It also changes when the bank revises its call cost, which no
-ranking metric does.
+the chosen $C_a$: on the day the same probabilities save 64.4% at a €5
+call and 34.5% at €40. A model can rank more frauds near the top and
+still save less, if the frauds it promotes are small.
 
-### Why savings does not choose the model
+### Which number chooses the model
 
 Savings is the number the bank cares about, so the obvious move is to
-select models by it on the prequential folds. Two properties of savings
-argue against that.
+select every model by it on the prequential folds, or else by card
+precision, the steadier ranking metric. Each has a blind spot.
 
-**It rests on a few frauds.** On the day, G5's three €1,200 frauds are
-worth 24 points of savings, and G6's 36 frauds of €6 are worth 1.4. A
-model that catches or misses three payments moves by a quarter of the
-scale, and a fold that happens to hold one more large fraud, or one fewer,
-moves every model's savings with it. Compared across folds, savings is
-dominated by which large frauds each fold drew, and the difference
-between two models drowns in that variation sooner than a count of
-caught frauds does.
+**Savings rests on a few frauds.** On the day, G5's three €1,200 frauds are
+worth 24 points of savings, and G6's 36 frauds of €6 are worth 1.4. Two
+models compared on the same fold face the same frauds, so what separates
+their savings is which of the fold's few large frauds each one catches:
+three payments caught by one and missed by the other move the gap by a
+quarter of the scale. On the next fold the large frauds are different
+ones, and the two models can swap places. The paired difference in
+savings swings from fold to fold far more than a difference in caught
+cards, which counts each card once, and it needs many more folds before
+it says which model is better. A comparison by savings also holds for
+one $C_a$, one correction and one rule; another setting can reorder the
+models.
 
-**It is not the model's alone.** Savings changes with the $C_a$ the bank
-set, with whether β was undone, and with the decision rule: on the day
-the same probabilities give 64.4% at a €5 call and 34.5% at €40. Two
-models compared by savings are compared under one setting of all three,
-and a different setting can reorder them.
+**Card precision cannot see what fitting with costs buys.** The
+published comparison put the cost-sensitive tree at 71% and the random
+forest with the rule at 64%. That gain comes from the amounts: a
+cost-fitted model trades small frauds for large ones near the top, a
+trade card precision does not reward and may score as a loss. Chosen by
+card precision alone, a cost-fitted learner has no way to show that it
+beats a plain one.
+
+So the two numbers split the choice. Card precision chooses within a
+family, where the amounts do not change between candidates: the
+learner's hyperparameters, its features, its training window. Savings
+decides between pipelines that use the amounts differently, a
+cost-fitted learner against a plain one under the rule, with $C_a$, the
+correction and the rule held fixed, and with its spread across folds
+reported, so that a gap smaller than the spread is not read as a win.
 
 <KeyFact>
-Choose models by card precision on prequential folds: it measures the
-ranking alone, which is what training controls, and each caught card
-counts once, so a single large fraud cannot swing it. The choice is blind
-to amounts; they enter through the decision rule and, where the learner
-allows, the weights. Report savings under the per-payment rule, on
-corrected probabilities and at the bank's current $C_a$, beside it for
-the chosen model.
+Choose within a model family by card precision on prequential folds: it
+measures the ranking alone, and each caught card counts once, so a single
+large fraud cannot swing it. Choose between a cost-fitted and a plain
+pipeline by savings at the bank's current $C_a$, on corrected
+probabilities and under the per-payment rule, with its spread across
+folds beside it.
 </KeyFact>
 
 <Conclusion>
@@ -585,10 +596,12 @@ rebalancing cannot carry them.
 The rule says which payments are worth a call, not how many calls the
 team can make: on a busy day it may flag more than the budget, on a quiet
 one fewer. Combining it with a fixed budget is the problem of <Ref
-lesson="score-to-action">score-to-action policies</Ref>. The next
-lesson, <Ref lesson="ulb-handbook-benchmark">the benchmark of five
-baseline models</Ref>, puts five standard models through the module's metrics
-on simulated and real card data.
+lesson="score-to-action">score-to-action policies</Ref>. Before any of that,
+which standard model is best is itself an open question: the answer
+changes with the metric and with whether the data is simulated or real,
+and each reversal has to be traced to its cause. That is <Ref
+lesson="ulb-handbook-benchmark">the benchmark of five baseline
+models</Ref>.
 </Conclusion>
 
 ## Exercises

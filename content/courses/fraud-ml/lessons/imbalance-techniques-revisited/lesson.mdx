@@ -359,7 +359,7 @@ The other remedies repeat the pattern.
 
 - **Class weights**, ω from 1 to 100: the tree's average precision is
   best at $\omega = 1$, 0.600, against 0.537 at $\omega = 100$. A logistic
-  regression loses more, 0.623 at $\omega = 1$ against 0.571 at
+  regression loses slightly less, 0.623 at $\omega = 1$ against 0.571 at
   $\omega = 100$, while its ROC-AUC rises from 0.868 to 0.871. On these
   features its log-odds are not linear, so the weights changed the
   slopes, not only the intercept, and the order moved.
@@ -427,16 +427,7 @@ precision</Ref>): the plain tree's 0.068 is about $0.068/0.0025 \approx
 67$ times the simulator's. It is only a sign, since weaker features or
 noisier labels would lower that multiple just as well.
 
-<KeyFact>
-On both streams, for every remedy, the setting that maximises average
-precision is no rebalancing or the mildest rebalancing tried, and the
-setting that maximises ROC-AUC is near full balance. Card precision at 100
-separates the streams: on the simulator no remedy moves it by more than
-the noise, on real data every resampler costs between 3 and 11 cards a
-day.
-</KeyFact>
-
-## Balanced ensembles: the gain is diversity, not balance
+## Balanced ensembles: the gain is not the balance
 
 One family of remedies does better than the rest on card data, and its
 name credits the rebalancing. *Bagging* fits many trees, each on a
@@ -473,15 +464,12 @@ Each balanced or weighted row is at the setting its prequential folds
 picked for each metric, scored on the test weeks; the dots of the
 ratio-sweep figure below mark instead the best test-week ratio, which is
 why balanced bagging's real-stream bests there, ROC-AUC 0.922 and AP
-0.090, sit a little above this table's 0.919 and 0.086. The real-stream XGBoost row, AP 0.095, owes its
-distance from the 0.035 of the alert-budget lesson to the same change of
-setup as the tree: 100 boosted trees of depth 6 chosen on prequential
-folds and scored over four weeks, against default settings and one week.
+0.090, sit a little above this table's 0.919 and 0.086. The real-stream XGBoost row, AP 0.095, sits
+above the 0.035 of the alert-budget lesson for the same reason the
+depth-6 tree does: tuned on prequential folds, scored over four weeks.
 
-Reading the card-precision columns needs the same noise scale: gaps under
-about two cards a day are within what another week could reverse, and on
-the real stream these
-models' $CP@100$ varies from one test week to the next with standard
+Reading the card-precision columns needs the same noise scale: on the
+real stream these models' $CP@100$ varies from one test week to the next with standard
 deviations of 0.03 to 0.07. Balanced bagging finds about four more
 compromised cards a day than bagging, 0.248 against 0.209, and balanced
 random forest about three more than random forest, 0.254 against 0.227:
@@ -511,14 +499,19 @@ on both streams.
 
 What the mildest ratio does do is subsample. At $r = 0.01$ on a stream
 with $\mathrm{IR} \approx 0.0025$, each tree keeps $\beta = 0.0025/0.01$,
-a quarter of the genuine rows, a different quarter for every tree. A
-hundred trees fitted on a hundred different subsets disagree more than
-a hundred trees fitted on overlapping bootstrap samples, and averaging
-trees that disagree cancels more of their individual overfitting. That
-is the gain: diversity among the trees, supplied cheaply by
-undersampling, and partly cancelled by the balance that comes with it.
-The exercise on diversity and rebalancing designs the experiment that
-separates the two.
+a quarter of the genuine rows, a different quarter for every tree. One
+explanation fits that: a hundred trees fitted on a hundred different
+subsets disagree more than a hundred trees fitted on overlapping
+bootstrap samples, and averaging trees that disagree cancels more of
+their individual overfitting. On that reading the gain is diversity
+among the trees, supplied cheaply by undersampling and partly cancelled
+by the balance that comes with it.
+
+The sweep is consistent with that reading; it does not demonstrate it.
+It rules balance out as the cause, but nowhere does it compare balanced
+bagging with an ensemble whose trees see subsets of the same size drawn
+at the stream's own mix, and only that comparison could credit the
+subsampling. The exercise on diversity and rebalancing designs it.
 
 ### Boosting without rebalancing: near-best, not the pick
 
@@ -613,7 +606,8 @@ a reported gain in ROC-AUC lies beyond the budget. On card data under
 forward folds the honest metrics favour little or no rebalancing, the
 target ratio is a hyperparameter chosen by card precision on prequential
 folds with the sampler inside each fold, and balanced ensembles gain
-through the diversity of their trees. A boosted tree without
+most at their mildest ratios, so not through balance; diversity among
+their trees fits that, but no experiment here has confirmed it. A boosted tree without
 rebalancing reaches the best or near-best average precision on both
 streams; on real card data card precision at 100 prefers a mild fraud
 weight or a balanced ensemble, by a margin inside the noise.
@@ -768,8 +762,10 @@ Balanced bagging at ratio $r$. Repeat (2) and (3) across several $r$,
 matching sizes each time, and score all arms on the same prequential
 folds with ROC-AUC, average precision and card precision at 100.
 
-**Reading it.** If (2) matches (3) on the ranking metrics, the gain is
-the subsampling, diversity; if (3) beats (2) at equal size, the change of
+**Reading it.** First compare both subsampled arms with (1): if neither
+beats plain bagging, there is no ensemble gain to attribute. If they do,
+and (2) matches (3) on the ranking metrics, the gain is the subsampling,
+diversity; if (3) beats (2) at equal size, the change of
 mix contributes. If (3)'s advantage over (2) grows as $r$ goes to 1,
 balance helps; if it shrinks or reverses, balance hurts. One caution: on
 a rare-class stream a 10% random subsample holds 10% of the frauds,
@@ -780,9 +776,14 @@ which is undersampling with $r = \mathrm{IR}$, no rebalancing at all.
 **The toy.** The second row is arm (2), the third arm (3). They agree on ROC-AUC (0.938 against 0.947) and average precision (0.592
 against 0.586) within the folds' spread; only balanced accuracy separates
 them, 0.713 against 0.920, which is the boundary move and nothing else.
-On the toy the rebalancing adds nothing to the ranking. On the real
-stream the ratio sweep points the same way: the gain is largest at the
-mildest ratio and turns into a loss at balance.
+On the toy the rebalancing adds nothing to the ranking. Neither does
+the subsampling: row 1, arm (1), beats both subsampled arms on average
+precision, 0.597 against 0.592 and 0.586, and sits between them on
+ROC-AUC, so the toy has no ensemble gain to attribute to diversity or
+anything else. On the real stream, where balanced bagging does beat
+bagging, the ratio sweep shows only that balance is not the cause: the
+gain is largest at the mildest ratio and turns into a loss at balance.
+Only arm (2), run there at matched sizes, could confirm diversity.
 </Solution>
 </Exercise>
 

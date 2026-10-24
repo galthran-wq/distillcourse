@@ -313,8 +313,20 @@ print(f"{len(stream):,} payments, {y.mean():.2%} fraud; by scenario:",
 # test day $d$ when it has a fraud on some day in $[s_j,\ d - \delta_{delay} - 1]$:
 # the labels of day $d - \delta_{delay}$ arrive during day $d$, too late for
 # that morning's scoring. The date moves with $d$ — each test day has its own
-# known-card list, which grows through the week. The count starts at the
-# fold's training block, as in the delayed-labels lesson.
+# known-card list, which grows through the week.
+#
+# The lower end, $s_j$, is this lab's addition. The delayed-labels lesson's
+# definition counts every fraud up to $d - \delta_{delay} - 1$, however old;
+# the rule here is narrower, and the reason is that folds are compared with
+# one another. Fold $j$ starts $j\,\delta_{test}$ days earlier than fold 0,
+# so with no lower end each fold would be cleaned with a different amount of
+# history: in the depth grid of section 7 the first fold's training block
+# has 28 days of stream before it, the last fold's has 7. Part of the spread
+# over folds would then measure how much past each fold happened to have.
+# Counting from $s_j$ gives every fold the same lookback, its training block
+# plus the elapsed delay and test days, as the handbook's reference splitter
+# does. The price: a card whose only fraud falls before the training block
+# stays scored, though a bank would already have blocked it.
 #
 # Return the folds as a role matrix rather than index lists: entry
 # `roles[j, i]` is 1 if row $i$ trains fold $j$, 2 if it is scored in fold
@@ -363,7 +375,8 @@ assert set(_cards[(_days == 14) & (_r == 2)]) == {2, 3, 4}
 assert set(_cards[(_days == 20) & (_r == 2)]) == {4}
 assert set(_cards[(_days == 17) & (_r == 2)]) == {3, 4}  # d's fraud (day 11) known only from day 19
 # The same cards with the fold started on day 2 (train 2-8, test 16-22): a's
-# fraud on day 1 is before the training block, so a stays scored all week.
+# fraud on day 1 is before the training block, so under this lab's lower end
+# a stays scored all week (the lesson's definition alone would remove it).
 _r = prequential_split(_days, _cards, _lab, 2, 1, 7, 7, 7)[0]
 assert set(_cards[(_days == 17) & (_r == 2)]) == {0, 3, 4}
 assert set(_cards[(_days == 20) & (_r == 2)]) == {0, 4}
@@ -372,6 +385,43 @@ assert set(_cards[(_days == 20) & (_r == 2)]) == {0, 4}
 _r = prequential_split(np.arange(60), np.arange(60), np.zeros(60, int), 30, 3, 7, 7, 7)
 for _j in range(3):
     assert np.flatnonzero(_r[_j] == 2).min() - np.flatnonzero(_r[_j] == 1).max() == 8
+
+# %% [markdown]
+# <details><summary>Hint 1 — strategy</summary>
+#
+# Start from an all-zero `(n_folds, n)` matrix and fill it row by row. Loop
+# over folds; in fold $j$ compute $s_j$ once, then mark the training days
+# with one mask. Leave the delay block alone: its rows are already 0. Then
+# loop over the fold's test days one at a time, and for each day build that
+# day's own known-card list before marking the day's payments: a single list
+# built once per fold is the frozen-list bug.
+# </details>
+#
+# <details><summary>Hint 2 — pseudocode</summary>
+#
+# ```
+# roles = zeros(n_folds, n)
+# for j in 0 .. n_folds-1:
+#     s = start - j * delta_test
+#     roles[j, rows with s <= day < s + delta_train] = 1
+#     for i in 0 .. delta_test-1:
+#         d = s + delta_train + delta_delay + i
+#         known = cards of fraud rows with s <= day <= d - delta_delay - 1
+#         roles[j, rows on day d whose card is not in known] = 2
+# ```
+# </details>
+#
+# <details><summary>Hint 3 — last resort</summary>
+#
+# The inner loop, the only part with a date in it:
+#
+# ```python
+# for i in range(delta_test):
+#     d = s + delta_train + delta_delay + i
+#     known = cards[(labels == 1) & (days >= s) & (days <= d - delta_delay - 1)]
+#     roles[j, (days == d) & ~np.isin(cards, known)] = 2
+# ```
+# </details>
 
 # %%
 distill.check("prequential-split", prequential_split)
@@ -695,6 +745,75 @@ def prequential_selection(days, cards, labels, candidates, fit_and_score,
                            card_precision_top_k(days[va], cards[va], s, labels[va], k).mean())
     return table, table.mean(axis=1).argmax(axis=0)
     # END SOLUTION
+
+# %%
+# Local referee: twelve days of four payments, one fraud a day, every payment
+# on its own card (so no card is ever known). Deployment training starts on
+# day 10 and every block is two days wide, so fold 0 trains on days 6-7 and
+# validates on 10-11 (the deployment training block, since the widths are
+# equal); fold 1 trains on 4-5 and validates on 8-9.
+_d = np.repeat(np.arange(12), 4)
+_c = np.arange(len(_d))
+_l = np.tile([1, 0, 0, 0], 12)
+_fits = []
+
+
+def _toy_fit(train_idx, cand):
+    _fits.append(np.unique(_d[train_idx]).tolist())
+    if cand == "right on days 10-11 only":
+        return np.where(np.isin(_d, [10, 11]), _l, 1 - _l).astype(float)
+    return _l.astype(float)
+
+
+_cands = ["right on days 10-11 only", "perfect", "perfect, listed second"]
+_tab, _picks = prequential_selection(_d, _c, _l, _cands, _toy_fit, 10, 2, 2, 2, 2, 1)
+assert _tab.shape == (3, 2, 3)
+assert sorted({tuple(f) for f in _fits}) == [(4, 5), (6, 7)]
+assert np.allclose(_tab[0, 0], 1.0)    # fold 0 scored days 10-11 and nothing else
+assert np.isclose(_tab[0, 1, 0], 0.0)  # fold 1 scored days 8-9, where it is inverted
+assert _picks.tolist() == [1, 1, 1]    # candidates 1 and 2 tie: the first wins
+
+# %% [markdown]
+# <details><summary>Hint 1 — strategy</summary>
+#
+# You do not need a second splitter. One call to your `prequential_split`,
+# started `delta_delay + delta_valid` days before `deploy_start` and with
+# `delta_valid` as its test width, returns every validation fold at once.
+# Then loop over folds, and inside each fold over candidates: fit on the
+# fold's training rows, keep the scores of its validation rows only, and
+# compute the three metrics on those rows alone. The picks come from the
+# table, after the loops.
+# </details>
+#
+# <details><summary>Hint 2 — pseudocode</summary>
+#
+# ```
+# roles = prequential_split(..., start = deploy_start - delta_delay - delta_valid,
+#                           n_folds, delta_train, delta_delay, delta_valid)
+# table = zeros(n_candidates, n_folds, 3)
+# for each fold j:
+#     tr = rows with role 1 in fold j;  va = rows with role 2 in fold j
+#     for each candidate c:
+#         s = fit_and_score(tr, candidates[c]) restricted to va
+#         table[c, j] = (ROC-AUC, your AP, mean of your daily CP@k) on va
+# picks = for each metric, the candidate with the highest mean over folds
+# ```
+# </details>
+#
+# <details><summary>Hint 3 — last resort</summary>
+#
+# The inside of the two loops and the picks; `np.argmax` already returns
+# the first index on a tie.
+#
+# ```python
+# s = fit_and_score(tr, cand)[va]
+# table[c, j] = (roc_auc_score(labels[va], s),
+#                average_precision(labels[va], s),
+#                card_precision_top_k(days[va], cards[va], s, labels[va], k).mean())
+# ...
+# picks = table.mean(axis=1).argmax(axis=0)
+# ```
+# </details>
 
 # %%
 distill.check("prequential-selection", prequential_selection)
