@@ -1,0 +1,975 @@
+A cardholder usually pays at 22:00, 23:00, 02:00 and 03:00. The average of those clock times is 12:30, an hour at which they never pay, so a feature built on 'distance from the usual time' with ordinary arithmetic would flag their most ordinary purchases. How should a 'usual time', a 'usual peer' and a 'usual self' be computed so that a departure from each is a feature a detector can use?
+
+<Ref lesson="transaction-aggregates">Entity history aggregates</Ref>
+placed a card's past beside its payment as counts and sums over windows:
+the number of payments in the last day, the mean amount over the last 30
+days. Three things a cardholder's habit holds are not counts. One is
+*when* the card pays, a clock time. Another is whether the card is
+behaving like cards of its kind. The third is whether it has just
+changed, measured against its own recent payments rather than a long
+average.
+
+Each of the three needs its own arithmetic. The constraint is the one the
+windows obeyed: a feature holds only what is known when the payment is
+scored, which is the payment's own fields and the card's payments before
+it, and it is cheap enough to compute for every payment.
+
+## Clock time lives on a circle
+
+The hour of a payment is a number from 0 to 24, and the first attempt
+treats it like any other number.
+
+### Why the average hour fails
+
+The opening's card pays at hours 22, 23, 2 and 3. Their arithmetic mean
+is $(22 + 23 + 2 + 3)/4 = 12.5$, half past noon. Their deviations from it
+are $\pm 9.5$ and $\pm 10.5$ hours, so the standard deviation is about 10
+hours. A rule "flag payments more than two standard deviations from the
+mean" can flag nothing on a 24-hour clock, and a feature "hours from the
+usual time" gives the card's own 23:00 payment a distance of 10.5 hours
+and a 13:00 payment, at an hour the card never uses, a distance of half
+an hour.
+
+The fault is where the numbers start. Hour 23 and hour 0 are one hour
+apart on the clock and 23 apart as numbers, because the number line cuts
+the clock at midnight. Moving the cut does not help. Cut at noon instead,
+and the night card is fixed, but a card that pays at 11:00 and 13:00 now
+averages to midnight. Every cut point splits some card's habit, so a usual
+time has to be computed without cutting the circle at all.
+
+<Figure
+  src="./figures/clock.svg"
+  alt="A 24-hour clock face with midnight at the top and four black dots at 22:00, 23:00, 02:00 and 03:00. A dashed blue hand points down to 12:30, labelled arithmetic mean 12:30. A short amber arrow points just right of midnight, labelled circular mean 00:30. Beside the clock: (22 + 23 + 2 + 3) / 4 = 12.5, an hour the card never pays at; the direction of the average arrow lies among the payments, and its length 0.86 says they are close together"
+  caption="The arithmetic mean of four late-night times points to noon; the direction of their average arrow points to 00:30, among them."
+/>
+
+### Averaging directions instead of numbers
+
+A point on a circle is a direction, and directions can be averaged
+without a cut. Treat each payment time as an arrow of length one from the
+centre of the clock face, add the arrows, and read where the sum points.
+Arrows that point near each other add up to a long sum; arrows that point
+in opposite directions cancel.
+
+<Definition title="circular mean and mean resultant length">
+An hour $h$, with $0 \le h < 24$, corresponds to the angle
+$\theta = 2\pi h / 24$ (15° per hour), measured from midnight in the
+direction the clock runs, and to the point $(\cos\theta, \sin\theta)$,
+whose first coordinate points to midnight and second to 06:00. For times
+$h_1, \dots, h_n$ with angles $\theta_1, \dots, \theta_n$,
+$$
+\bar C = \frac1n \sum_{j=1}^{n} \cos\theta_j, \qquad
+\bar S = \frac1n \sum_{j=1}^{n} \sin\theta_j, \qquad
+\bar R = \sqrt{\bar C^{2} + \bar S^{2}} .
+$$
+The *circular mean* $\hat\mu$ is the direction of the point
+$(\bar C, \bar S)$: the angle with $\cos\hat\mu = \bar C / \bar R$ and
+$\sin\hat\mu = \bar S / \bar R$, converted back to hours. $\bar R$, the
+*mean resultant length*, lies between 0 and 1: it is 1 when all times
+coincide and 0 when the arrows cancel, in which case $\hat\mu$ is
+undefined.
+</Definition>
+
+<Example title="the four late-night times">
+| time | $\theta$ | $\cos\theta$ | $\sin\theta$ |
+|---|---|---|---|
+| 22:00 | 330° | 0.866 | −0.500 |
+| 23:00 | 345° | 0.966 | −0.259 |
+| 02:00 | 30° | 0.866 | 0.500 |
+| 03:00 | 45° | 0.707 | 0.707 |
+| sum | | 3.405 | 0.448 |
+
+Dividing by 4 gives $\bar C = 0.851$ and $\bar S = 0.112$, so
+$\bar R = \sqrt{0.851^2 + 0.112^2} = 0.86$. The point lies almost
+straight toward midnight, tilted slightly toward 06:00: its angle is
+$\arctan(0.112 / 0.851) = 7.5°$, and at 15° per hour that is half an
+hour, $\hat\mu = $ 00:30. The circular mean sits in the middle of the
+card's habit, and $\bar R = 0.86$ says the four arrows point nearly the
+same way.
+</Example>
+
+<Exercise>
+A card pays at 21:00, 00:00 and 03:00. Compute the arithmetic mean of the
+hours, then $\bar C$, $\bar S$, $\bar R$ and the circular mean. Write the
+three angles down before computing anything.
+
+<Solution>
+**Arithmetic.** $(21 + 0 + 3)/3 = 8$, so 08:00, a morning hour far from
+all three payments.
+
+**Circular.** The angles are 315°, 0° and 45°. Cosines: 0.707, 1 and
+0.707, so $\bar C = 2.414/3 = 0.805$. Sines: −0.707, 0 and 0.707, so
+$\bar S = 0$. Then $\bar R = 0.805$ and the point $(0.805, 0)$ lies
+exactly toward midnight: $\hat\mu = $ 00:00, which the symmetry of the
+three times about midnight already says.
+</Solution>
+</Exercise>
+
+When a card's times are bunched far from midnight, the two means nearly
+agree: 13:00, 14:00 and 16:00 average to 14:20 by arithmetic and 14:19 on
+the circle. Arithmetic fails only for habits the cut splits, but a
+feature computed for every card has to be right for all of them.
+
+## A usual range: the von Mises arc
+
+A mean says where a card's habit is centred. A feature has to say whether
+this payment's hour belongs to the habit, which takes a range, and a range
+with a stated probability takes a distribution. The normal distribution
+lives on a line: fitted to clock times it puts probability on hour 25 and
+hour −3, and it inherits the cut.
+
+### A distribution on the circle
+
+<Definition title="von Mises distribution">
+The *von Mises distribution* with direction $\mu$ and concentration
+$\kappa \ge 0$ has density on the angle $\theta$
+$$
+f(\theta) = \frac{e^{\kappa \cos(\theta - \mu)}}{2\pi\, I_0(\kappa)} ,
+$$
+where $I_0(\kappa)$ is the constant that makes the total probability 1
+(a modified Bessel function, which numerical libraries compute).
+</Definition>
+
+The density is largest at $\theta = \mu$ and falls off symmetrically on
+both sides, and $\cos(\theta - \mu)$ takes the same value at $\theta$ and
+at $\theta + 2\pi$, so the distribution does not care where the clock is
+cut. The concentration $\kappa$ sets the spread. At $\kappa = 0$ every
+hour is equally likely. For large $\kappa$ the distribution is close to a
+normal distribution with standard deviation $1/\sqrt{\kappa}$ radians,
+that is $3.82/\sqrt{\kappa}$ hours: it is the normal distribution of the
+circle.
+
+**Fitting it to a card's past.** Given the card's earlier times, the
+direction is estimated by the circular mean $\hat\mu$. The concentration
+is the $\hat\kappa$ for which a von Mises distribution would produce, in
+the long run, a mean resultant length equal to the observed $\bar R$:
+the solution of $A(\hat\kappa) = \bar R$, where
+$A(\kappa) = I_1(\kappa)/I_0(\kappa)$, a ratio of two Bessel functions, is an
+increasing function that a library inverts numerically. Both are the
+maximum-likelihood estimates. A tight cluster, $\bar R$ near 1, gives a large $\hat\kappa$.
+
+### The arc and the flag
+
+<Definition title="periodic time feature">
+For a payment, fit $\hat\mu$ and $\hat\kappa$ to the times of the card's
+earlier payments in a history window. The *arc at level $\alpha$* is the
+range $[\hat\mu - c,\ \hat\mu + c]$ around the circular mean, with the
+half-width $c$ chosen so that the fitted von Mises distribution puts
+probability $\alpha$ inside it:
+$$
+\int_{\hat\mu - c}^{\hat\mu + c} f(\theta)\, d\theta = \alpha ,
+\qquad f \text{ the density with } \mu = \hat\mu,\ \kappa = \hat\kappa .
+$$
+The *periodic time feature* is 1 if the payment's
+hour lies inside the arc and 0 otherwise.
+</Definition>
+
+<FigureSequence
+  name="circular"
+  alt="Four frames on the same 24-hour clock with arrows to 22:00, 23:00, 02:00 and 03:00. Frame 1: the four unit arrows, labelled 22:00 to 330 degrees and so on. Frame 2: an amber arrow for their average, length 0.86, coordinates 0.851 and 0.112. Frame 3: the average arrow extended to the rim at 00:30, the circular mean. Frame 4: an amber band on the rim from 21:03 to 03:57, the 90 percent arc of the fitted von Mises distribution with concentration 3.9"
+  caption="From four payment times to a 90% arc: unit arrows, their average, its direction, and the arc the fitted distribution puts around it."
+/>
+
+<Task>
+Step through to frame 4 and read the arc's ends. Before checking the
+answer below, decide whether a payment at 01:00 and one at 06:00 would
+get the flag 1 or 0.
+</Task>
+
+The integral that fixes $c$ has no closed form, so $c$ is found
+numerically: a statistics library's von Mises interval function, given
+$\hat\kappa$ and $\alpha$, returns it in radians, and $\times 24/2\pi$
+turns it into hours. The hand check is the normal approximation above: a
+central 90% of a normal distribution lies within 1.645 standard
+deviations, so
+$$
+c \approx 1.645 \times \frac{3.82}{\sqrt{\hat\kappa}} \text{ hours} ,
+$$
+a little too narrow when $\hat\kappa$ is small, where the von Mises
+density is flatter than the normal one.
+
+For the opening's card the whole path runs:
+$\bar R = 0.86$; solving $A(\hat\kappa) = 0.86$ gives $\hat\kappa = 3.9$;
+the numerical half-width is $c = 3.45$ hours, 3 h 27 min (hand check
+$1.645 \times 3.82/\sqrt{3.9} = 3.2$ hours); and the arc is 00:30 minus and
+plus 3 h 27 min, from 21:03 to 03:57. A payment at 01:00 is inside, value
+1; a payment at 06:00 is outside, value 0. The tighter the card's times,
+the narrower the arc, and the closer the hand check comes:
+
+| $\bar R$ | 0.50 | 0.80 | 0.86 | 0.95 | 0.99 |
+|---|---|---|---|---|---|
+| $\hat\kappa$ | 1.2 | 2.9 | 3.9 | 10.3 | 50 |
+| half-width $c$ of the 90% arc | 7.9 h | 4.2 h | 3.5 h | 2.0 h | 0.9 h |
+| hand check $1.645 \times 3.82/\sqrt{\hat\kappa}$ | 5.8 h | 3.7 h | 3.2 h | 2.0 h | 0.9 h |
+
+<Task>
+In the demo, use **+ add** and **− remove** to leave four payments in the
+history, then move them until the dashed arithmetic hand points at least
+three hours from every payment while the amber circular hand sits within
+two hours of one. Keeping that card, set the payment being scored to
+06:00. Before reading the flag, predict it from the table: how long is
+the amber hand, and so how wide should the arc be?
+</Task>
+
+<Demo
+  name="CircularMeanClock"
+  caption="Payment times on a 24-hour clock: the arithmetic mean (dashed blue), the circular mean (amber, drawn with length R̄) and the 90% arc fitted to the history, against which a separate payment is scored."
+/>
+
+### The seven-payment card, scored
+
+<Example title="the seven-payment card of the previous lesson">
+<Ref lesson="transaction-aggregates" id="seven-payments-by-hand">The
+seven-payment card</Ref> paid at 18:20, 20:35 and 22:30 on 1 January, and
+at 00:50, 19:18 and 23:45 on 2 January. Score payment 6, at 23:45, from
+the five before it.
+
+**Angles.** 18:20, 20:35, 22:30, 00:50 and 19:18 are 275°, 308.75°,
+337.5°, 12.5° and 289.5°.
+
+**Sums.** The cosines are 0.087, 0.625, 0.924, 0.976 and 0.334, so
+$\bar C = 2.946/5 = 0.589$. The sines are −0.996, −0.780, −0.383, 0.216
+and −0.943, so $\bar S = -2.886/5 = -0.577$.
+
+**Direction and length.** $\bar R = \sqrt{0.589^2 + 0.577^2} = 0.82$.
+The point lies between the midnight and 18:00 directions, at
+$360° - 44.4° = 315.6°$, which is 21.04 hours: $\hat\mu = $ 21:02. The
+arithmetic mean of the same five hours is 16:19.
+
+**Arc and flag.** $\bar R = 0.82$ gives $\hat\kappa = 3.2$, and the
+numerical half-width is $c = 3.88$ hours (hand check 3.5 hours). The
+circular mean is 21.04 hours, so the 90% arc runs from
+$21.04 - 3.88 = 17.16$ to $21.04 + 3.88 = 24.92$ hours: 17:10 to 00:55. Payment 6 at 23:45 is inside: the feature
+is 1.
+
+**The next payment.** Refit on all six earlier times: $\hat\mu = $ 21:33,
+$\hat\kappa = 3.2$, arc 17:37 to 01:28. The card's actual seventh payment,
+at 00:00 on 3 January, is inside. Had it come at 06:00, it would have been
+outside, value 0, while the arithmetic mean of the six (17:33) is an hour
+the card never paid at.
+</Example>
+
+<Figure
+  src="./figures/seven-card.svg"
+  alt="Two 24-hour clocks. Left, titled scoring payment 6 (2 Jan 23:45) from payments 1 to 5: five black dots in the evening and just after midnight, an amber band from 17:10 to 00:55, an amber hand labelled circular 21:02, a dashed blue hand labelled arithmetic 16:19, and a green ring at 23:45 labelled inside. Right, titled scoring a payment on 3 Jan from payments 1 to 6: six dots, an amber band from 17:37 to 01:28, circular 21:33, arithmetic 17:33, a green ring at 00:00 labelled inside and a black cross at 06:00 labelled outside"
+  caption="The arc follows the card's evenings across midnight; the arithmetic mean points into the afternoon, where the card never pays."
+/>
+
+### What α means
+
+$\alpha$ is the share of the fitted distribution inside the arc, not a
+significance level, and that fixes how often the flag fires on the
+cardholder's own payments. The flag is an input for the model to weigh
+beside the amount and the windows, not an alarm.
+
+<KeyFact>
+If a card's habit really is the fitted distribution, a 90% arc flags one
+genuine payment in ten on that card, however regular the card; fitted to
+few payments, it flags more.
+</KeyFact>
+
+## How much history the arc needs
+
+The seven-payment card was scored from its own first day and a half. Run
+the same construction from its start and the flag misfires. Payment 3, at
+22:30, scored from 18:20 and 20:35: $\bar R = 0.96$, $\hat\kappa = 11.9$,
+arc 17:36 to 21:19, flag 0. Payment 4, at 00:50, scored from the first
+three: arc 17:39 to 23:18, flag 0. Two of the card's first four payments,
+all in its ordinary evenings, are called unusual.
+
+### Few points look concentrated
+
+$\bar R$ computed from a few times is large even when there is no habit.
+For times spread uniformly over the clock, the root-mean-square value of
+$\bar R$ is exactly $1/\sqrt{n}$: about 0.5 for four payments, 0.27 for
+fourteen. Four payments of a card that pays at any hour therefore give
+$\hat\kappa \approx 1.2$ and a 90% arc about 16 hours wide, a habit that
+does not exist. A card that does have a habit gets an arc that is too
+narrow for the same reason, and more than one of its genuine payments in
+ten falls outside it.
+
+### A window shorter than a day puts the current hour at its edge
+
+If the history window is shorter than 24 hours, every earlier payment in
+it happened in the hours just before the current one, so on the clock
+the current hour lies at the leading edge of the cluster. Payment 3
+against 18:20 and 20:35 is this case: whatever the card's habit, each
+new evening payment comes after the ones the arc was fitted to.
+
+**The rule.** Fit the arc on at least the previous seven days, and only
+once that window holds at least seven payments. The week fixes the
+leading-edge problem and covers weekdays and the weekend. The count is a
+judgment, not a theorem: from seven payments, times with no habit give
+$\bar R$ around $1/\sqrt7 = 0.38$ and an arc about 18 hours wide around
+a habit that does not exist; and on simulated cards whose times are drawn
+from a fixed von Mises habit (not the course's transaction simulator,
+which draws every customer's times from the same distribution around
+noon), a 90% arc fitted on seven
+payments leaves about one genuine payment in five outside, twice the
+nominal rate. Fewer payments push both errors further. Below the
+minimum, leave the feature missing rather than 0, so that "no history
+yet" is not read as "unusual hour", and keep the payment count beside the
+flag so the model can weigh a young arc. By this rule none of the
+seven-payment card's flags would be emitted yet: its example showed the
+arithmetic, not a deployable value.
+
+The same construction with $\theta = 2\pi d/7$ for day $d$ of the week
+gives a day-of-week arc, for cards used only on weekend nights or only in
+working hours.
+
+## What an unusual hour is worth
+
+Whether the arc pays is a measurement. <Ref lesson="example-dependent-cost"
+id="what-a-published-comparison-on-processor-data-shows">The processor
+comparison</Ref> fitted eight detectors (a tree, logistic regression and a
+random forest, each also with the per-payment cost rule, and the two
+cost-sensitive models) on a European card processor's data, and scored
+each by its savings against flagging nothing. <Ref
+lesson="transaction-aggregates"
+id="on-a-processors-real-data-savings-roughly-triple">The previous
+lesson</Ref> took one result from it: adding the card's windowed counts and
+sums to the raw fields roughly tripled the savings. The same study also
+gave every detector in-arc flags of this lesson's kind, once on the raw
+fields alone and once on top of both aggregate sets (the plain windows and
+the windows conditioned on the payment's type, country or merchant).
+
+<Figure
+  src="./figures/savings-per.svg"
+  alt="Grouped bar chart of savings for eight detectors (tree, logistic, forest, the three with the per-payment cost rule, cost-sensitive logistic, cost-sensitive tree), four bars each. Raw fields: 19, 3, 21, 16, 13, 13, 18, 15 percent. Raw plus periodic: 19, 5, 18, 24, 21, 27, 24, 34. Raw plus both aggregate sets: 42, 15, 50, 45, 42, 52, 63, 65. Raw plus aggregates plus periodic: 52, 12, 57, 60, 46, 64, 67, 71. A note reads: savings read off a published chart to about a point"
+  caption="On average the periodic flags add about seven points of savings with or without the aggregates: 15% to 22% on the raw fields, 47% to 54% stacked on both aggregate sets."
+/>
+
+Averaged over the eight detectors, the periodic set moved the savings on
+the raw fields from about 15% to 22%, and on top of both aggregate sets
+from about 47% to 54%: **about seven points in both settings**. The
+aggregates did not absorb the gain. Had the in-arc flag been a disguised
+form of what the windows hold, how often and how much the card pays, the
+stacked gain would have shrunk toward nothing once the windows were in
+the model. It did not, because the windows hold counts and sums of
+amounts and never the payment's hour against the card's own hours. In
+relative terms the flag matters more where the model knows less: seven
+points are about half again the raw fields' 15%, and about a seventh of
+the stacked 47%.
+
+The average hides one exception in each setting. On the raw fields the
+random forest fell from 21% to 18% and the plain tree held at 19%;
+stacked, the plain logistic regression fell from 15% to 12%. Every other
+detector rose in both. The same caveat as before applies: one split
+without a delay block, so the levels are optimistic, a fall of three
+points on one detector is within what one split can produce, and the
+direction is what transfers.
+
+On <Ref lesson="canonical-datasets" id="the-generating-rules">the
+transaction simulator</Ref> the flag has nothing to find. The generator
+draws every payment's time from one distribution around noon, the same for
+all customers, and its leaked cards keep the owner's own payment times. A
+card-specific hour does not exist there, so neither does an unusual one: a
+feature finds only the fraud that changes what it measures.
+
+## The usual self: has the card just changed?
+
+A windowed ratio, the amount divided by the card's 30-day mean, compares
+one payment with the card's past; it was the strongest single feature for
+the simulator's leaked cards in <Ref lesson="transaction-aggregates"
+id="exercises">the previous lesson's exercises</Ref>. "Has this card changed?" is a question
+about several payments. A single €300 purchase on a card that usually
+pays €40 is a jump; a card that has paid twice its usual amount at every
+payment for several days has a new level, and one ratio at a time cannot
+tell the two apart. A difference in euros also has no scale: a rise of
+€40 is large for a card whose payments vary by €8 and small for one whose
+payments vary by €80.
+
+### An old part, a new part, and a t-statistic
+
+<Definition title="break-point analysis">
+Take the card's last 24 payments, the current one included, with values
+$x$ (here the amounts). The current amount is a field of the payment
+being scored, known at that moment, so it may enter the new part; no later
+payment may. The first 20 form the *old part*, the card's
+recent habit; the last 4 form the *new part*. With means
+$\bar x_{\text{old}}, \bar x_{\text{new}}$ and standard deviations
+$s_{\text{old}}, s_{\text{new}}$, the break-point statistic is the
+two-sample $t$-statistic
+$$
+t_{\text{bp}} = \frac{\bar x_{\text{new}} - \bar x_{\text{old}}}{s_p \sqrt{\tfrac{1}{20} + \tfrac{1}{4}}},
+\qquad
+s_p^2 = \frac{19\, s_{\text{old}}^2 + 3\, s_{\text{new}}^2}{22} .
+$$
+Accounts are ranked by $t_{\text{bp}}$; a large positive value says the
+level has risen.
+</Definition>
+
+$t_{\text{bp}}$ is the usual $t$-statistic of two independent samples:
+the difference of the means in units of its own standard error. Each
+choice in the construction answers a part of the question.
+
+- **Counted in payments, not days**, so the window fits each card's
+  rate: 24 payments are about 12 days for a card that pays twice a day
+  and three months for one that pays twice a week.
+- **Twenty old payments** are enough to estimate a mean and a spread and
+  recent enough to be the current habit.
+- **Four new payments**, not one, so that the question is the level of a
+  run of payments and the new part has a spread of its own.
+- **Ranked, not tested.** Amounts are far from normal and consecutive
+  windows overlap, so the $t$-distribution's p-values mean little; the
+  statistic is used as a score, and the investigators work down the list
+  either way.
+
+<Example title="a card whose level moves">
+A card's 20 old payments are €32, 45, 38, 51, 29, 40, 36, 47, 55, 33, 41,
+28, 44, 39, 50, 35, 42, 31, 46 and 38: $\bar x_{\text{old}} = 40.00$,
+$s_{\text{old}} = 7.56$. Its four newest are €80, 85, 75 and 90:
+$\bar x_{\text{new}} = 82.50$, $s_{\text{new}} = 6.45$.
+
+**Pooled spread.**
+$s_p^2 = (19 \times 7.56^2 + 3 \times 6.45^2)/22 = (1{,}086 + 125)/22 = 55.0$,
+so $s_p = 7.42$.
+
+**Statistic.** $\sqrt{1/20 + 1/4} = 0.548$, and
+$t_{\text{bp}} = (82.50 - 40.00)/(7.42 \times 0.548) = 42.5/4.06 = 10.5$.
+
+No single new payment is out of the ordinary for a card payment; what
+moved is the level of all four together, about six old standard
+deviations above the old mean.
+</Example>
+
+<Figure
+  src="./figures/breakpoint.svg"
+  alt="Bar chart of 24 payment amounts in order: 20 blue bars between 28 and 55 euros with a dashed line at the old mean of 40 euros, then 4 amber bars of 80, 85, 75 and 90 euros with a dashed line at their mean of 82.50 euros. Labels: old part, previous 20 payments, mean 40.00, s = 7.56; new, last 4; two-sample t = 10.5, the level has moved"
+  caption="Break-point analysis compares the mean of the card's last four payments with the mean of the twenty before, in units of their spread."
+/>
+
+<Exercise>
+The same card's four newest payments are instead €38, 44, 300 and 41.
+Compute $t_{\text{bp}}$ and the ratio of the €300 payment to the old mean.
+Which of the two numbers reacts to this pattern, and why does the other
+not?
+
+<Solution>
+**New part.** $\bar x_{\text{new}} = 423/4 = 105.75$, a larger mean than
+in the example. Its standard deviation is $s_{\text{new}} = 129.5$,
+dominated by the one €300 payment.
+
+**Statistic.**
+$s_p^2 = (1{,}086 + 3 \times 129.5^2)/22 = (1{,}086 + 50{,}326)/22 = 2{,}337$,
+$s_p = 48.3$, and
+$t_{\text{bp}} = (105.75 - 40.00)/(48.3 \times 0.548) = 65.75/26.5 = 2.5$.
+
+**Ratio.** $300/40 = 7.5$.
+
+**Why.** The single large payment raises the new part's mean, but it
+raises its spread far more, and the spread is in the denominator:
+$t_{\text{bp}}$ drops from 10.5 to 2.5 although the new mean is higher.
+The break-point statistic measures whether a run of payments has moved
+together; one outlier among ordinary payments is what the ratio of one
+payment to the card's mean measures. A card needs both: the ratio for a
+jump, the break point for a new level.
+</Solution>
+</Exercise>
+
+A fraud that inflates some of a card's payments and leaves the rest alone
+produces this pattern over and over: large amounts scattered among
+ordinary ones. That is how the simulator's leaked cards behave.
+
+### Spending as a line
+
+Plotted against time, a card's cumulative spending is close to a straight
+line whose slope is the card's spending rate. A jump in the line is one
+large payment; a lasting change of slope is a new level of spending.
+
+<Figure
+  src="./figures/cumspend.svg"
+  alt="Cumulative spending of one simulated card from day 56 to day 126, a black staircase rising from 0 to about 9,200 euros. A dashed blue line continues the card's usual slope of about 106 euros a day. Over days 84 to 98, shaded and labelled card leaked (14 days), the staircase climbs faster, about 242 euros a day, with the inflated payments drawn as amber steps, and then resumes its old slope at a higher level"
+  caption="A leaked card on the simulator: while a third of its payments are multiplied by five, the slope of its cumulative spending rises from about €106 to €242 a day."
+/>
+
+The card in the figure is one of the simulator's leaked cards: for 14
+days a third of its payments are multiplied by five, so its spending
+rate should rise by a factor of $\tfrac23 + \tfrac13 \times 5 = \tfrac73$,
+about 2.3; the run gives 242/106 = 2.3.
+
+The slope has changed, and yet the break point does not catch this card.
+The change of slope shows only in spending summed over many days. At any
+one payment, the four-payment new part holds on average $4/3$ inflated
+payments among ordinary ones, the €300 case of the exercise above, and
+$t_{\text{bp}}$ stays low. The line looks at two weeks; the break point
+looks at four payments.
+
+## The usual peer: when every card changes at once
+
+A comparison of the card with its own past looks like the safest
+reference there is: nothing enters it but the card. Christmas breaks it.
+In the weeks before 25 December nearly every card spends more than it did
+in October, so a card's December against its own autumn is unusual for
+almost all cards at once. A break-point statistic, or a *z-score* (the
+week's spend minus the card's autumn mean, divided by its autumn standard
+deviation), flags the whole population.
+
+<Figure
+  src="./figures/peer.svg"
+  alt="Two panels of one card's weekly spend from October to Christmas week, illustrative, amber line rising from about 300 euros to 620 euros in the last week. Left, against its own past: a blue band for its usual range around 315 euros; the last week is far above it, labelled flagged, z about 8. Right, against 20 peers in the same weeks: a blue band for the peers' mean plus or minus one standard deviation, rising to 600 plus or minus 80 euros in Christmas week; the card's line stays inside the band, labelled not flagged, t = 0.25"
+  caption="A self-comparison flags a season every card shares; the same week judged against similar cards in the same week is ordinary."
+/>
+
+The card in the figure spent about €315 a week through the autumn, with a
+standard deviation of about €37, and €620 in Christmas week: $z \approx 8$
+against its own past. Its peers spent €600 that week on average. The
+question that separates the season from the fraud is not "has this card
+changed?" but "has it changed more than cards like it, over the same
+weeks?"
+
+### Choosing the peers
+
+A card's *peer group* is the $k$ accounts that behaved most like it over
+a reference period before the period being scored. Peers come from
+business knowledge (the same kind of card, the same customer segment:
+students, small businesses) or from a distance between profiles, such as
+weekly spend, number of payments and mean amount, standardised and
+compared by Euclidean distance.
+
+- **Chosen in the past and then held fixed.** Peers chosen on the
+  current week's behaviour would let a card whose spending a thief has
+  inflated pick big spenders as its peers and look ordinary.
+- **$k$ neither small nor large.** With three peers the spread is
+  estimated from three numbers, and one peer's holiday or one peer's own
+  fraud moves the reference. With thousands, the peers are no longer
+  similar to the card and the comparison becomes a threshold for the
+  whole population, the global rule a peer group exists to replace.
+
+### The peer t-score
+
+<Definition title="peer-group analysis">
+Let $y_n$ be an account's statistic in period $n$ (its spend this week so
+far, the current payment included, say), and $x_{1,n}, \dots, x_{k,n}$ the same statistic for its $k$
+peers in the same period, with mean $\bar x_{k,n}$ and standard deviation
+$s_{k,n}$. The peer score is
+$$
+t_{\text{peer}} = \frac{y_n - \bar x_{k,n}}{s_{k,n}} ,
+$$
+and accounts are ranked by it.
+</Definition>
+
+For the card in the figure, $t_{\text{peer}} = (620 - 600)/80 = 0.25$:
+ordinary. A card of the same group that spent €900 that week scores
+$(900 - 600)/80 = 3.75$; both cards would have been flagged against their
+own pasts. The peers' statistic is computed from their payments before
+the scored payment's timestamp, like every other feature.
+
+<KeyFact>
+The peer score does not replace the self-comparison. Its denominator is
+the spread between cards, which is wider than one card's spread over
+time: a card that spends €250 ± 20 a week in October, in a peer group at
+€320 ± 80, and then spends €400 scores $t_{\text{peer}} = 1.0$ against its
+peers and $z = 7.5$ against itself. Peers cancel a shared season; only the
+card's own past sees a change smaller than the peers' spread.
+</KeyFact>
+
+## The time since the previous payment
+
+The windows count payments, and counts lose their order: five payments in
+one hour and five spread over a day both give a 1-day count of 5. The
+order is where a burst shows. A card in a fraudster's hands is used
+quickly and repeatedly, as <Ref lesson="financial-crime-typology"
+id="card-fraud-a-label-that-does-arrive">the typology</Ref> described,
+because the card is worth something only until the owner notices.
+
+The finest-grained measure of that is the gap $\Delta_i = t_i - t_{i-1}$
+between a payment's timestamp and that of the card's previous payment,
+which is
+<Ref lesson="transaction-aggregates"
+id="summarising-a-cards-past-recency-frequency-monetary">recency</Ref>,
+the R of the RFM aggregates. What it shows is clearest on the cloned
+telephone of <Ref lesson="financial-crime-typology"
+id="a-telephone-account-call-by-call">the typology</Ref>: a subscriber
+whose calls start in New York in the daytime, until short night calls
+from Boston appear on the account.
+
+<Figure
+  src="./figures/gaps.svg"
+  alt="Two rows of dots on a logarithmic time axis from under a minute to over 100 hours. Genuine calls, blue: gaps of 1 h 22 min, 5 h 19 min, 9 h 33 min, 24 h 5 min, 2 d 19 h and 4 d 5 h, with a vertical blue line at the shortest, 1 h 22 min, labelled shortest genuine gap. Fraudulent calls, amber: 53 s, 3 min 33 s, 4 min 25 s, 9 h 17 min and 34 h 37 min"
+  caption="The time since the previous call for each call of the cloned telephone: three of the five fraudulent calls came within five minutes of the one before; no genuine call came within an hour."
+/>
+
+The shortest gap before any of the subscriber's genuine calls is 1 hour
+22 minutes; three of the five fraudulent calls came 53 seconds, 3½ and
+4½ minutes after the previous call. A gap is short or long only against
+the account's own rhythm, though: a card that pays ten times a day has
+gaps of an hour or two, a card that pays twice a week has gaps of days.
+The construction of the previous sections applies again. Take the
+logarithm of the gaps, since they range from seconds to weeks and what
+matters is their ratio, and express the current one in units of the
+card's own spread: $(\ln \Delta_i - m_\Delta)/s_\Delta$, with $m_\Delta$
+and $s_\Delta$ the mean and standard deviation of the log-gaps over the card's previous 20 payments.
+
+On the simulator the gap finds nothing. The generator's leaked cards and
+compromised terminals change which payments are fraud, not when payments
+happen: in one run, the median gap before a leaked-card fraud was about
+5½ hours, like a genuine payment's 6. Bursts are exactly what the script
+leaves out. A run of short gaps is also a sequence, and a model that
+reads the sequence of a card's payments directly can learn such runs
+itself, which is the subject of <Ref
+lesson="sequence-models-for-transactions">sequence models for
+transactions</Ref>.
+
+## One pattern under four features: the card is the context
+
+Why is 01:45 an ordinary hour for a card whose arc spans the night and an
+unusual one for a card that pays in daylight, and why is €620 in
+Christmas week unusual against the card's autumn and ordinary against its
+peers? And what do these features give a model that the windowed
+aggregates did not? In each pair the value is the same; what differs is
+the reference it is judged against. Each of the four features takes a
+value of the current payment (an hour, an amount, a level of spending, a
+gap) and scores it against a reference built from a context: the card's
+own hours, the card's own previous 20 payments, the card's peers in the
+same week, the card's own rhythm.
+
+Run the cloned telephone through all four.
+
+- **Hour.** The subscriber's six genuine calls before the fraud, between
+  09:42 and 16:28, give $\hat\mu = $ 13:41 and a 90% arc from 09:14 to
+  18:09. The calls at 01:45 and 22:00 are outside; the genuine call at
+  11:23 is inside.
+- **Gap.** Against the five genuine gaps before the fraud starts at
+  01:45 (mean log-gap 2.80, about 16 hours, standard deviation 1.79), the
+  three short fraudulent gaps score $-3.9$, $-3.1$ and $-3.0$; the shortest
+  genuine gap scores $-1.4$.
+- **Old against new.** The comparison of the break point, run on call
+  durations: half-minute calls after a habit of calls lasting minutes.
+- **Peers.** Chosen from the past, other daytime callers in New York, the
+  Boston night calls stand out. Chosen by the place of the current call,
+  Boston residents, they look ordinary. The context has to come from the
+  account's past, never from the event being judged.
+
+This is also what separates these features from the aggregates. An
+aggregate states a reference, a 30-day mean, and leaves the comparison to
+the model. These features are the comparison, in the card's own units of
+spread: an in-arc flag, a $t$-statistic, a standardised log-gap. A tree
+can learn "amount well above the mean" from the amount and the mean
+given enough depth; it cannot rebuild an arc from aggregates that never
+held the sums of cosines and sines.
+
+<KeyFact>
+A value that is unusual only relative to a context is a *contextual
+anomaly*; the four features are its scores built by hand, with the card
+as the context.
+</KeyFact>
+
+<Conclusion>
+You can now compute a usual hour on the circle, fit a von Mises arc to a
+card's past week and emit the in-arc flag, knowing that a 90% arc flags
+one genuine payment in ten and more when fitted to few payments; test
+whether a card's last payments have moved its level with a break-point
+$t$-statistic; compare a card with its peers in the same period so that a
+shared season cancels; and standardise the gap since the previous payment
+against the card's own rhythm. You can explain why each is a score of a
+value against the cardholder as the context, and why the periodic flag
+adds about as much with the aggregates as without them: it holds what
+they do not.
+
+Every feature so far needs no label. The terminal's recent fraud rate
+does, and labels arrive a delay late; <Ref
+lesson="point-in-time-features">point-in-time features</Ref> builds it, and
+the rule that every feature in a training row holds only what was known
+at that row's moment. <Ref lesson="anomaly-detection-framing">Anomaly
+types</Ref> takes up the contextual anomaly as one kind among several.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+A card pays on Saturday, Sunday, Sunday, Monday and Monday. Number the
+days Monday = 0 to Sunday = 6 and use the angle $\theta = 2\pi d/7$.
+Compute the arithmetic mean of the day numbers, the circular mean (as a
+day and a time of day) and $\bar R$.
+
+<Solution>
+**Arithmetic.** $(5 + 6 + 6 + 0 + 0)/5 = 3.4$: Thursday, a day the card
+never uses.
+
+**Angles.** One day is $360°/7 = 51.43°$: Saturday 257.1°, Sunday 308.6°,
+Monday 0°.
+
+**Sums.** Cosines: −0.222, 0.623, 0.623, 1, 1, so
+$\bar C = 3.024/5 = 0.605$. Sines: −0.975, −0.782, −0.782, 0, 0, so
+$\bar S = -2.539/5 = -0.508$.
+
+**Direction and length.** $\bar R = \sqrt{0.605^2 + 0.508^2} = 0.79$.
+The angle is $360° - \arctan(0.508/0.605) = 360° - 40.0° = 320.0°$, which
+is $320.0/51.43 = 6.22$ days: Sunday plus 0.22 of a day, about 05:20 on
+Sunday. The weekend card's centre falls in its weekend, between the
+Saturday and Monday payments, where the arithmetic put it on Thursday.
+</Solution>
+</Exercise>
+
+<Exercise>
+(a) A card's history holds two payments, at 06:00 and 18:00. Compute
+$\bar R$ and say what the circular mean, $\hat\kappa$ and the 90% arc
+become. (b) Compute the circular mean of 06:00 and 17:50, and of 06:00
+and 18:10. (c) What should the periodic feature be for this card's next
+payment, and why is 0 the wrong value?
+
+<Solution>
+**(a)** The angles are 90° and 270°, the points $(0, 1)$ and $(0, -1)$.
+They cancel: $\bar R = 0$, so the direction is undefined. $A(\kappa) = 0$
+gives $\hat\kappa = 0$, the uniform distribution, under which every arc
+21.6 hours long holds 90%: there is no unique arc, and inside or outside
+depends on where software happens to put it.
+
+**(b)** 06:00 and 17:50: angles 90° and 267.5°. $\bar C = (0 - 0.044)/2 =
+-0.022$, $\bar S = (1 - 0.999)/2 \approx 0.0005$: the point lies toward
+noon, $\hat\mu \approx $ 11:55. 06:00 and 18:10: $\bar C = +0.022$, so
+$\hat\mu \approx $ 00:05. Moving one payment by twenty minutes moves the
+"usual time" by twelve hours, with $\bar R = 0.02$ in both cases.
+
+**(c)** The feature should be missing, with the history size, or $\bar R$,
+available beside it so that a model can tell how much the arc is worth.
+Setting it to 0 asserts "this hour is unusual for the card" on the basis
+of an arc that does not exist; for every new card, and every card that
+has no daily habit, the model would learn that "unusual hour" means
+"short history". A tree handles a missing value as its own branch; the
+values 0 and 1 are kept for arcs fitted on at least seven payments over
+at least a week.
+</Solution>
+</Exercise>
+
+<Exercise>
+"A card that pays at the same time every day has a huge concentration, so
+its arc is narrow and its flag is the most reliable: a payment off the
+card's routine is almost certainly not the cardholder." Refute the claim.
+Use these measurements: for a card whose payment times scatter around
+08:00 with a standard deviation of 10 minutes, a 90% arc fitted on 7
+payments has a median half-width of 14 minutes and leaves 20% of the
+card's next genuine payments outside; fitted on 14 payments, 15%; on 28,
+12%; on 200, 10%. For a card with a 60-minute standard deviation the
+shares are 21%, 14%, 11% and 10%.
+
+<Solution>
+**What the arc measures.** $\alpha$ fixes the share of the fitted
+distribution inside the arc. A tighter habit gives a narrower arc, not a
+smaller share of genuine payments outside it: if the fit were exact,
+10% of the card's own payments would fall outside a 90% arc whether the
+habit spans ten minutes or six hours. The 200-payment rows show exactly
+that, 10% for both cards. A narrow arc means "unusual by minutes", not
+"unlikely to be the cardholder".
+
+**What few payments add.** With 7 payments both cards leave about 20% of
+their genuine payments outside, double the nominal rate, because
+$\bar R$ from few points overstates the concentration and the arc comes
+out too narrow (median half-width 14 minutes against the true 16). The
+rate depends on the number of payments, not on the regularity: the claim
+picks the wrong variable.
+
+**The degenerate case.** If the timestamps are recorded to the minute and
+a card's seven payments all read 08:00, $\bar R = 1$ and $\hat\kappa$ is
+infinite: the arc has zero width and every later payment, a minute off,
+is flagged. A pipeline needs a floor, a cap on $\hat\kappa$ or a minimum
+half-width such as 30 minutes, because no real habit is that exact and
+the recorded resolution is not the habit.
+
+**The step that fails.** "Narrow arc, so reliable flag" equates the
+arc's width with its error rate. The error rate is $1 - \alpha$ plus the
+small-sample excess; the width only says what counts as "off routine".
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the fit the lesson stated. For angles $\theta_1, \dots, \theta_n$
+drawn from a von Mises distribution, (a) show that the maximum-likelihood
+estimate of $\mu$ is the circular mean, and that it is a maximum; (b)
+show that the estimate of $\kappa$ solves $A(\kappa) = \bar R$, using
+$I_0'(\kappa) = I_1(\kappa)$; (c) show that for times bunched within a
+few hours of each other the circular mean is close to the arithmetic mean
+of the hours, computed with the cut placed far from the bunch, and check
+it on 13:00, 14:00 and 16:00.
+
+<Solution>
+**Log-likelihood.**
+$\ell(\mu, \kappa) = \kappa \sum_j \cos(\theta_j - \mu) - n \ln\bigl(2\pi I_0(\kappa)\bigr)$.
+
+**(a)** $\partial\ell/\partial\mu = \kappa \sum_j \sin(\theta_j - \mu)$.
+Expanding $\sin(\theta_j - \mu) = \sin\theta_j \cos\mu - \cos\theta_j \sin\mu$
+and setting the derivative to zero gives $n\bar S \cos\mu = n\bar C \sin\mu$,
+so $\tan\mu = \bar S/\bar C$. Two angles satisfy it, the direction of
+$(\bar C, \bar S)$ and the opposite one. The second derivative is
+$-\kappa \sum_j \cos(\theta_j - \mu) = -\kappa n (\bar C\cos\mu + \bar S\sin\mu)$.
+At the direction of $(\bar C, \bar S)$, $\bar C\cos\mu + \bar S\sin\mu = \bar R > 0$,
+so the second derivative is $-\kappa n \bar R < 0$: a maximum, the circular
+mean. The opposite direction gives $+\kappa n \bar R$, the minimum.
+
+**(b)** $\partial\ell/\partial\kappa = \sum_j \cos(\theta_j - \hat\mu) - n I_0'(\kappa)/I_0(\kappa)$.
+The sum is $n(\bar C\cos\hat\mu + \bar S\sin\hat\mu) = n\bar R$, and
+$I_0' = I_1$, so the condition is $I_1(\kappa)/I_0(\kappa) = \bar R$, that
+is $A(\kappa) = \bar R$.
+
+**(c)** Write $\theta_j = \mu + \varepsilon_j$ with every $|\varepsilon_j|$
+small (a few hours are a few tenths of a radian). Then
+$\sin(\theta_j - \mu) = \varepsilon_j - \varepsilon_j^3/6 + \dots$, and the
+condition of (a), $\sum_j \sin(\theta_j - \mu) = 0$, becomes
+$\sum_j (\theta_j - \mu) = 0$ up to third-order terms: $\mu$ is the
+arithmetic mean of the angles, provided they are written without a cut
+between them. For 13:00, 14:00 and 16:00 (195°, 210°, 240°): $\bar C =
+-2.332/3$, $\bar S = -1.625/3$, direction $180° + 34.9° = 214.9°$, which is
+14.32 hours, 14:19; the arithmetic mean is 14:20. The minute of
+difference is the cubic term. The circular mean is the arithmetic mean
+corrected for the cut, and the correction matters only for habits that
+straddle it.
+</Solution>
+</Exercise>
+
+<Exercise>
+This exercise uses a different seeded run of the same generator, with no
+removal of known cards: the cards whose fraud was already labelled before
+the test week stay in it. Take the test week (days 129 to 135) and keep
+the genuine payments and the leaked-card frauds: 68,860 payments, 176 of
+them fraud, a base rate of 0.0026. The previous lesson's run, with known
+cards removed, had a base rate of 0.0014 and gave the ratio below an
+average precision of 0.61. Since a random ranking's average precision is
+the base rate itself, the two runs' values do not compare one to one. For
+each payment compute (i) the break-point statistic on the card's last 24
+amounts, current payment included, and (ii) the ratio of the amount to
+the card's mean amount over the strictly earlier 30 days. (a) Before
+computing, predict which ranks the leaked-card frauds better. (b) The run
+gives average precision 0.047 for the break point and 0.71 for the ratio;
+scored per card and day instead of per payment, 0.06 and 0.82. Explain the gap from what a leaked card does: for 14 days,
+a third of its payments are multiplied by five. (c) For which kind of
+change would you expect the ranking of the two to reverse?
+
+<Solution>
+**(a)** The ratio. The fraud is a per-payment event, one payment in three
+inflated, and the ratio scores each payment against a reference the
+fraud barely touches; the break point scores runs of payments.
+
+**(b)** Four effects, all visible in the definitions.
+
+- **Dilution.** The new part holds four payments, on average $4/3$ of
+  them inflated. When the current payment is a fraud it is averaged with
+  three others, mostly genuine.
+- **Spread.** An inflated payment among ordinary ones raises the new
+  part's standard deviation far more than its mean, as in the in-body
+  exercise with the €300 payment: the denominator grows with the very
+  change being tested.
+- **Contamination.** For a card that pays two or three times a day, the
+  20 old payments reach back about a week, so after a few days of the
+  14-day leak the old part holds inflated payments too and its mean rises.
+  The 30-day mean is diluted far less.
+- **Unit.** $t_{\text{bp}}$ describes the card's recent level, and the
+  card's genuine payments during the leak get the same high values as its
+  frauds; per payment, they compete with the frauds for the top of the
+  ranking. Scoring per card and day removes this effect, and the gap
+  stays (0.06 against 0.82) because the first three remain.
+
+With a base rate of 0.0026, 0.047 is an informative ranking, about
+eighteen times the base rate, but an order of magnitude below the ratio.
+
+**(c)** A change that moves every payment of the card together: a
+fraudster who has replaced the owner and spends at a different level on
+every payment, or an account whose whole inflow changes. Then the new
+part's spread stays small, the old part is clean until the change, and
+$t_{\text{bp}}$ separates a level shift from one large purchase, which
+the ratio cannot. The transferable point: choose the statistic by the
+shape of the change it must catch.
+</Solution>
+</Exercise>
+
+<Exercise>
+A pipeline builds the periodic feature with a group-by over each card's
+payments within three and a half days on either side of the payment, "so
+that each row gets a full week of history". Take the seven-payment card,
+with its seventh payment at 00:00 on 3 January, and score payment 4 (2
+January 00:50). (a) Compute the flag from the payments before it. (b) The
+pipeline's window holds payments 1 to 3 and 5 to 7; it gives
+$\hat\mu = $ 21:26 and an arc from 17:49 to 01:02. What flag does the
+training row get? (c) Name the defect and say what the live system would
+compute for the same payment.
+
+<Solution>
+**(a)** From payments 1 to 3 (18:20, 20:35, 22:30), angles 275°,
+308.75° and 337.5°.
+
+- **Sums.** Cosines 0.087, 0.626, 0.924, so $\bar C = 1.637/3 = 0.546$;
+  sines −0.996, −0.780, −0.383, so $\bar S = -2.159/3 = -0.720$.
+- **Direction and length.** $\bar R = \sqrt{0.546^2 + 0.720^2} = 0.903$;
+  the angle is $360° - \arctan(0.720/0.546) = 360° - 52.8° = 307.2°$,
+  20.48 hours: $\hat\mu = $ 20:29.
+- **Concentration.** Solving $A(\hat\kappa) = 0.903$ numerically gives
+  $\hat\kappa = 5.5$ (between the table's rows for 0.86 and 0.95).
+- **Half-width.** The von Mises interval at $\hat\kappa = 5.5$ and
+  $\alpha = 0.9$ gives $c = 2.83$ hours, 2 h 50 min; hand check
+  $1.645 \times 3.82/\sqrt{5.5} = 2.7$ hours.
+- **Arc and flag.** $20.478 \mp 2.829$ hours, from 17.649 to 23.307
+  hours: 17:39 to 23:18. 00:50
+  is outside: flag 0. (Three payments are below the history rule's
+  minimum, so a deployed pipeline would emit missing; the arc is what
+  matters for the comparison with (b).)
+
+**(b)** 00:50 lies inside 17:49 to 01:02: flag 1. The later payments at
+23:45 and 00:00 pulled the arc toward midnight and over the scored hour.
+Including payment 4 itself, as a plain group-by over the card would,
+gives an arc from 18:02 to 01:51 and the same flag 1.
+
+**(c)** The window reads the future: payments 5 to 7 did not exist when
+payment 4 was scored. It is the leak of <Ref lesson="transaction-aggregates"
+id="three-ordinary-table-operations-that-break-the-rule">the three
+ordinary table operations</Ref>, now in a circular feature: the training
+row says "usual hour", while the live system, which sees only payments 1
+to 3, computes an arc that excludes 00:50. The fix is the same as for the windows: fit on the
+card's strictly earlier payments over the previous seven days, evaluated
+at each row's own timestamp.
+</Solution>
+</Exercise>
+
+<Exercise>
+Build a detector from peer groups alone, with no labels. On a run of the
+simulator, give each customer a profile from days 99 to 128 (mean amount
+per payment and payments per day, each divided by its standard deviation
+over customers) and take as peers its 20 nearest customers. For each day
+of the test week, compute every active card's spend that day and its
+$t_{\text{peer}}$ against its peers' spend the same day, and alert the 100
+cards with the highest score. (a) Predict which of the three scripted
+frauds the alerts can find. (b) The run gives a share of compromised
+cards among the 100 alerts of 0.06 to 0.15, mean 0.11, against about 0.02
+compromised among active cards; with 5 peers the mean is 0.08, with 100
+it is 0.12, with 1,000 it is 0.14. Interpret the precision and the effect
+of $k$. (c) Compare with a supervised detector on this stream.
+
+<Solution>
+**(a)** Spend is an amount, so the alerts can see fraud that changes
+amounts: the leaked cards, whose payments are multiplied by five, and
+the amount-rule frauds above €220. Compromised terminals hit ordinary
+payments of ordinary size, and a card's daily spend does not move.
+Indeed, of the roughly 11 compromised cards a day among the 100 alerts,
+about 8 are leaked cards and about 1 an amount-rule fraud.
+
+**(b)** A share of 0.11 is about five times the 0.02 a random draw of
+active cards would give, from a score that used no label at all. It is
+also low: nine alerts in ten are big spenders on a big day. The effect of
+$k$ runs against the advice of the lesson because the simulator has no
+structure for peers to capture: customers are drawn independently, there
+is no December and no segment that moves together, so a larger peer set
+only estimates the population's spread more precisely. On a real stream,
+where seasons and segments exist, a peer set of a thousand is the global
+threshold again.
+
+**(c)** The depth-2 tree trained on the fifteen standard inputs reaches <Ref
+lesson="alert-budget-metrics" id="card-precision-at-k-the-team-calls-cards">a
+card precision at 100</Ref> of about 0.24 on a comparable test week, about
+twice the peer detector, with labels; the comparison is rough, since
+this exercise skips the removal of known cards. An unsupervised score
+built on "unlike its context" ranks well above chance and well below a
+supervised model: that is the pattern <Ref
+lesson="anomaly-detection-framing">anomaly types and label regimes</Ref>
+starts from, where the peer group is one of the contexts a contextual
+anomaly is defined against.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Correa Bahnsen, D. Aouada, A. Stojanovic, B. Ottersten, "Feature Engineering Strategies for Credit Card Fraud Detection," *Expert Systems with Applications* 51, 2016, pp. 134–142 — Sec. 3.2 (why the arithmetic mean of transaction times fails, the 02:00/03:00/22:00/23:00 example averaging to 12:30; the von Mises model of a customer's transaction times, Eqs. 12–14; the binary feature "inside the confidence interval at level α"; at least seven days of history; the same idea for the day of the week), Table 6 (the periodic features of the seven-transaction example; its printed means and intervals could not be reproduced: rows 5 and 7 differ from the recomputed means by exactly one hour, and the intervals do not follow from the stated scale; the values in this chapter are recomputed with the maximum-likelihood fit), Appendix A (periodic mean and standard deviation, Eqs. A.1–A.3), Sec. 5 and Figs. 6–7 (savings of eight detectors with the periodic set, on the raw fields alone and stacked on the aggregates). https://doi.org/10.1016/j.eswa.2015.12.030
+2. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — Sec. 2.3.8 "Periodic variables" (the mean of angles as the direction of the averaged unit vectors; the von Mises distribution; maximum-likelihood estimates of its direction and of its concentration through $A(m) = I_1(m)/I_0(m)$).
+3. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015 — Ch. 3, "Break-Point Analysis" (intra-account; a window of 24 transactions split into 20 old and 4 new; Student's t-test; ranking by the statistic; Fig. 3.4) and "Peer-Group Analysis" (inter-account; peers by business knowledge or by distance; the number of peers neither too small nor too large; the t-score of the target against its peers at the same time; Christmas spending flagged by an intra-account comparison and not by peers; Table 3.1, Fig. 3.5); Ch. 1, Table 1.2 (the cloned-phone call records).
+4. R. J. Bolton, D. J. Hand, "Statistical Fraud Detection: A Review," *Statistical Science* 17(3), 2002, pp. 235–255 — Sec. 3 (cumulative card spending remarkably linear in time; jumps and changes of slope merit investigation), Sec. 4 (peer group analysis and break detection applied to money laundering). https://doi.org/10.1214/ss/1042727940
+5. Y. Lucas, J. Jurgovsky, "Credit Card Fraud Detection Using Machine Learning: A Survey," arXiv:2010.06479, 2020 — Sec. 4.2 (the time difference between consecutive transactions, Eq. 5, because frauds come in bursts). https://arxiv.org/abs/2010.06479
+6. V. Chandola, A. Banerjee, V. Kumar, "Anomaly Detection: A Survey," *ACM Computing Surveys* 41(3), 2009 — Sec. 2.2.2 (contextual anomalies: contextual and behavioural attributes; a weekly spend normal at Christmas and anomalous in July), Sec. 10.1 (the profile as context: the cell-phone user as the contextual attribute; analysis of users within their group). https://doi.org/10.1145/1541880.1541882
+7. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 3.2 (the transaction simulator: transaction times drawn around noon for every customer; the three fraud scenarios). Every simulator number in this chapter (the leaked card's spending slope, the gaps, the break-point and peer-group measurements in the exercises) comes from one seeded run of a re-implementation of that generator, without removal of known cards; it is not the run the previous lessons measured. https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+</References>

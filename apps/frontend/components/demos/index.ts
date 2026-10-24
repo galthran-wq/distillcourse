@@ -108,4 +108,5 @@ export const demos: Record<
   ExerciseRuleExplorer: () => import("./quant/ExerciseRuleExplorer"),
   QuadraticVariationZoom: () => import("./quant/QuadraticVariationZoom"),
   RankingBudgetExplorer: () => import("./fraud-ml/RankingBudgetExplorer"),
+  CircularMeanClock: () => import("./fraud-ml/CircularMeanClock"),
 };

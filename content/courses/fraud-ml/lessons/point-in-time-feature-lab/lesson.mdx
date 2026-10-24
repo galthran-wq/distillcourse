@@ -1,0 +1,69 @@
+The lab builds the feature pipeline: windowed aggregates over each entity's past, conditional sums, a terminal risk shifted by the label delay and a circular time feature, joined onto every scoring row as of its own timestamp — and a shipped reference pipeline hides one leak for the learner to find.
+A training table that breaks a point-in-time rule has the same columns as
+one that keeps it, plausible numbers in every cell, and a better offline
+score. Only the code that built it says which one it is.
+
+Every rule has been stated already. A card's windows hold its payments
+strictly before the row and less than $w$ earlier, conditioned or not on
+the payment's type and country, as in <Ref lesson="transaction-aggregates"
+id="the-rule" />. The usual hour is a circular mean with a von Mises arc
+around it, fitted only once the previous seven days hold seven payments,
+from <Ref lesson="behavioural-profiles" id="how-much-history-the-arc-needs" />.
+A terminal's fraud rate reads only labels that have arrived, so its window
+ends $\delta$ days before the row, and a stored value reaches a row by an
+as-of join, from <Ref lesson="point-in-time-features" />. Which columns of
+a log are knowable at scoring time, and which merely look so, is the
+reading <Ref lesson="paysim-feature-matrix" /> did on a public file.
+
+You write six functions, one per checkpoint: `calendar_flags`,
+`customer_windows` (around a window helper that the next checkpoint reuses
+on a finer key), `conditional_aggregates`, `terminal_risk_delayed`,
+`periodic_time_flag` and `point_in_time_join`. Each is checked against the
+course's worked cases first (the seven-payment card, the two-sums terminal,
+the late-night card) and then against inputs built to catch the usual bugs:
+a payment inside its own window, same-second payments counted as earlier,
+an undelayed label window, a mean of hours taken as numbers, an arc that
+does not cross midnight, a join that reads the latest record. A shipped
+nightly job then asks your terminal function for every terminal's delayed
+rate at 00:30, and a shipped builder assembles your functions into an
+18-column matrix, one row per payment, on a simulated card log of about
+118,000 payments over 60 days, with a label delay of seven days. The
+generator is the course's card simulator with three additions, so that
+every feature has something to find: payment types and countries, web
+merchants, and a personal hour for each card.
+
+Then a second pipeline, shipped complete and written the ordinary way,
+produces a matrix with the same columns that a frozen logistic regression
+scores better on, 0.92 against 0.83 in ROC-AUC on the last week. One of
+its columns reads the future. The written answer names it, gives the first
+row where it differs from yours, and says why no offline number could have
+shown it; the same cell shows what happens to that column on a week whose
+labels have not arrived.
+
+The lab runs as a Jupyter notebook — open it in Colab with the button
+below, or in any Jupyter. Pair the notebook with the code from this page;
+each checkpoint submits your function's outputs for verification, and the
+checklist below tracks what stands. The six exact checkpoints are the
+required set. The written answer and the open task are optional: the open
+task keeps the model frozen and grades your matrix, plus any columns you
+add, on the unlabelled week of a second simulator run, where the 18 columns
+alone fall short of the bar. Expect about four and a half hours. When a
+check goes red, the verdict often names the bug, so read it before
+rereading your code.
+
+What exists at the end is a leak-free matrix built by your own functions,
+and the habit of diffing two pipelines row by row until the first row
+where they disagree. The point-in-time lookup returns in
+<Ref lesson="pipeline-capstone-lab" />, where the detector reads its
+features as of each day of a simulated stream.
+
+With an honest matrix scored by honest metrics, what remains of supervised
+detection is choosing the model that reads it, starting from the one a
+regulator can audit line by line in <Ref lesson="scorecards-woe" />.
+
+<References>
+1. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 3.2 (the transaction data simulator, rewritten for the lab from its stated rules, with payment types, countries, web merchants and personal hours added), Ch. 3.3 (the baseline features: calendar flags, the card's windows over 1, 7 and 30 days, and the terminal risk delayed by a week as the difference of two rolling sums). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+2. A. Correa Bahnsen, D. Aouada, A. Stojanovic, B. Ottersten, "Feature Engineering Strategies for Credit Card Fraud Detection," *Expert Systems with Applications* 51, 2016, pp. 134–142 — Table 5 (the seven-transaction aggregation example, used as the local check of the conditional window), Section 3.2 and Table 6 (the von Mises periodic feature). https://doi.org/10.1016/j.eswa.2015.12.030
+3. Google Cloud, *FraudFinder: a comprehensive lab series on fraud detection with Google Cloud*, 2022–2023 — notebook 02 (batch customer and terminal windows, the terminal risk with a seven-day delay, zero-filled placeholder columns) and the BigQuery ML notebook 04 (the read-instances table and point-in-time retrieval from the feature store). https://github.com/GoogleCloudPlatform/fraudfinder
+4. FITE7410 "Financial Fraud Analytics," University of Hong Kong, 2022–23, lecturer V. Chan — Assignment 1, Part I (feature engineering on the PaySim log: hour of day, numeric identifiers, per-account transaction counts). One of the two assignments this lab is modelled on; it grades by hand what the lab checks by machine.
+</References>

@@ -1,0 +1,811 @@
+A single card payment record says: card 4471, terminal 9023, EUR 184, Tuesday 14:07. Nothing in those four fields says whether it is fraud; the same payment is normal for one cardholder and alarming for another. How do you turn a card's and a terminal's past into numbers that stand next to the payment, computed only from what happened before it?
+
+Every model in the previous module was scored against an honest referee:
+a forward-in-time test week behind a delay block, judged by card precision
+at 100. What the models were given went unexplained. <Ref
+lesson="ulb-handbook-benchmark" id="fifteen-inputs-built-the-same-way">The
+benchmark</Ref> listed fifteen inputs, among them a card's number of
+payments over the last 1, 7 and 30 days, and <Ref
+lesson="fraud-detection-system"
+id="where-a-learned-model-fits-after-the-answer">the layered system</Ref>
+called the step that builds such numbers feature augmentation, without
+saying how they are computed.
+
+The constraint comes with the payment. The model scores card 4471's
+EUR 184 within seconds of the payment, and at that instant nothing after
+it exists. Whatever stands next to the payment in the feature vector must
+be computable from the payments before it, in training exactly as in
+service.
+
+## What the raw record can tell a model
+
+The obvious first attempt hands the four fields to a learner. A decision
+tree needs no scaling and splits integers as readily as amounts, so
+nothing seems to stop it.
+
+### An identifier names an entity; it does not measure one
+
+A learner needs features that are numbers and whose order means
+something: a split at a threshold sends the smaller values one way and the
+larger the other. The amount qualifies. The card number and the terminal
+number are numbers that do not: terminal 9023 is not more of anything than
+terminal 1983. They are names of things that have a history, and the
+history is where the information is.
+
+A tree can still split on them. A deep enough tree carves the terminal
+axis into intervals one terminal wide and learns which particular
+terminals were fraudulent in its training week. That is a lookup table of
+past labels, valid for those terminals and only as long as their status
+lasts.
+
+### An amount needs a reference point
+
+EUR 184 is a weekly shop for one cardholder and ten times the usual
+payment of another. A tree on the amount alone can only learn amounts
+that are suspicious for everyone. On <Ref lesson="canonical-datasets"
+id="the-transaction-simulator-a-world-whose-rules-are-known">the
+transaction simulator</Ref>, whose three scripted frauds are a fixed
+amount rule, compromised terminals and leaked cards, that is exactly one
+scenario. The depth-2 tree that <Ref lesson="canonical-datasets"
+id="three-scripted-frauds">the canonical datasets</Ref> trained on one
+week split at amount 218.67, the first scenario's line of 220. Give the
+same tree the card number, the terminal number, the time of day and the
+weekday as well, and it asks the same questions about the amount and
+ignores the rest.
+
+A categorical field such as the country of the payment does carry
+information on its own, a rate for the whole population. In one Belgian
+issuer's month of online card payments, payments made outside the European
+Union were fraud about 5% of the time against 0.05% for payments in Belgium, a
+hundredfold difference. But a population rate is the same for every
+cardholder, so it cannot say that a payment abroad is unusual for this
+card, which is what the opening asks.
+
+<KeyFact>
+Fraud is a departure from a particular card's or terminal's habit, and a
+habit is a statistic over that entity's past. The raw record carries the
+present payment only; the reference it has to be compared with must be
+computed and placed beside it.
+</KeyFact>
+
+## Summarising a card's past: recency, frequency, monetary
+
+A card that has paid for two years has hundreds of past payments, and a
+model takes a fixed number of inputs. The history has to be cut down to a
+few numbers.
+
+### Why not the lifetime average
+
+The first candidate is the card's mean amount over everything it ever
+did. It fails on the very change it should catch. A card stolen yesterday
+has two years of honest payments behind it and a day of fraud: the
+lifetime mean has barely moved, and it will not move much until the fraud
+has run for weeks. A summary of a habit has to forget, so that a recent
+change shows.
+
+### Three questions about a habit
+
+A card's habit can be broken in three ways: it pays sooner after its
+previous payment than it used to, it pays more often, or it pays
+different amounts. Each gives one kind of summary.
+
+<Definition title="entity and RFM aggregates">
+An *entity* is anything that recurs across payments and has a history: a
+card, a customer, a terminal, an account. For a payment of an entity, its
+*RFM aggregates* summarise that entity's earlier payments:
+
+- **recency**: the time since the entity's previous payment;
+- **frequency**: the number of its payments in a recent period;
+- **monetary value**: the amount of its payments in that period, summed
+  or averaged, or the smallest, largest or most recent amount.
+</Definition>
+
+The name comes from marketing, where the same three numbers rank
+customers by how recently, how often and how much they buy. Recency is one
+number per payment; frequency and monetary value also need a period.
+
+### Probe, then spend
+
+<Ref lesson="economics-of-detection" id="one-card-five-chances-to-act">The
+stolen card of the economics lesson</Ref> was tested with a €1 payment and
+then used for five payments of €200 over two days. Say its owner paid
+about once a day, around €40. Read the first €200 payment through the
+three questions.
+
+<Figure
+  src="./figures/probe.svg"
+  alt="A timeline of one card over its last eight days: grey dots for daily payments of 30 to 50 euros, then a small amber dot labelled 1 euro probe at 13:02 and a tall amber bar labelled 200 euros at 15:10 the same day. Below, a table of the card's aggregates at the 200-euro payment against its usual values: time since previous payment 2 hours 8 minutes against about 24 hours; payments in the last 24 hours 2 against 1; mean amount of the last 30 days 40 euros, so the current payment is 5 times it; most recent amount 1 euro"
+  caption="The probe-then-spend pattern read as aggregates: a recent, low payment followed by a recent, high one."
+/>
+
+All three questions answer "unusual": a second payment within two hours
+from a card that pays once a day, a most recent amount of €1, and a
+current amount five times the card's 30-day mean. No field of the €200
+record is odd on its own, since €200 is an ordinary purchase. The pattern
+is the pair, a recent low payment and then a recent high one, and only
+aggregates over the card's own past can express it.
+
+## How far back to look: windows of several lengths
+
+Frequency and monetary value need a period, and the obvious choice is one
+period for everything, say the last 30 days. Two cards show why one
+length is not enough.
+
+### A burst and a drift
+
+<Figure
+  src="./figures/windows.svg"
+  alt="Two timelines over the last 30 days, each with three nested brackets behind the current payment labelled 1 day, 7 days and 30 days. Top, a card that pays about twice a day and makes six payments in the last hour: its 1-day count is 8 against a usual 2, its 7-day count 20 against 14, its 30-day count 66 against 60. Bottom, a card that went from two payments a day to four three weeks ago: its 1-day count is 4, within its old day-to-day range; its 7-day count 28 against 14; its 30-day count 102 against 60"
+  caption="A short window sees a burst that a long one dilutes; a long window sees a drift that a short one cannot tell from noise. Illustrative cards."
+/>
+
+The first card pays about twice a day and then makes six payments within
+an hour, the thief's burst of <Ref lesson="financial-crime-typology"
+id="card-fraud-a-label-that-does-arrive">the typology</Ref>. Its count
+over the last day is 8 against a usual 2; over 30 days it is 66 against a
+usual 60, a change smaller than the card's ordinary month-to-month
+variation. The second card has paid four times a day for the last three
+weeks instead of twice. On any one day, four payments is within what a
+card paying twice a day sometimes does; over 30 days its count is 102
+against 60.
+
+A short window reacts fast and is noisy; a long window is stable and
+slow. Computing both and letting the model weigh them lets it read changes
+at several speeds. A common choice is three windows, 1, 7 and 30 days;
+another system used eight, of 1, 3, 6, 12, 18, 24, 72 and 168 hours; no
+length is agreed on, and each set is a guess to be tested on the data. On
+the real Belgian stream, <Ref lesson="ulb-handbook-benchmark"
+id="a-compromised-terminal-and-a-burst">the benchmark's shallow
+tree</Ref> chose the 1-day count as its second question: more than 13
+payments today on a card at a terminal with recent fraud.
+
+### A window has to fill before it means anything
+
+The short-window noise and the long-window lag can be seen on one
+simulated customer. The simulator draws each customer's habit once; for
+customer 0 it drew a mean amount of €62.26 and 2.18 payments a day. Run
+the 30-day window along this customer's half-year of payments.
+
+<Figure
+  src="./figures/customer0.svg"
+  alt="Two panels over the 183 simulated days for customer 0. Top: the number of payments in the previous 30 days, rising from 0 to about 60 over the first 30 days and then wandering between about 50 and 90 around a dashed line at 65.4, which is 2.18 times 30. Bottom: the mean amount over the previous 30 days in amber, staying between about 55 and 70 euros around a dashed line at 62.26 after the first month, and the mean over the previous day as faint grey dots scattered from a few euros to over 120"
+  caption="The 30-day aggregates settle near the parameters the simulator drew for the customer once a month of history has accumulated; the 1-day mean stays scattered."
+/>
+
+For the first 30 days the 30-day count climbs from zero, because the
+window reaches back to before the data began: a feature computed there
+describes the start of the file, not the customer. After a month the count
+wanders around 65, the drawn rate times 30, and the mean amount stays
+within a few euros of €62. The mean over the last day, a handful of
+payments drawn with a spread of half the mean, scatters from a few euros to
+over €120 and cannot serve as the reference by itself.
+
+So a training set should start one longest window after the data does,
+or its first rows carry half-filled features.
+
+## Computing a window from earlier rows only
+
+The windows are now chosen. Computing them on a table of past payments,
+for training, contains a trap that the live system never meets: the
+table holds the future of every row except the last.
+
+### The rule
+
+<Definition title="windowed aggregate">
+Let payment $i$ belong to entity $e_i$, happen at time $t_i$ and have
+amount $\mathrm{Amt}_i$. Over a window of length $w$, its count and sum
+are taken over the same entity's payments strictly before it and less than
+$w$ earlier:
+$$
+N_w(i) = \#\{\, j : e_j = e_i,\ t_i - w < t_j < t_i \,\},
+\qquad
+S_w(i) = \sum_{j :\ e_j = e_i,\ t_i - w < t_j < t_i} \mathrm{Amt}_j ,
+$$
+with mean amount $M_w(i) = S_w(i)/N_w(i)$, set to 0 when $N_w(i) = 0$.
+</Definition>
+
+The time $t_i$ here is the payment's timestamp, finer than the day index
+$t$ of earlier lessons, and $w$ is written in hours or days. Two features
+of the definition carry the time constraint. The window ends **before**
+$t_i$, so the payment being judged is not part of its own reference. And
+it is computed at each row's own timestamp, so a training row from 3 May
+sees the card's payments up to 3 May, not up to the day the table was
+built. No label enters $N_w$ or $S_w$: payments in <Ref
+lesson="delayed-labels-prequential"
+id="what-the-delay-block-is-and-is-not">the delay block</Ref> may enter
+them, because the bank saw those payments even though their labels had
+not arrived.
+
+### Seven payments by hand
+
+<Example title="one card over three days, 24-hour window">
+A card makes seven payments between the evening of 1 January and
+midnight on 3 January, in Luxembourg and then in neighbouring Germany.
+Its type is POS, a payment at a shop's card terminal, or ATM, a cash
+withdrawal. For each payment, $N_{24\text{h}}$ and $S_{24\text{h}}$ count
+and sum the card's payments in the 24 hours before it.
+
+| # | time | type | country | amount (€) | $N_{24\text{h}}$ | $S_{24\text{h}}$ (€) |
+|---|---|---|---|---|---|---|
+| 1 | 1 Jan 18:20 | POS | Luxembourg | 250 | 0 | 0 |
+| 2 | 1 Jan 20:35 | POS | Luxembourg | 400 | 1 | 250 |
+| 3 | 1 Jan 22:30 | ATM | Luxembourg | 250 | 2 | 650 |
+| 4 | 2 Jan 00:50 | POS | Germany | 50 | 3 | 900 |
+| 5 | 2 Jan 19:18 | POS | Germany | 100 | 3 | 700 |
+| 6 | 2 Jan 23:45 | POS | Germany | 150 | 2 | 150 |
+| 7 | 3 Jan 00:00 | POS | Luxembourg | 10 | 3 | 300 |
+
+**Row 1.** Nothing precedes it: every aggregate is 0. The first payment
+of any history looks like this.
+
+**Rows 2 to 4.** The window reaches back to the evening before, so it
+holds every earlier payment: row 4 at 00:50 sees rows 1 to 3,
+$250 + 400 + 250 = 900$.
+
+**Row 5.** Its window opens at 1 Jan 19:18. Row 1, at 18:20, is outside;
+rows 2, 3 and 4 are in: $N = 3$, $S = 400 + 250 + 50 = 700$.
+
+**Row 6.** The window opens at 1 Jan 23:45, after row 3: rows 4 and 5
+remain, $N = 2$, $S = 50 + 100 = 150$.
+
+**Row 7.** The window opens at 2 Jan 00:00 and holds rows 4, 5 and 6:
+$N = 3$, $S = 50 + 100 + 150 = 300$.
+</Example>
+
+<FigureSequence
+  name="window"
+  alt="Four frames of one timeline from 1 January 18:00 to 3 January 01:00 with the seven payments as bars proportional to their amounts. In each frame one payment is amber and a 24-hour band is shaded behind it; the payments inside the band are blue and the rest grey, and a box reads the count and sum. Frame 1, payment 1: empty band, N = 0, S = 0. Frame 2, payment 4: payments 1 to 3 inside, N = 3, S = 900. Frame 3, payment 5: payment 1 has left the band, N = 3, S = 700. Frame 4, payment 7: payments 4 to 6 inside, N = 3, S = 300"
+  caption="The 24-hour window slides with the payment being scored and always ends just before it."
+/>
+
+<Task>
+Step to the third frame and find the payment that left the window between
+payments 4 and 5. Then predict, before stepping on, which payments the
+window holds at payment 7.
+</Task>
+
+<Exercise>
+An eighth payment arrives: 3 January 09:10, POS, France, €300. Compute
+its $N_{24\text{h}}$ and $S_{24\text{h}}$, and its count over the last 7
+days. Write down which rows each window holds before adding anything up.
+
+<Solution>
+**24 hours.** The window opens at 2 January 09:10. Row 4 (2 Jan 00:50)
+is outside; rows 5, 6 and 7 are inside: $N_{24\text{h}} = 3$,
+$S_{24\text{h}} = 100 + 150 + 10 = 260$.
+
+**7 days.** The window opens on 27 December and holds all seven earlier
+payments: $N_{7\text{d}} = 7$, with a sum of €1,210.
+</Solution>
+</Exercise>
+
+### Three ordinary table operations that break the rule
+
+- **A statistic over the whole table.** "The card's mean amount" computed
+  with a group-by over the full file uses every payment the card ever
+  made, including those after the row. In training the feature knows the
+  card's future; in service it cannot.
+- **A value computed once and joined to every row.** The card's 30-day
+  count as of the day the table was built, attached to all of its rows,
+  gives a row from May a number about September. The aggregate has to be
+  evaluated at each row's own $t_i$.
+- **The current payment inside its own window.** A rolling window in
+  pandas, `rolling("7d")` on a time index, covers $(t_i - w,\, t_i]$ and
+  so includes the payment itself; `closed="left"` excludes it. Including
+  it is not a leak, since the payment is known when it is scored, but it
+  mixes the payment into the reference it is meant to be compared with,
+  and for a card that pays rarely the reference becomes the payment.
+  The simulator benchmark's card windows included the current payment;
+  the windows here exclude it, and the two give different numbers, so a
+  pipeline must state which it uses.
+
+## Conditioning the window on the kind of payment
+
+A card pays in France every day and, today, once in Brazil. Its count of
+payments over the last day is ordinary, and so is its amount. What is
+unusual is a payment in Brazil, which this card has never made, and a
+plain window cannot ask about that.
+
+### The same window, a narrower question
+
+<Definition title="conditional aggregate">
+Let $g_i$ be a categorical value of payment $i$, such as its type, its
+country or its merchant category. The conditional count and sum keep only
+the entity's earlier payments that share the current payment's value:
+$$
+N^{g}_w(i) = \#\{\, j : e_j = e_i,\ g_j = g_i,\ t_i - w < t_j < t_i \,\},
+$$
+and $S^{g}_w(i)$ sums their amounts in the same way. Several conditions
+can be combined, such as the same type **and** the same country.
+</Definition>
+
+For the seven payments, take $g$ to be the pair (type, country).
+
+| # | type, country | amount (€) | $N^{g}_{24\text{h}}$ | $S^{g}_{24\text{h}}$ (€) |
+|---|---|---|---|---|
+| 1 | POS, Luxembourg | 250 | 0 | 0 |
+| 2 | POS, Luxembourg | 400 | 1 | 250 |
+| 3 | ATM, Luxembourg | 250 | 0 | 0 |
+| 4 | POS, Germany | 50 | 0 | 0 |
+| 5 | POS, Germany | 100 | 1 | 50 |
+| 6 | POS, Germany | 150 | 2 | 150 |
+| 7 | POS, Luxembourg | 10 | 0 | 0 |
+
+Row 3 is the card's first cash withdrawal and row 4 its first payment in
+Germany: their plain counts are 2 and 3, their conditional counts 0. Row 7
+returns to Luxembourg after a day in Germany; within 24 hours there is no
+earlier POS payment in Luxembourg, so its conditional count is 0 while
+its plain count is 3. A zero next to a busy plain window is the signature
+the feature exists for: this card is active, but not like this.
+
+<Figure
+  src="./figures/conditional.svg"
+  alt="The seven-payment timeline with bars coloured by type and country: POS Luxembourg in blue, ATM Luxembourg in grey, POS Germany in amber. Payment 7, a small blue bar, is outlined, and the 24-hour band behind it holds payments 4, 5 and 6, all amber. A box reads: payment 7, POS, Luxembourg; plain window N = 3, S = 300 euros; same type and country N = 0, S = 0 euros"
+  caption="A conditional window counts only the earlier payments of the same kind: payment 7 has a full plain window and an empty conditional one."
+/>
+
+### Two meanings of "at the merchant"
+
+"The card's number of payments at the merchant in the last 24 hours" can
+mean two different features.
+
+- **At a fixed, named merchant.** One column per merchant, "payments at
+  shop M in the last 24 hours", the same question for every row. It is
+  zero for almost every card and almost every row, and a network with
+  thousands of merchants needs thousands of such columns.
+- **At the same merchant as the current payment.** One column, whose
+  question changes with the row: at shop M it counts visits to M, at shop
+  K visits to K. It is the conditional aggregate above, with $g$ the
+  merchant.
+
+The second is compact and answers "has this card been here before?"; the
+first answers a question about one place, which is useful only for a few
+places worth watching.
+
+### How fast the grid grows
+
+Each condition multiplies the plain features. Eight window lengths, each
+with a count and a sum, plain and conditional on each of five criteria,
+give $8 \times 2 \times 6 = 96$ features per payment. The five
+criteria are the country; the transaction type (shop payment or cash
+withdrawal); the entry mode, how the card reached the terminal (chip,
+magnetic stripe, contactless, or card details typed in online); the
+merchant code, the category a merchant is registered under, such as
+grocery or air travel; and the merchant group, a coarser grouping of those
+categories. Conditions can also
+be combined, as the definition allows, and one card processor's model,
+built on those eight windows and five criteria, used 280 aggregated
+features in all. Every one of them must be recomputed for each payment within the
+time the system has to score it, which caps the grid long before the data
+runs out of conditions to try; <Ref
+lesson="real-time-scoring-architecture">the real-time scoring
+architecture</Ref> takes that limit up.
+
+## The terminal's past, and the fifteen inputs
+
+The card is one entity. The terminal that receives the payment is
+another, and the same windows can run over its rows: its number of
+payments over the last 1, 7 and 30 days. What these see depends on what a
+compromise does to a terminal's traffic.
+
+On the simulator a compromised terminal keeps its ordinary customers; it
+is every payment there that becomes fraud for 28 days, not the number of
+payments that changes. Its counts over 1, 7 or 30 days look like any
+other terminal's. The counts give the terminal's scale, a busy shop
+against a quiet one, and they would move under a burst of traffic, but
+they do not see this scenario. What sees it is the share of the
+terminal's recent payments that turned out to be fraud, and that number
+needs labels. Labels have a clock, so that feature is the subject of
+<Ref lesson="point-in-time-features">point-in-time features</Ref>; here it
+is only reserved a place.
+
+<Figure
+  src="./figures/feature-vector.svg"
+  alt="Left, the raw record: card 4471, terminal 9023, amount 184 euros, Tuesday 14:07. Arrows lead to a feature vector on the right in three groups. The payment: amount 184, weekend 0, night 0. The card's past: number of payments and mean amount over the last 1, 7 and 30 days, six features. The terminal's past: number of payments over the last 1, 7 and 30 days, three features, and below them three greyed slots for the terminal's fraud rate over 1, 7 and 30 days, labelled needs labels, built later. The card and terminal identifiers are struck through with the note used to compute the windows, not as features"
+  caption="Four raw fields become a feature vector: two calendar flags, six card aggregates, three terminal counts, and three terminal fraud rates still to be built. The identifiers are used to group the history and then leave."
+/>
+
+The timestamp gives two flags of its own: whether the payment falls on a
+weekend, and whether it falls at night, here before 06:00. These are
+fixed calendar facts, the same for every card; a time of day that is
+unusual *for this card* is the subject of <Ref
+lesson="behavioural-profiles">behavioural profiles</Ref>. Together with
+the amount, the six card aggregates and the three terminal counts they
+make twelve numbers, all computed without a label; the terminal's three
+fraud rates complete the benchmark's fifteen inputs. The card and terminal
+numbers are not among them: they are needed to find each entity's
+history, and <Ref lesson="delayed-labels-prequential"
+id="why-the-cards-identity-stays-out-of-the-features">the delayed-labels
+lesson</Ref> showed why a card number among the inputs teaches a model
+which cards were caught. What the identifier carried, a card's habit, now
+enters as numbers that two cards with similar habits share, so that what
+is learned on one card applies to another.
+
+## What the aggregates buy
+
+Whether the windows pay is a measurement, and on the simulator the answer
+key makes it a precise one: it says which scenario each found fraud
+belongs to.
+
+### On the simulator: one scenario found, one not
+
+Train a random forest of 100 trees on the simulator's training week, 25
+to 31 July 2018, and score it on the test week behind a delay block, with
+known cards removed, as in <Ref lesson="delayed-labels-prequential"
+id="where-the-training-set-must-end-the-delay-block">the delayed-labels
+lesson</Ref>. The test week holds 385 frauds: 20 from the amount rule,
+281 at compromised terminals and 84 on leaked cards. Change only the
+inputs, and record, for each scenario, the share of its test frauds that
+reach the top 100 payments of their day.
+
+| inputs | average precision | $CP@100$ | amount rule | terminals | leaked cards |
+|---|---|---|---|---|---|
+| amount, weekend, night | 0.13 | 0.06 | 100% | 1% | 33% |
+| the raw record: amount, card and terminal numbers, time of day, weekday | 0.23 | 0.16 | 100% | 29% | 33% |
+| amount, weekend, night, card windows | 0.21 | 0.08 | 100% | 1% | 80% |
+| the same, plus terminal counts | 0.20 | 0.08 | 100% | 1% | 75% |
+| the same, plus terminal fraud rate (built later) | 0.65 | 0.29 | 100% | 66% | 73% |
+
+<Figure
+  src="./figures/scenarios.svg"
+  alt="Grouped bar chart. For each of three scenarios (amount rule, compromised terminals, leaked cards) five bars give the share of that scenario's test frauds in the daily top 100 for five input sets: amount and calendar flags; plus identifiers; card windows; plus terminal counts; plus terminal fraud rate. Amount rule: 100% for all. Compromised terminals: 1%, 29%, 1%, 1%, 66%. Leaked cards: 33%, 33%, 80%, 75%, 73%"
+  caption="Card windows lift the leaked-card scenario from a third of its frauds to four fifths and leave the compromised terminals untouched."
+/>
+
+<Task>
+In the chart, find the one scenario that the card windows move and the
+one that only the last input set moves. Then check the table: why does
+$CP@100$ barely rise when the card windows are added, although the
+leaked-card share more than doubles?
+</Task>
+
+**Leaked cards.** Their fraudulent payments are the card's own amounts
+multiplied by five. On the amount alone, the third of them that cross
+€220 are found, the ones scenario 1's line catches anyway. With the card
+windows the forest can compare the amount with the card's mean, and 80% of
+them reach the top 100: the reference point the raw record lacked.
+
+**Compromised terminals.** The card windows do not see them, because the
+paying card is an ordinary customer paying ordinary amounts; neither do
+the terminal counts, for the reason given above. That is why $CP@100$
+barely moves: terminal frauds are 281 of the 385, and the card windows
+leave them where they were.
+
+### The identifier as a lookup table
+
+The second row is the warning. Handing the forest the card and terminal
+numbers lifts $CP@100$ from 0.06 to 0.16, and the whole gain is at
+compromised terminals, 29% of whose frauds now reach the top 100. The
+forest has memorised which terminals had frauds in its training week, and
+on the simulator a terminal stays compromised for 28 days, so for a
+terminal compromised late in the training week the memory is still right
+a fortnight later. It can never be right about a terminal compromised
+after the training week, and on a real stream a memorised terminal is
+one that has since been investigated and repaired or closed.
+
+The memory itself is legitimate: "this terminal's recent payments were fraud" is exactly what the terminal's
+fraud rate records, for every terminal, recomputed every day from the
+labels that have arrived. With that feature in place of the identifier,
+the last row finds 66% of terminal fraud and $CP@100$ reaches 0.29.
+
+### On a processor's real data: savings roughly triple
+
+<Ref lesson="example-dependent-cost"
+id="what-a-published-comparison-on-processor-data-shows">The processor
+comparison of the cost lesson</Ref> fitted eight detectors on a European
+card processor's data, with savings measured against flagging nothing. Its
+feature sets were the raw fields of the record; the raw fields plus
+windowed counts and sums of the card's payments over windows from 1 hour
+to a week; and, on top, the same windows conditioned on the current
+payment's type, country or merchant.
+
+<Figure
+  src="./figures/savings.svg"
+  alt="Paired horizontal bars of savings for eight detectors: tree, logistic, forest, the three with the per-payment cost rule, cost-sensitive logistic and cost-sensitive tree. Grey bars for raw fields only, amber for raw fields plus card windows. Approximate values: tree 19% to 39%, logistic 3% to 9%, forest 21% to 45%, tree with the rule 16% to 41%, logistic with the rule 13% to 36%, forest with the rule 13% to 48%, cost-sensitive logistic 18% to 59%, cost-sensitive tree 15% to 60%. A note reads: savings read off a published chart to about a point"
+  caption="Adding the card's windowed counts and sums to the raw fields raised every detector's savings, from two to four times; the average increase was about 200%."
+/>
+
+Every detector gained. The plain tree went from about 19% to 39%, the
+cost-sensitive tree from about 15% to 60%; averaged over the eight, the
+increase was about 200%, savings roughly tripled. Adding the conditional
+windows raised the average increase to about 250%, but conditional windows
+**instead of** the plain ones did worse than the plain ones alone: a
+conditional count says something only beside the plain count it narrows,
+as rows 3, 4 and 7 of the table showed. These numbers come from a single
+split without a delay block, so their levels carry that optimism; the
+direction, the same on every detector, is the part that transfers.
+
+<KeyFact>
+Aggregates do not add signal across the board: they add the signal of the
+fraud that changes the entity they summarise. Card windows found the
+leaked cards and nothing at the compromised terminals, whose signal is in
+the terminal's labels.
+</KeyFact>
+
+<Conclusion>
+You can now turn a raw payment record into features over its entities'
+past: recency, counts and amounts over windows of several lengths,
+computed for each row from the same entity's strictly earlier payments,
+and conditioned on the payment's type, country or merchant where the
+question is "is this kind of payment usual for this card". You can
+explain why each carries signal the record lacks, the card's own
+reference point, and why on the simulator they find the leaked cards and
+not the compromised terminals.
+
+The terminal's recent fraud rate, which finds those terminals, is built
+from labels, and labels arrive a delay late; <Ref
+lesson="point-in-time-features">point-in-time features</Ref> builds it, and
+every other feature, so that each training row holds only what was known at
+its own moment. What the windows cannot say is whether a payment's hour is
+usual for this card, or whether the card behaves like cards similar to it.
+A mean of clock times already fails there: a card that pays at 23:00 and
+at 01:00 averages to noon, an hour it never pays at. <Ref
+lesson="behavioural-profiles">Behavioural profiles</Ref> builds those
+comparisons.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+A card's very first payment has every aggregate at zero: no recency, no
+counts, no amounts. (a) Show that a model given only the twelve
+label-free numbers (amount, calendar flags, card windows, terminal
+counts) cannot tell a brand-new card from a card that
+has not paid for 31 days. (b) Why might the two deserve different scores?
+(c) Name a feature that restores the distinction, and say what value it
+takes on each card.
+
+<Solution>
+**(a)** For both cards every window of 1, 7 and 30 days is empty, so all
+six card aggregates are 0. The amount, the calendar flags and the terminal
+counts describe the payment and the terminal, not the card's age, and can
+be identical. Same inputs, same score.
+
+**(b)** A new card has no habit yet: any first payment is "unusual" for
+it, and a model that scored every first payment high would flood the
+queue. A dormant card that wakes with a large payment is a familiar
+pattern of stolen credentials used on an account the owner no longer
+watches. The two warrant different readings.
+
+**(c)** Recency computed without a cap: the time since the card's
+previous payment is undefined (or a separate flag "first payment ever")
+for the new card and 31 days for the dormant one. A cap such as "30 days
+or more" would merge them again, which is why a capped recency needs the
+flag beside it. Equivalent alternatives: the card's age (time since its
+first payment), or a count over a window longer than 30 days, 0 for the
+new card and positive for the dormant one. Flags marking the first payment
+in each window serve the same purpose for a linear model, which cannot
+read a zero as "missing".
+</Solution>
+</Exercise>
+
+<Exercise>
+"Including the current payment in the card's 7-day mean amount is
+harmless: it is one payment among many." Refute the claim with a card that
+pays once a week, and say what the feature loses. Is including it a leak?
+
+<Solution>
+**The counterexample.** A card that pays once a week has, at each
+payment, no other payment in the last 7 days. With the current payment
+included, the 7-day mean equals the current amount, every time: a €40
+payment gets a mean of €40, and a €900 fraud on the same card gets a mean
+of €900. The ratio of amount to mean is 1 for both.
+
+**What fails.** "One among many" assumes the window holds many payments.
+The mean is meant to be the card's reference, and a reference that
+contains the payment being judged moves toward it: by a factor of
+$1/(N+1)$ of the gap for a window that held $N$ earlier payments, which is
+negligible at $N = 60$ and total at $N = 0$. Rarely used cards, exactly
+the ones on which a large fraud stands out, are where the feature goes
+blind.
+
+**Not a leak.** The current payment is known when it is scored, so the
+feature can be computed identically in training and in service; nothing
+from the future enters. The defect is lost signal, not optimism: the
+model is honestly evaluated and simply weaker.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive an algorithm that computes $N_w(i)$ and $S_w(i)$ for every
+payment of one entity and every $w$ in a set of window lengths
+$W = \{w_1, \dots, w_m\}$, and state its cost. The payments of the entity
+are sorted by time, $t_1 \le t_2 \le \dots \le t_n$. (a) Show that a
+single pointer per window, moved only forward, finds each window's first
+row. (b) Use prefix sums to get the sums. (c) What does the conditional
+version $N^{g}_w$ cost?
+
+<Solution>
+**(a)** For window $w$, let $\ell(i)$ be the first index with
+$t_{\ell(i)} > t_i - w$. As $i$ increases, $t_i - w$ does not decrease,
+so $\ell(i) \ge \ell(i-1)$: the pointer only moves forward. Start
+$\ell = 1$; for each $i$, advance $\ell$ while $t_\ell \le t_i - w$. The
+rows in the window are $\ell(i), \dots, r(i)$, where $r(i)$ is the last
+row with $t_{r(i)} < t_i$ (it is $i - 1$ unless an earlier row shares the
+timestamp $t_i$, which a second forward pointer handles). So
+$N_w(i) = r(i) - \ell(i) + 1$ when $r(i) \ge \ell(i)$, else 0.
+
+**(b)** With prefix sums $P_0 = 0$, $P_k = \mathrm{Amt}_1 + \dots +
+\mathrm{Amt}_k$, the sum is $S_w(i) = P_{r(i)} - P_{\ell(i) - 1}$.
+
+**Cost.** Each pointer moves at most $n$ times in total, so one window
+costs $O(n)$ for the entity, all of $W$ costs $O(mn)$, plus $O(n)$ for the
+prefix sums. Over all entities, after one sort by (entity, time) costing
+$O(N \log N)$ for $N$ payments, the work is $O(mN)$. (Binary search for
+$\ell(i)$ instead of the pointer gives $O(mN \log N)$ and is what a
+vectorised implementation does.)
+
+**(c)** Group by (entity, value of $g$) instead of entity and run the
+same sweep within each group: still $O(mN)$ after an $O(N \log N)$ sort.
+Each further condition is one more pass of the same cost, which is how
+the grid of the conditional section turns into recomputation time.
+</Solution>
+</Exercise>
+
+<Exercise>
+On the simulator's test week, restricted to genuine payments and the 84
+frauds on leaked cards (base rate 0.0014), each single feature ranks the
+payments on its own. Average precision of each:
+
+| feature | average precision |
+|---|---|
+| card's payments in the last day | 0.001 |
+| card's mean amount over the last 30 days | 0.005 |
+| amount | 0.34 |
+| amount ÷ card's mean amount over the last 7 days | 0.15 |
+| amount ÷ card's mean amount over the last 30 days | 0.61 |
+
+Explain each number from what a leaked card does in the simulator: a third
+of its payments, for 14 days, have their amount multiplied by five. In
+particular: why is the count below the base rate, why does the 30-day mean
+alone carry almost nothing, and why does the 30-day ratio beat the 7-day
+one?
+
+<Solution>
+**Count, 0.001.** A leak does not change how often the card pays: the
+fraudulent payments are the owner's own payments with inflated amounts.
+The count is unrelated to the label, so its ranking is random, and AP of a
+random ranking sits near the base rate. Being just under it is noise.
+
+**30-day mean, 0.005.** The mean describes the card, not the payment.
+Leaked cards were drawn at random, so their usual amounts are like
+anyone's; the inflated payments of the previous days raise the mean only
+a little. A high mean marks a big spender, not a fraud.
+
+**Amount, 0.34.** Five times an amount is often large in absolute terms,
+so large amounts are enriched in fraud, but a big spender's genuine
+payments compete with a small spender's inflated ones.
+
+**Ratios.** Dividing by the card's own mean removes that competition: an
+inflated payment sits near five times its card's mean whatever the card.
+The 30-day ratio reaches 0.61. The 7-day ratio does worse because its
+reference is contaminated: after a few days of compromise, a third of the
+payments in the last 7 days are themselves inflated, which multiplies the
+7-day mean by $\tfrac23 + \tfrac13 \times 5 = \tfrac73 \approx 2.3$ and
+pulls the ratio of the next inflated payment from 5 to about 2. A 30-day
+window holds at most 14 compromised days among 30, so its mean grows by at
+most $\tfrac{16}{30} + \tfrac{14}{30} \times \tfrac73 \approx 1.6$ and
+the ratio stays above 3.
+
+**The transferable point.** An aggregate carries signal through its
+comparison with the current payment. A tree can learn the comparison from
+the amount and the mean together, given depth; writing the ratio as a
+feature hands it over in one split.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague reads the simulator table of the last section and proposes keeping
+the card and terminal numbers among the inputs: "the identifiers lift
+$CP@100$ from 0.06 to 0.16, and that difference is far beyond the noise
+line." (a) Is the difference beyond the noise line, by the rule of the
+metrics lesson? (b) Of the test week's 281 terminal frauds, 150 are at
+terminals that already had frauds in the training week. What is the most
+of the terminal fraud a lookup of identifiers could ever find, and how
+close did the forest come? (c) Give two
+reasons from earlier lessons why the lift would shrink or vanish in a
+bank, and say what replaces the identifier.
+
+<Solution>
+**(a)** Yes. A $CP@100$ difference of 0.10 is ten compromised cards a
+day, five times the two-cards-a-day line under which <Ref
+lesson="alert-budget-metrics" id="what-each-disagreement-means">the
+metrics lesson</Ref> treats a one-week difference as noise. The gain is
+real on this test week; the question is what produces it.
+
+**(b)** A lookup of training-week labels can only flag terminals that had
+fraud in the training week. Of the 281 test-week terminal frauds, 150 sit
+at such terminals, so at most 150 of 281, about 53%, are reachable; the
+forest found 29% of the 281, about half of the reachable ones. The other
+131 are at terminals compromised after the training week, which no lookup
+can know.
+
+**(c)** First, the simulator keeps a compromised terminal fraudulent for a
+fixed 28 days and keeps its identifier; a real terminal that was used for
+fraud is investigated, repaired or closed, so the memorised identifiers
+point at terminals whose status has changed. Second, the card number
+teaches the model which cards were caught, and the bank blocks those
+cards, so in a backtest it is credited for frauds that never happen, the
+argument of <Ref lesson="delayed-labels-prequential"
+id="why-the-cards-identity-stays-out-of-the-features">the delayed-labels
+lesson</Ref>. What replaces the identifier is the same information as a
+feature valid for every terminal and every day: the terminal's fraud rate
+over a recent window of labelled days, which in the table's last row finds
+66% of terminal fraud.
+</Solution>
+</Exercise>
+
+<Exercise>
+A bank wants a feature that flags a card paying at many merchants it has
+never used before, as happens when stolen card details are tried at one
+online shop after another. (a) Which of the two meanings of "at the
+merchant" does the feature need, and what value does it take on a
+first visit? (b) Build from it a single card-level count that rises with
+the pattern. (c) Why would the other meaning fail here, even with one
+column per merchant?
+
+<Solution>
+**(a)** The same merchant as the current payment: $N^{g}_{w}(i)$ with $g$
+the merchant, over a long window such as 30 days. On a first visit to a
+merchant it is 0, whatever the card's overall activity.
+
+**(b)** Over the last 24 hours, count the card's payments whose own
+same-merchant 30-day count was 0: the number of first visits today. A
+card that pays at its two usual shops scores 0; a card tried at six new
+shops in an hour scores 6. It is a windowed count, conditioned on an
+indicator computed by another window, and it still uses only earlier
+payments.
+
+**(c)** A fixed-merchant column answers "how often at shop M", the same
+question on every row. The pattern is not about any particular shop: each
+new shop's column is 0 before the visit, like the columns of thousands of
+shops the card never visits, so nothing distinguishes "new here" from
+"never here", and the model would need one column per shop to see the
+visit at all.
+</Solution>
+</Exercise>
+
+<Exercise>
+On the simulator, a compromised terminal turns every payment it receives
+into fraud for 28 days, and its traffic is steady. Define a terminal's
+30-day fraud rate as the share of its payments in a 30-day window that are
+fraud. (a) For a terminal compromised $d$ days ago, with $0 \le d \le 28$,
+write the rate over the 30 days before today when every label is known,
+and the rate over the 30 days ending 7 days ago. (b) On a given day the
+simulator holds 56 compromised terminals, two drawn on each of the last 28
+days. How many of them have a rate of 0 under the second definition? (c)
+Which of the two definitions can the bank compute on the morning of day
+$t$, and what happens to a model trained with the other one?
+
+<Solution>
+**(a)** With steady traffic the rate is the fraction of the window that
+falls after the compromise began. All labels known: the last 30 days
+contain $d$ compromised days, so the rate is $d/30$. Window ending 7 days
+ago: it covers days $t - 37$ to $t - 7$, which contain $\max(0, d - 7)$
+compromised days, so the rate is $\max(0, d - 7)/30$.
+
+**(b)** The rate is 0 when $d \le 7$: the terminals drawn in the last
+seven days, $2 \times 7 = 14$ of the 56, a quarter of them.
+
+**(c)** Labels arrive a week late, so on the morning of day $t$ the bank
+knows labels only up to about a week back: it can compute the second
+definition, not the first. A model trained with the first learns that a
+rate of $1/30$ to $7/30$ marks a fresh compromise; in service those
+terminals show 0, and the rule never fires. That fresh quarter, the most
+valuable to catch, is where the training feature and the served feature
+part. Building every feature so that training and service see the same
+value is the problem of <Ref lesson="point-in-time-features">point-in-time
+features</Ref>, which computes this rate over $[t-(d+w),\,t-d]$ as the
+difference of two rolling sums.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Correa Bahnsen, D. Aouada, A. Stojanovic, B. Ottersten, "Feature Engineering Strategies for Credit Card Fraud Detection," *Expert Systems with Applications* 51, 2016, pp. 134–142 — Sec. 3 and Table 4 (the raw attributes of a card transaction), Sec. 3.1 (raw-only studies, last-transaction features, the transaction aggregation strategy, Eqs. 6–8 for windowed counts and sums and Eqs. 9–11 for the same restricted to matching type and country; the grid of windows from 1 to 168 hours and five criteria, 280 features), Table 5 (the seven-payment worked example; its last row's 24-hour sum is printed as 400 and recomputed here as 300), Sec. 5, Figs. 4, 5 and 7 (savings by feature set: about +200% for the aggregates, about +250% with the conditional ones; conditional alone below plain), Sec. 6 (recomputation time as the limit on the number of features). https://doi.org/10.1016/j.eswa.2015.12.030
+2. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 3.2 (the simulator; customer 0's drawn parameters, mean amount 62.26 and 2.18 payments a day), Ch. 3.3 "Baseline feature transformation" (why identifiers are numerical but not ordered; weekend and night flags; the card's count and mean amount over 1, 7 and 30 days with a rolling window that includes the current payment; the terminal features, whose fraud rate is shifted by the delay; the convergence check on customer 0). The simulator was re-run from the code printed in Ch. 3.2 for every simulator number in this chapter. https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+3. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015 — Ch. 2, "Types of data sources" (RFM variables as the core aggregated transactional feature, their operationalisation, and the small test payment followed by a large one).
+4. V. Van Vlasselaer, C. Bravo, O. Caelen, T. Eliassi-Rad, L. Akoglu, M. Snoeck, B. Baesens, "APATE: A Novel Approach for Automated Credit Card Transaction Fraud Detection Using Network-Based Extensions," *Decision Support Systems* 75, 2015 — Sec. 3.1 (RFM summaries of a card's past at several aggregation levels and windows; Table 2, fraud rates by region, 0.05% Belgium against 5.36% outside Europe). https://doi.org/10.1016/j.dss.2015.04.013
+5. Y. Lucas, J. Jurgovsky, "Credit Card Fraud Detection Using Machine Learning: A Survey," arXiv:2010.06479, 2020 — Sec. 4.2 (RFM as the consensus framework; no consensus on window lengths; time since the previous transaction; aggregates need no labels; the two semantics of an aggregate "at the merchant"). https://arxiv.org/abs/2010.06479
+6. A. Dal Pozzolo, O. Caelen, Y.-A. Le Borgne, S. Waterschoot, G. Bontempi, "Learned Lessons in Credit Card Fraud Detection from a Practitioner Perspective," *Expert Systems with Applications* 41(10), 2014, pp. 4915–4928 — Sec. 4 (aggregates over the strictly earlier payments of the same card in a 90-day frame; once they are added, the card identifier is no longer needed, and cards with similar habits share similar aggregates). https://doi.org/10.1016/j.eswa.2014.02.026
+7. A. Dal Pozzolo, G. Boracchi, O. Caelen, C. Alippi, G. Bontempi, "Credit Card Fraud Detection: A Realistic Modeling and a Novel Learning Strategy," *IEEE Transactions on Neural Networks and Learning Systems* 29(8), 2018 — Sec. II-A (aggregated features summarise recent cardholder activity) and Sec. VI-A (the card identifier used only to compute aggregates and removed from the feature vector). https://doi.org/10.1109/TNNLS.2017.2736643
+</References>

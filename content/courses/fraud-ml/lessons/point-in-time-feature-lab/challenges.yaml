@@ -1,0 +1,530 @@
+checkpoints:
+  calendar-flags:
+    kind: exact
+    seed: 3101
+    atol: 0.5
+    inputs_code: |
+      start = np.datetime64("2018-01-01T00:00:00")
+      random = start + rng.integers(0, 730 * 86400, 180).astype("timedelta64[s]")
+      # Hour and weekday boundaries: 05:59:59, 06:00:00, 06:59:59 on a Friday,
+      # Saturday, Sunday and Monday.
+      edges = np.array([f"2018-06-{d:02d}T{hms}" for d in (1, 2, 3, 4)
+                        for hms in ("05:59:59", "06:00:00", "06:59:59", "00:00:00", "23:59:59")],
+                       dtype="datetime64[s]")
+      ts = np.concatenate([random, edges])
+      inputs = (ts[rng.permutation(len(ts))],)
+    wrong:
+      - hint: "Night includes the 06:00 hour. Night is before 06:00: a payment at 06:00:00 or 06:30 is a morning payment, so the test is hour < 6, not hour <= 6."
+        code: |
+          import numpy as np, pandas as pd
+          def f(timestamps):
+              ts = pd.DatetimeIndex(pd.to_datetime(timestamps))
+              return np.asarray((ts.dayofweek >= 5).astype(np.int64)), np.asarray((ts.hour <= 6).astype(np.int64))
+      - hint: "The weekend flag misses Saturday. pandas numbers Monday 0 to Sunday 6, so the weekend is dayofweek >= 5; dayofweek > 5 keeps only Sunday."
+        code: |
+          import numpy as np, pandas as pd
+          def f(timestamps):
+              ts = pd.DatetimeIndex(pd.to_datetime(timestamps))
+              return np.asarray((ts.dayofweek > 5).astype(np.int64)), np.asarray((ts.hour < 6).astype(np.int64))
+
+  customer-windows:
+    kind: exact
+    seed: 3202
+    atol: 1.0e-6
+    inputs_code: |
+      n = 500
+      card = rng.integers(0, 15, n)
+      # Whole hours over 40 days: payments exactly 1 or 7 days apart and
+      # same-card payments at the same second both occur.
+      t = rng.integers(0, 40 * 24, n) * 3600
+      amount = np.round(rng.lognormal(3.5, 0.8, n), 2)
+      inputs = (card, t, amount)
+    wrong:
+      - hint: "The payment is inside its own window. The window holds the card's payments strictly before t: (t - w, t), not (t - w, t] as rolling(\"7d\") gives without closed=\"neither\"."
+        code: |
+          import numpy as np
+          def f(card, t, amount):
+              card = np.asarray(card); t = np.asarray(t); amount = np.asarray(amount, float)
+              same = card[:, None] == card[None, :]
+              cols = []
+              for w in (1, 7, 30):
+                  m = same & (t[None, :] > t[:, None] - w * 86400) & (t[None, :] <= t[:, None])
+                  n = m.sum(1).astype(float); s = (m * amount[None, :]).sum(1)
+                  cols += [n, np.where(n > 0, s / np.maximum(n, 1), 0.0)]
+              return np.column_stack(cols)
+      - hint: "A payment exactly w before is inside the window. The window is open at both ends: t - w < t_j, so a payment 24 hours earlier is not in the 1-day window."
+        code: |
+          import numpy as np
+          def f(card, t, amount):
+              card = np.asarray(card); t = np.asarray(t); amount = np.asarray(amount, float)
+              same = card[:, None] == card[None, :]
+              cols = []
+              for w in (1, 7, 30):
+                  m = same & (t[None, :] >= t[:, None] - w * 86400) & (t[None, :] < t[:, None])
+                  n = m.sum(1).astype(float); s = (m * amount[None, :]).sum(1)
+                  cols += [n, np.where(n > 0, s / np.maximum(n, 1), 0.0)]
+              return np.column_stack(cols)
+      - hint: "Same-second payments counted as earlier. Two payments of a card at the same second are not before each other; ordering them by row position puts one inside the other's window."
+        code: |
+          import numpy as np
+          def f(card, t, amount):
+              card = np.asarray(card); t = np.asarray(t); amount = np.asarray(amount, float)
+              order = np.lexsort((t, card)); rank = np.empty(len(t), int); rank[order] = np.arange(len(t))
+              same = card[:, None] == card[None, :]
+              cols = []
+              for w in (1, 7, 30):
+                  m = same & (t[None, :] > t[:, None] - w * 86400) & (rank[None, :] < rank[:, None])
+                  n = m.sum(1).astype(float); s = (m * amount[None, :]).sum(1)
+                  cols += [n, np.where(n > 0, s / np.maximum(n, 1), 0.0)]
+              return np.column_stack(cols)
+      - hint: "Assumed the rows arrive in time order. The checker's rows are shuffled: \"earlier\" means an earlier timestamp, not an earlier row of the input; sort by (card, time) and scatter the results back."
+        code: |
+          import numpy as np
+          def f(card, t, amount):
+              card = np.asarray(card); t = np.asarray(t); amount = np.asarray(amount, float)
+              same = card[:, None] == card[None, :]
+              before = np.tri(len(t), k=-1, dtype=bool)
+              cols = []
+              for w in (1, 7, 30):
+                  m = same & before & (t[None, :] > t[:, None] - w * 86400)
+                  n = m.sum(1).astype(float); s = (m * amount[None, :]).sum(1)
+                  cols += [n, np.where(n > 0, s / np.maximum(n, 1), 0.0)]
+              return np.column_stack(cols)
+
+  conditional-aggregates:
+    kind: exact
+    seed: 3303
+    atol: 1.0e-6
+    inputs_code: |
+      # The seven-payment card (card 0, hours from 1 Jan 2018), then 300
+      # payments of eight more cards; rows shuffled.
+      t7 = np.array([18*60+20, 20*60+35, 22*60+30, 24*60+50, 43*60+18, 47*60+45, 48*60]) * 60
+      type7 = np.array(["POS", "POS", "ATM", "POS", "POS", "POS", "POS"])
+      country7 = np.array(["LU", "LU", "LU", "DE", "DE", "DE", "LU"])
+      amount7 = np.array([250.0, 400.0, 250.0, 50.0, 100.0, 150.0, 10.0])
+      n = 300
+      card = np.r_[np.zeros(7, int), rng.integers(1, 9, n)]
+      t = np.r_[t7, rng.integers(0, 10 * 24 * 4, n) * 900]
+      amount = np.r_[amount7, np.round(rng.lognormal(3.5, 0.8, n), 2)]
+      tx_type = np.r_[type7, rng.choice(["POS", "ATM", "ONLINE"], n, p=[0.6, 0.2, 0.2])]
+      country = np.r_[country7, rng.choice(["LU", "DE", "FR"], n, p=[0.5, 0.3, 0.2])]
+      p = rng.permutation(len(t))
+      inputs = (card[p], t[p], amount[p], tx_type[p], country[p], 86400)
+    wrong:
+      - hint: "Conditioned on the type only. The key is the pair (type, country): the seven-payment card's fourth payment, its first in Germany, has an empty window although POS payments precede it."
+        code: |
+          import numpy as np
+          def f(card, t, amount, tx_type, country, width):
+              card = np.asarray(card); t = np.asarray(t); amount = np.asarray(amount, float); g = np.asarray(tx_type)
+              m = (card[:, None] == card[None, :]) & (g[:, None] == g[None, :])
+              m &= (t[None, :] > t[:, None] - width) & (t[None, :] < t[:, None])
+              return m.sum(1).astype(float), (m * amount[None, :]).sum(1)
+      - hint: "Conditioned on the country only. The key is the pair (type, country): the seven-payment card's third payment, its first cash withdrawal, has an empty window although Luxembourg payments precede it."
+        code: |
+          import numpy as np
+          def f(card, t, amount, tx_type, country, width):
+              card = np.asarray(card); t = np.asarray(t); amount = np.asarray(amount, float); g = np.asarray(country)
+              m = (card[:, None] == card[None, :]) & (g[:, None] == g[None, :])
+              m &= (t[None, :] > t[:, None] - width) & (t[None, :] < t[:, None])
+              return m.sum(1).astype(float), (m * amount[None, :]).sum(1)
+      - hint: "Left the card out of the key. The window holds the card's own earlier payments of the same type and country; keyed on (type, country) alone it counts every card's payments of that kind."
+        code: |
+          import numpy as np
+          def f(card, t, amount, tx_type, country, width):
+              t = np.asarray(t); amount = np.asarray(amount, float)
+              a, b = np.asarray(tx_type), np.asarray(country)
+              m = (a[:, None] == a[None, :]) & (b[:, None] == b[None, :])
+              m &= (t[None, :] > t[:, None] - width) & (t[None, :] < t[:, None])
+              return m.sum(1).astype(float), (m * amount[None, :]).sum(1)
+      - hint: "The payment is inside its own conditional window. As for the plain window, only the card's strictly earlier payments count."
+        code: |
+          import numpy as np
+          def f(card, t, amount, tx_type, country, width):
+              card = np.asarray(card); t = np.asarray(t); amount = np.asarray(amount, float)
+              a, b = np.asarray(tx_type), np.asarray(country)
+              m = (card[:, None] == card[None, :]) & (a[:, None] == a[None, :]) & (b[:, None] == b[None, :])
+              m &= (t[None, :] > t[:, None] - width) & (t[None, :] <= t[:, None])
+              return m.sum(1).astype(float), (m * amount[None, :]).sum(1)
+
+  terminal-risk-delayed:
+    kind: exact
+    seed: 3404
+    atol: 1.0e-6
+    inputs_code: |
+      n = 900
+      term = rng.integers(0, 12, n)
+      t = rng.integers(0, 60 * 24, n) * 3600
+      start = rng.integers(5, 50, 12)                    # each terminal's compromise day
+      fraud = ((t // 86400 >= start[term]) & (t // 86400 < start[term] + 10)).astype(float)
+      fraud[rng.random(n) < 0.02] = 1.0
+      # Queries on the same hourly grid (window edges fall on payments), plus
+      # two terminals with no payments at all.
+      q_term = rng.integers(0, 14, 300)
+      q_t = rng.integers(0, 62 * 24, 300) * 3600
+      p = rng.permutation(n)
+      inputs = (term[p], t[p], fraud[p], q_term, q_t, 5)
+    wrong:
+      - hint: "No delay: the window ends at the query time. At time t the labels known are those of payments up to t - delay; the window is (t - delay - w, t - delay]."
+        code: |
+          import numpy as np
+          def f(term, t, fraud, q_term, q_t, delay_days):
+              term, t, fraud = np.asarray(term), np.asarray(t), np.asarray(fraud, float)
+              q_term, q_t = np.asarray(q_term), np.asarray(q_t)
+              same = q_term[:, None] == term[None, :]
+              cols = []
+              for w in (1, 7, 30):
+                  m = same & (t[None, :] > q_t[:, None] - w * 86400) & (t[None, :] <= q_t[:, None])
+                  n = m.sum(1).astype(float); fr = (m * fraud[None, :]).sum(1)
+                  cols += [n, np.where(n > 0, fr / np.maximum(n, 1), 0.0)]
+              return np.column_stack(cols)
+      - hint: "The delay shifts the payment count but not the fraud sum. Both sums run over the same shifted window: frauds from the last delay days are labels that have not arrived."
+        code: |
+          import numpy as np
+          def f(term, t, fraud, q_term, q_t, delay_days):
+              term, t, fraud = np.asarray(term), np.asarray(t), np.asarray(fraud, float)
+              q_term, q_t = np.asarray(q_term), np.asarray(q_t)
+              same = q_term[:, None] == term[None, :]
+              d = delay_days * 86400
+              cols = []
+              for w in (1, 7, 30):
+                  m = same & (t[None, :] > q_t[:, None] - d - w * 86400) & (t[None, :] <= q_t[:, None] - d)
+                  m2 = same & (t[None, :] > q_t[:, None] - w * 86400) & (t[None, :] <= q_t[:, None])
+                  n = m.sum(1).astype(float); fr = (m2 * fraud[None, :]).sum(1)
+                  cols += [n, np.where(n > 0, fr / np.maximum(n, 1), 0.0)]
+              return np.column_stack(cols)
+      - hint: "Took only the long sum. The window ending delay days ago is the last delay + w days MINUS the last delay days; the long window alone still holds the unarrived labels."
+        code: |
+          import numpy as np
+          def f(term, t, fraud, q_term, q_t, delay_days):
+              term, t, fraud = np.asarray(term), np.asarray(t), np.asarray(fraud, float)
+              q_term, q_t = np.asarray(q_term), np.asarray(q_t)
+              same = q_term[:, None] == term[None, :]
+              cols = []
+              for w in (1, 7, 30):
+                  m = same & (t[None, :] > q_t[:, None] - (delay_days + w) * 86400) & (t[None, :] <= q_t[:, None])
+                  n = m.sum(1).astype(float); fr = (m * fraud[None, :]).sum(1)
+                  cols += [n, np.where(n > 0, fr / np.maximum(n, 1), 0.0)]
+              return np.column_stack(cols)
+      - hint: "The window's ends are closed the wrong way round. A label of a payment at exactly t - delay has arrived, one at exactly t - delay - w is outside: the window is (t - delay - w, t - delay]."
+        code: |
+          import numpy as np
+          def f(term, t, fraud, q_term, q_t, delay_days):
+              term, t, fraud = np.asarray(term), np.asarray(t), np.asarray(fraud, float)
+              q_term, q_t = np.asarray(q_term), np.asarray(q_t)
+              same = q_term[:, None] == term[None, :]
+              d = delay_days * 86400
+              cols = []
+              for w in (1, 7, 30):
+                  m = same & (t[None, :] >= q_t[:, None] - d - w * 86400) & (t[None, :] < q_t[:, None] - d)
+                  n = m.sum(1).astype(float); fr = (m * fraud[None, :]).sum(1)
+                  cols += [n, np.where(n > 0, fr / np.maximum(n, 1), 0.0)]
+              return np.column_stack(cols)
+
+  periodic-time-flag:
+    kind: exact
+    seed: 3505
+    atol: 1.0e-6
+    inputs_code: |
+      m, k = 60, 20
+      habit = rng.uniform(0, 24, m)
+      habit[:20] = rng.uniform(-3, 3, 20) % 24          # a third of the cards straddle midnight
+      conc = rng.uniform(0.5, 8, m)
+      n_times = rng.integers(2, k + 1, m)
+      hours = np.full((m, k), np.nan)
+      for r in range(m):
+          draws = rng.vonmises(habit[r] * np.pi / 12, conc[r], n_times[r]) % (2 * np.pi)
+          hours[r, :n_times[r]] = np.round(draws * 12 / np.pi, 4)
+      query = (habit + rng.normal(0, 4, m)) % 24
+      inputs = (hours, query, 0.9)
+    wrong:
+      - hint: "Averaged the hours as numbers. Clock time lives on a circle: 23:00 and 01:00 average to noon arithmetically. Average the unit vectors (cos, sin) of the angles and take the direction of their mean."
+        code: |
+          import numpy as np
+          from scipy.special import i0e, i1e
+          _G = np.r_[0.0, np.geomspace(1e-3, 1e3, 3000)]
+          def kappa_from_rbar(rbar):
+              rbar = np.asarray(rbar, dtype=float)
+              a = i1e(_G) / i0e(_G)
+              k = np.interp(rbar, a, _G)
+              for _ in range(3):
+                  A = i1e(k) / i0e(k)
+                  dA = 1 - A / np.maximum(k, 1e-12) - A**2
+                  k = np.clip(k - (A - rbar) / np.maximum(dA, 1e-12), 0.0, 1e3)
+              return k
+          def arc_half_width(kappa, alpha=0.9):
+              theta = np.linspace(0, np.pi, 4001)
+              kappas = np.r_[0.0, np.geomspace(1e-3, 1e3, 400)]
+              half = []
+              for k in kappas:
+                  f = np.exp(k * (np.cos(theta) - 1))
+                  mass = np.r_[0.0, np.cumsum((f[1:] + f[:-1]) / 2 * np.diff(theta))]
+                  half.append(np.interp(alpha, mass / mass[-1], theta))
+              return np.interp(np.asarray(kappa, dtype=float), kappas, np.array(half)) * 24 / (2 * np.pi)
+          def f(history_hours, query_hours, alpha=0.9):
+              h = np.asarray(history_hours, dtype=float)
+              theta = h * 2 * np.pi / 24
+              c_bar = np.nanmean(np.cos(theta), axis=1); s_bar = np.nanmean(np.sin(theta), axis=1)
+              mu = np.nanmean(h, axis=1)
+              kappa = kappa_from_rbar(np.hypot(c_bar, s_bar)); c = arc_half_width(kappa, alpha)
+              dist = np.abs((np.asarray(query_hours, dtype=float) - mu + 12) % 24 - 12)
+              return mu, kappa, c, (dist <= c).astype(np.int64)
+      - hint: "Compared the query hour with mu - c and mu + c as plain numbers. An arc that crosses midnight (17:10 to 00:55) then misses 00:30; measure the distance the short way round the clock, (h - mu + 12) % 24 - 12."
+        code: |
+          import numpy as np
+          from scipy.special import i0e, i1e
+          _G = np.r_[0.0, np.geomspace(1e-3, 1e3, 3000)]
+          def kappa_from_rbar(rbar):
+              rbar = np.asarray(rbar, dtype=float)
+              a = i1e(_G) / i0e(_G)
+              k = np.interp(rbar, a, _G)
+              for _ in range(3):
+                  A = i1e(k) / i0e(k)
+                  dA = 1 - A / np.maximum(k, 1e-12) - A**2
+                  k = np.clip(k - (A - rbar) / np.maximum(dA, 1e-12), 0.0, 1e3)
+              return k
+          def arc_half_width(kappa, alpha=0.9):
+              theta = np.linspace(0, np.pi, 4001)
+              kappas = np.r_[0.0, np.geomspace(1e-3, 1e3, 400)]
+              half = []
+              for k in kappas:
+                  f = np.exp(k * (np.cos(theta) - 1))
+                  mass = np.r_[0.0, np.cumsum((f[1:] + f[:-1]) / 2 * np.diff(theta))]
+                  half.append(np.interp(alpha, mass / mass[-1], theta))
+              return np.interp(np.asarray(kappa, dtype=float), kappas, np.array(half)) * 24 / (2 * np.pi)
+          def f(history_hours, query_hours, alpha=0.9):
+              theta = np.asarray(history_hours, dtype=float) * 2 * np.pi / 24
+              c_bar = np.nanmean(np.cos(theta), axis=1); s_bar = np.nanmean(np.sin(theta), axis=1)
+              mu = (np.arctan2(s_bar, c_bar) % (2 * np.pi)) * 24 / (2 * np.pi)
+              kappa = kappa_from_rbar(np.hypot(c_bar, s_bar)); c = arc_half_width(kappa, alpha)
+              q = np.asarray(query_hours, dtype=float)
+              return mu, kappa, c, ((q >= mu - c) & (q <= mu + c)).astype(np.int64)
+      - hint: "Took the direction with arctan(S / C), which cannot tell opposite quadrants apart: a card centred at 14:00 comes out at 02:00. np.arctan2(S, C) keeps the quadrant."
+        code: |
+          import numpy as np
+          from scipy.special import i0e, i1e
+          _G = np.r_[0.0, np.geomspace(1e-3, 1e3, 3000)]
+          def kappa_from_rbar(rbar):
+              rbar = np.asarray(rbar, dtype=float)
+              a = i1e(_G) / i0e(_G)
+              k = np.interp(rbar, a, _G)
+              for _ in range(3):
+                  A = i1e(k) / i0e(k)
+                  dA = 1 - A / np.maximum(k, 1e-12) - A**2
+                  k = np.clip(k - (A - rbar) / np.maximum(dA, 1e-12), 0.0, 1e3)
+              return k
+          def arc_half_width(kappa, alpha=0.9):
+              theta = np.linspace(0, np.pi, 4001)
+              kappas = np.r_[0.0, np.geomspace(1e-3, 1e3, 400)]
+              half = []
+              for k in kappas:
+                  f = np.exp(k * (np.cos(theta) - 1))
+                  mass = np.r_[0.0, np.cumsum((f[1:] + f[:-1]) / 2 * np.diff(theta))]
+                  half.append(np.interp(alpha, mass / mass[-1], theta))
+              return np.interp(np.asarray(kappa, dtype=float), kappas, np.array(half)) * 24 / (2 * np.pi)
+          def f(history_hours, query_hours, alpha=0.9):
+              theta = np.asarray(history_hours, dtype=float) * 2 * np.pi / 24
+              c_bar = np.nanmean(np.cos(theta), axis=1); s_bar = np.nanmean(np.sin(theta), axis=1)
+              mu = (np.arctan(s_bar / c_bar) % (2 * np.pi)) * 24 / (2 * np.pi)
+              kappa = kappa_from_rbar(np.hypot(c_bar, s_bar)); c = arc_half_width(kappa, alpha)
+              dist = np.abs((np.asarray(query_hours, dtype=float) - mu + 12) % 24 - 12)
+              return mu, kappa, c, (dist <= c).astype(np.int64)
+      - hint: "mu is not brought into [0, 24). np.arctan2 returns an angle in (-pi, pi], so a card centred between 12:00 and 24:00 comes out with a negative hour; take the angle % (2 * pi) before converting to hours."
+        code: |
+          import numpy as np
+          from scipy.special import i0e, i1e
+          _G = np.r_[0.0, np.geomspace(1e-3, 1e3, 3000)]
+          def kappa_from_rbar(rbar):
+              rbar = np.asarray(rbar, dtype=float)
+              a = i1e(_G) / i0e(_G)
+              k = np.interp(rbar, a, _G)
+              for _ in range(3):
+                  A = i1e(k) / i0e(k)
+                  dA = 1 - A / np.maximum(k, 1e-12) - A**2
+                  k = np.clip(k - (A - rbar) / np.maximum(dA, 1e-12), 0.0, 1e3)
+              return k
+          def arc_half_width(kappa, alpha=0.9):
+              theta = np.linspace(0, np.pi, 4001)
+              kappas = np.r_[0.0, np.geomspace(1e-3, 1e3, 400)]
+              half = []
+              for k in kappas:
+                  f = np.exp(k * (np.cos(theta) - 1))
+                  mass = np.r_[0.0, np.cumsum((f[1:] + f[:-1]) / 2 * np.diff(theta))]
+                  half.append(np.interp(alpha, mass / mass[-1], theta))
+              return np.interp(np.asarray(kappa, dtype=float), kappas, np.array(half)) * 24 / (2 * np.pi)
+          def f(history_hours, query_hours, alpha=0.9):
+              theta = np.asarray(history_hours, dtype=float) * 2 * np.pi / 24
+              c_bar = np.nanmean(np.cos(theta), axis=1); s_bar = np.nanmean(np.sin(theta), axis=1)
+              mu = np.arctan2(s_bar, c_bar) * 24 / (2 * np.pi)
+              kappa = kappa_from_rbar(np.hypot(c_bar, s_bar)); c = arc_half_width(kappa, alpha)
+              dist = np.abs((np.asarray(query_hours, dtype=float) - mu + 12) % 24 - 12)
+              return mu, kappa, c, (dist <= c).astype(np.int64)
+      - hint: "Counted the NaN padding as payments at midnight. The padding marks missing times: average over each row's real times only (np.nanmean)."
+        code: |
+          import numpy as np
+          from scipy.special import i0e, i1e
+          _G = np.r_[0.0, np.geomspace(1e-3, 1e3, 3000)]
+          def kappa_from_rbar(rbar):
+              rbar = np.asarray(rbar, dtype=float)
+              a = i1e(_G) / i0e(_G)
+              k = np.interp(rbar, a, _G)
+              for _ in range(3):
+                  A = i1e(k) / i0e(k)
+                  dA = 1 - A / np.maximum(k, 1e-12) - A**2
+                  k = np.clip(k - (A - rbar) / np.maximum(dA, 1e-12), 0.0, 1e3)
+              return k
+          def arc_half_width(kappa, alpha=0.9):
+              theta = np.linspace(0, np.pi, 4001)
+              kappas = np.r_[0.0, np.geomspace(1e-3, 1e3, 400)]
+              half = []
+              for k in kappas:
+                  f = np.exp(k * (np.cos(theta) - 1))
+                  mass = np.r_[0.0, np.cumsum((f[1:] + f[:-1]) / 2 * np.diff(theta))]
+                  half.append(np.interp(alpha, mass / mass[-1], theta))
+              return np.interp(np.asarray(kappa, dtype=float), kappas, np.array(half)) * 24 / (2 * np.pi)
+          def f(history_hours, query_hours, alpha=0.9):
+              theta = np.nan_to_num(np.asarray(history_hours, dtype=float)) * 2 * np.pi / 24
+              c_bar = np.mean(np.cos(theta), axis=1); s_bar = np.mean(np.sin(theta), axis=1)
+              mu = (np.arctan2(s_bar, c_bar) % (2 * np.pi)) * 24 / (2 * np.pi)
+              kappa = kappa_from_rbar(np.hypot(c_bar, s_bar)); c = arc_half_width(kappa, alpha)
+              dist = np.abs((np.asarray(query_hours, dtype=float) - mu + 12) % 24 - 12)
+              return mu, kappa, c, (dist <= c).astype(np.int64)
+
+  point-in-time-join:
+    kind: exact
+    seed: 3606
+    atol: 0.5
+    inputs_code: |
+      # A feature log of 12 entities, one record per half hour at most,
+      # shuffled; rows on the same half-hour grid (ties with the stamps),
+      # some before an entity's first record, some for entities never logged.
+      ents, stamps = [], []
+      for e in range(12):
+          s = np.sort(rng.choice(200, rng.integers(5, 25), replace=False)) * 1800
+          ents.append(np.full(len(s), e)); stamps.append(s)
+      log_entity, log_t = np.concatenate(ents), np.concatenate(stamps)
+      p = rng.permutation(len(log_t))
+      log_entity, log_t = log_entity[p], log_t[p]
+      row_entity = rng.integers(0, 14, 300)
+      row_t = rng.integers(0, 210, 300) * 1800 + rng.choice([0, 0, 0, 600], 300)
+      inputs = (row_entity, row_t, log_entity, log_t)
+    wrong:
+      - hint: "Read the entity's latest record. A row receives what the store held at the row's moment: the record with the largest stamp at or before the row's timestamp, not the newest record in the log."
+        code: |
+          import numpy as np
+          def f(row_entity, row_t, log_entity, log_t):
+              row_entity, log_entity, log_t = np.asarray(row_entity), np.asarray(log_entity), np.asarray(log_t)
+              out = np.full(len(row_entity), -1)
+              for i, e in enumerate(row_entity):
+                  idx = np.flatnonzero(log_entity == e)
+                  if len(idx):
+                      out[i] = idx[np.argmax(log_t[idx])]
+              return out
+      - hint: "Excluded a record stamped at exactly the row's time. The record is readable from its stamp on: a row at 00:30:00 reads the record stamped 00:30:00 (largest stamp <= t)."
+        code: |
+          import numpy as np
+          def f(row_entity, row_t, log_entity, log_t):
+              row_entity, row_t, log_entity, log_t = map(np.asarray, (row_entity, row_t, log_entity, log_t))
+              out = np.full(len(row_entity), -1)
+              for i, (e, t) in enumerate(zip(row_entity, row_t)):
+                  idx = np.flatnonzero((log_entity == e) & (log_t < t))
+                  if len(idx):
+                      out[i] = idx[np.argmax(log_t[idx])]
+              return out
+      - hint: "Searched forward, or to the nearest record. A record stamped after the row's timestamp did not exist when the row was scored; only records at or before t qualify, and a row with none gets -1."
+        code: |
+          import numpy as np
+          def f(row_entity, row_t, log_entity, log_t):
+              row_entity, row_t, log_entity, log_t = map(np.asarray, (row_entity, row_t, log_entity, log_t))
+              out = np.full(len(row_entity), -1)
+              for i, (e, t) in enumerate(zip(row_entity, row_t)):
+                  idx = np.flatnonzero(log_entity == e)
+                  if len(idx):
+                      out[i] = idx[np.argmin(np.abs(log_t[idx] - t))]
+              return out
+      - hint: "Ignored the entity. The search runs within the row's own entity's records; when that entity has nothing at or before t, the row gets -1, not another entity's record."
+        code: |
+          import numpy as np
+          def f(row_entity, row_t, log_entity, log_t):
+              row_t, log_t = np.asarray(row_t), np.asarray(log_t)
+              out = np.full(len(row_t), -1)
+              for i, t in enumerate(row_t):
+                  idx = np.flatnonzero(log_t <= t)
+                  if len(idx):
+                      out[i] = idx[np.argmax(log_t[idx])]
+              return out
+      - hint: "Returned positions in the sorted log. The answer indexes the log as given, and the checker shuffles it: map each sorted position back through the sort permutation, order[pos]."
+        code: |
+          import numpy as np
+          def f(row_entity, row_t, log_entity, log_t):
+              log_entity = np.asarray(log_entity, dtype=np.int64); log_t = np.asarray(log_t, dtype=np.int64)
+              row_entity = np.asarray(row_entity, dtype=np.int64)
+              order = np.lexsort((log_t, log_entity))
+              composite = log_entity[order] * 10**11 + log_t[order]
+              pos = np.searchsorted(composite, row_entity * 10**11 + np.asarray(row_t, dtype=np.int64), side="right") - 1
+              hit = np.maximum(pos, 0)
+              found = (pos >= 0) & (log_entity[order][hit] == row_entity)
+              return np.where(found, hit, -1)
+      - hint: "Did not check the entity of the record found. When the row's entity has nothing at or before t, the search on (entity, stamp) lands on the previous entity's last record; the row gets -1 instead."
+        code: |
+          import numpy as np
+          def f(row_entity, row_t, log_entity, log_t):
+              log_entity = np.asarray(log_entity, dtype=np.int64); log_t = np.asarray(log_t, dtype=np.int64)
+              row_entity = np.asarray(row_entity, dtype=np.int64)
+              order = np.lexsort((log_t, log_entity))
+              composite = log_entity[order] * 10**11 + log_t[order]
+              pos = np.searchsorted(composite, row_entity * 10**11 + np.asarray(row_t, dtype=np.int64), side="right") - 1
+              return np.where(pos >= 0, order[np.maximum(pos, 0)], -1)
+
+  find-the-leak:
+    kind: review
+    rubric: |
+      The question: a shipped reference pipeline builds the same 18-column
+      feature matrix as the learner's on a simulated card log (label delay 7
+      days, nightly terminal job readable at 00:30, as-of join), and a frozen
+      logistic regression scores better on it offline (test-week ROC-AUC
+      0.915 vs 0.833). The learner must name the leaking feature and why it
+      leaks, give the first row where it differs from their own matrix, and
+      say what happens to it at serving time.
+
+      The facts: the reference's nightly terminal job computes
+      TERMINAL_RISK_1DAY/7DAY/30DAY over the terminal's payments in the last
+      w days before the snapshot (strictly earlier rows), with NO shift by
+      the 7-day label delay, so it reads labels that had not arrived. The
+      first row (log order = time order) where a TERMINAL_RISK column
+      differs is row index 2398, 2018-04-02 04:51:34, terminal 2074; the
+      reference reads 0.2 there, the honest pipeline 0. The TERMINAL_NB_TX
+      columns differ too (unshifted vs shifted window) but are not a leak:
+      payment counts need no label.
+
+      Pass if the answer contains all three:
+      (a) the feature: the terminal fraud rate / terminal risk (any or all
+          of its windows), with the reason — it uses labels of the last 7
+          days / of payments after t - delay / labels not yet known at
+          scoring time / no delay shift. "Strictly earlier rows is not
+          enough for labels" or "the window ends at the snapshot instead of
+          delay days before" are equivalent. Naming only the terminal counts
+          (NB_TX), a card window, the conditional aggregates, the periodic
+          flag or the calendar flags fails (a).
+      (b) the row: terminal 2074 and a timestamp of 2 April 2018 at 04:51
+          (seconds optional), or row index 2398. Accept the row identified
+          by its index or by (terminal, time). If the learner reports a
+          different row but explicitly restricts to a single window column,
+          accept 2398 / terminal 2074 only; any other row fails (b).
+      (c) serving: the live system cannot compute that value (the labels do
+          not exist yet; it would be missing, or 0, or the delayed value), so
+          the model relies on a signal it never gets in time; and an offline
+          score cannot reveal it because training and test rows carry the
+          same leak. Either half of (c) with the other implied is enough.
+
+      Not required for a pass: the explanation of why the NB_TX difference
+      is harmless. Do not fail an answer for wording, length or for
+      mentioning that the counts also differ. Fail an answer that calls the
+      NB_TX difference the leak and does not name the risk.
+
+  feature-lift:
+    kind: metric
+    metric: roc_auc
+    threshold: 0.855
+    holdout: data/holdout_log.csv.gz
+    labels_code: |
+      labels = np.loadtxt("private/holdout_y.csv")
