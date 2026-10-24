@@ -1,0 +1,493 @@
+checkpoints:
+  average-precision:
+    kind: exact
+    seed: 2101
+    atol: 1.0e-9
+    inputs_code: |
+      n = 2000
+      labels = (rng.random(n) < 0.03).astype(float)
+      labels[:3] = 1.0
+      # Two-decimal scores: blocks of tied rows, so the tie rule is tested.
+      scores = np.round(rng.beta(2, 5, n) + 0.3 * labels * rng.random(n), 2)
+      inputs = (labels, scores)
+    wrong:
+      - hint: "Joined the precision-recall points with trapezoids. AP is a step sum: each recall gain is multiplied by the precision at the cut that reached it, never by an average of two neighbouring precisions."
+        code: |
+          import numpy as np
+          def f(labels, scores):
+              labels = np.asarray(labels, float); scores = np.asarray(scores, float)
+              o = np.argsort(-scores, kind="stable"); s, y = scores[o], labels[o]
+              last = np.r_[s[1:] != s[:-1], True]
+              tp = np.cumsum(y)[last]; n = np.flatnonzero(last) + 1
+              p = np.r_[1.0, tp / n]; r = np.r_[0.0, tp / y.sum()]
+              return float(np.sum(np.diff(r) * (p[1:] + p[:-1]) / 2))
+      - hint: "Treated every row as its own cut. Rows with equal scores form one block the team opens whole: every fraud in it is reached at the precision after the whole block."
+        code: |
+          import numpy as np
+          def f(labels, scores):
+              labels = np.asarray(labels, float); scores = np.asarray(scores, float)
+              y = labels[np.argsort(-scores, kind="stable")]
+              tp = np.cumsum(y)
+              p = tp / np.arange(1, len(y) + 1)
+              return float(np.sum(p * y) / y.sum())
+      - hint: "Averaged the precision over every cut of the list. AP averages it only at the cuts where recall moves, that is at the frauds."
+        code: |
+          import numpy as np
+          def f(labels, scores):
+              labels = np.asarray(labels, float); scores = np.asarray(scores, float)
+              o = np.argsort(-scores, kind="stable"); s, y = scores[o], labels[o]
+              last = np.r_[s[1:] != s[:-1], True]
+              tp = np.cumsum(y)[last]; n = np.flatnonzero(last) + 1
+              return float(np.mean(tp / n))
+
+  savings-metric:
+    kind: exact
+    seed: 2202
+    atol: 1.0e-6
+    inputs_code: |
+      n = 200
+      amounts = np.round(rng.lognormal(3.5, 1.0, n), 2)
+      labels = np.zeros(n, dtype=np.int64)
+      frauds = rng.choice(n, 6, replace=False)
+      labels[frauds] = 1
+      decisions = (rng.random(n) < 0.08).astype(np.int64)
+      decisions[frauds[:2]] = 1
+      # €0.25 makes flagging everything the cheaper trivial policy; €5 and
+      # €40 make it flagging nothing.
+      c_a = np.array([0.25, 5.0, 40.0])
+      inputs = (amounts, labels, decisions, c_a)
+    wrong:
+      - hint: "A caught fraud was priced at zero. The call is made on a caught fraud too: a true positive costs the alert cost, like a false positive."
+        code: |
+          import numpy as np
+          def f(amounts, labels, decisions, c_a):
+              a = np.asarray(amounts, float); y = np.asarray(labels, float); d = np.asarray(decisions, float)
+              c_a = np.atleast_1d(np.asarray(c_a, float))
+              cost = np.sum(y * (1 - d) * a) + np.sum((1 - y) * d) * c_a
+              base = np.minimum(np.sum(y * a), len(a) * c_a)
+              return cost, base, (base - cost) / base
+      - hint: "The baseline is always the cost of flagging everything. It is the cheaper of flagging nothing (the fraud amount) and flagging everything (N times the alert cost) — on card data almost always flagging nothing."
+        code: |
+          import numpy as np
+          def f(amounts, labels, decisions, c_a):
+              a = np.asarray(amounts, float); y = np.asarray(labels, float); d = np.asarray(decisions, float)
+              c_a = np.atleast_1d(np.asarray(c_a, float))
+              cost = np.sum(y * (1 - d) * a) + d.sum() * c_a
+              base = len(a) * c_a
+              return cost, base, (base - cost) / base
+      - hint: "The baseline is always the cost of flagging nothing. With a cheap enough alert, flagging everything costs less, and the baseline is the cheaper of the two."
+        code: |
+          import numpy as np
+          def f(amounts, labels, decisions, c_a):
+              a = np.asarray(amounts, float); y = np.asarray(labels, float); d = np.asarray(decisions, float)
+              c_a = np.atleast_1d(np.asarray(c_a, float))
+              cost = np.sum(y * (1 - d) * a) + d.sum() * c_a
+              base = np.full_like(c_a, np.sum(y * a))
+              return cost, base, (base - cost) / base
+      - hint: "Divided the saving by the detector's cost. Savings is a share of the baseline cost: (baseline - cost) / baseline."
+        code: |
+          import numpy as np
+          def f(amounts, labels, decisions, c_a):
+              a = np.asarray(amounts, float); y = np.asarray(labels, float); d = np.asarray(decisions, float)
+              c_a = np.atleast_1d(np.asarray(c_a, float))
+              cost = np.sum(y * (1 - d) * a) + d.sum() * c_a
+              base = np.minimum(np.sum(y * a), len(a) * c_a)
+              return cost, base, (base - cost) / cost
+
+  prequential-split:
+    kind: exact
+    seed: 2304
+    atol: 0.5
+    inputs_code: |
+      n = 600
+      days = np.sort(rng.integers(0, 30, n))
+      cards = rng.integers(0, 25, n)
+      labels = np.zeros(n, dtype=np.int64)
+      for card, first in zip(rng.choice(25, 14, replace=False), rng.integers(0, 26, 14)):
+          window = (cards == card) & (days >= first) & (days < first + 8)
+          labels[window & (rng.random(n) < 0.6)] = 1
+      inputs = (days, cards, labels, 14, 3, 5, 3, 4)
+    wrong:
+      - hint: "Removed cards using every label up to the day before the test day. On test day d only the labels of days up to d - delay - 1 have arrived; a card whose fraud was later is still scored."
+        code: |
+          import numpy as np
+          def f(days, cards, labels, start, n_folds, dtr, ddel, dte):
+              roles = np.zeros((n_folds, len(days)), dtype=np.int64)
+              for j in range(n_folds):
+                  s = start - j * dte
+                  roles[j, (days >= s) & (days < s + dtr)] = 1
+                  for i in range(dte):
+                      d = s + dtr + ddel + i
+                      known = cards[(labels == 1) & (days >= s) & (days <= d - 1)]
+                      roles[j, (days == d) & ~np.isin(cards, known)] = 2
+              return roles
+      - hint: "Froze the known-card list at the end of training. The list grows through the test week: on test day d it holds every card with a fraud up to day d - delay - 1."
+        code: |
+          import numpy as np
+          def f(days, cards, labels, start, n_folds, dtr, ddel, dte):
+              roles = np.zeros((n_folds, len(days)), dtype=np.int64)
+              for j in range(n_folds):
+                  s = start - j * dte
+                  roles[j, (days >= s) & (days < s + dtr)] = 1
+                  known = cards[(labels == 1) & (days >= s) & (days < s + dtr)]
+                  for i in range(dte):
+                      d = s + dtr + ddel + i
+                      roles[j, (days == d) & ~np.isin(cards, known)] = 2
+              return roles
+      - hint: "Counted frauds from before the fold's training block. On test day d the known-card list holds the cards with a fraud on a day from s_j, the fold's first training day, to d - delay - 1."
+        code: |
+          import numpy as np
+          def f(days, cards, labels, start, n_folds, dtr, ddel, dte):
+              roles = np.zeros((n_folds, len(days)), dtype=np.int64)
+              for j in range(n_folds):
+                  s = start - j * dte
+                  roles[j, (days >= s) & (days < s + dtr)] = 1
+                  for i in range(dte):
+                      d = s + dtr + ddel + i
+                      known = cards[(labels == 1) & (days <= d - ddel - 1)]
+                      roles[j, (days == d) & ~np.isin(cards, known)] = 2
+              return roles
+      - hint: "Removed cards known up to day d - delay. The labels of day d - delay arrive during day d, too late for that morning's scoring: a card is known on d if its fraud is on a day up to d - delay - 1."
+        code: |
+          import numpy as np
+          def f(days, cards, labels, start, n_folds, dtr, ddel, dte):
+              roles = np.zeros((n_folds, len(days)), dtype=np.int64)
+              for j in range(n_folds):
+                  s = start - j * dte
+                  roles[j, (days >= s) & (days < s + dtr)] = 1
+                  for i in range(dte):
+                      d = s + dtr + ddel + i
+                      known = cards[(labels == 1) & (days >= s) & (days <= d - ddel)]
+                      roles[j, (days == d) & ~np.isin(cards, known)] = 2
+              return roles
+      - hint: "Shifted only the test block back. The whole geometry moves one test block per fold — training, delay and test — so every fold keeps the delay between training and test."
+        code: |
+          import numpy as np
+          def f(days, cards, labels, start, n_folds, dtr, ddel, dte):
+              roles = np.zeros((n_folds, len(days)), dtype=np.int64)
+              for j in range(n_folds):
+                  s = start - j * dte
+                  roles[j, (days >= start) & (days < start + dtr)] = 1
+                  for i in range(dte):
+                      d = s + dtr + ddel + i
+                      known = cards[(labels == 1) & (days >= s) & (days <= d - ddel - 1)]
+                      roles[j, (days == d) & ~np.isin(cards, known) & (roles[j] == 0)] = 2
+              return roles
+
+  card-precision-top-k:
+    kind: exact
+    seed: 2404
+    atol: 1.0e-9
+    inputs_code: |
+      counts = rng.poisson(1.5, (7, 60)).ravel()
+      days = np.repeat(np.repeat(np.arange(7), 60), counts)
+      cards = np.repeat(np.tile(np.arange(60), 7), counts)
+      compromised = np.isin(cards, rng.choice(60, 14, replace=False))
+      labels = (compromised & (rng.random(len(days)) < 0.5)).astype(np.int64)
+      scores = rng.random(len(days)) + 0.6 * labels * rng.random(len(days))
+      perm = rng.permutation(len(days))
+      inputs = (days[perm], cards[perm], scores[perm], labels[perm], 4)
+    wrong:
+      - hint: "Ranked transactions, not cards. Collapse each day to one row per card (maximum score, maximum label) before taking the top k: a card with three alerts is one call."
+        code: |
+          import numpy as np
+          def f(days, cards, scores, labels, k):
+              out = []
+              for d in np.unique(days):
+                  m = days == d
+                  top = np.argsort(-scores[m], kind="stable")[:k]
+                  out.append(labels[m][top].sum() / k)
+              return np.array(out)
+      - hint: "Credited the same card on several days. A compromised card found in the top k is blocked: remove its payments from every later day before ranking."
+        code: |
+          import numpy as np
+          import pandas as pd
+          def f(days, cards, scores, labels, k):
+              fr = pd.DataFrame({"day": days, "card": cards, "score": scores, "label": labels})
+              out = []
+              for _, t in fr.groupby("day", sort=True):
+                  pc = t.groupby("card")[["score", "label"]].max().sort_values("score", ascending=False).head(k)
+                  out.append((pc.label == 1).sum() / k)
+              return np.array(out)
+      - hint: "Removed every called card from later days. Only the compromised cards found are blocked; a genuine card that was called and cleared stays in the stream."
+        code: |
+          import numpy as np
+          import pandas as pd
+          def f(days, cards, scores, labels, k):
+              fr = pd.DataFrame({"day": days, "card": cards, "score": scores, "label": labels})
+              gone, out = set(), []
+              for _, t in fr.groupby("day", sort=True):
+                  t = t[~t.card.isin(gone)]
+                  pc = t.groupby("card")[["score", "label"]].max().sort_values("score", ascending=False).head(k)
+                  out.append((pc.label == 1).sum() / k)
+                  gone.update(pc.index)
+              return np.array(out)
+      - hint: "Ranked cards by their mean score. A card's most suspicious payment decides whether it is called: collapse with the maximum score."
+        code: |
+          import numpy as np
+          import pandas as pd
+          def f(days, cards, scores, labels, k):
+              fr = pd.DataFrame({"day": days, "card": cards, "score": scores, "label": labels})
+              gone, out = set(), []
+              for _, t in fr.groupby("day", sort=True):
+                  t = t[~t.card.isin(gone)]
+                  pc = t.groupby("card").agg(score=("score", "mean"), label=("label", "max"))
+                  pc = pc.sort_values("score", ascending=False).head(k)
+                  found = pc.index[pc.label == 1]
+                  out.append(len(found) / k)
+                  gone.update(found)
+              return np.array(out)
+
+  undersampling-correction:
+    kind: exact
+    seed: 2606
+    atol: 1.0e-9
+    inputs_code: |
+      p_s = rng.random(50)
+      inputs = (p_s, 0.5, 400, 49_600, 3_600)
+    wrong:
+      - hint: "Multiplied by beta without renormalising. The odds are multiplied by beta, not the probability: p' = beta p_s / (beta p_s - p_s + 1)."
+        code: |
+          import numpy as np
+          def f(p_s, tau_s, n_fraud, n_gen, n_kept):
+              b = n_kept / n_gen
+              return b * np.asarray(p_s, float), float(b * tau_s)
+      - hint: "Used the stream's class ratio as beta. Beta is the keep rate of genuine rows, kept / genuine in the stream; it equals the class ratio only when the training set was cut to exactly balanced."
+        code: |
+          import numpy as np
+          def f(p_s, tau_s, n_fraud, n_gen, n_kept):
+              b = n_fraud / n_gen
+              g = lambda p: b * p / (b * p - p + 1)
+              return g(np.asarray(p_s, float)), float(g(tau_s))
+      - hint: "Used the training set's class ratio as beta. Beta is the share of the stream's genuine rows that were kept, kept / genuine in the stream."
+        code: |
+          import numpy as np
+          def f(p_s, tau_s, n_fraud, n_gen, n_kept):
+              b = n_fraud / n_kept
+              g = lambda p: b * p / (b * p - p + 1)
+              return g(np.asarray(p_s, float)), float(g(tau_s))
+
+  bmr-threshold:
+    kind: exact
+    seed: 2505
+    atol: 1.0e-9
+    inputs_code: |
+      n = 400
+      amounts = np.round(rng.lognormal(3.5, 1.3, n), 2)
+      # Scores of a model that kept 3,000 of 59,700 genuine rows (beta ~ 5%).
+      p_s = rng.beta(0.6, 3, n)
+      beta = 3_000 / 59_700
+      labels = (rng.random(n) < beta * p_s / (beta * p_s - p_s + 1)).astype(np.int64)
+      labels[:3] = 1
+      inputs = (amounts, labels, p_s, 300, 59_700, 3_000, np.array([1.0, 5.0, 20.0]))
+    wrong:
+      - hint: "Decided on the raw undersampled scores. p_s overstates the fraud probability by up to 1 / beta, so the cost rule alerts far too often; correct p_s with undersampling_correction before comparing Amt * p with C_a."
+        code: |
+          import numpy as np
+          def f(amounts, labels, p_s, n_fraud, n_gen, n_kept, c_a):
+              a = np.asarray(amounts, float); y = np.asarray(labels, float)
+              c_a = np.asarray(c_a, float)
+              d = (c_a[:, None] <= a * np.asarray(p_s, float)).astype(np.int64)
+              cost = np.array([np.sum(y * (1 - r) * a) + r.sum() * c for r, c in zip(d, c_a)])
+              base = np.minimum(np.sum(y * a), len(a) * c_a)
+              return d, (base - cost) / base
+      - hint: "Alerted on a corrected probability of at least 0.5. The cost rule compares the expected loss Amt * p with the alert cost: alert iff C_a <= Amt * p, a threshold of C_a / Amt that differs for every payment."
+        code: |
+          import numpy as np
+          def f(amounts, labels, p_s, n_fraud, n_gen, n_kept, c_a):
+              a = np.asarray(amounts, float); y = np.asarray(labels, float)
+              c_a = np.asarray(c_a, float); b = n_kept / n_gen; ps = np.asarray(p_s, float)
+              p = b * ps / (b * ps - ps + 1)
+              d = np.tile((p >= 0.5).astype(np.int64), (len(c_a), 1))
+              cost = np.array([np.sum(y * (1 - r) * a) + r.sum() * c for r, c in zip(d, c_a)])
+              base = np.minimum(np.sum(y * a), len(a) * c_a)
+              return d, (base - cost) / base
+      - hint: "The comparison is reversed. Alert when the expected loss of leaving the payment, Amt * p, is at least the alert cost: C_a <= Amt * p."
+        code: |
+          import numpy as np
+          def f(amounts, labels, p_s, n_fraud, n_gen, n_kept, c_a):
+              a = np.asarray(amounts, float); y = np.asarray(labels, float)
+              c_a = np.asarray(c_a, float); b = n_kept / n_gen; ps = np.asarray(p_s, float)
+              p = b * ps / (b * ps - ps + 1)
+              d = (c_a[:, None] > a * p).astype(np.int64)
+              cost = np.array([np.sum(y * (1 - r) * a) + r.sum() * c for r, c in zip(d, c_a)])
+              base = np.minimum(np.sum(y * a), len(a) * c_a)
+              return d, (base - cost) / base
+
+  prequential-selection:
+    kind: exact
+    seed: 2707
+    atol: 1.0e-6
+    inputs_code: |
+      counts = rng.poisson(0.6, (41, 150)).ravel()
+      days = np.repeat(np.repeat(np.arange(41), 150), counts)
+      cards = np.repeat(np.tile(np.arange(150), 41), counts)
+      labels = np.zeros(len(days), dtype=np.int64)
+      for d0 in range(41):
+          for card in rng.choice(150, 2, replace=False):
+              window = (cards == card) & (days >= d0) & (days < d0 + 6)
+              labels[window & (rng.random(len(days)) < 0.5)] = 1
+      # One feature, informative through its magnitude: frauds sit in both
+      # tails. A candidate is a number of quantile bins of a histogram model.
+      x = rng.normal(0, 1, len(days)) + labels * rng.choice([-2.5, 2.5], len(days))
+
+      def fit_and_score(train_idx, n_bins):
+          edges = np.quantile(x[train_idx], np.linspace(0, 1, n_bins + 1)[1:-1])
+          b = np.searchsorted(edges, x[train_idx])
+          rate = ((np.bincount(b, weights=labels[train_idx], minlength=n_bins) + 0.5)
+                  / (np.bincount(b, minlength=n_bins) + 1.0))
+          return rate[np.searchsorted(edges, x)] + 1e-6 * x
+
+      inputs = (days, cards, labels, [1, 2, 4, 8, 32], fit_and_score, 30, 3, 5, 3, 4, 3)
+    wrong:
+      - hint: "Validated on the deployment geometry itself, the folds whose test blocks are the test weeks. The validation folds start delta_delay + delta_valid days before deploy_start, so the freshest fully labelled week validates and the test weeks stay untouched."
+        code: |
+          import numpy as np
+          import pandas as pd
+          from sklearn.metrics import roc_auc_score
+          def split(days, cards, labels, start, n_folds, dtr, ddel, dte):
+              roles = np.zeros((n_folds, len(days)), dtype=np.int64)
+              for j in range(n_folds):
+                  s = start - j * dte
+                  roles[j, (days >= s) & (days < s + dtr)] = 1
+                  for i in range(dte):
+                      d = s + dtr + ddel + i
+                      known = cards[(labels == 1) & (days >= s) & (days <= d - ddel - 1)]
+                      roles[j, (days == d) & ~np.isin(cards, known)] = 2
+              return roles
+          def ap(y, s):
+              o = np.argsort(-s, kind="stable"); s, y = s[o], y[o].astype(float)
+              last = np.r_[s[1:] != s[:-1], True]
+              tp = np.cumsum(y)[last]; n = np.flatnonzero(last) + 1
+              return float(np.sum(np.diff(np.r_[0.0, tp / y.sum()]) * tp / n))
+          def cp(days, cards, s, y, k):
+              fr = pd.DataFrame({"day": days, "card": cards, "score": s, "label": y})
+              gone, out = set(), []
+              for _, t in fr.groupby("day", sort=True):
+                  t = t[~t.card.isin(gone)]
+                  pc = t.groupby("card")[["score", "label"]].max().sort_values("score", ascending=False).head(k)
+                  found = pc.index[pc.label == 1]
+                  out.append(len(found) / k); gone.update(found)
+              return float(np.mean(out))
+          def f(days, cards, labels, candidates, fit_and_score, deploy_start, n_folds, dtr, ddel, dval, k):
+              roles = split(days, cards, labels, deploy_start, n_folds, dtr, ddel, dval)
+              table = np.zeros((len(candidates), n_folds, 3))
+              for j in range(n_folds):
+                  tr, va = np.flatnonzero(roles[j] == 1), np.flatnonzero(roles[j] == 2)
+                  for c, cand in enumerate(candidates):
+                      s = fit_and_score(tr, cand)[va]
+                      table[c, j] = (roc_auc_score(labels[va], s), ap(labels[va], s),
+                                     cp(days[va], cards[va], s, labels[va], k))
+              return table, table.mean(axis=1).argmax(axis=0)
+      - hint: "Shifted the validation folds back by one validation block only. The shift is the delay plus the validation block: the validation block takes the test block's place, and its own delay block has to fit before it."
+        code: |
+          import numpy as np
+          import pandas as pd
+          from sklearn.metrics import roc_auc_score
+          def split(days, cards, labels, start, n_folds, dtr, ddel, dte):
+              roles = np.zeros((n_folds, len(days)), dtype=np.int64)
+              for j in range(n_folds):
+                  s = start - j * dte
+                  roles[j, (days >= s) & (days < s + dtr)] = 1
+                  for i in range(dte):
+                      d = s + dtr + ddel + i
+                      known = cards[(labels == 1) & (days >= s) & (days <= d - ddel - 1)]
+                      roles[j, (days == d) & ~np.isin(cards, known)] = 2
+              return roles
+          def ap(y, s):
+              o = np.argsort(-s, kind="stable"); s, y = s[o], y[o].astype(float)
+              last = np.r_[s[1:] != s[:-1], True]
+              tp = np.cumsum(y)[last]; n = np.flatnonzero(last) + 1
+              return float(np.sum(np.diff(np.r_[0.0, tp / y.sum()]) * tp / n))
+          def cp(days, cards, s, y, k):
+              fr = pd.DataFrame({"day": days, "card": cards, "score": s, "label": y})
+              gone, out = set(), []
+              for _, t in fr.groupby("day", sort=True):
+                  t = t[~t.card.isin(gone)]
+                  pc = t.groupby("card")[["score", "label"]].max().sort_values("score", ascending=False).head(k)
+                  found = pc.index[pc.label == 1]
+                  out.append(len(found) / k); gone.update(found)
+              return float(np.mean(out))
+          def f(days, cards, labels, candidates, fit_and_score, deploy_start, n_folds, dtr, ddel, dval, k):
+              roles = split(days, cards, labels, deploy_start - dval, n_folds, dtr, ddel, dval)
+              table = np.zeros((len(candidates), n_folds, 3))
+              for j in range(n_folds):
+                  tr, va = np.flatnonzero(roles[j] == 1), np.flatnonzero(roles[j] == 2)
+                  for c, cand in enumerate(candidates):
+                      s = fit_and_score(tr, cand)[va]
+                      table[c, j] = (roc_auc_score(labels[va], s), ap(labels[va], s),
+                                     cp(days[va], cards[va], s, labels[va], k))
+              return table, table.mean(axis=1).argmax(axis=0)
+      - hint: "Pooled the validation rows of all folds into one list per candidate. Each fold is scored on its own — its own model, its own known-card removal, its own days — and the metric averages the per-fold numbers."
+        code: |
+          import numpy as np
+          import pandas as pd
+          from sklearn.metrics import roc_auc_score
+          def split(days, cards, labels, start, n_folds, dtr, ddel, dte):
+              roles = np.zeros((n_folds, len(days)), dtype=np.int64)
+              for j in range(n_folds):
+                  s = start - j * dte
+                  roles[j, (days >= s) & (days < s + dtr)] = 1
+                  for i in range(dte):
+                      d = s + dtr + ddel + i
+                      known = cards[(labels == 1) & (days >= s) & (days <= d - ddel - 1)]
+                      roles[j, (days == d) & ~np.isin(cards, known)] = 2
+              return roles
+          def ap(y, s):
+              o = np.argsort(-s, kind="stable"); s, y = s[o], y[o].astype(float)
+              last = np.r_[s[1:] != s[:-1], True]
+              tp = np.cumsum(y)[last]; n = np.flatnonzero(last) + 1
+              return float(np.sum(np.diff(np.r_[0.0, tp / y.sum()]) * tp / n))
+          def f(days, cards, labels, candidates, fit_and_score, deploy_start, n_folds, dtr, ddel, dval, k):
+              roles = split(days, cards, labels, deploy_start - ddel - dval, n_folds, dtr, ddel, dval)
+              table = np.zeros((len(candidates), n_folds, 3))
+              for c, cand in enumerate(candidates):
+                  ys, ss = [], []
+                  for j in range(n_folds):
+                      tr, va = np.flatnonzero(roles[j] == 1), np.flatnonzero(roles[j] == 2)
+                      ss.append(fit_and_score(tr, cand)[va]); ys.append(labels[va])
+                  y, s = np.concatenate(ys), np.concatenate(ss)
+                  table[c, :, 0] = roc_auc_score(y, s)
+                  table[c, :, 1] = ap(y, s)
+              return table, table.mean(axis=1).argmax(axis=0)
+
+  why-auc-spares-depth-50:
+    kind: review
+    rubric: |
+      The question: on prequential validation folds of a simulated card
+      stream, a fully grown decision tree (max_depth 50, trained on one
+      week) scores a ROC-AUC level with the best depths while its average
+      precision is the worst of the depth grid. The learner must explain
+      the disagreement from the shape of that tree's scores.
+
+      Pass if the answer contains both:
+      (a) the structure: a fully grown tree has (near-)pure leaves, so on
+          new data it outputs essentially two scores (0 and 1, or a handful
+          of values) — a small top block and a large tied bottom block that
+          still holds part of the frauds. "Few distinct scores", "pure
+          leaves give 0/1 probabilities" or "massive ties" are sufficient;
+      (b) what each metric does with it: ROC-AUC credits the top block's
+          recall at a very low false-positive rate and treats the tied
+          bottom block as one straight segment / half-correct pairs (it is
+          the mean of TPR and TNR for a two-score model), so the frauds left
+          in the bottom block cost it little; AP reaches those frauds only
+          when the whole tied block is opened, at base-rate precision, so
+          they add almost nothing and AP is capped near (top-block recall) x
+          (top-block precision). Stating that AP weights the top of the
+          ranking / the precision at each fraud while AUC weights all
+          false-positive rates equally, including ones far beyond the alert
+          budget, satisfies (b) when tied to the bottom block.
+
+      Fail if the answer only says the tree overfits, has high variance, or
+      memorises training data without saying what its ranking looks like;
+      or claims AUC is inflated by class imbalance as such (AUC is
+      insensitive to class sizes); or attributes the gap to the delay block,
+      known-card removal or the fold geometry.
+
+  beat-holdout-week:
+    kind: metric
+    metric: roc_auc
+    threshold: 0.85
+    holdout: data/holdout_week.csv.gz
+    labels_code: |
+      labels = np.loadtxt("private/holdout_y.csv")
