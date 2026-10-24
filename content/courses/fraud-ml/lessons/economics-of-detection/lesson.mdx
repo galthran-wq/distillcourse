@@ -1,0 +1,880 @@
+A detector catches 99 of every 100 frauds and wrongly flags 1 of every 100 genuine payments. On a stream where one payment in a thousand is fraud, what share of its alerts are actually fraud, what does each alert and each miss cost, and how many alerts a day should the bank pay people to look at?
+
+<Ref lesson="financial-crime-typology">The typology of financial crime</Ref>
+placed each crime by who labels it and how late. For the crimes that do
+get labels, card fraud first, a detector now has to be judged, and the
+first instinct from a course in classical machine learning is to read its
+two error rates. Catching 99% of fraud and clearing 99% of genuine
+payments sounds like a detector that is right 99 times in 100, so its
+alerts should be fraud about 99 times in 100.
+
+That instinct fails on all three questions of the opening. The share of
+alerts that are fraud turns out to be about one in eleven. The error rates
+say nothing about money, and the two kinds of error cost different amounts
+to different people. And the number of alerts worth working is a staffing
+decision that neither error rate answers. Each question needs one more
+quantity the error rates leave out: the share of fraud in the stream, the
+price of each outcome, and the size of the team.
+
+## What share of the alerts are fraud: the base rate decides
+
+Start with the first question, because the other two are priced in
+alerts. The detector's two numbers are rates *within* a class: of the
+frauds, 99% are flagged; of the genuine payments, 1% are flagged. The
+question asks about a different group, the flagged payments, which mixes
+the two classes. How they mix depends on how large each class is.
+
+### Counting a thousand payments
+
+The share of fraud in the stream is the *base rate*, written $\pi$: the
+prevalence of the positive class, here $\pi = 0.001$.
+
+<Example title="the 99%/99% detector at one fraud in a thousand">
+Take 1,000 payments. With $\pi = 0.001$, one of them is fraud and 999 are
+genuine.
+
+**The fraud.** The detector flags it with probability 0.99, so on average
+$0.99$ true alerts per thousand payments.
+
+**The genuine payments.** It flags each with probability 0.01, so
+$0.01 \times 999 \approx 10$ false alerts per thousand.
+
+**The alerts.** About $0.99 + 9.99 \approx 11$ alerts per thousand
+payments, of which about 1 is fraud. The share of alerts that are fraud is
+
+$$
+\frac{0.99}{0.99 + 9.99} \approx 0.09 .
+$$
+
+Out of every 100 alerts, about 9 are fraud and 91 are genuine customers.
+</Example>
+
+<FigureSequence
+  name="funnel"
+  alt="Three frames over a grid of 1,000 small squares: first one amber square among 999 grey ones; then the amber square ringed as caught and ten scattered squares turned blue as false alarms; then the eleven flagged squares gathered into a box beside the grid, one amber and ten blue, labelled precision about 9%"
+  caption="A thousand payments through a detector that is 99% right on each class: eleven alerts, one of them fraud."
+/>
+
+<Task>
+Step through the three frames and count the blue squares in the second.
+Which class do they come from, and why are there about ten of them when the
+detector is right 99 times in 100 on that class?
+</Task>
+
+### Bayes' rule, and why the error rates cannot rescue precision
+
+The example computed the *precision* of the detector, the share of its
+alerts that are fraud, which you know from classical machine learning as
+$\mathrm{TP}/(\mathrm{TP}+\mathrm{FP})$. Written with the recall
+$\mathrm{TPR}$ (the share of frauds flagged) and the false-positive rate
+$\mathrm{FPR}$ (the share of genuine payments flagged), the same count is
+Bayes' rule:
+
+$$
+\text{precision} = P(\text{fraud} \mid \text{alert})
+= \frac{\mathrm{TPR}\cdot \pi}{\mathrm{TPR}\cdot \pi + \mathrm{FPR}\cdot(1-\pi)} .
+$$
+
+With $\mathrm{TPR} = 0.99$, $\mathrm{FPR} = 0.01$, $\pi = 0.001$ it gives
+$0.00099 / (0.00099 + 0.00999) \approx 0.09$, the example's 9%.
+
+The intuition that 99% and 99% make 99% treats the two error rates as if
+they were the whole story. That intuition is common enough to have a name,
+*base-rate neglect*: judging $P(\text{fraud} \mid \text{alert})$ from how
+well the test separates the classes while ignoring how many members each
+class has. It fails because the true alerts are drawn from the tiny class
+and the false alerts from the huge one, so a small rate applied to 999
+outnumbers a large rate applied to 1.
+
+The cleanest way to see what a detector can and cannot do is to rewrite
+Bayes' rule in odds:
+
+$$
+\underbrace{\frac{P(\text{fraud}\mid\text{alert})}{P(\text{genuine}\mid\text{alert})}}_{\text{odds after the alert}}
+= \underbrace{\frac{\mathrm{TPR}}{\mathrm{FPR}}}_{\text{set by the detector}}
+\times \underbrace{\frac{\pi}{1-\pi}}_{\text{set by the stream}} .
+$$
+
+The detector's only contribution is the ratio $\mathrm{TPR}/\mathrm{FPR}$,
+here $0.99/0.01 = 99$. The stream starts at odds of 1 to 999. An alert
+multiplies them by 99, to about 1 to 10: one fraud for every ten genuine
+customers in the alert queue, the eleven squares of the figure.
+
+<Remark title="what it takes to reach even odds">
+For an alert to be fraud more often than not, $\mathrm{TPR}/\mathrm{FPR}$
+must exceed $(1-\pi)/\pi \approx 999$. With recall near 1 that means a
+false-positive rate below about 0.1%: one genuine payment in a thousand.
+At one fraud in ten thousand it means one in ten thousand. The rarer the
+crime, the more of the burden falls on the false-positive rate.
+</Remark>
+
+### The same detector on different streams
+
+Hold the detector fixed and change only the stream. How does its
+precision move as fraud gets rarer, from one payment in ten to one in a
+hundred thousand?
+
+<Figure
+  src="./figures/precision-prevalence.svg"
+  alt="An amber curve of precision against base rate on a log axis from 1 in 10 to 1 in 100,000, falling from about 92% to near zero, with points marked at 1 in 100 (50%), 1 in 400 (20%), 1 in 1,000 (9%) and 1 in 10,000 (1%)"
+  caption="One detector, every stream: once fraud is rarer than about one in a thousand, each tenfold drop in the base rate cuts precision about tenfold."
+/>
+
+At one in a hundred the alerts are a coin flip. At the 0.25% of the
+Belgian e-commerce stream from <Ref lesson="fraud-detection-system"
+id="a-hundred-cases-a-day-the-models-output-is-a-ranking">the layered
+system</Ref>, one in 400, they are fraud one time in five. For
+laundering, where the rate is far lower still, nearly every alert is a
+legitimate customer. A detector's error rates travel between streams; its
+precision does not.
+
+<KeyFact>
+At one fraud in a thousand, a detector that is 99% right on each class
+produces about 9 frauds per 100 alerts. Error rates travel between streams
+and precision does not. At a fixed base rate only the ratio
+$\mathrm{TPR}/\mathrm{FPR}$ moves precision, and with recall already near 1
+that means the false-positive rate.
+</KeyFact>
+
+<Exercise>
+The Belgian stream carries about 400,000 payments a day at a base rate of
+0.25%. Run the 99%/99% detector over one day of it: how many alerts does it
+raise, how many are fraud, and what is the precision? Write the two class
+counts before opening the solution.
+
+<Solution>
+Frauds: $0.0025 \times 400{,}000 = 1{,}000$. Genuine: $399{,}000$.
+
+True alerts: $0.99 \times 1{,}000 = 990$. False alerts:
+$0.01 \times 399{,}000 = 3{,}990$. Alerts: $4{,}980$.
+
+Precision: $990 / 4{,}980 \approx 0.20$, one alert in five. In odds: the
+stream's 1 to 399 times 99 is about 1 to 4.
+
+The day also raises almost 5,000 alerts for a team that works about a
+hundred cards, a mismatch the budget section below takes up.
+</Solution>
+</Exercise>
+
+## Accuracy prices every mistake the same
+
+The detector of the first section misses one fraud in a hundred and
+flags one genuine payment in a hundred. Whether that is good depends on
+what each mistake costs, and the measure most courses start from,
+accuracy, assumes that both cost the same.
+
+On a stream with $\pi = 0.001$, a "detector" that never raises an alert is
+wrong only on the frauds: its error rate is $0.001$, its accuracy
+$0.999$. It catches nothing. The 99%/99% detector has accuracy $0.99$, so
+by accuracy the do-nothing rule wins. The comparison is absurd for a
+plain reason: accuracy counts a missed fraud and a wrong alert as one
+error each, while a missed fraud costs the bank the stolen money and a
+wrong alert costs an investigator a phone call.
+
+So each of the four outcomes of a decision gets its own price.
+
+<Definition title="cost matrix">
+For a decision to alert or not on a payment that is fraud or genuine, the
+*cost matrix* assigns a cost to each outcome: $c_{TP}$ (fraud, alerted),
+$c_{FN}$ (fraud, not alerted), $c_{FP}$ (genuine, alerted) and $c_{TN}$
+(genuine, not alerted). The cost of a set of decisions is the weighted
+loss
+$$
+\text{cost} = \mathrm{TP}\cdot c_{TP} + \mathrm{FN}\cdot c_{FN} + \mathrm{FP}\cdot c_{FP} + \mathrm{TN}\cdot c_{TN} .
+$$
+</Definition>
+
+Accuracy is the special case $c_{FN} = c_{FP} = 1$ and
+$c_{TP} = c_{TN} = 0$. For card fraud both halves of that special case are
+wrong: an alert costs money even when it is right, and a miss costs far
+more than a false alert.
+
+<Figure
+  src="./figures/cost-matrix.svg"
+  alt="Two 2-by-2 cost matrices side by side, rows fraud and genuine, columns alert and no alert. Both put the alert cost C_a in the two alert cells and 0 for a genuine payment not alerted; the left charges a missed fraud a fixed price c, the right charges it the payment's amount; the no-alert column is shaded blue in both and labelled as where doing nothing lives"
+  caption="Two conventions for the four cells. They agree on everything except the price of a miss."
+/>
+
+### What an alert costs: the call, and sometimes the customer
+
+An alert flags a payment, and an investigator phones the holder of the
+card that made it. That call costs the same whether the card turns out
+compromised or not, so both alert cells carry the same price, the *alert
+cost* $C_a$: $c_{TP} = c_{FP} = C_a$. The cost of a call is small next to
+the loss from a fraud, a few euros of an investigator's time.
+
+The unit needs a word of care. The detector scores payments, but the call
+is about a card, and <Ref lesson="fraud-detection-system"
+id="a-hundred-cases-a-day-the-models-output-is-a-ranking">the layered
+system</Ref> showed that one call settles all of a card's recent payments,
+about three frauds on a compromised card. Until the budget section, every
+flagged payment is priced as if it were its own call. That simplification
+keeps the confusion matrix, the costs and the precision on one unit, the
+payment; the budget section moves to cards and says how the two prices
+relate.
+
+That price holds only while the alert is a question. If the system acts on
+its own, by blocking the card, a false positive costs the customer a card
+that stops working, and the bank a customer who may move their spending
+elsewhere. Scale makes this decisive. On a base of a million accounts, a
+daily false-alarm rate of 1% shuts down 10,000 genuine customers a day.
+That is why, as in <Ref lesson="fraud-detection-system"
+id="why-a-block-has-to-be-nearly-always-right">the argument for blocking
+rules</Ref>, automatic action is kept for the rare patterns that are
+almost always fraud, and everything else becomes a call.
+
+### What a miss costs: the amount, or more
+
+A missed fraud is where the conventions split. The common choice sets
+$c_{FN}$ to the payment's amount, because the bank reimburses the
+cardholder for an unauthorised payment. That makes each miss cost what it
+actually cost, and makes a missed €2,000 fraud a hundred times worse than
+a missed €20 one.
+
+The objection comes from how fraudsters use a card. A stolen card is
+usually tested first with a small payment, and if that goes through it is
+used for large ones. A missed €1 probe costs far more than €1: it costs
+the spending that follows. Charging every missed fraud the same fixed
+price $c$ gives small and large frauds equal weight, which the probe
+pattern argues for, at the price of no longer measuring the money lost.
+The card's spending limit is a third candidate, as the most a missed
+fraud can lead to.
+
+No convention is agreed. The cost matrix is a modelling decision, made by
+the bank, and every metric computed from it inherits that decision. Whatever
+the convention, every outcome costs the bank something except one: leaving
+a genuine payment alone, $c_{TN} = 0$.
+<Ref lesson="example-dependent-cost">The lesson on example-dependent
+cost</Ref> takes the amount convention and derives the decision rule it
+implies, payment by payment.
+
+<KeyFact>
+The two errors are paid by different people in different currencies: a
+missed fraud by the bank in reimbursed money (and by the next payments on
+the card), a false alert by an investigator in minutes, and a wrong block
+by a customer who cannot pay.
+</KeyFact>
+
+## What a detector is worth: the cost it removes
+
+A cost matrix turns a confusion matrix into a sum of money. On its own
+that sum means nothing: a detector that costs the bank €300,000 a month is
+good if the alternative costs €1,000,000 and bad if the alternative costs
+€200,000. A detector is a purchase, and it is judged against the
+alternative the bank would otherwise run.
+
+### The baseline: doing nothing
+
+The alternative that every detector can be compared with is to accept
+every payment and alert on none. Its cost is the blue column of the
+figure above: $c_{FN}$ on every fraud, nothing else. With the amount
+convention that is the total amount of fraud in the stream.
+
+That baseline is also a ceiling. If 0.1% of 100 million payments are
+fraud at £10 each, doing nothing loses £1 million, and no detector on
+that stream can save more than £1 million, since a perfect one would
+only remove the fraud loss and would still pay for its alerts. The
+*value* of a detector is the cost of doing nothing minus its own cost:
+
+$$
+\text{value} = \text{cost}(\text{do nothing}) - \text{cost}(\text{detector}).
+$$
+
+Put the cost matrix into both terms, with $c_{TP} = c_{FP} = C_a$ and
+$c_{TN} = 0$. Doing nothing misses every fraud, the $\mathrm{TP} +
+\mathrm{FN}$ frauds the detector splits into caught and missed. The
+detector pays a call on each of its alerts and the miss cost on the frauds
+it lets through:
+
+$$
+\text{cost}(\text{do nothing}) = (\mathrm{TP} + \mathrm{FN})\,c_{FN},
+\qquad
+\text{cost}(\text{detector}) = (\mathrm{TP} + \mathrm{FP})\,C_a + \mathrm{FN}\,c_{FN}.
+$$
+
+Subtracting, the $\mathrm{FN}\,c_{FN}$ of the missed frauds appears in
+both and cancels:
+
+$$
+\text{value} = \mathrm{TP}\,c_{FN} - (\mathrm{TP} + \mathrm{FP})\,C_a
+= \mathrm{TP}\cdot(c_{FN} - C_a) - \mathrm{FP}\cdot C_a :
+$$
+
+each caught fraud saves its miss cost less the call, and each false alert
+costs a call. Nothing in this expression has to be positive.
+
+<Example title="a 99%/99% detector worth less than nothing">
+A bank sees 1,000,000 card payments a day at $\pi = 0.001$: 1,000 frauds
+and 999,000 genuine payments. It runs the 99%/99% detector and,
+unrealistically, works every alert, each priced as one call. A call costs $C_a = \text{€}10$; a missed
+fraud costs its amount, on average $A$.
+
+**Counts.** $\mathrm{TP} = 990$, $\mathrm{FN} = 10$,
+$\mathrm{FP} = 9{,}990$. Alerts: $10{,}980$.
+
+**Detector's cost.** Calls: $10{,}980 \times \text{€}10 = \text{€}109{,}800$. Misses:
+$10 A$.
+
+**Doing nothing.** $1{,}000 A$.
+
+**At $A = \text{€}100$.** Doing nothing costs €100,000. The detector costs
+$\text{€}109{,}800 + \text{€}1{,}000 = \text{€}110{,}800$. Its value is $-\text{€}10{,}800$ a day.
+
+**At $A = \text{€}200$.** Doing nothing costs €200,000; the detector costs
+€111,800; its value is $+\text{€}88{,}200$ a day.
+</Example>
+
+Where does the sign change? Setting the value to zero gives
+$990 \cdot (A - 10) = 9{,}990 \times 10$, so $A \approx \text{€}111$. That number
+has a direct reading. Precision is 9%, so each caught fraud comes with
+about 11 alerts, and catching it costs about $11 \times \text{€}10 = \text{€}111$ in
+calls. In general, the cost of one caught fraud is the alert cost divided
+by the precision, and the detector pays only if a caught fraud is worth
+more than that:
+
+$$
+\text{value} > 0 \iff c_{FN} > \frac{C_a}{\text{precision}} .
+$$
+
+<KeyFact>
+Each caught fraud costs $C_a/\text{precision}$ in alerts: about eleven
+calls at 9% precision. A detector with excellent error rates can lose
+money when the frauds it catches are small and the stream is clean.
+</KeyFact>
+
+<Exercise>
+In the example, the average fraud is €100 and the detector loses €10,800
+a day. Keep the stream, the detector and $A = \text{€}100$. (a) What alert cost
+$C_a$ would make the detector break even? (b) Alternatively keep
+$C_a = \text{€}10$: what false-positive rate would make it break even, with the
+recall fixed at 99%? Write the value expression with the unknown in it
+before solving.
+
+<Solution>
+**(a)** Value $= 990\,(100 - C_a) - 9{,}990\,C_a = 99{,}000 - 10{,}980\,C_a$.
+It is zero at $C_a = 99{,}000/10{,}980 \approx \text{€}9.02$. A call that costs a
+euro less turns the loss into a break-even.
+
+**(b)** With $C_a = \text{€}10$, value $= 990 \times 90 - \mathrm{FP}\times 10$,
+zero at $\mathrm{FP} = 8{,}910$. Out of 999,000 genuine payments that is
+$\mathrm{FPR} = 8{,}910 / 999{,}000 \approx 0.89\%$. Precision there is
+$990/(990 + 8{,}910) = 10\%$, and $C_a/\text{precision} = \text{€}100 = A$, as
+the break-even condition says.
+
+The transferable move: with the stream and the recall fixed, the alert
+cost and the false-positive rate both enter the value through the alert
+bill $(\mathrm{TP} + \mathrm{FP})\,C_a$, and break-even fixes that bill at
+$\mathrm{TP}\cdot c_{FN} = 990 \times \text{€}100 = \text{€}99{,}000$
+however it is reached: $10{,}980 \times \text{€}9.02$ in (a),
+$9{,}900 \times \text{€}10$ in (b). Because $\mathrm{FP}$ is ten times
+$\mathrm{TP}$, almost all of that bill is false alerts
+($\mathrm{FP}\cdot C_a \approx \text{€}90{,}000$ in (a), €89,100 in (b)),
+so a cheaper call and a cleaner detector buy nearly the same thing.
+</Solution>
+</Exercise>
+
+## How many alerts to pay for: the budget that maximises value
+
+The example worked all 10,980 alerts. No bank does: the team calls about
+a hundred cards a day. <Ref lesson="fraud-detection-system"
+id="ranking-then-cutting-at-the-capacity">The layered system</Ref>
+already drew the consequence: the model's output is used as a ranking,
+and the team works its top $k$. What that lesson took as given, the
+size of $k$, is the third question of the opening. Headcount sets $k$,
+and someone decides the headcount.
+
+### The value of the next call
+
+The unit is now the card, because the team calls cards. Rank the day's
+cards by the model's score. Write $p_r$ for the probability that the card
+at rank $r$ is compromised; the ranking puts the likeliest first, so $p_r$
+falls with $r$. A call still costs $C_a$, but what it saves is no longer
+one payment's $c_{FN}$: it is the sum of $c_{FN}$ over the frauds the card
+would otherwise carry until its holder noticed. Call that sum $V$. Under
+the amount convention, $V$ is the money those remaining frauds would
+take, several times the average fraud $A$ when a card carries about three.
+
+The value of working the top $k$ cards is then the value formula of the
+previous section with cards for payments, taken in expectation. Among the
+top $k$, the expected number of compromised cards (the true positives) is
+$\sum_{r \le k} p_r$ and the expected number of genuine ones is
+$k - \sum_{r \le k} p_r$, so against doing nothing
+
+$$
+U(k) = \Big(\sum_{r=1}^{k} p_r\Big)(V - C_a) - \Big(k - \sum_{r=1}^{k} p_r\Big)C_a
+= V\sum_{r=1}^{k} p_r \;-\; C_a\,k .
+$$
+
+Adding the $k$-th call changes the value by $V p_k - C_a$. Because $p_k$
+falls, the early calls add a lot, later calls add less, and from some rank
+on each call costs more than it is expected to save. The best budget
+is the last rank at which the next call still pays:
+
+$$
+\text{work card } k \text{ while } p_k > \frac{C_a}{V} .
+$$
+
+<Example title="staffing for one ranking">
+Suppose the card at rank $r$ is compromised with probability
+$p_r = 0.3\,e^{-r/60}$. Summed over the top 100 cards that is about 15
+compromised cards, the figure a logistic regression achieved on the
+Belgian stream. Take $V = \text{€}500$ and $C_a = \text{€}10$.
+
+**Stopping rank.** Work card $k$ while $0.3\,e^{-k/60} > 10/500 = 0.02$,
+that is while $e^{-k/60} > 1/15$, so up to $k = 60 \ln 15 \approx 162$.
+
+**Value there.** $\sum_{r \le k} p_r \approx 18\,(1 - e^{-k/60})$, so
+$U(162) \approx 500 \times 16.8 - 10 \times 162 \approx \text{€}6{,}775$ a day.
+At the current $k = 100$: $500 \times 14.6 - 1{,}000 \approx \text{€}6{,}300$.
+At $k = 500$: $500 \times 18 - 5{,}000 \approx \text{€}4{,}000$.
+
+**Hit rate there.** At $k = 162$ the team finds about 16.8 compromised
+cards in 162 calls: about 10% of calls find fraud, and the last call has
+a 2% chance.
+</Example>
+
+<Figure
+  src="./figures/utility-budget.svg"
+  alt="Against calls per day from 0 to 600: an amber curve of value against doing nothing rising steeply to a peak of about 6,775 euros at about 160 calls and then falling slowly to about 3,000 at 600; a blue curve of hit rate falling from about 30% at the first call to about 10% at the peak and under 5% at 600"
+  caption="Value peaks where the next call's expected saving equals its cost. The hit rate falls the whole way and has no peak to aim at."
+/>
+
+### Why hit rate is not a target
+
+Banks track the share of investigated cases that turn out to be fraud,
+and it is tempting to manage the team by it.
+
+<Definition title="hit rate">
+The *hit rate* at budget $k$ is the share of the $k$ investigated cases
+that are fraud: $h(k) = \frac{1}{k}\sum_{r \le k} y_r$, with $y_r = 1$ if
+the case at rank $r$ is fraud. It is the precision of the top $k$.
+</Definition>
+
+The figure shows why raising it is the wrong goal. Along a fixed ranking
+the hit rate falls with every call added, because each added card is less
+likely than the one before. The highest hit rate is reached by working
+one card, the most obvious one. A 100% hit rate does not mean the team is
+efficient; it means the team stopped while the next cards in line were
+still worth calling. In the example the value-maximising budget runs at
+10% and leaves nine calls in ten finding nothing, and cutting to the 20%
+hit rate of $k \approx 50$ throws away about €2,200 a day.
+
+The hit rate does carry information when the budget is held fixed:
+between two models working the same $k$, the one with the higher hit rate
+finds more fraud. It stops carrying information when the budget is what
+is being chosen.
+
+<KeyFact>
+The best budget stops where the last call's chance of finding fraud equals
+$C_a/V$, here 2%, so a well-staffed team spends most of its calls on
+genuine customers. A team proud of its hit rate is usually understaffed.
+</KeyFact>
+
+<Aside>
+**Utilities with four signs.** The example priced only two outcomes, a
+call and a caught card. A fuller accounting gives each of the four
+outcomes a value in money. Investigating a fraud earns the amount
+recovered plus any penalty or fine, less legal and investigation costs.
+Investigating an innocent case costs the investigation but may earn a
+deterrent effect: fraudsters who see that inspections happen commit less.
+Leaving an innocent case alone is worth zero. Leaving a fraud alone is
+strongly negative, and may carry a non-economic value set by management,
+such as the damage to trust if the bank is known as an easy target.
+Total utility at each budget is the number of each outcome times its
+value, and the staffing rule is the same: grow the budget while the
+marginal case adds utility. The same calculation sets the share of
+customers to target in a marketing campaign, with expected response in
+place of fraud probability.
+</Aside>
+
+## ★ Which alerts first: expected amount, not probability
+
+The staffing example gave every compromised card the same worth $V$. Under
+the amount convention two cases at the top of the queue can differ by a
+factor of a thousand in what they put at stake, and ranking by
+probability alone ignores that.
+
+Compare two cases. One has a 90% probability of fraud on a €10 payment;
+the other a 25% probability on a €10,000 payment. Ranked by probability,
+the first goes ahead. In money, the first case puts
+$0.9 \times \text{€}10 = \text{€}9$ at stake, the second $0.25 \times \text{€}10{,}000 =
+\text{€}2{,}500$. An investigation that costs more than €9 is not worth starting
+on the first case at all.
+
+### Ranking by money at stake
+
+The quantity that orders the queue is the *expected fraud amount*,
+$P(\text{fraud}) \times \text{amount}$: the money the case is expected to
+put at risk. Banding both axes turns the rule into a table.
+
+<Figure
+  src="./figures/expected-amount.svg"
+  alt="A 5-by-5 grid with probability bands from 0–0.2 to 0.8–1 across and amount bands from 0–100 to 5,000+ euros down, each cell showing probability times amount at the band midpoints; an amber stepwise line separates the cells of at least 200 euros (shaded, investigate) from the rest; blue dots mark the 90% × €10 = €9 case in the top-right cell and the 25% × €10,000 = €2,500 case in the bottom row"
+  caption="Ranking by expected fraud amount draws a staircase: high probability does not save a small case, and low probability does not exclude a large one."
+/>
+
+### Where the line falls, and what it assumes
+
+Where the line falls is set by the stopping rule of the budget section,
+with the case's amount in place of $V$: a case is worth a call while its
+expected amount exceeds $C_a$. With an unlimited team and a €10 call the
+line would sit at €10. A real team runs out first: sorted by expected
+amount, a day's queue reaches the end of the team's capacity at some case,
+and the line sits at that case's expected amount. The grid is drawn for a
+day on which the last case the team can afford puts €200 at stake. With a
+larger team the line moves left and down toward €10, with a smaller one
+up and right, and its stepped shape stays. Two cautions come
+with it. The probabilities must be calibrated, since a score that reads
+0.6 for cases that are fraud 10% of the time places every case in the
+wrong column; <Ref lesson="undersampling-calibration">the lesson on
+undersampling and calibration</Ref> shows how a common training trick
+distorts exactly this. And the per-payment version of the staircase is
+the decision rule of <Ref lesson="example-dependent-cost">the lesson on
+example-dependent cost</Ref>, while <Ref lesson="score-to-action">the
+lesson on score-to-action policies</Ref> builds the full set of zones a
+bank acts on.
+
+## What waiting costs: value falls as evidence grows
+
+Every calculation so far scored a case once. A stolen card is not a single
+payment: it produces a sequence of them, and the bank can choose when to
+act. Waiting makes the decision easier and the saving smaller.
+
+### One card, five chances to act
+
+<Example title="one stolen card">
+A card is stolen. The thief tests it with a €1 payment, then makes five
+payments of €200 over two days, after which the holder notices and
+complains. Suppose the model's probability that the card is compromised,
+computed from its payments so far, grows as below. Calling after a given
+payment saves the €200 payments still to come if the card is compromised,
+so the expected saving of a call is that probability times the amount
+still to be stolen.
+
+| Bank acts after | Still to be stolen | P(fraud) so far | Expected saving |
+|---|---|---|---|
+| the €1 probe | €1,000 | 0.05 | €50 |
+| 1st €200 | €800 | 0.40 | €320 |
+| 2nd €200 | €600 | 0.70 | €420 |
+| 3rd €200 | €400 | 0.85 | €340 |
+| 4th €200 | €200 | 0.95 | €190 |
+| 5th €200 | €0 | 0.99 | €0 |
+| the complaint | €0 | 1.00 | €0 |
+</Example>
+
+<Figure
+  src="./figures/delay.svg"
+  alt="Over the stolen card's payments in order, a dashed line of the share of 1,000 euros still to be stolen falls from 1 to 0, a blue line of the probability of fraud rises from 0.05 to 1, and an amber line of their product rises to a peak of 0.42 after the second 200-euro payment and falls to 0"
+  caption="The saving left falls while the evidence rises; their product peaks in between, after the second large payment."
+/>
+
+### Two curves that cross
+
+Acting at the probe saves the most but almost never
+fires, because a €1 payment looks like any other. Waiting for certainty
+means waiting for the complaint, when nothing is left to save: a fraud
+that reveals itself is detected for free and worth nothing to detect. The
+expected saving peaks in between, and where depends on how fast the
+evidence accumulates against how fast the money leaves.
+
+### Time to detection and graded responses
+
+Two consequences follow for how a detector is judged and run. First, a
+count of frauds caught hides when they were caught. A detector that flags
+the card after the fifth payment and one that flags it after the second
+have the same recall on that card and very different value, so the time
+to detection, in minutes or in payments after the first fraud, belongs in
+the evaluation beside the hit rate and the cost. Second, the budget can
+be spent in grades. Cards with very high scores get an immediate,
+expensive response: a call now, or a block. Cards with high but not
+extreme scores go on a watch list, where the next payment on the card
+triggers a call at a lower score than a fresh card would need, so that
+their evidence can mature without a call spent on each.
+
+<KeyFact>
+The money still at stake is largest when the evidence is weakest, and the
+evidence is strongest when nothing is left, so the expected saving of a
+catch peaks in between: on the stolen card, €420 after the second large
+payment against €50 at the probe and nothing at the complaint. A metric
+that counts
+only whether a fraud was caught, and not after how many payments, cannot
+see the difference between a detector that saves the card and one that
+confirms the loss.
+</KeyFact>
+
+You can now answer the three questions of the opening for any detector.
+The share of alerts that are fraud follows from the error rates and the
+base rate by Bayes' rule, and at one fraud in a thousand a 99%/99%
+detector delivers about 9 in 100. Each outcome gets a price in a cost
+matrix whose miss cell is a modelling decision, and a detector's value is
+the cost it removes from doing nothing, which can be negative and turns
+positive only when a caught fraud is worth more than $C_a/\text{precision}$.
+The number of alerts to work is the budget at which the next call's
+expected saving equals its cost, which leaves a low hit rate by design;
+and the timing of a catch is part of its value. Every number in these calculations had to be
+assumed: the base rate, the amounts, when the labels arrive. <Ref
+lesson="canonical-datasets">The next lesson</Ref> asks what the public
+datasets of this field actually contain, how their labels were made, and
+which of these quantities each one hides.
+
+## Exercises
+
+<Exercise>
+Run the 99%/99% detector over two other streams: a card stream with one
+fraud in 200 payments, and a laundering stream with one suspicious
+transfer in 10,000. Give the precision of each, and the odds of fraud
+after an alert.
+
+<Solution>
+**One in 200.** $\pi = 0.005$. Precision
+$= 0.99 \times 0.005 / (0.99 \times 0.005 + 0.01 \times 0.995)
+= 0.00495 / 0.01490 \approx 0.33$. In odds: $1{:}199$ times 99 is about
+$1{:}2$, one fraud per two genuine alerts.
+
+**One in 10,000.** $\pi = 0.0001$. Precision
+$= 0.000099 / (0.000099 + 0.009999) \approx 0.0098$, about 1%. In odds:
+$1{:}9{,}999$ times 99 is about $1{:}101$.
+
+The same detector goes from a third of its alerts being right to one in a
+hundred, a factor of 34, as the base rate falls by a factor of 50. Once
+the posterior odds are small, precision is nearly proportional to the
+base rate.
+</Solution>
+</Exercise>
+
+<Exercise>
+Push the false-positive rate to its edges. (a) A detector has
+specificity 100%, so $\mathrm{FPR} = 0$, and recall 50%. What is its
+precision at $\pi = 0.001$ and at $\pi = 0.000001$? (b) Now take
+$\mathrm{FPR} = 0.01\%$ and recall 99%. At what base rate is the
+precision exactly 50%? (c) For each case, name the step of the funnel
+argument that changes.
+
+<Solution>
+**(a)** With $\mathrm{FPR} = 0$ there are no false alerts: precision
+$= \mathrm{TPR}\,\pi / (\mathrm{TPR}\,\pi + 0) = 1$ at any base rate and
+any nonzero recall. Recall decides how many frauds are flagged, not what
+share of the flags are fraud.
+
+**(b)** Precision is 50% when true and false alerts are equal:
+$0.99\,\pi = 0.0001\,(1 - \pi)$, so $\pi = 0.0001/0.9901 \approx 0.000101$,
+about one fraud in 9,900. In odds: the detector multiplies the odds by
+$0.99/0.0001 = 9{,}900$, so it reaches even odds from a starting point of
+$1{:}9{,}900$.
+
+**(c)** The funnel's whole effect rests on false alerts being drawn from
+the huge class: a small rate times a large count. In (a) the rate is zero,
+so the size of the genuine class no longer matters and the base rate drops
+out. In (b) the rate is small enough to balance the count at one in about
+ten thousand; for any rarer crime the false alerts win again. No real
+detector reaches (a), which is why rare crimes push all the work onto the
+false-positive rate.
+</Solution>
+</Exercise>
+
+<Exercise>
+Break this claim: "Our new model raised the hit rate from 40% to 80%, so it
+is better than the old one." Construct one ranking for which both numbers
+come out of the same model, and name the step at which the claim fails.
+Then, with $V = \text{€}500$ and $C_a = \text{€}10$, say which of the two operating
+points is worth more.
+
+<Solution>
+**One ranking, two numbers.** Suppose a model's top 20 cards hold 16
+compromised cards and its top 100 hold 40. At $k = 20$ its hit rate is
+$16/20 = 80\%$; at $k = 100$ it is $40/100 = 40\%$. If the old model was
+measured at $k = 100$ and the new one at $k = 20$, the "improvement" is
+produced by the budget, not by the model.
+
+**The failing step.** The claim compares hit rates without fixing $k$.
+Along any ranking the hit rate falls as $k$ grows, because each added card
+is less likely than the last, so a smaller budget always shows a higher
+hit rate. The comparison is valid only at the same $k$.
+
+**Which point is worth more.** At $k = 20$: $16 \times 500 - 20 \times 10
+= €7{,}800$. At $k = 100$: $40 \times 500 - 100 \times 10 = €19{,}000$. The
+40% operating point is worth more than twice the 80% one, because the
+80 extra calls find 24 more compromised cards at €500 each for €800 of
+calls.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the stopping rule for a general cost structure. The cases are
+worked in rank order, the case at rank $r$ is fraud with probability
+$p_r$ (falling in $r$), and the four outcomes have utilities $u_{TP}$
+(investigate a fraud), $u_{FP}$ (investigate an innocent case), $u_{FN}$
+(skip a fraud) and $u_{TN}$ (skip an innocent case). Show that the total
+expected utility of working the top $k$ is maximised by working case $k$
+exactly while
+$$
+p_k\,(u_{TP} - u_{FN}) + (1 - p_k)\,(u_{FP} - u_{TN}) > 0 ,
+$$
+and check that the lesson's rule $p_k > C_a/V$ is a special case.
+
+<Solution>
+**Total utility.** With $n$ cases, working the top $k$ gives expected
+utility
+$$
+T(k) = \sum_{r \le k} \big[p_r u_{TP} + (1-p_r) u_{FP}\big]
++ \sum_{r > k} \big[p_r u_{FN} + (1-p_r) u_{TN}\big].
+$$
+
+**One more case.** Moving case $k$ from the skipped set to the worked set
+changes the total by
+$$
+T(k) - T(k-1) = p_k (u_{TP} - u_{FN}) + (1-p_k)(u_{FP} - u_{TN}) =: g(p_k).
+$$
+
+**Monotonicity.** $g$ is linear in $p$ with slope
+$(u_{TP} - u_{FN}) - (u_{FP} - u_{TN})$. Catching a fraud gains more over
+skipping it than investigating an innocent case gains over skipping it
+(the first difference is large and positive, the second usually negative),
+so the slope is positive. Since $p_k$ falls with $k$, so does $g(p_k)$:
+the increments are positive up to some rank and negative after it. $T$
+therefore rises while $g(p_k) > 0$ and falls afterwards, and the maximum
+is at the last $k$ with $g(p_k) > 0$.
+
+**Special case.** In the lesson, utilities are measured against doing
+nothing: $u_{FN} = u_{TN} = 0$, $u_{TP} = V - C_a$, $u_{FP} = -C_a$. Then
+$g(p) = p(V - C_a) - (1-p)C_a = pV - C_a$, and $g(p_k) > 0$ is
+$p_k > C_a/V$.
+
+The threshold in general is
+$p^* = (u_{TN} - u_{FP}) / \big[(u_{TP} - u_{FN}) + (u_{TN} - u_{FP})\big]$:
+a deterrent value of inspecting innocent cases (raising $u_{FP}$) or a
+penalty attached to unpunished fraud (lowering $u_{FN}$) both lower $p^*$
+and enlarge the best budget.
+</Solution>
+</Exercise>
+
+<Exercise>
+Suppose an insurer compares two detectors on a test set of claims holding 67
+fraudulent claims. A boosted-tree model flags 90 claims, 58 of them
+fraudulent; a nearest-neighbour model flags 147, 59 of them fraudulent.
+Measured by ROC area the tree wins (0.86 against 0.75), by recall the
+neighbour model wins narrowly (88% against 87%). The average fraudulent
+claim is \$60,302, and investigating a flagged claim costs \$4,214 of an
+investigator's month. (a) Using a cost matrix with $c_{TP} = c_{FP} =$
+the investigation cost, $c_{FN} =$ the average claim and $c_{TN} = 0$,
+compute each model's cost and the percentage by which one is cheaper. (b)
+Recompute with an investigation cost of \$400 and say which model wins
+and why. (c) State one way this cost model is too simple.
+
+<Solution>
+**(a) Confusion counts.** Tree: $\mathrm{TP} = 58$, $\mathrm{FN} = 67 - 58 = 9$,
+$\mathrm{FP} = 90 - 58 = 32$. Neighbours: $\mathrm{TP} = 59$,
+$\mathrm{FN} = 8$, $\mathrm{FP} = 147 - 59 = 88$.
+
+Tree, in dollars: misses $9 \times 60{,}302 = 542{,}718$; investigations
+$90 \times 4{,}214 = 379{,}260$; total \$921,978.
+
+Neighbours, in dollars: misses $8 \times 60{,}302 = 482{,}416$;
+investigations $147 \times 4{,}214 = 619{,}458$; total \$1,101,874.
+
+The tree is cheaper by $1 - 921{,}978/1{,}101{,}874 \approx 16.3\%$. The
+neighbour model's one extra caught claim saves \$60,302; its 57 extra
+investigations cost \$240,198.
+
+**(b) At \$400.** Tree: $542{,}718 + 90 \times 400 = 578{,}718$ dollars.
+Neighbours: $482{,}416 + 147 \times 400 = 541{,}216$ dollars. The neighbour
+model now wins by about \$37,500. When investigations are cheap, the 57
+extra flags cost only \$22,800 and the extra caught claim is worth more
+than that. The ROC area did not change, but the ranking of the two models
+reversed: which model is better depends on the cost ratio
+$c_{FN}/C_a$, not on a threshold-free summary.
+
+**(c)** Possible answers: every fraudulent claim is charged the average
+amount, while the misses of the two models may be smaller or larger
+claims than average; an investigated fraud is assumed to recover the full
+claim; investigation cost is a month's salary regardless of the case;
+there is no value for deterrence; and both models are compared at their
+default thresholds, while each could be cut at the budget that maximises
+its own value.
+</Solution>
+</Exercise>
+
+<Exercise>
+Go back to the five crimes of <Ref lesson="financial-crime-typology"
+id="the-typology-five-crimes-four-coordinates">the typology</Ref>: card
+fraud, account takeover, laundering, mules and structuring, sanctions
+evasion. For each, say whether the convention "$c_{FN}$ = the amount" is
+even definable, and if not, what a missed case costs the bank instead.
+
+<Solution>
+**Card fraud.** Definable: the bank reimburses the unauthorised payment,
+so the amount is a real loss. It understates the cost of a missed probe,
+whose real cost is the spending that follows.
+
+**Account takeover.** Definable: the amounts drained from the account,
+which the bank usually reimburses. The unit is the account's stream, so
+the miss cost is the sum over the payments made after the takeover, not
+one payment's amount.
+
+**Laundering.** Not definable as an amount lost. No customer is robbed,
+and the bank's money is not taken. A missed case costs regulatory
+exposure: fines and remediation if a supervisor finds the bank failed to
+report, plus a social cost the bank is required to weigh. The label is
+an STR, years late or never, so even the count of misses is unknown.
+
+**Mules and structuring.** The amounts passed through the account are
+measurable but are not the bank's loss; the cost is again regulatory, and
+where the mule account receives a fraud victim's money the bank may face a
+reimbursement claim.
+
+**Sanctions evasion.** Not a cost trade-off at all: a missed designated
+counterparty is a breach of a legal duty, with penalties set by law
+regardless of the amount. There is no budget at which missing one is
+acceptable, which is why screening is list matching rather than a ranking
+cut.
+
+Read down the list and the cost matrix gets less meaningful as the
+label disappears: the crimes with a complaining victim have a price for a
+miss, and the others have a penalty that a bank cannot write into one
+cell.
+</Solution>
+</Exercise>
+
+<Exercise>
+Ten payments are scored, two of them fraud. Three models rank them, and
+the positions of the two frauds in each ranking (1 = most suspicious) are:
+model A at 1 and 8; model B at 4 and 5; model C at 3 and 6. (a) Compute
+the area under the ROC curve of each, as the share of (fraud, genuine)
+pairs in which the fraud is ranked above the genuine payment. (b) Compute
+the share of fraud among the top 1 and among the top 3 for each. (c) A
+team can work one alert a day; another can work three. Which model should
+each choose, and what does (a) tell them?
+
+<Solution>
+**(a)** There are $2 \times 8 = 16$ pairs. A fraud at rank $r$ is above
+every genuine payment ranked below it.
+
+- A: the fraud at 1 is above all 8 genuine payments; the fraud at 8 is
+  above the 2 genuine payments at 9 and 10. $10/16 = 0.625$.
+- B: the fraud at 4 is above ranks 5–10 minus the other fraud, 5 genuine;
+  the fraud at 5 is above 5 genuine. $10/16 = 0.625$.
+- C: the fraud at 3 is above ranks 4–10 minus one fraud, 6 genuine; the
+  fraud at 6 is above 4. $10/16 = 0.625$.
+
+**(b)** Top 1: A $= 1$, B $= 0$, C $= 0$. Top 3: A $= 1/3$, B $= 0$,
+C $= 1/3$.
+
+**(c)** The one-alert team should take A, the only model whose first
+alert is fraud. The three-alert team is indifferent between A and C and
+should never take B, which finds nothing in either budget. The ROC area
+is the same for all three, so it cannot make either choice: it averages
+over every possible cut, while each team works at one cut. This is the
+gap that <Ref lesson="alert-budget-metrics">the lesson on alert-budget
+metrics</Ref> closes by measuring precision at the budget, the hit rate
+of this lesson at the team's own $k$.
+</Solution>
+</Exercise>
+
+<References>
+1. R. J. Bolton, D. J. Hand, "Statistical Fraud Detection: A Review," *Statistical Science* 17(3), 2002, pp. 235–255 — Sec. 1, pp. 235–237 (the 99%/99% detector at one in a thousand giving about 9 frauds per 100 flagged; suspicion scores ranked against limited investigation; 0.1% of 100 million transactions at £10 as £1 million; effort, cost and adverse publicity), Sec. 3, p. 239 (misclassification rate useless at a 0.1% bad rate; cost-weighted loss or a fixed investigation budget), Sec. 8, p. 246 (time to detection; graded investigation), and F. Provost's comment, pp. 249–251 (value of detection falling with time while evidence builds; self-revealing fraud; 1% false alarms on a million accounts as 10,000 a day; automatic versus mixed-initiative intervention; card testing before use). https://doi.org/10.1214/ss/1042727940
+2. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015 — Ch. 6, "Selecting the sample to investigate," pp. 286–290 (hit rate and why a high one may signal too few inspections; utilities of the four outcomes; the total-utility-maximising inspection budget and its marketing analogue; expected fraud amount, the €9 and €2,500 cases, Table 6.5), and Ch. 7, p. 336 (total utility in the return on investment).
+3. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 4.2, "Threshold-based metrics" (the do-nothing classifier's accuracy; the cost matrix and weighted loss; fixed versus amount-dependent cost of a missed fraud; card testing with small amounts; spending limits and reaction time; no agreed cost measure). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+4. A. Dal Pozzolo, O. Caelen, Y.-A. Le Borgne, S. Waterschoot, G. Bontempi, "Learned Lessons in Credit Card Fraud Detection from a Practitioner Perspective," *Expert Systems with Applications* 41(10), 2014, pp. 4915–4928 — Sec. 5, "Performance measure" (timeliness of decision; the cost of a fraud is not its amount; small test payments before large ones; accept, refuse and block outcomes; the cost of a false alert as a phone call). https://doi.org/10.1016/j.eswa.2014.02.026
+5. C. Elkan, "The Foundations of Cost-Sensitive Learning," *Proceedings of the 17th International Joint Conference on Artificial Intelligence (IJCAI)*, 2001, pp. 973–978 — Sec. 2 (the cost matrix $c_{ij}$ and the reasonableness conditions on it).
+6. M. Bar-Hillel, "The Base-Rate Fallacy in Probability Judgments," *Acta Psychologica* 44(3), 1980, pp. 211–233 (base-rate neglect: posterior judgments driven by the diagnosticity of the evidence while the prior is ignored). https://doi.org/10.1016/0001-6918(80)90046-3
+</References>

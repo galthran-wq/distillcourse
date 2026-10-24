@@ -1,0 +1,950 @@
+No bank publishes its transactions, so the published results of this field come from a handful of public datasets: two days of anonymised card payments, a simulator, a replayed mobile-money log, a Bitcoin transaction graph and a synthetic laundering world. Before any number from them is trusted, what does each one actually contain, where did its labels come from, and which part of the detection loop does it leave out?
+
+<Ref lesson="economics-of-detection">The economics of detection</Ref>
+ended on a list of quantities every calculation had to assume: the base
+rate, the amounts, when the labels arrive. A newcomer looking for real
+values reaches for a public file, loads it, and finds a column called
+`Class` or `isFraud`. The obvious move is to treat that file as "the data"
+and that column as "the truth": fit a model, report its score, and expect
+the score to say something about a bank.
+
+That move skips a question. Every one of these files was made by a
+process: an anonymisation, a script, a calibrated generator, a company's
+attribution of addresses to owners. The process decides what a row is,
+what the label means, and which parts of the real problem never made it
+into the file. A model's score on the file measures the model against
+that process, so a score cannot be read until the process is known.
+
+## What to ask of a public dataset
+
+Before opening any of the five files, it helps to know what to look for.
+Which features of a file decide whether a score on it says anything about
+a bank? The answer depends on two things: why public files are so
+limited in the first place, and which parts of the real problem a file
+can leave out.
+
+### Why the public data is so thin
+
+A bank's payment log is personal data: each row says which person paid
+whom, where and when. It is also a competitive asset, since it shows a
+bank's customers and its fraud losses. So a bank can release its data
+only after removing what identifies people, or not at all.
+
+What identifies a person is the entity: the card number, the account,
+the customer. And the entity is exactly what a fraud detector needs most,
+because the signal for card fraud and account takeover lives in an
+entity's own history. This leaves two routes to a public dataset, each
+with a price:
+
+- **Anonymise real data.** The rows are real, and so are the labels, but
+  the entity and anything that could re-identify it are stripped out.
+- **Synthesise.** A program generates transactions, so nothing is personal
+  and the entity can stay. But the labels mean whatever the program says
+  they mean.
+
+Among synthetic data there is a further split that matters for trusting
+the label. A *simulator* invents a world from parameters someone chose:
+how many customers, how often they pay, what fraud looks like. A *replay*
+calibrates its generator to statistics of a real log, so that the
+synthetic data reproduces the real one's aggregates. Of the five datasets
+below, one is anonymised, one is a simulator, one a replay, one an
+anonymised graph with company-made labels, and one a simulated world.
+
+### The reading grid
+
+Which parts can a file leave out? Any part of the real problem met so
+far, so each part becomes a question to ask of a file.
+
+From the coordinates of <Ref lesson="financial-crime-typology"
+id="four-questions-the-card-loop-answered-without-asking">the
+typology</Ref> (unit, label source, label delay, signal structure) come
+three questions. The signal for card fraud and account takeover lives in
+an entity's history, so the first question is whether the file keeps
+that entity. The label source becomes the question of who wrote the
+label column. The label delay becomes a question about the calendar: a
+file can only contain a delay if it spans more time than the delay does.
+
+1. **Entity.** Is there an identifier (card, customer, account, terminal)
+   that groups rows into histories?
+2. **Time.** How long does the file span? Long enough to contain a label
+   delay $\delta$ of a week or more, a weekly cycle, a change in the fraud?
+3. **Label source.** Who or what wrote the label column?
+
+The typology also showed that the label source decides how much of the
+crime gets labelled at all, so a fourth question follows:
+
+4. **Completeness.** Is every criminal row labelled?
+
+The last two questions come from how the loop of <Ref
+lesson="fraud-detection-system"
+id="the-fast-labels-are-a-sample-the-model-chose">the layered detection
+system</Ref> gets its labels and from how fraud behaves over time. In
+that loop the fastest labels are the investigators' verdicts on the
+cards yesterday's model alerted on, so the model chooses which labels it
+gets back. And fraud is <Ref lesson="financial-crime-typology"
+id="rarity-is-one-difficulty-out-of-five">time-evolving</Ref>: when a
+method is blocked, fraudsters change it, as structuring showed when it
+split deposits to stay below a reporting threshold.
+
+5. **Feedback.** Do the labels depend on which rows an earlier model
+   alerted on?
+6. **Adversary.** Does the fraud change in response to detection?
+
+The fourth question needs a precise name, because it separates the crimes
+of the typology more sharply than any base rate does.
+
+<Definition title="label completeness">
+A dataset's labels are *complete* when every criminal unit in it carries a
+positive label, so that every unlabelled unit is genuinely clean. Its
+*label completeness* is the share of the criminal units that are
+labelled.
+</Definition>
+
+Card fraud comes close to complete, because <Ref
+lesson="financial-crime-typology" id="where-the-card-label-comes-from">the
+cardholder who lost money disputes the payment</Ref>; the gaps are cases
+nobody looks at, such as a counterfeit copy. Laundering sits at the other
+end: <Ref lesson="financial-crime-typology"
+id="where-the-laundering-label-comes-from">its only label is a bank's own
+suspicious transaction report</Ref>, and most laundering is never
+reported. A generated dataset can sit at
+exactly 1, because the generator wrote both the crime and the label. A
+near-miss shows what the definition does not cover: a dataset in which
+every row carries a label, but where "genuine" means "not reported within
+$\delta$", is fully *labelled* and still incomplete, since some of its
+genuine rows are unreported fraud.
+
+<KeyFact>
+Anonymisation keeps the labels real and removes the entity; synthesis
+keeps the entity and makes the labels whatever the generator says. No
+public dataset has both a real entity history and real labels.
+</KeyFact>
+
+## The ULB card set: two days with the card removed
+
+Take the first route: a real card log, anonymised for release. The
+entity has to go, because it identifies the cardholder. What is left of a
+card log once the card has been removed, and what can a model still learn
+from it?
+
+Only one public file lets you find out with real card data. In 2015 the Machine
+Learning Group of the Université Libre de Bruxelles (ULB) and the payment
+processor it worked with released a set of real card transactions,
+distributed through the data platform
+[Kaggle](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud). It is
+the file most fraud tutorials start from.
+
+### What the file contains
+
+It holds the online card payments of European cardholders over two days
+of September 2013: 284,807 payments, of which 492 are fraud. The base rate
+is 0.172%, one payment in 580, between the Belgian stream's one in 400
+and the one in a thousand of the economics lesson.
+
+Each row has 31 columns. `Time` is the number of seconds since the first
+payment in the file, `Amount` is the payment's amount, and `Class` is 1
+for fraud. The other 28 columns, `V1` to `V28`, are principal components:
+the processor ran PCA on its original features and released only the
+projections, so that the originals cannot be recovered. What those
+originals were is not disclosed.
+
+<Figure
+  src="./figures/ulb-anonymisation.svg"
+  alt="Left, a column of boxes for the fields a card processor holds: card identifier, time, amount, three boxes of merchant and derived features, fraud verdict. Time, amount and the verdict map by arrows to the released columns Time, Amount and Class; the feature boxes feed an amber PCA box that outputs V1 to V28; the card identifier ends in a cross marked dropped"
+  caption="Anonymisation keeps time, amount and the label, compresses the rest into 28 components, and drops the card."
+/>
+
+### What the anonymisation removed
+
+The obvious way to use the file is to treat `V1`–`V28` as features like any
+other and fit a classifier. That works, and it tests something, but look
+at what the file can no longer show.
+
+**No entity.** There is no card column. The investigators of the layered
+system work cards, and the strongest card-fraud features compare a payment
+with the same card's recent past. On this file neither can be computed:
+no card history, no ranking of cards, no count of how many compromised
+cards a top 100 holds.
+
+**No feature meaning.** A principal component mixes every original
+feature. A model can still learn from it, but no one can say which
+component carries the merchant or the country, so a new feature cannot be
+built from domain knowledge and an explanation of a score cannot be given
+in words.
+
+**Two days.** The label delay of the card loop is a week to a month; two
+days cannot hold even one delay window. There is no weekly cycle, no
+change in the fraud over time, no retraining. The file can be split, at
+random or day 1 against day 2, but every split keeps training and test
+inside the same 48 hours, so no split can hold a delay window between
+them or a weekly cycle.
+
+The labels themselves are as good as card labels get. The processor
+labels a payment from its investigators' calls to cardholders and from
+cardholders' disputes, which is why they are near-complete. But the file
+records no date at which each label became known, so nothing about the
+delay survives. What a model can still learn here is to score one
+payment at a time from anonymous columns at a real card base rate; the
+card, the calendar and the label clock are gone.
+
+<Exercise>
+For each feature below, say whether it can be computed from the ULB file,
+and if not, which removal prevents it: (a) the payment's amount divided by
+the same card's average amount over the previous seven days; (b) the hour
+of the day; (c) whether the payment is the largest in the file so far;
+(d) the number of other payments made at the same merchant in the
+previous hour. Decide each before opening.
+
+<Solution>
+**(a)** No. It needs the card identifier to group payments into a card's
+history, and seven days of history; the file has neither.
+
+**(b)** Only up to an unknown offset. `Time` counts seconds from the
+first payment in the file, not from midnight, so `Time` modulo 86,400
+gives a time of day shifted by the unknown clock time of that first
+payment. The daily rhythm is visible; the actual hours are not.
+
+**(c)** Yes. It needs only `Amount` and the order given by `Time`, both
+released.
+
+**(d)** No. The merchant, if it was among the original features, is
+mixed into the principal components and cannot be recovered as an
+identifier to group by.
+
+The pattern: anything defined on a single row survives anonymisation;
+anything defined on a group of rows sharing an entity does not.
+</Solution>
+</Exercise>
+
+## The transaction simulator: a world whose rules are known
+
+The ULB set removed the entity to protect it. The opposite route is a
+generator that has entities from the start, because nobody real stands
+behind them. In 2021 the same ULB group published an open-source
+transaction simulator with a reference dataset, the data its later
+benchmarks use.
+
+The first objection is that simulated data is fake and a result on it
+says nothing. That misses what the simulator is for. Because its rules
+are known, it is a test with an answer key: when a detector finds a
+pattern, you can check whether it found the pattern that was put there.
+And it has what real public data lacks: customers, terminals and half a
+year of time.
+
+### The generating rules
+
+The world is a square grid, 100 units on a side. On it sit 5,000
+customers and 10,000 terminals (a terminal is the merchant's point of
+sale), each at a uniformly random location. A customer pays only at
+terminals within a radius of 5 of their home, which leaves about 75
+terminals each. Each customer gets three numbers, drawn once:
+
+- a mean number of payments per day, drawn uniformly between 0 and 4; the
+  actual count each day is Poisson with that mean;
+- a mean amount, drawn uniformly between 5 and 100; each amount is normal
+  with that mean and a standard deviation of half of it;
+- payment times are normal around noon.
+
+<Figure
+  src="./figures/simulator-world.svg"
+  alt="A 20 by 20 corner of the grid scattered with grey terminal dots at a density of one per unit square; a blue square marks a customer at the centre of an amber circle of radius 5, inside which about 75 terminals are amber; a panel lists the customer's parameters"
+  caption="A customer and the terminals it may use: every payment it makes goes to one of the amber dots."
+/>
+
+Run for 183 days from 1 April 2018, these rules produce 1,754,155
+payments, about 9,600 a day. None is fraud yet.
+
+### Three scripted frauds
+
+Fraud is added afterwards by three scenarios, each standing for a
+pattern a detector must learn in a different place:
+
+1. **Large amounts.** Every payment over 220 is fraud. No real fraud
+   works this way; the scenario is a sanity check that any detector should
+   pass, since a single split on the amount finds it.
+2. **Compromised terminals.** Each day two terminals are drawn at random,
+   and every payment at them over the next 28 days is fraud. It stands
+   for a terminal used criminally, for instance by phishing customers who
+   pay there. The amounts look normal, so the signal is in the terminal's
+   recent history of fraud.
+3. **Leaked card credentials.** Each day three customers are drawn, and
+   over the next 14 days a third of their payments are multiplied by 5 and
+   marked fraud. It stands for card details stolen and used remotely while
+   the owner keeps paying. The signal is in the customer's own spending
+   history.
+
+The three scenarios map onto the three places a signal can live in <Ref
+lesson="financial-crime-typology"
+id="four-questions-the-card-loop-answered-without-asking">the
+typology</Ref>: the single row, a terminal's history, a customer's
+history. Run in that order, scenario 1 marks 978 payments, scenario 2
+adds 9,099 and scenario 3 adds 4,604, for 14,681 frauds: a base rate of
+0.84%, about 85 frauds a day.
+
+Next to each payment's fraud label the generator writes a second column,
+the *scenario*: which of the three scenarios made the payment fraud. A
+payment can be touched by more than one scenario (a large payment at a
+compromised terminal, say), and the column then records the last one.
+This column is what makes the simulator an answer key.
+
+<Example title="reading a detector against the answer key">
+A decision tree of depth 2 is trained on one week of the simulated data
+(25 to 31 July 2018), with the amount among its inputs. Such a tree asks
+at most two questions in a row, so it has at most three splits and four
+leaves. One of its splits sends payments with amount above **218.67** to
+a leaf that is nearly all fraud: of the training payments that land
+there, only two are genuine.
+
+**What it found.** Scenario 1: the true rule is amount above 220. No
+genuine payment anywhere in the data exceeds 219.98, because scenario 1
+turned every larger one into fraud, so the two genuine payments in the
+leaf are training-week payments with amounts between 218.67 and 220. The
+tree does not know the rule; it picks the threshold that best separates
+fraud from genuine in the training week. Had that range held only those
+two genuine payments, a split just above them would have separated
+better, so the range must also hold some frauds, from scenarios 2 or 3.
+Catching them was worth letting in two genuine payments, and the split
+landed a little below 220.
+
+**What the key also shows.** Scenario 3 multiplies amounts by 5, so 2,281 of the 4,631 payments whose
+recorded scenario is 3 also exceed 220. A detector credited with
+"catching large-amount fraud" catches half of the leaked-card fraud by
+the same split.
+
+**Why this is possible only here.** On real data there is no rule to
+compare the split with. Here the scenario column says which pattern each
+caught fraud came from.
+</Example>
+
+### What the calendar shows, and what it leaves out
+
+Plot the frauds per day and the first month looks different from the rest.
+
+<Figure
+  src="./figures/simulator-daily.svg"
+  alt="Over days 0 to 182, an amber line of fraudulent payments per day rising from near zero to about 85 by day 28 and then fluctuating between 60 and 110, and a blue line of customers with at least one fraud that day, rising to and fluctuating around 75; the first 28 days are shaded and marked ramp-up"
+  caption="Scenarios 2 and 3 keep a terminal compromised for 28 days and a card for 14, so the fraud rate climbs for four weeks before it settles."
+/>
+
+On day 0 only the terminals and customers drawn that day are
+compromised. Each later day adds two terminals and three customers. A
+customer stays compromised for 14 days, so from day 14 on the customers
+leaving their window balance the ones joining, and the count holds at
+$3 \times 14 = 42$. A terminal stays compromised for 28 days, so the
+terminal count keeps growing until day 28 and then holds at
+$2 \times 28 = 56$. The first month averages 57 frauds a day, the rest 85.
+
+The blue line counts something else: customers with at least one fraud
+that day, from any scenario. It settles near 75, well above the 42
+leaked cards, because most of scenario 2's fifty-odd daily frauds fall on
+different customers who happened to pay at a compromised terminal. Fraud
+spread over customers this way is invisible in any one customer's
+history, which is why scenario 2 can only be found from the terminal's.
+
+Any study on this data has to start its training after the ramp-up or treat the
+first month as a different regime; a model trained on April and tested on
+September sees a base rate jump that is an artefact of the start of the
+simulation, not of fraud.
+
+Against the reading grid, the simulator supplies the entity (customer and
+terminal) and the time (half a year). Four things it leaves out:
+
+- **Labels are complete and instant.** Every fraud is labelled at the
+  moment it is generated. A delay exists only if the analyst imposes one,
+  by hiding the labels of the last $\delta$ days when training.
+- **No feedback.** No model chooses which labels come back; every label
+  is in the file.
+- **No adversary.** The scenarios run the same script whatever a detector
+  does.
+- **No channel.** There is no card-present or card-not-present field, no
+  merchant category, no country; the only features are the customer, the
+  terminal, the time and the amount.
+
+<KeyFact>
+On the simulator a result can be checked against the rule that produced
+it: a detector that finds amount above 218.67 has found scenario 1, and
+nothing else in the field allows that check. What the check cannot cover
+is a fraud that reacts to the detector, since the script never does.
+</KeyFact>
+
+## PaySim: a replayed mobile-money log
+
+The third dataset is the most downloaded of the synthetic ones, and the
+one whose label column is most often misread. It describes *mobile
+money*: an account held on a mobile phone, into which a customer pays
+cash at a merchant and from which they pay, send money to another user or
+withdraw cash again.
+
+The obvious reading is that its `isFraud` column marks the fraud of a
+real mobile-money service, imitated. To see what it actually marks, look
+at what the generator was built to copy.
+
+### What was replayed
+
+PaySim was built in 2016 from one month of logs of a mobile-money
+service in an African country. The log itself stayed private. What the
+generator took from it was an *aggregate file*: for each hour of the
+month and each transaction type, how many transactions there were, and
+the mean and standard deviation of their amounts. A line has the form:
+day 1, hour 15, 8,703 transactions of type PAYMENT, mean 180,000, standard
+deviation 15,000. Those numbers are an illustration of the format, not a
+line of the real file, which was never published; the currency is not
+disclosed either.
+
+The five types are CASH-IN (cash paid in at a merchant), CASH-OUT (cash
+withdrawn at a merchant), DEBIT (money sent to a bank account), PAYMENT
+(paying a merchant) and TRANSFER (sending money to another user).
+Generated *agents*, small programs that each play one client, draw for
+every hour a transaction type, an amount and a counterparty from those
+distributions, so that the totals per hour and type match the log.
+
+<Figure
+  src="./figures/paysim-replay.svg"
+  alt="A table row from the aggregate file (day 1, hour 15, PAYMENT, count 8,703, mean 180,000, sd 15,000) in blue feeds a box of agents, which emits a synthetic row whose step, type and amount cells are blue and whose originator, destination and balance cells are amber; a legend says blue is matched to the log's hourly aggregates and amber is invented and never checked"
+  caption="What a replay copies and what it makes up: the hourly totals per type come from the real log; who pays whom does not."
+/>
+
+One run, about 24 million transactions, was kept. It was chosen because
+its aggregates had the smallest sum of squared errors against the log's, and
+its fidelity was shown by overlaying, per hour and type, the count, sum,
+mean and spread of the synthetic data on the original's.
+
+<Figure
+  src="./figures/paysim-fidelity-overlay.png"
+  alt="Eight small line charts in four pairs, one pair per transaction type: CASH-IN, TRANSFER, CASH-OUT and PAYMENT. In each pair the top chart is the number of transactions per step (COUNT) and the bottom one is their total amount (SUM), plotted against the hourly step of the month on the horizontal axis. A continuous red line for the original log and a dashed blue line for synthetic run 41840 rise and fall together in a daily rhythm. They agree closely for CASH-OUT, while the blue sits lower at the peaks for CASH-IN and for TRANSFER's sum. Both go quiet after about step 400."
+  caption="How the fidelity of the kept run was checked. For each hour and transaction type, the real log's count and total amount (red) are drawn against the simulation's (blue, dashed). The two curves rise and fall together. Every point is a total over a whole hour; at no point is one account compared with another."
+/>
+
+The overlays track closely, and they show where the evidence stops. Every
+check is on aggregates. Nothing compared a synthetic account's sequence of
+transactions with a real account's, or the network of who pays whom with
+the real network. The agents' individual behaviour, the very thing an
+entity-history feature would read, was never validated.
+
+### Where the fraud label came from
+
+The 2016 generator injects no fraud at all: fraudulent agents are listed
+as future work. The file people download, from
+[Kaggle](https://www.kaggle.com/datasets/ealaxi/paysim1), is a later run
+scaled to a quarter of the original size: 6,362,620 transactions over 744
+hourly steps, with fraudulent agents added. Their behaviour is a script:
+take control of a customer's account, transfer its balance to another
+account, then cash it out.
+
+That script explains the patterns people "discover" in the file. Fraud
+occurs only in TRANSFER and CASH-OUT rows, because those are the two steps
+of the script. It makes up 0.129% of all rows, about 8,200. It is spread
+evenly over the 744 hours, while genuine traffic has a daily rhythm,
+because the replay copied the log's rhythm for genuine transactions and
+the fraud script has none.
+
+The balance columns need a warning of their own, which the release
+itself gives. Each row records the sender's and the recipient's balance
+before and after the transaction. Inside the simulation the mobile-money
+service runs its own fraud control, and a transaction it detects as
+fraud is cancelled: the row stays in the file, but the money does not
+move as it would for a completed transaction, so the balances after it
+record a reversal rather than a transfer. Only fraud rows are ever
+cancelled, so the way the balances relate to the amount differs
+systematically between fraud and genuine rows. A model given the
+balance columns can learn that difference, and the difference exists
+only because the label was already decided: it is the label written a
+second time, in another column. A real detector scores a payment before
+anyone has decided to cancel it, so the release says these four columns
+must not be used for fraud detection.
+
+<KeyFact>
+In PaySim the type mix and the hourly rhythm are copied from a real log;
+the accounts' behaviour and the fraud are not. A detector trained on its
+`isFraud` column learns a two-step script and the bookkeeping of
+cancelled transactions, not mobile-money fraud.
+</KeyFact>
+
+## Elliptic: a graph whose labels come from names
+
+The first three datasets concern card and account fraud, where a victim
+eventually complains. The last two concern laundering, where nobody does,
+and where the evidence lies in connections rather than rows. The first of
+them is real.
+
+### What it contains
+
+[Bitcoin](https://bitcoin.org) is a currency whose every transaction is
+written to a public ledger. A Bitcoin transaction takes coins from one or
+more *addresses* (the identifiers that hold coins) and sends them to
+others; owners are not recorded, only addresses. The Elliptic data set,
+released in 2019 by Elliptic, a company that sells analysis of such
+ledgers, turns part of that ledger into a graph: each node is a
+transaction, and an edge runs from one transaction to the next when coins
+flow between them.
+
+It has 203,769 transactions and 234,355 edges, a small slice of a ledger
+that holds over 400 million transactions. Each node carries 166 features.
+The first 94 describe the transaction itself (its time step, the number
+of inputs and outputs, the fee, the volume, averages over the addresses
+involved); the other 72 summarise the same quantities over the
+transactions one step before and after it in the graph. The feature names
+are not released, for intellectual-property reasons.
+
+The time structure is unusual. The nodes fall into 49 *time steps* about
+two weeks apart, and each step is a single connected component of
+transactions that reached the ledger within three hours of one another.
+No edge joins two steps.
+
+<Figure
+  src="./figures/elliptic-snapshots.svg"
+  alt="A row of 49 small boxes, the first 34 blue and marked train, the last 15 amber and marked test, with step 43 marked by a dashed line as the closure of a dark market; below, an inset graph of eleven transaction nodes joined by arrows, one amber (illicit), three blue (licit), the rest hollow (unknown), with a legend giving 2%, 21% and 77%"
+  caption="Elliptic is 49 separate snapshots, not one growing graph, and most of its nodes carry no label at all."
+/>
+
+So the graph is 49 disconnected snapshots, each a three-hour window two
+weeks from the next. A model cannot follow money from one step to the
+next, and features built from the graph see only the neighbourhood inside
+a snapshot.
+
+### Where the labels came from
+
+A transaction is labelled *illicit* if the entity controlling its input
+addresses belongs to an illicit category (scams, malware, ransomware,
+Ponzi schemes, terrorist organisations, dark markets) and *licit* if it
+belongs to a licit one (exchanges, wallet providers, miners, other legal
+services). Which entity controls which addresses is the company's own
+attribution, made from heuristics such as the observation that addresses
+spent together in one transaction usually share an owner. Transactions
+that mix the inputs of several owners are ignored by that rule.
+
+Of the 203,769 nodes, 4,545 (2%) are illicit, 42,019 (21%) licit, and the
+remaining 77% are *unknown*. Unknown is not licit: it means the company
+could not attribute the transaction either way. That gives the dataset
+two base rates. Over all nodes it is 2%; over the labelled ones, the only
+ones a classifier can be trained and scored on, it is one in ten.
+
+<Figure
+  src="./figures/elliptic-steps-balance.png"
+  alt="Two panels over time steps 1 to 49. Top: a line of illicit divided by licit labelled nodes, near zero for the first eight steps, then jumping between about 0.02 and 0.55 from step to step, and falling back near zero over steps 43 to 46. Bottom: stacked bars of nodes per step, between about 1,000 and 8,000, mostly blue unknown with an orange licit band and a thin green illicit sliver on top"
+  caption="The 49 steps of the Elliptic set. Top: illicit nodes per licit node in each step, swinging from near zero to above 0.5 between neighbouring steps. Bottom: nodes per step, unknown in blue, licit in orange, illicit in green; every step holds between about 1,000 and 8,000 transactions."
+  float="right"
+  width="m"
+/>
+
+The standard use of the data trains on steps 1 to 34 and tests on 35 to
+49, so it tests generalisation forward in time, which the ULB set cannot.
+And it contains the one real change of regime among the five datasets: at
+step 43 a large dark market closed, and all the models tested on the
+data at its release fail to recognise illicit transactions after it, including a model
+retrained at every step with the labels assumed to be available
+immediately.
+
+Against the grid, Elliptic has real transactions and real time, in
+snapshots. It hides the entity: nodes are transactions, and no address or
+owner identifier is released. Its label source is attribution by a
+company, not investigation or a victim's complaint. Labels carry no
+date, so there is no delay and no feedback.
+
+## AMLworld: complete labels no bank has
+
+Elliptic's labels cover less than a quarter of its nodes. <Ref
+lesson="financial-crime-typology"
+id="where-the-laundering-label-comes-from">The typology</Ref> explained
+why real laundering labels are worse still: the only label is a bank's
+own report, most laundering is never reported, and the report arrives
+years later. Only a generator that knows where every unit of money came
+from can label all of it. AMLworld, released in 2023, is such a
+generator's output.
+
+### What the world contains
+
+AMLworld simulates individuals, companies and banks. People are paid
+salaries and pensions, companies buy supplies and pay staff, and each
+person or company may hold accounts at several banks and own shares of
+other companies. A few agents are criminals, with income from one of nine
+activities (smuggling, drugs, extortion, embezzlement and others). They
+launder it through the three stages of <Ref
+lesson="financial-crime-typology"
+id="placement-layering-integration">placement, layering and
+integration</Ref>, partly through eight standard shapes of transfers
+between accounts (one account fanning out to many, many fanning in to
+one, cycles, and combinations of these) and partly by spending it in ways
+that look ordinary, such as a criminal boss paying employees.
+
+Six datasets were published: a higher-illicit and a lower-illicit
+version, each in small, medium and large, from 5 million transactions
+over 10 days to 180 million over 97. Laundering runs from one transaction
+in 807 to one in 1,942. As a check of realism, in the large lower-illicit
+set the two shapes known as scatter-gather (money split across several
+accounts and gathered again into one) and gather-scatter (the reverse)
+make up one
+transaction in 21,440; six months of real transactions at a large Italian
+bank contained about one such laundering transaction in 21,000.
+
+### Labels that follow the money
+
+The label is *transitive*: the generator tracks illicit funds through
+every transaction, including when they are mixed with legitimate money in
+one account, and tags every transfer that carries them. <Ref
+lesson="financial-crime-typology" id="exercises">The typology's exercise
+on transitive taint</Ref> already worked out what this does to a model
+moved into a bank: the transfers several hops downstream carry labels in
+the simulation and none in the bank, so a score measured on one is not a
+score measured on the other.
+
+What AMLworld adds is the size of that downstream mass. In the large
+lower-illicit set, 100,604 transactions are laundering. Only 19,461 of
+them, about one in five, belong to one of the eight shapes; the other
+81,143 are integration disguised as payroll, supplies and other ordinary
+payments. A detector that looks for the shapes misses four laundering
+transactions in five by construction, and only a dataset with complete
+labels can show that miss.
+
+The release also leaves one thing out on purpose. Only the data was
+published, not the generator, so that launderers cannot produce variants
+of the data and test them against detection methods. The dataset is
+static, and so is the laundering in it: the adversary was kept out of the
+data along with the code.
+
+## Five datasets against one loop
+
+Each dataset, read alone, answered the grid's six questions in its own
+way. Is there a part of the loop that every one of them leaves out, so
+that no choice of dataset can supply it? Setting the five answers side
+by side shows it.
+
+<Figure
+  src="./figures/scorecard.svg"
+  alt="A table with five columns (ULB card set, simulator, PaySim on Kaggle, Elliptic, AMLworld) and rows positive rate, entity to follow, time span, label source, labels complete, label delay, alert feedback loop, adaptive adversary; amber dots mark present, hollow dots absent, half dots partial; the last three rows are hollow in every column except one half dot for Elliptic's adversary, and are shaded"
+  caption="Each dataset supplies some parts of the detection loop. None supplies a label delay or a feedback loop."
+/>
+
+### What every column is missing
+
+Read the shaded rows first. None of the five records when a label became
+known, so none contains the delay; and in none do the labels depend on
+which rows an earlier model alerted on, so none contains the feedback
+loop of <Ref lesson="fraud-detection-system"
+id="the-fast-labels-are-a-sample-the-model-chose">the layered
+system</Ref>. Both have to be imposed by the person running the
+experiment. Only one dataset contains a real change of regime, and it is
+an event (a market closing), not an adversary watching the detector.
+
+Then read the columns. Each dataset hides a different part:
+
+- the **ULB set** hides the entity and the calendar, and keeps real labels;
+- the **simulator** keeps entity and calendar and hides the adversary,
+  with labels that are complete because a script wrote them;
+- **PaySim** keeps a real hourly rhythm and hides where its fraud came
+  from, which turns out to be a two-step script;
+- **Elliptic** keeps real transactions in time and hides the entity and
+  most labels, the rest coming from attribution;
+- **AMLworld** keeps the whole money trail and hides the incompleteness
+  that defines real laundering labels.
+
+### Which question each one can answer
+
+A study question is about one part of the loop, so the dataset that can
+answer it is one whose column has that part. The rule has three steps.
+First, name the part the question is about: an entity's history, a span
+of time, the labels, or the adversary. Second, take a dataset whose
+scorecard column shows that part present; if none does, as for the delay
+and the feedback, the part has to be built on top of a dataset by hand.
+Third, name the parts the chosen column lacks, because the answer
+silently assumes them. Whether an hour-of-day feature helps is a
+question about time, and PaySim's hourly rhythm is copied from a real
+log; but its fraud script has no rhythm at all, so the answer would
+measure the contrast between a real rhythm and none, not between genuine
+and fraudulent habits. Whether a model holds up at a laundering rate of
+about one in 1,750, scored against every laundering transaction, goes
+to AMLworld and inherits laundering that never reacts to the model.
+
+<KeyFact>
+In every file whose labels are complete (the simulator, PaySim,
+AMLworld) the crime is a fixed script, and the only real change in the
+criminal population sits in Elliptic, whose labels are partial. No public
+dataset lets complete labels and a changing crime be studied together.
+</KeyFact>
+
+You can now take any result reported on a public financial-crime dataset
+and say what it can mean: what a row is and whether rows can be grouped
+into histories, who wrote the label and how completely, and which part
+of the detection loop the number cannot speak to. The first thing read
+off each dataset was its base rate: 0.17%, 0.84%, 0.13%, one in ten of
+the labelled, one in a thousand or two. <Ref
+lesson="alert-budget-metrics">The next lesson</Ref> takes up what to
+compute from a detector's ranked output at such rates, when a team can
+open only a hundred alerts a day and accuracy and the ROC curve no longer
+say which model catches more fraud.
+
+## Exercises
+
+<Exercise>
+Run the 99%/99% detector of <Ref lesson="economics-of-detection"
+id="what-share-of-the-alerts-are-fraud-the-base-rate-decides">the
+economics lesson</Ref> (it flags 99% of positives and 1% of negatives) on
+three base rates: AMLworld's large lower-illicit set (one in 1,750),
+Elliptic over all nodes (4,545 of 203,769) and Elliptic over the labelled
+nodes only (4,545 of 46,564). Give the precision in each case, then say
+which Elliptic figure describes what a model scored on the dataset
+experiences and why neither describes a real Bitcoin screening system.
+
+<Solution>
+Precision is $\mathrm{TPR}\,\pi / (\mathrm{TPR}\,\pi + \mathrm{FPR}(1-\pi))$
+with $\mathrm{TPR} = 0.99$, $\mathrm{FPR} = 0.01$.
+
+**AMLworld, $\pi = 1/1{,}750 \approx 0.000571$.**
+$0.000566 / (0.000566 + 0.009994) \approx 0.054$: about 5 alerts in 100
+are laundering.
+
+**Elliptic, all nodes, $\pi = 4{,}545/203{,}769 \approx 0.0223$.**
+$0.0221 / (0.0221 + 0.0098) \approx 0.69$.
+
+**Elliptic, labelled nodes, $\pi = 4{,}545/46{,}564 \approx 0.0976$.**
+$0.0966 / (0.0966 + 0.0090) \approx 0.91$.
+
+**Which applies.** A model trained and scored on Elliptic is scored only
+on labelled nodes, since the unknown ones have no truth to compare with,
+so its reported precision lives at the one-in-ten rate: 91% for this
+detector. That is the most favourable of the three numbers, by a factor
+of 17 over AMLworld's.
+
+**Why neither describes a real system.** The labelled nodes are those a
+company could attribute, which overrepresents transactions of known
+exchanges and known illicit services; the 77% that could not be
+attributed are where an unknown launderer would be. The all-nodes figure
+treats every unknown node as licit, which the labels do not say. A real
+screening system scores every transaction, at a base rate nobody knows.
+The transferable move: before quoting a precision, say over which rows
+the base rate was counted.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "The ULB set has real labels produced by investigators, so a
+model that reaches an average precision of 0.8 on a random split of it
+would reach about 0.8 in production." Name the parts of the production
+setting the file does not contain and the step of the claim that fails
+first.
+
+<Solution>
+**The labels are real; the setting is not.** The claim's premise is
+true: the labels come from investigators and disputes and are
+near-complete. What fails is the step from "real labels" to "the same
+score in production".
+
+**The first failing step is the split.** A random split of two days
+trains and tests on the same two days, with fraud of the same cards on
+both sides. In production a model is trained on labels at least a delay
+$\delta$ old, a week or more, and tested on later days, where the fraud
+has moved on. Two days cannot contain a single delay window, so no split
+of this file can imitate that.
+
+**Missing parts.** No card identifier, so no history features and no
+card-level ranking: production scores are computed with features this
+file cannot have, and judged per card at a budget of about a hundred
+cards a day. No label dates, so no delay. No feedback: in production the
+fast labels exist only for the cards the previous model alerted on. No
+drift over weeks.
+
+The score is a statement about separating fraud from genuine payments
+within two days, from anonymous per-row features. It is not an estimate
+of a deployed system's precision.
+</Solution>
+</Exercise>
+
+<Exercise>
+In the simulator, change two settings. (a) Scenario 2 compromises its
+terminals for 1 day instead of 28. (b) Scenario 3 compromises its
+customers for all of the remaining days instead of 14. For each, say
+which kind of feature could still detect the scenario, and what happens
+to the first-month ramp-up.
+
+<Solution>
+**(a) One-day terminals.** A terminal receives about one payment a day
+(1.75 million payments over 10,000 terminals and 183 days), so a
+compromise now produces about one fraud and is over the same day. A
+feature counting the terminal's recent frauds sees the fraud only after
+its label exists, by which time the terminal is clean again; with any
+label delay it never sees it. The fraud payment has a normal amount at a
+terminal the customer normally uses, so neither the row nor the
+customer's history shows anything. Scenario 2 becomes label noise that no
+feature can learn. Its ramp-up shrinks to one day.
+
+**(b) Permanent leaked cards.** Three customers join every day and none
+leaves, so after day $d$ there are $3(d+1)$ compromised customers, about
+550 by the end, one customer in nine. A third of their payments are five
+times their usual size, indefinitely. A history feature such as "this
+amount divided by the customer's 30-day average" works at first, but
+after a month the average itself contains the inflated payments, so the
+contrast shrinks: the fraud becomes the customer's normal. And the ramp-up
+never ends: scenario 3's fraud count grows linearly over all 183 days, so
+there is no stationary period at all, and every test period has a higher
+base rate than the training period before it.
+
+The hypothesis these probes expose: the scenario windows of 28 and 14
+days are what make the simulated stream reach a steady state, and what
+make history features informative. Both are choices of the script.
+</Solution>
+</Exercise>
+
+<Exercise>
+Running the simulator's three scenarios in order prints 978, 9,099 and
+4,604 frauds, and the total number of fraud payments is 14,681, exactly
+their sum. Someone concludes that no payment was hit by two scenarios.
+The generator also writes each fraud's scenario into a column, which
+records the last scenario that touched the payment; that column counts
+973, 9,077 and 4,631. (a) Explain why the printed counts always sum to
+the total, whatever the overlaps. (b) From the two sets of counts, derive
+how many payments were relabelled, and what can and cannot be said about
+which scenario overlapped which.
+
+<Solution>
+**(a)** Each printed count is computed as the number of fraud payments
+after the scenario ran minus the number before. Scenario 2's 9,099 is
+therefore the number of payments it newly made fraud, not the number of
+payments at compromised terminals; a scenario-1 fraud at a compromised
+terminal is touched by scenario 2 and not counted again. Increments of a
+running total always sum to the final total, so the equality holds for
+any overlap and refutes nothing.
+
+**(b)** Let $a$ be the scenario-1 frauds later touched by scenario 2, $b$
+the scenario-1 frauds touched by scenario 3, and $c$ the scenario-2
+frauds touched by scenario 3. The recorded column loses each touched
+payment from its old scenario and gives it to the new one:
+$$
+973 = 978 - a - b,\qquad 9{,}077 = 9{,}099 + a - c,\qquad 4{,}631 = 4{,}604 + b + c .
+$$
+The first gives $a + b = 5$, the third $b + c = 27$; the second, $c - a =
+22$, follows from the other two, so there are only two independent
+equations for three unknowns. At least 27 payments were touched by
+scenario 3 after already being fraud, and 5 scenario-1 frauds were
+relabelled, but how the 5 split between scenarios 2 and 3 cannot be
+recovered from the counts alone; it needs the data. (A payment touched by
+all three scenarios would count in both $a$ and $b$, so these are counts
+of touches, not of distinct payments.)
+
+The transferable move: when a count is an increment of a running total,
+the overlap is in the difference between "new" counts and "final" counts,
+never in their sum.
+</Solution>
+</Exercise>
+
+<Exercise>
+The 2016 PaySim run has 24,638,052 rows: 4,496,947 CASH-IN, 9,014,407
+CASH-OUT, 2,030,969 TRANSFER, 8,955,794 PAYMENT, 139,935 DEBIT. The
+Kaggle file is a quarter-scale run with 6,362,620 rows, of which
+2,237,500 are CASH-OUT, and 0.129% are fraud, all in TRANSFER and
+CASH-OUT. (a) Using the 2016 type shares, estimate the number of
+TRANSFER rows in the Kaggle file. (b) Estimate the fraud rate within
+TRANSFER and CASH-OUT together. (c) If each fraud consists of one
+TRANSFER followed by one CASH-OUT, estimate the fraud rate within each
+type separately. (d) State what you would compute on the file to check
+each estimate, and what would count as agreement.
+
+<Solution>
+**(a)** TRANSFER share in 2016: $2{,}030{,}969 / 24{,}638{,}052 \approx
+8.24\%$. Applied to the Kaggle file: $0.0824 \times 6{,}362{,}620 \approx
+524{,}000$ TRANSFER rows. As a check on the method, the 2016 CASH-OUT
+share, $36.6\%$, predicts $2{,}329{,}000$ CASH-OUT rows against the
+2,237,500 observed (35.2%), a 4% overestimate: the quarter-scale run keeps
+the type mix to within a few percent.
+
+**(b)** Fraud rows: $0.00129 \times 6{,}362{,}620 \approx 8{,}200$.
+Candidate rows: $524{,}000 + 2{,}237{,}500 \approx 2{,}760{,}000$. Fraud
+rate within the two types: $8{,}200 / 2{,}760{,}000 \approx 0.30\%$, one in
+about 340, more than twice the overall rate because the other three types
+carry no fraud.
+
+**(c)** Half the fraud rows in each type, about 4,100: TRANSFER
+$4{,}100 / 524{,}000 \approx 0.78\%$, CASH-OUT $4{,}100 / 2{,}237{,}500
+\approx 0.18\%$. A fraud TRANSFER is four times as common, relative to
+its type, as a fraud CASH-OUT.
+
+**(d)** `value_counts` of `type` for (a), within a few percent of 524,000;
+a cross-tabulation of `type` against `isFraud` for (b) and (c). Agreement
+with (c) means fraud rows split nearly evenly between the two types; a
+clearly uneven split would mean some frauds stop after the TRANSFER (for
+instance because the cash-out was blocked), which the script's
+description does not say. Either way, what is being estimated is a
+property of the fraud script, not of mobile-money fraud.
+</Solution>
+</Exercise>
+
+<Exercise>
+Four study questions. For each, choose the dataset (or datasets) of this
+chapter that can answer it, and name the part of the question the chosen
+dataset cannot speak to. (a) Does a feature counting a terminal's frauds
+over the last seven days improve a card-fraud detector? (b) Does a graph
+model detect laundering better than a gradient-boosted tree when the
+laundering crosses several banks? (c) Does a model trained before an
+abrupt change in the criminal population keep working after it? (d) Does
+the <Ref lesson="undersampling-calibration">probability correction for
+undersampling</Ref> restore calibration on real card data?
+
+<Solution>
+**(a)** The simulator: it is the only dataset with a terminal identifier
+and fraud planted at terminals (scenario 2). It cannot say whether real
+compromised terminals behave like a 28-day script, and its labels are
+instant, so the delay that a real terminal-fraud feature must respect has
+to be imposed by hand.
+
+**(b)** AMLworld: it has several banks, accounts and complete labels for
+cross-bank patterns. It cannot say how the comparison looks when scored
+against a bank's incomplete reports, and its laundering does not adapt.
+
+**(c)** Elliptic: the dark-market closure at step 43 is the only real
+change of regime in the five datasets. It is one event, the labels are
+attributions rather than investigations, and there is no entity to
+follow across it.
+
+**(d)** The ULB set: the only real card labels, at a real card base rate
+of 0.172%. It cannot say whether the correction holds over time, since it
+spans two days and a single base rate.
+</Solution>
+</Exercise>
+
+<Exercise>
+In the simulator, take a test week of days 129 to 135 and suppose the
+labels of every payment up to day 128 are known when the test begins.
+(a) Using only the scenario rules, estimate the share of the test week's
+scenario-2 frauds that occur at terminals whose compromise began before
+day 129. (b) Estimate the same share for scenario 3, for customers whose
+compromise began before day 129. (c) A re-run of the generator gives 330
+of 384 for (a) and 110 of 152 for (b). Explain what a model can exploit
+in such a test week that has nothing to do with recognising new fraud.
+
+<Solution>
+**(a)** On test day $d$, the compromised terminals are the two drawn on
+each of the days $d - 27$ to $d$: 28 draws. Those drawn on day 128 or
+earlier number $28 - (d - 128)$. Over $d = 129, \dots, 135$ the share runs
+$27/28, 26/28, \dots, 21/28$, averaging $24/28 \approx 86\%$. With equal
+traffic at every terminal, about 86% of the week's scenario-2 frauds are
+at terminals compromised before the week began. The re-run gives
+$330/384 = 86\%$.
+
+**(b)** The same count with a 14-day window: on day $d$, the share of
+active draws made by day 128 is $(14 - (d - 128))/14$, running
+$13/14$ down to $7/14$, average $10/14 \approx 71\%$. The re-run gives
+$110/152 = 72\%$.
+
+**(c)** Most test-week fraud continues compromises that were already
+visible, with labels, before the week started. A model can score well by
+remembering which terminals and customers had fraud in the last weeks
+and flagging their next payments, without recognising any new
+compromise. A bank would already have blocked many of those cards, so
+those frauds would never reach the model. <Ref
+lesson="delayed-labels-prequential">Temporal validation with delayed
+labels</Ref> builds the test week the honest way: it leaves a delay
+block between training and test, and removes from the test days the
+payments of cards known to be compromised by then.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Dal Pozzolo, O. Caelen, R. A. Johnson, G. Bontempi, "Calibrating Probability with Undersampling for Unbalanced Classification," *IEEE Symposium Series on Computational Intelligence (SSCI)*, 2015 — Sec. VI and footnote 1 (the credit-card set: online transactions of September 2013, two days, 492 frauds of 284,807, 0.172%, minimum undersampling rate ≈ 0.00173, released with the paper).
+2. Machine Learning Group, Université Libre de Bruxelles, and Worldline, "Credit Card Fraud Detection," Kaggle dataset `mlg-ulb/creditcardfraud` — dataset description (European cardholders, September 2013; V1–V28 as principal components with the original features withheld for confidentiality; Time as seconds since the first transaction; Amount; Class). https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud
+3. Y. Lucas, J. Jurgovsky, "Credit Card Fraud Detection Using Machine Learning: A Survey," arXiv:2010.06479, 2020 — Sec. 1.1 (no public data reflecting real card payments; the ULB set as the only public sample, PCA-transformed, from the same payment provider; fraud labels assigned by investigators after consulting the cardholder). https://arxiv.org/abs/2010.06479
+4. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 2, "Machine learning for credit card fraud detection" (lack of public datasets; the 2016 Kaggle release as the only real one), Ch. 3, "Transaction data simulator" (customer and terminal profiles, radius $r = 5$, the reference dataset of 5,000 customers, 10,000 terminals, 183 days and 1,754,155 transactions, the three fraud scenarios with their counts, the first-month ramp-up), and Ch. 3, "Baseline fraud detection system" (the one-week training and test periods with a one-week delay; the depth-2 tree's 218.67 split). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+5. E. A. Lopez-Rojas, A. Elmir, S. Axelsson, "PaySim: A Financial Mobile Money Simulator for Fraud Detection," *28th European Modeling and Simulation Symposium (EMSS)*, 2016, pp. 249–255 — Abstract and Sec. 1 (fraud injection out of scope), Sec. 3 (the five transaction types), Sec. 4.2–4.4 (aggregate transaction file, day/hour steps, the "day 1, hour 15, 8,703 PAYMENT" example, agents), Sec. 5 (744 steps, selection by sum of squared errors, run PS41840 and Table 1, Figures 1–5), Sec. 6 (fraudulent agents as future work).
+6. E. A. Lopez-Rojas, "Synthetic Financial Datasets For Fraud Detection," Kaggle dataset `ealaxi/paysim1` — dataset description (quarter-scale run, 744 hourly steps; `isFraud` as transactions of fraudulent agents that take over accounts, transfer and cash out; cancelled frauds and the balance columns; `isFlaggedFraud` for transfers above 200,000). https://www.kaggle.com/datasets/ealaxi/paysim1
+7. M. Weber, G. Domeniconi, J. Chen, D. K. I. Weidele, C. Bellei, T. Robinson, C. E. Leiserson, "Anti-Money Laundering in Bitcoin: Experimenting with Graph Convolutional Networks for Financial Forensics," *KDD Workshop on Anomaly Detection in Finance*, 2019 — Sec. 2.1 (graph construction; 203,769 nodes, 234,355 edges; 2% illicit, 21% licit; 94 local and 72 aggregated features; 49 time steps with no edges between them; Figure 1), Sec. 2.2 (heuristic labelling), Sec. 4 (temporal 70:30 split at step 34; the dark-market shutdown at step 43). https://arxiv.org/abs/1908.02591
+8. Elliptic, "Elliptic Data Set," Kaggle dataset `ellipticco/elliptic-data-set` — dataset description (licit, illicit and unknown classes; feature descriptions withheld for intellectual-property reasons). https://www.kaggle.com/datasets/ellipticco/elliptic-data-set
+9. E. Altman, J. Blanuša, L. von Niederhäusern, B. Egressy, A. Anghel, K. Atasu, "Realistic Synthetic Financial Transactions for Anti-Money Laundering Models," *NeurIPS 2023 Datasets and Benchmarks Track* — Sec. 1 and 3.1 (incomplete real labels), Table 1 (comparison with earlier synthetic AML data), Sec. 3.2 (the eight patterns), Sec. 3.3–3.4 (the virtual world, nine criminal activities, transitive labelling), Sec. 3.5 (the six public datasets and the realism comparison with a large Italian bank), Sec. 7 (data released, generator withheld), Appendix Tables 4, 7 and 8. https://arxiv.org/abs/2306.16424
+</References>
