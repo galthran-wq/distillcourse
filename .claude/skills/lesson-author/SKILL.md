@@ -248,6 +248,12 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
    is needed (an hour to an hour and a half is fine); if the lesson turns
    out to carry two problems that each need full treatment, say so in your
    report as a proposed split — the syllabus is the human's.
+   Then the **tightening pass (L0f)**: strike every sentence that restates
+   its heading, re-says the paragraph before it, previews what comes next,
+   or sums up a section; strike every sentence whose deletion loses no
+   idea, number or step. Expect to cut 15–25% of a first draft. The
+   closing goes in `<Conclusion>` right before `## Exercises` — the one
+   place the lesson sums itself up.
 
 6a. **Update the ledger.** Write `content/courses/<course>/research/taught/<lesson>.md`
    (replace it on a revision) — what THIS lesson actually explained, as

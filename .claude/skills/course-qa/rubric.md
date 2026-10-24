@@ -46,6 +46,12 @@ how easily they would master what it presents.
   actually explains — terms, notation, running cases, what is left open.
   Later lessons are written and checked against it; a missing or wrong
   entry is a required fix.
+- **U8 (required)**: each thing said once within the lesson (L0f). Quote
+  every first sentence that restates its heading, every section that ends
+  by summing itself up, every paragraph that re-says the one before it,
+  every preview of what a later section will show. Name the sections that
+  could lose a fifth of their words without losing an idea. The closing
+  must be a `<Conclusion>` before `## Exercises`, and the only summary.
 - **U5 (advisory)**: length is judged by need, not by the clock: an hour
   to an hour and a half is fine when every part is needed; name any
   section the newcomer would not miss, and flag a lesson carrying two

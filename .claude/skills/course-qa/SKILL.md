@@ -45,7 +45,7 @@ rubric's lab section.
    cannot judge the scaffold from the version that still has the answers in
    it.
 
-4. Run the newcomer test (rubric U1–U6) FIRST, before any other item and
+4. Run the newcomer test (rubric U1–U8) FIRST, before any other item and
    before your judgment is anchored by the checklist: you are the reader
    who knows the prerequisites and nothing else. Then score every rubric
    item **PASS / WEAK / FAIL / N-A** with one line of
@@ -59,8 +59,13 @@ rubric's lab section.
 6. End with:
    - **Verdict:** ready for `reviewed` / needs revision / needs rewrite.
    - A prioritized fix list (max 5 items, most damaging first), each with the
-     file and the concrete change. Newcomer-test (U1–U4, U6) failures rank above
+     file and the concrete change. Newcomer-test (U1–U4, U6, U8) failures rank above
      everything else; a lesson with an open U item is never "ready".
+     The list is not a quota: a fix belongs on it only if you would hold
+     the lesson back from a human reader over it. When what remains is
+     polish, say so and mark the lesson ready — the fix loop has two
+     rounds, and every round spent on polish is a rewrite that can open a
+     new gap.
    - What to spot-check by hand in `npm run dev` — for a lab, which cells to
      run in Colab.
 

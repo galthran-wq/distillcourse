@@ -64,6 +64,7 @@ const ALLOWED_COMPONENTS = new Set([
   "Remark",
   "KeyFact",
   "Task",
+  "Conclusion",
   "Exercise",
   "Solution",
   "References",

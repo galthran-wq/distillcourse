@@ -81,6 +81,16 @@ only by someone who already knows the material.
   is. What every earlier lesson actually explained is kept in the course's
   ledger, `research/taught/<lesson>.md`, which the writer of each lesson
   updates and every later writer and reviewer reads.
+  (f) **Say each thing once — within the lesson too.** A heading names
+  what the section is about; the sentence under it never restates it (a
+  question heading is not followed by the same question in other words).
+  No section ends by summing itself up, no paragraph re-says what the one
+  before it established, no sentence announces what the next will show;
+  a callback to an earlier section is a clause, not a re-explanation. The
+  lesson sums itself up once, in its `<Conclusion>` (L10c). Then tighten:
+  delete every sentence whose deletion loses no idea, number or step. A
+  lesson that can lose a fifth of its words that way was too long; length
+  is earned by content, never by restatement.
 - **L1 — One objective.** Exactly one `goal` per lesson, starting with a Bloom
   verb ("Compute…", "Explain…", "Construct…"). If a draft teaches two things,
   split it.
@@ -212,7 +222,9 @@ only by someone who already knows the material.
   lesson closes by saying, in plain words, what the reader can now do or
   explain, and which problem stays open for the next lesson. (d) Stating
   what comes next is required; manufacturing suspense ("you'll soon see…")
-  stays banned.
+  stays banned. The closing is a `<Conclusion>` block placed right before
+  `## Exercises` — one or two short paragraphs, the only summary the
+  lesson has.
   (e) Sections argue, not inventory: within a section, paragraphs run
   claim → evidence → bearing on the lesson's question, and every section
   ends with its bearing visible in the body itself. The test: cover the

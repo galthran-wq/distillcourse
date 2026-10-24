@@ -12,6 +12,10 @@ Report PASS/FAIL for each, with a quoted line as evidence where sensible.
    answer to a stated problem, with its "because"?
 0b. No source (author, book, paper) named anywhere in the body, exercises
    and solutions included; `source-in-prose` silent?
+0c. Each thing said once (L0f): no first sentence restating its heading,
+   no section recap, no paragraph re-saying the previous one, no preview;
+   tightening pass done; the closing is a `<Conclusion>` before
+   `## Exercises` and the only summary?
 
 ## Structure (validator also checks the mechanical parts)
 1. Opens with the opening statement verbatim, and it is the PROBLEM in

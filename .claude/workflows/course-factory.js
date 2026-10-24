@@ -384,7 +384,7 @@ if (phaseArg === 'lessons') {
         { label: `demo: ${lesson.slug}`, phase: 'Lessons' },
       )
     }
-    const qaPrompt = `${at}Execute this repo's course-qa skill, non-interactively: read .claude/skills/course-qa/SKILL.md and follow it exactly for course-slug ${slug}, lesson-slug ${lesson.slug} (read-only, ${isLab ? 'lab lesson — build the notebook and score it against the rubric\'s lab section B1-B8, reading it as the learner before you open solution.py; report nothing `npm run validate` already reports' : 'full rubric — the newcomer test U1-U7 first'}). Then produce structured output: ready=true only if no REQUIRED fixes remain; fixes = prioritized required fixes (max 5).`
+    const qaPrompt = `${at}Execute this repo's course-qa skill, non-interactively: read .claude/skills/course-qa/SKILL.md and follow it exactly for course-slug ${slug}, lesson-slug ${lesson.slug} (read-only, ${isLab ? 'lab lesson — build the notebook and score it against the rubric\'s lab section B1-B8, reading it as the learner before you open solution.py; report nothing `npm run validate` already reports' : 'full rubric — the newcomer test U1-U8 first'}). Then produce structured output: ready=true only if no REQUIRED fixes remain; fixes = prioritized required fixes (max 5).`
     const qa = await run(qaPrompt, {
       label: `qa: ${lesson.slug}`, phase: 'Lessons', model: 'opus', schema: QA_SCHEMA,
     })

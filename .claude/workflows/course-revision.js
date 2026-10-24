@@ -163,7 +163,7 @@ const done = await pipeline(
     return lesson
   },
   async (lesson) => {
-    const qaPrompt = `${at}Execute this repo's course-qa skill, non-interactively: read .claude/skills/course-qa/SKILL.md and follow it exactly for course-slug ${slug}, lesson-slug ${lesson.slug} (read-only, full rubric — the newcomer test U1-U7 first). Then produce structured output: ready=true only if no REQUIRED fixes remain; fixes = prioritized required fixes (max 5).`
+    const qaPrompt = `${at}Execute this repo's course-qa skill, non-interactively: read .claude/skills/course-qa/SKILL.md and follow it exactly for course-slug ${slug}, lesson-slug ${lesson.slug} (read-only, full rubric — the newcomer test U1-U8 first). Then produce structured output: ready=true only if no REQUIRED fixes remain; fixes = prioritized required fixes (max 5).`
     const qa = await agent(qaPrompt, {
       label: `qa: ${lesson.slug}`, phase: 'Revise', model: 'opus', schema: QA_SCHEMA,
     })
