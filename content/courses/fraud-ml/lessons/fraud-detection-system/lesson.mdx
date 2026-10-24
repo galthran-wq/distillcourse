@@ -6,11 +6,10 @@ probability of fraud, put it in front of every payment, and refuse the payment
 when the probability passes one half. Each of the three constraints in the
 opening breaks one piece of that picture.
 
-- **The deadline.** The answer must reach the till within a second or two,
-  and most of that is spent carrying the request to the bank and the answer
-  back, so the bank's own checks get a few milliseconds. Whatever refuses a
-  payment in that time turns a customer away each time it is wrong, so it
-  must almost never be wrong, and a classifier's "fraud" is rarely that sure.
+- **The deadline.** Whatever refuses a payment must decide within the
+  second or two the till waits, and turns a customer away each time it is
+  wrong, so it must almost never be wrong; a classifier's "fraud" is rarely
+  that sure.
 - **The team.** A classifier that wrongly says "fraud" on just one genuine
   payment in a hundred says it about 4,000 times a day. A hundred cases is
   all anyone can check.
@@ -18,25 +17,18 @@ opening breaks one piece of that picture.
   produced by those same hundred cases and by customers who complain, late
   or never. Nobody hands the bank a labelled copy of the day.
 
-So the real question is what shape of system these three constraints force,
-and where in it a classifier fits. Take them one at a time, starting with the
-clock.
-
 ## The deadline splits the work in two
 
 When a card is used at a till or on a website, the terminal sends a request to
-the bank that issued the card (the card's *issuer*) and waits for one word back: accept or deny. The
-customer is standing at the counter or watching a spinner. End to end the
-answer must arrive within one or two seconds. Most of that budget goes on the
-journey: the request travels from the terminal through the card network to
-the issuer, and the answer travels back. The issuer's own checks get the few
-milliseconds left over. What can be decided in a few milliseconds?
+the bank that issued the card (the card's *issuer*) and waits for one word back: accept or deny. End to end the
+answer must arrive within one or two seconds, and most of that goes on the
+round trip from the terminal through the card network to the issuer and
+back. The issuer's own checks get the few milliseconds left over.
 
 ### What can be checked before the answer
 
 Some questions need only the request and a lookup of values the bank already
-keeps for the card's account: is
-the PIN right (for a chip card), how many wrong attempts have there been, is
+keeps for the card's account: is the PIN right (for a chip card), how many wrong attempts have there been, is
 the card active or blocked, is there enough balance, is the spending limit
 reached. These are the *terminal checks*. A request that fails one is denied.
 They are not fraud detection as such, but they stop a stolen card that has
@@ -49,28 +41,24 @@ information. One example:
 
 This is a *blocking rule*: an if-then statement evaluated on the request alone,
 without the card's history, that refuses the payment when it fires. Many run
-side by side, and a payment that fires any of them is refused, while the card
-itself stays active.
+side by side; a payment that fires any of them is refused, while the card
+stays active.
 
 ### Why a block has to be nearly always right
 
-Refusing a payment has a cost that the obvious picture leaves out. A refused
-genuine payment is a lost sale for the merchant and an embarrassed customer at
-the till, who may take their next purchase to a different card. Put a number
-on it. Of the 400,000 daily payments, about 399,000 are genuine. A rule that
+A refused genuine payment is a lost sale for the merchant and an embarrassed
+customer at the till, who may take their next purchase to a different card.
+Of the 400,000 daily payments, about 399,000 are genuine. A rule that
 wrongly fires on 1% of genuine payments refuses about 4,000 genuine customers a
-day: four for every fraud in the whole stream, even if the same rule caught
-every single fraud.
+day: four for every fraud in the whole stream, even if it caught every fraud.
 
-So whatever refuses a payment must fire almost only on fraud, with a
-false-alarm rate far below 1%. That is why blocking rules are few and narrow,
-and why each one is written by a person who can say why it is safe.
+Blocking rules are therefore few and narrow, each written by a person who can
+say why it is safe.
 
 <KeyFact>
-Two demands decide what may refuse a payment: it must finish before the
-answer, and its false alarms must stay at a handful a day out of 400,000
-payments. The split is between fast-and-precise and everything else, not
-between rules and models.
+What may refuse a payment must finish before the answer and keep its false
+alarms to a handful a day out of 400,000 payments. The split is between
+fast-and-precise and everything else, not between rules and models.
 </KeyFact>
 
 ### Where a learned model fits: after the answer
@@ -83,43 +71,36 @@ continent forty minutes ago. To see that, the model needs features computed
 over the card's history: counts and sums of its payments over the last hour,
 day, week and month, its average weekly spend, the location of its last
 purchase; beside them, the same kind of feature for the merchant, such as
-how often it has been hit by fraud lately. A working
-model reads dozens of them. Building these history features for each payment
-is called *feature augmentation*.
+how often it has been hit by fraud lately. A working model reads dozens of
+them. Building them for each payment is called *feature augmentation*.
 
 ### Could the model refuse payments?
 
-Could the model then sit before the answer, beside the blocking rules, and
-refuse the payments it scores high? Check it against the two demands, and
-start with precision, because precision decides. A model's score adds up
-many weak hints. Among the hundred cards it is most suspicious of on a
-typical day, about 85 turn out to be genuine, as the next section measures.
-Letting those scores refuse payments would turn away genuine customers on
-most of the cards it acts on, every day, far beyond the handful of false
-alarms a refusal may cost. Raising the threshold until its refusals are
-almost always fraud leaves only a thin sliver of the scores above it, so as
-a whole the model cannot do a blocking rule's job.
+Test the model against the two demands, precision first, because precision
+decides. A model's score adds up many weak hints: among the hundred cards it
+is most suspicious of on a typical day, about 85 turn out to be genuine, as
+the next section measures. Letting those scores refuse payments would turn
+away genuine customers on most of the cards it acts on, every day. Raising the
+threshold until its refusals are almost always fraud leaves only a thin
+sliver of the scores above it, so as a whole the model cannot do a blocking
+rule's job.
 
-Time does not rule the model out on its own. Plenty of history features can
-be kept ready before a request arrives: a stored count of the card's
-payments today, plus one, is today's count including this payment, and a
-weekly average can be updated overnight. What the deadline does is limit
-what may run before the answer: only values ready when the request arrives,
-and an evaluation that finishes in milliseconds on every one of the 400,000
-payments without ever holding up the answer. Since the model may not refuse
-anyway, there is nothing to gain from squeezing it into that slot, and after
-the answer the limit is gone: every feature can be recomputed with the new
+Time alone does not rule the model out. Many history features can be kept
+ready before a request arrives (a stored count of the card's payments today,
+plus one, is today's count including this payment; a weekly average can be
+updated overnight), and before the answer the deadline allows exactly that:
+values ready at request time and an evaluation that finishes in milliseconds.
+But since the model may not refuse anyway, nothing is gained by squeezing it
+into that slot. After the answer every feature can be recomputed with the new
 payment included, and the model can be as large as it needs to be.
 
-So the model scores a payment that has already been accepted: the payment
-is enriched with its history features and scored in near real time, within
-a second or so after the answer. Nothing the score can still do loses much
-by waiting that second. It cannot refuse the payment it scores, which it was
-not precise enough to do in any case. It can block the *card* for future
-payments, and a second's delay costs almost nothing there, because a stolen
-card is used in a burst over minutes and hours, not within the same second.
-And it can ask a person to look. That request is an *alert*. An alert
-refuses nothing: it puts the card in front of an investigator.
+So the model scores a payment that has already been accepted, enriched with
+its history features, within a second or so after the answer. It cannot
+refuse that payment. It can
+block the *card* for future payments, and a second's delay costs almost
+nothing there, because a stolen card is used in a burst over minutes and
+hours. And it can ask a person to look: that request is an *alert*, which
+refuses nothing and puts the card in front of an investigator.
 
 <FigureSequence
   name="clock"
@@ -135,53 +116,43 @@ written.
 </Task>
 
 <Aside>
-**A model inside the deadline.** Some issuers do run a learned model before the
-answer. One Belgian card processor computes a fraud probability inside its
-authorisation window, alongside the terminal checks, and aborts the payment
-when that probability passes a threshold. Its features come from customer
-profiles computed in advance and only looked up when the request arrives,
-and the model itself is re-estimated every night at midnight, since fitting
-cannot run inside the window. This fits the argument above rather than
-breaking it. The processor stays within the time limit by scoring only from
-what is ready before the request, and it meets the precision bar by letting
-the score refuse a payment only above a threshold set high enough to match
-the false-alarm rate a blocking rule must meet. Below that threshold its
-scores feed the same slower ranking job as in the main text.
+**A model inside the deadline.** One Belgian card processor computes a fraud
+probability inside its authorisation window, alongside the terminal checks,
+and aborts the payment when it passes a threshold. Its features come from
+customer profiles computed in advance and looked up when the request arrives,
+and the model is re-estimated every night, since fitting cannot run inside the
+window. The threshold is set high enough to match a blocking rule's
+false-alarm rate; below it, the scores feed the same slower ranking job.
 </Aside>
 
 ## A hundred cases a day: the model's output is a ranking
 
-After the deadline, one piece of the obvious picture is still standing: the
-threshold at one half that turns the probability into "fraud" or "not fraud".
-The investigation team is what breaks it.
-
-Investigators do not check payments one at a time. An investigator phones the
-cardholder and goes through all of the card's recent payments in one call. So
-the unit of their work is the card, and the team's capacity is about a hundred
-cards a day.
+One piece of the obvious picture still stands: the threshold at one half that
+turns the probability into "fraud" or "not fraud". The investigation team
+breaks it. An investigator phones the cardholder and goes through all of the
+card's recent payments in one call, so the unit of their work is the card, and
+the team's capacity is about a hundred cards a day.
 
 <Example title="one day of a real card stream">
 A Belgian e-commerce card stream in 2018 carried about 400,000 payments a day.
 About 1,000 of them were fraudulent, 0.25% of the stream, spread over slightly
 more than 300 cards, so a compromised card carried about three fraudulent
-payments a day. The team can call 100 cards.
+payments a day.
 
-How many distinct cards paid on such a day is not part of these figures.
-Take about 120,000, a little over three payments per card. Then the 300
+The figures do not say how many distinct cards paid; take about 120,000, a
+little over three payments per card. Then the 300
 compromised cards are one card in 400, the same quarter of a percent that
 fraud is of payments.
 
-**A perfect model.** Suppose the model knew exactly which cards were
-compromised. It could still send only 100 of the roughly 300 compromised cards
-to the investigators. At best all 100 calls find fraud, and about 200 cards,
+**A perfect model.** A model that knew exactly which cards were compromised
+could still send only 100 of the 300 to the investigators: about 200,
 two-thirds of the day's compromised cards, are never looked at that day.
 
-**A thresholded model.** Now take a model that flags every payment whose
-probability passes one half, and suppose it is wrong on only 1% of genuine
-payments. It flags about $0.01 \times 399{,}000 \approx 4{,}000$ genuine
+**A thresholded model.** A model that flags every payment whose probability
+passes one half, wrong on only 1% of genuine payments, flags about $0.01 \times 399{,}000 \approx 4{,}000$ genuine
 payments, plus whatever frauds it catches. That is about forty times what the
-team can work. The flags beyond the hundredth card are not acted on, so the
-yes/no output describes 4,000 decisions while the bank makes at most 100.
+team can work: the yes/no output describes 4,000 decisions while the bank
+makes at most 100.
 </Example>
 
 <Figure
@@ -198,9 +169,7 @@ yes/no output describes 4,000 decisions while the bank makes at most 100.
   width="m"
 />
 
-The example's day is a typical one, and the gap between the two lower lines
-is what the investigators' way of working rests on. Frauds outnumber
-compromised cards about three to one on every day of the three weeks, because
+Frauds outnumber compromised cards about three to one on every day of the three weeks, because
 a stolen card is used several times before anyone stops it. So one call to a
 cardholder settles about three fraudulent payments at once, and the card,
 not the payment, is the natural unit to rank and to count.
@@ -208,28 +177,25 @@ not the payment, is the natural unit to rank and to count.
 ### Ranking, then cutting at the capacity
 
 The useful question for the model is therefore not "is this payment fraud?"
-but "which hundred cards should the team call today?". The answer is to sort
-the day's cards by their highest score and hand the top $k$ to the
-investigators, with $k \approx 100$. Write $T_t$ for the payments of day $t$.
+but "which hundred cards should the team call today?". So the day's cards are
+sorted by their highest score and the top $k$ go to the investigators, with
+$k \approx 100$. Write $T_t$ for the payments of day $t$.
 The day's *alerts* $A_t$ are the payments of $T_t$ on the $k$
 highest-ranked cards.
 
-Two consequences follow. First, $k$ is fixed by people (how many investigators,
-how many calls each can make in a day), not by the model. There will be about
-a hundred alerts tomorrow whatever the model's quality. Second, what a better
-model buys is a more precise top hundred: more real fraud among the cards the
-team was going to call anyway.
+$k$ is fixed by people (how many investigators, how many calls each can make
+in a day), not by the model: there will be about a hundred alerts tomorrow
+whatever the model's quality. What a better model buys is a more precise top
+hundred: more real fraud among the cards the team was going to call anyway.
 
-How precise is that in practice? On the same Belgian stream, a plain logistic
+On the same Belgian stream, a plain logistic
 regression put about 15 compromised cards in its daily top 100. A hundred
 cards picked at random from the example's 120,000 would hold on average
-$100 \times 300 / 120{,}000 = 0.25$, a quarter of a compromised card. Fifteen
-in a hundred sounds poor until it is set against that random hundred:
-counted in cards on both sides, the ranking finds about sixty times as many
-compromised cards as chance. The assumed card count barely matters here: for
-a random hundred to hold even one compromised card, the 400,000 payments
-would have to come from fewer than 30,000 cards, more than thirteen payments
-per card per day. Precision also matters for a reason beyond the count:
+$100 \times 300 / 120{,}000 = 0.25$, a quarter of a compromised card, so
+fifteen in a hundred is about sixty times what chance finds. The assumed card
+count barely matters: a random hundred would hold even one compromised card
+only if the 400,000 payments came from fewer than 30,000 cards, more than
+thirteen payments per card per day. Precision also matters for a reason beyond the count:
 investigators who spend most of their calls on legitimate customers start to
 distrust the alerts.
 
@@ -240,18 +206,15 @@ distrust the alerts.
 />
 
 <KeyFact>
-A fraud model is judged by how many real fraud cards it puts above a cut that
-headcount, not the model, decides. Accuracy over 400,000 payments plays no
-role, which is why <Ref lesson="alert-budget-metrics">the metrics lesson</Ref>
+Accuracy over 400,000 payments says nothing about the fraud cards above the
+cut, which is why <Ref lesson="alert-budget-metrics">the metrics lesson</Ref>
 replaces it with precision at the budget.
 </KeyFact>
 
 <Exercise>
 A larger issuer sees 2,000,000 card payments a day, 0.1% of them fraudulent,
 with about four fraudulent payments per compromised card. Its team of 25
-investigators can each work 12 cards a day. Before opening the solution, write
-down the three quantities you need (compromised cards, $k$, false flags).
-Compute: the number of compromised cards a day; the largest share of them a
+investigators can each work 12 cards a day. Compute: the number of compromised cards a day; the largest share of them a
 perfect ranking could put in front of the team; and the number of genuine
 payments a threshold that is wrong on 1% of genuine payments would flag, as a
 multiple of the team's capacity.
@@ -268,19 +231,16 @@ Genuine payments: $2{,}000{,}000 - 2{,}000 = 1{,}998{,}000$. A 1% false-flag
 rate flags about $19{,}980 \approx 20{,}000$ of them, about $20{,}000 / 300
 \approx 67$ times what the team can work.
 
-The transferable move: compare every count to $k$ first. This bank's team is
-larger in absolute terms than the 100-card team in the example, and a larger
-share of its compromised cards is reachable, but the thresholded classifier
-still overwhelms it by more than an order of magnitude, because the false
-flags scale with the 2,000,000 genuine payments and the team does not.
+The team is three times the example's, yet the false flags, which scale with
+the genuine payments while the team does not, still overwhelm it by more than
+an order of magnitude.
 </Solution>
 </Exercise>
 
 ## Rules beside the model: two tools with different upkeep
 
 Once a model ranks the cards, it is tempting to retire the rules people
-wrote. The rules that survive after the answer are of a second kind, and two
-differences keep them.
+wrote. The rules that run after the answer are of a second kind.
 
 A *scoring rule* reads the same history features as the model, but instead of
 refusing a payment it gives it a score, and its alerts join the model's in the
@@ -296,15 +256,15 @@ can encode it on Monday. The model learns a pattern only after enough labelled
 examples of it have reached its training set, which takes days at least.
 
 **Readability.** A rule can be read and argued over: the investigator knows
-exactly why a card was flagged. The same rule can be deleted the day it starts
-raising false alarms. The model cannot be opened and edited. The only way to
+exactly why a card was flagged, and the rule can be deleted the day it starts
+raising false alarms. The model cannot be opened and edited; the only way to
 change what it does is to retrain it on new labels.
 
 ### What the model can do that a rule cannot
 
 A rule catches only patterns someone has already discovered, and only patterns
 simple enough to state in a few features. Different experts write different
-rules, and a set of hundreds of them becomes hard to keep consistent. The
+rules, and hundreds of them become hard to keep consistent. The
 model combines dozens of features at once, nonlinearly, and finds patterns no
 one has stated. The two tools fail differently, so a system uses both.
 
@@ -317,8 +277,7 @@ one has stated. The two tools fail differently, so a system uses both.
 | Investigators | the same day | every recent payment of a card | label, block the card | hiring |
 
 <KeyFact>
-The five rows are one bank's arrangement, not a fixed design: another bank
-may merge the two kinds of rule or split the model into several. What the
+The five rows are one bank's arrangement: another bank may merge the two kinds of rule or split the model into several. What the
 three constraints fix is the order: fast and precise before the answer, a
 slower ranking after it, people at the end, and their labels flowing back
 into the model.
@@ -326,18 +285,16 @@ into the model.
 
 ## What the model gets back: two kinds of label on two clocks
 
-The model, unlike every rule in the table, is built from labelled payments. A classroom dataset
-arrives with a label on every row, and the obvious assumption is that the
-bank's training data looks the same. It cannot: nobody checks 400,000
-payments a day. Only two groups of people ever say whether a payment was
-fraud, and they work on different clocks.
+The model, unlike every rule in the table, is built from labelled payments. A
+classroom dataset arrives with a label on every row; the bank's training data
+cannot, because nobody checks 400,000 payments a day. Only two groups of people ever say whether a payment was
+fraud.
 
 ### Investigators: fast labels on the alerted cards
 
-When an investigator phones the holder of an alerted card, they go through the
-card's recent payments together, and each one is marked fraud or genuine and
-returned to the system the same day. A card found compromised is blocked
-straight away. These labels are called *feedbacks*. Write $F_t$ for the
+During the call on an alerted card, each of its recent payments is marked
+fraud or genuine and returned to the system the same day; a card found
+compromised is blocked straight away. These labels are called *feedbacks*. Write $F_t$ for the
 recent payments of the cards alerted on day $t$, with their labels. One call
 can produce many feedback labels, most of them on genuine payments of a card
 that was alerted for one bad payment, or of a card that turned out not to be
@@ -365,9 +322,8 @@ $D_{t-\delta}$: every payment of day $t - \delta$, each with a label.
 </Definition>
 
 Banks set $\delta$ between about a week and a month; the examples here use
-$\delta = 7$. The feedbacks of day $t - \delta$ are part of $D_{t-\delta}$, since
-the alerted payments were payments of that day too: the delayed samples confirm
-them and add everything else.
+$\delta = 7$. The feedbacks of day $t - \delta$ are part of $D_{t-\delta}$: the
+delayed samples confirm them and add everything else.
 
 <FigureSequence
   name="labels"
@@ -384,8 +340,7 @@ compute it?
 
 ### Silence read as genuine is a decision, not a fact
 
-The rule "undisputed means genuine" is a modelling choice with a cost. A
-fraud that the cardholder never notices (a small amount, an unread statement,
+A fraud that the cardholder never notices (a small amount, an unread statement,
 a card they rarely use) enters the training set labelled genuine. A dispute
 that arrives after $\delta$ days means a fraud was already used in training as
 a genuine payment. How many such rows the training data hold is unknown,
@@ -410,31 +365,27 @@ payments indistinguishable from genuine ones.
 ## The fast labels are a sample the model chose
 
 The feedbacks are the freshest labels the bank has, and fraud changes from week
-to week, so the natural move is to train mostly on them. Look at how they were
-selected.
+to week, so the natural move is to train mostly on them.
 
-Yesterday's model ranked the cards. The investigators called its top hundred.
-Their labels are $F_t$. Every fraud in $F_t$ is therefore a fraud that
-yesterday's model already scored high. A kind of fraud the model scores low
+The investigators called the top hundred cards of yesterday's model, so every
+fraud in $F_t$ is a fraud that model already scored high. A kind of fraud the model scores low
 lands below the cut, never reaches an investigator, and never appears in the
 feedbacks. It reaches the training set only through the slow channel, a week
 or more later, and only if the customer disputes it.
 
-The class mix is distorted as well. Around 15 of the 100 alerted cards are
-compromised, while 100 cards drawn at random from the day's stream would hold
-a quarter of one. A model trained on feedbacks as if they were a sample of the
-stream learns that compromised cards are about sixty times as common as
+The class mix is distorted as well: about 15 of the 100 alerted cards are
+compromised, against a quarter of one in a random hundred. A model trained on
+feedbacks as if they were a sample of the stream learns that compromised cards are about sixty times as common as
 they are, and learns the boundary of its own past choices rather than
 the boundary of fraud.
 
 ### Why the investigators cannot just sample at random
 
 The obvious repair is to spend some calls on randomly chosen cards, so that
-the fast labels become a fair sample. A hundred randomly chosen cards hold on
-average a quarter of a compromised card, against about fifteen in the model's
-top hundred. Every call spent that way is a call not spent on the
-most suspicious cards, and those calls are the bank's only way to stop fraud
-this week. So the fast labels stay selected by the model, and the system has
+the fast labels become a fair sample. Every such call finds a compromised card
+about one time in four hundred, against about fifteen in a hundred for the
+model's top cards, and those calls are the bank's only way to stop fraud this
+week. So the fast labels stay selected by the model, and the system has
 to learn from them as they are.
 
 <Figure
@@ -444,20 +395,16 @@ to learn from them as they are.
 />
 
 <KeyFact>
-The labels that arrive fastest are chosen by the model that will be trained
-on them. Everything below the cut gets its label only through the slow
-channel, where silence counts as genuine. How to learn inside this loop is
-the subject of <Ref lesson="alert-feedback-selection-bias">the lesson on
+Everything below the cut gets its label only through the slow channel, where
+silence counts as genuine. How to learn inside this loop is the subject of <Ref lesson="alert-feedback-selection-bias">the lesson on
 feedback selection bias</Ref>.
 </KeyFact>
 
 ## How often the model changes: a nightly retrain beside hand-edited rules
 
-The last question is when the loop turns. A model trained once encodes the
-stream of the weeks it was trained on. Both sides of that stream move:
-fraudsters change methods when they are caught, and customers change habits
-with holidays, new shops and new devices. A model is only as current as its
-last training set.
+A model trained once encodes the stream of the weeks it was trained on, and
+both sides of that stream move: fraudsters change methods when they are
+caught, and customers change habits with holidays, new shops and new devices.
 
 Feedbacks trickle in all day as investigators finish calls, but a retrain
 needs many labels at once and takes time to run. So the model is usually
@@ -469,32 +416,31 @@ different clock: investigators add a blocking or scoring rule the day they
 spot a pattern, and remove one that raises too many false alarms.
 
 <Remark title="the fraud cycle">
-Seen as a process rather than a set of layers, the system is a cycle of four
+As a process rather than a set of layers, the system is a cycle of four
 activities: *detection* (scoring every payment), *investigation* (a person
 examines the flagged cards), *confirmation* (the true label is settled, by
 the call or by a dispute) and *prevention* (blocking the card, writing a new
-rule). The arrow from confirmation back to detection, newly confirmed cases
-going into the training data, is the feedback loop of the previous section.
+rule). The arrow from confirmation back to detection is the feedback loop of
+the previous section.
 How often it should turn depends on how fast the fraud changes, how good the
 current model is, how many confirmed cases arrive per day and how much a
 retrain costs.
 </Remark>
 
-You can now explain each part of the system as the answer to a constraint.
-The authorisation deadline and the cost of refusing a genuine customer put
-fast, very precise checks before the answer and the model after it, where
-it can block a card and raise alerts but not refuse the payment it scores. A
-team that calls about a hundred cards a day turns the model's output into a
-ranking cut at $k$, judged by the fraud it puts above the cut. Labels arrive
-on two clocks: feedbacks the same day for the alerted cards, and delayed
-samples after $\delta$ days for everything, with silence read as genuine.
-The fast labels are chosen by the model itself, and the model is retrained
-nightly on both kinds while rules are edited by hand. All of this treated
-"fraud" as one thing on one kind of payment.
+<Conclusion>
+You can now derive each part of the system from a constraint: the deadline
+and the cost of refusing a genuine customer put fast, very precise checks
+before the answer and the model after it, blocking cards and raising alerts;
+a team of about a hundred calls a day makes the model's output a ranking cut
+at $k$; labels arrive on two clocks, the fast ones chosen by the model
+itself, and feed a nightly retrain beside hand-edited rules.
+
+All of this treated "fraud" as one thing on one kind of payment.
 <Ref lesson="financial-crime-typology">The next lesson</Ref> asks which
 financial crimes have a label at all, who produces it and how late it
 arrives, and whether the signal sits in one payment, in one customer's
 history or in the connections between accounts.
+</Conclusion>
 
 ## Exercises
 
@@ -521,8 +467,7 @@ frauds, so 100 cards picked at random among them settle about 333. The most:
 all 50 heavy cards ($50 \times 10 = 500$) plus 50 light ones
 ($50 \times 2 = 100$), 600 frauds, 60% of the day's fraud. The fewest: 100
 light cards, 200 frauds, 20%. With the same 100 calls, all of them on
-compromised cards, the fraud settled varies threefold with which cards are
-chosen.
+compromised cards, the fraud settled varies threefold.
 
 **(b)** Score a card by the number of its payments above some score level, or
 by the sum of its payment scores over the day. A card with ten suspicious
@@ -531,15 +476,13 @@ with activity: a genuine card that pays thirty times a day collects many
 small scores, and a summed score can lift it above a compromised card with
 two clearly fraudulent payments. Counting only payments above a high level
 limits that, at the price of missing cards whose frauds each look only
-mildly odd. There is also a second goal the count ignores: a card with two
-frauds may be at the start of its burst, and calling it now blocks the
-frauds it has not yet made.
+mildly odd. The count also ignores that a card with two frauds may be at the
+start of its burst, and calling it now blocks the frauds it has not yet made.
 
 **(c)** No. Whatever the spread, 100 calls reach at most $100/300$, a third,
 of the compromised cards. The spread changes how many fraudulent payments
-those calls settle, not how many compromised cards they reach, so a ranking
-judged in cards and a ranking judged in payments can disagree about which is
-better.
+those calls settle, so rankings judged in cards and in payments can disagree
+about which is better.
 </Solution>
 </Exercise>
 
@@ -566,11 +509,10 @@ are fast and unselected, and the delayed channel adds only the frauds that
 cardholders themselves failed to recognise on the phone.
 
 **Untouched in both.** The authorisation deadline. Whatever the team's size,
-whatever refuses a payment must finish in milliseconds before the answer and
-be wrong on almost no genuine payments, and the model, far from that
-precision, still may not refuse and so still scores after the answer. The selection problem and the label
-delay are consequences of $k$ being small relative to the stream; the
-deadline is not.
+whatever refuses a payment must finish in milliseconds and be wrong on almost
+no genuine payments, so the model still scores after the answer. The
+selection problem and the label delay come from $k$ being small relative to
+the stream; the deadline does not.
 </Solution>
 </Exercise>
 
@@ -580,27 +522,24 @@ replace the blocking rules." Use the numbers of the lesson, and name the step
 in the system at which the claim fails.
 
 <Solution>
-**Timing is not where it fails.** As deployed, the model scores the
-payment after it has been accepted, and a score cannot refuse a payment that
-is already accepted, so "under a second" is beside the point. But that
-placement is a choice: fed only features ready when the request arrives, a
-model can be evaluated within the milliseconds before the answer. Speed
-alone neither supports the claim nor refutes it.
+**Timing is not where it fails.** As deployed, the model scores a payment
+already accepted, so "under a second" is beside the point. But that placement
+is a choice: fed only features ready when the request arrives, a model can be
+evaluated within the milliseconds before the answer. Speed neither supports
+the claim nor refutes it.
 
-**Precision.** Suppose the model were moved before the answer and allowed to
-refuse. Its most confident hundred cards a day hold about 15 compromised
+**Precision.** Move the model before the answer and let it refuse. Its most confident hundred cards a day hold about 15 compromised
 cards, so blocking their payments would refuse genuine customers on about 85
 cards for every 15 frauds stopped. Lowering the bar further makes it worse: a
 1% false-alarm rate on 399,000 genuine payments is about 4,000 refused
-customers a day. A blocking rule is acceptable only because it fires on
-patterns that are almost always fraud.
+customers a day.
 
 **The failing step** is the assumption that a fast score is a blocking
-decision. A block must be both before the answer and nearly always right.
-Speed can be engineered; the precision is not there, and the model's useful
-output is the ranking that fills the investigators' hundred calls. A model can take over blocking only in the
-narrow form described in the aside on models inside the deadline: features
-ready in advance and a threshold high enough to meet the blocking bar.
+decision. A block must be both before the answer and nearly always right;
+speed can be engineered, the precision is not there. A model can take over
+blocking only in the narrow form of the aside on models inside the deadline:
+features ready in advance and a threshold high enough to meet the blocking
+bar.
 </Solution>
 </Exercise>
 
@@ -611,9 +550,9 @@ you would estimate, on which sample of payments, over which horizon, and what
 result would count as "safe".
 
 <Solution>
-**What can go wrong.** Two kinds of fraud are labelled genuine by the
-convention: frauds disputed after $\delta$ days (late disputes) and frauds
-never disputed at all (unnoticed). They need different measurements.
+Two kinds of fraud are labelled genuine by the convention, and they need
+different measurements: frauds disputed after $\delta$ days, and frauds never
+disputed at all.
 
 **Late disputes.** Take a cohort: every payment of a set of past days, at
 least thirteen months old, since that is the dispute window under PSD2. For
@@ -623,19 +562,19 @@ that were still labelled genuine at $\delta$ days, overall and split by
 amount and by the model's score band. Plot it against $\delta$ (7, 14, 30, 60
 days): the curve shows how many frauds each choice of $\delta$ mislabels.
 
-**Unnoticed fraud.** No dispute data can find it, by definition. The only
-estimate is an audit: investigators call the holders of a random sample of
+**Unnoticed fraud.** No dispute data can find it. The only estimate is an
+audit: investigators call the holders of a random sample of
 cards whose payments are all labelled genuine, and go through the payments
 with them. Because the expected rate is small, the sample must be large: to
 see even ten such frauds at a true rate of one in ten thousand payments needs
-on the order of $10^5$ audited payments, which is why the audit is done once
-in a while, stratified towards high-score cards, rather than daily.
+on the order of $10^5$ audited payments, so the audit is run occasionally,
+stratified towards high-score cards, not daily.
 
 **What counts as safe.** The mislabelled share of the training negatives,
 late plus unnoticed, must be small compared with the fraud rate itself: if
 the labelled fraud is 0.25% of payments and the negatives hide another
-0.05%, one fraud in six is labelled the wrong way, which is not safe. Safety also depends on where the mislabelled frauds sit: if they
-concentrate in one score band or one kind of fraud, the model is taught
+0.05%, one fraud in six is labelled the wrong way, which is not safe. Where
+the mislabelled frauds sit matters too: if they concentrate in one score band or one kind of fraud, the model is taught
 precisely to ignore that kind, even if the overall share is small.
 </Solution>
 </Exercise>
@@ -660,10 +599,9 @@ only through their feedbacks $F$ (and any early disputes).
 
 **(b)** A perfect ranking calls 100 compromised cards at about three frauds
 each: about 300 labelled frauds a day, 2,100 over the seven feedback-only
-days, leaving about 4,900 of the 7,000, 70%, unseen. The model's ranking
-leaves about 95% unseen, so a perfect model moves the unseen share only from
-95% to 70%: even it sees less than a third of the newest fraud before $\delta$
-days have passed. The bound comes from $k$ and $\delta$, not from the model,
+days, leaving about 4,900 of the 7,000, 70%, unseen, against about 95% for
+the model's ranking. Even a perfect model sees less than a third of the
+newest fraud before $\delta$ days have passed. The bound comes from $k$ and $\delta$, not from the model,
 which is why a newly appearing kind of fraud reaches the training data mostly
 through the delayed samples, a week late.
 </Solution>
@@ -714,19 +652,16 @@ for d in range(1, 11):
           (y[top] & first[top]).sum(), (y[top] & ~first[top]).sum())
 ```
 
-**What you see.** Each day's top 100 holds about 20 to 35 frauds, so every
-day adds rows that are about a quarter fraud. The training set's fraud share
+**What you see.** Each day's top 100 holds about 20 to 35 frauds. The training set's fraud share
 climbs from about 1% to about 3% after the first day, about 9 to 10% after
 five and about 13 to 14% after ten, while the stream stays at 1%. In many
 runs the split between the two kinds of fraud also drifts: one kind takes
 most of the top 100, and the other almost stops reaching the labels, even
 though both are equally common in the stream.
 
-**What it means.** The training set is no longer a sample of the stream. It
-is a record of what the model chose to show, and it moves further from the
-stream every day the loop turns. A model trained on it overestimates the
-fraud rate and keeps learning the kind of fraud it already finds. This is
-the selection bias of the fast labels, measured before it is named; <Ref
+**What it means.** The training set is a record of what the model chose to
+show, and it moves further from the stream every day the loop turns. A model trained on it overestimates the
+fraud rate and keeps learning the kind of fraud it already finds; <Ref
 lesson="alert-feedback-selection-bias">the lesson on feedback selection
 bias</Ref> shows why reweighting cannot undo it and trains on the feedbacks
 and the delayed samples separately instead.

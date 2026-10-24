@@ -12,7 +12,7 @@ variance concentrated at the top.
 
 ## Explained
 - Card-rate cut: 0.4% fraud, balanced chunk discards ~99.6% genuine — intro
-- Recall (classical-ml imbalance-leakage, named in plain text) in this notation: s+ = 1, s- = β, odds_s = odds/β, log-odds + ln(1/β) (no symbol: δ is the label delay), p_s = p/(p+β(1−p)), p' = βp_s/(βp_s−p_s+1), monotone ⇒ ranking unchanged; opening numbers p=0.02 → p_s≈0.505, p_s=0.5 → p'=0.0196 — intro (key image map.svg)
+- Recall (classical-ml imbalance-leakage, named in plain text) in this notation: s+ = 1, s- = β, odds_s = odds/β, log-odds + ln(1/β) (no symbol: δ is the label delay), p_s = p/(p+β(1−p)), p' = βp_s/(βp_s−p_s+1), monotone ⇒ ranking unchanged; opening numbers p=0.02 → p_s≈0.505, p_s=0.5 → p'=0.0196 — intro (no longer recalls the delayed-labels leaf exercise) (key image map.svg)
 - 100,000-payment bars (β = 1/0.1/0.02/0.002); π_s = π/(π+β(1−π)) and its inverse β = π(1−π_s)/(π_s(1−π)) (recover β from reported shares); 0.4% chunk → β≈0.004 — §The keep rate on a card stream / Reading β off a training set
 - β is a keep rate, not a class ratio: β = stream odds π/(1−π) ÷ training odds π_s/(1−π_s); equals the stream's class ratio (1:499) only at the balanced cut, where training odds = 1; bug = pipeline keeps passing the logged stream class ratio after the cut moves off balanced — same §
 - Coin flip with label-only bias; near-misses: keeping only small genuine payments; training on alerted payments (fast labels) ⇒ no β; KeyFact: whether β exists is read off the code that built the set (label + random draw only); a wrong correction is caught only by a reliability check on unselected stream payments — § / When the coin looks at the payment
@@ -23,7 +23,7 @@ variance concentrated at the top.
 - Amount-weighted queue reverses (A €100 p_s 0.99 → €66; B €200 p_s 0.60 → €6); products with varying amounts are not one monotone map; in-body exercise C/D/E reverses fully — § / An amount-weighted queue reverses
 - Prior shift at deployment: odds_t = [π_t/(1−π_t)]/[π_s/(1−π_s)] × odds_s; equals β when π_t = π; fraud wave 0.002→0.004: 0.5 → 0.039 (vs 0.0196), 0.9 → 0.265 (vs 0.153) — §After deployment / Correcting to a different base rate
 - π_t known only a label delay late (latest fully labelled week); fitted calibrator has same lag and ~20 frauds per 10,000; prior factor cannot fix concept drift (p(x|fraud) changes); KeyFact: β stored with the model artifact at cut time; π_t re-estimated from the latest fully labelled week on the monitoring cadence and the prior factor re-applied — § / Where the current base rate comes from
-- Variance lands at the top: slope β/(1−(1−β)p_s)² from β at the bottom, crossing 1 at p_s ≈ 0.88, → 1/β as p_s → 1 (0.001 at 0.999 → ~0.05 at β=0.02; figure slope.svg); classical-ml's general SE inflation recalled; correction keeps the noisy model's order — §What undersampling still costs: precision at the top / The correction amplifies errors where the list starts; closing hand-off under ### The question left open
+- Variance lands at the top: slope β/(1−(1−β)p_s)² from β at the bottom, crossing 1 at p_s ≈ 0.88, → 1/β as p_s → 1 (0.001 at 0.999 → ~0.05 at β=0.02; figure slope.svg); classical-ml's general SE inflation recalled; correction keeps the noisy model's order — §What undersampling still costs: precision at the top (no ### subsections); closing hand-off and the trade (faster training vs variance at the top) in the <Conclusion>
 
 ## Notation
 - β keep rate of genuine payments (= s-/s+ of classical-ml with s+ = 1); the log-odds shift is written ln(1/β), never δ (δ stays the label delay from fraud-detection-system)
@@ -45,7 +45,7 @@ variance concentrated at the top.
 ## Assumed
 - classical-ml imbalance-leakage (named in plain text; Ref cannot cross courses): odds factor s+/s- and its selection-event proof with x-blind hypothesis, intercept shift (δ there; written ln(1/β) here), inverse correction, monotonicity (ROC/ranking unchanged), stated 0.5 on balanced set = prevalence (implicit cost (1−π)/π), matched threshold on stated scores, Platt/isotonic on unresampled held-out data, variance cost of downsampling (SE ∝ 1/√n−)
 - classical-ml classification-metrics: calibration, reliability diagram, Brier score
-- delayed-labels-prequential: leaf exercise (0.092 vs 0.01 at β = 0.1, p_s formula counted for a leaf); the label clock / delay block
+- delayed-labels-prequential: the label clock / delay block
 - economics-of-detection: odds form of Bayes' rule, base rate π, C_a, c_FN, next-call rule C_a/V, ★ expected-amount queue, base-rate funnel (exercise)
 - alert-budget-metrics: AUC, AP, CP@k depend only on order and ties
 - fraud-detection-system: fast labels selected by the model (near-miss)

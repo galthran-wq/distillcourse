@@ -25,7 +25,7 @@
 - Repeat days: leaked card compromised 14 days; terminal-hit card again on any return within 28 days ⇒ day-by-day metric re-credits blocked cards — §A detected card is a blocked card
 - Detected-card removal: carry detected cards through the test week, remove their payments from later days; γ_t then counts compromised cards not yet found; unqualified CP@k means the version with removal; the test week was already cleaned of cards known from training (raw 74–91 frauds/day) — §A detected card is a blocked card / Removing cards the team has already found
 - NCP@k(t) = CP@k(t)/min(1, γ_t/k); backtesting only (γ_t known late); undefined when γ_t = 0 — same §, ### Normalising by the day's ceiling
-- Three metrics, three questions (closing KeyFact: AUC can be won on the unreachable part; few distinct scores lose AP because tied frauds are reached near the base rate; CP@k ties within a card/day); rule: report all three, CP@k at the team's k decides deployment, AP breaks ties when k uncertain; CP@k differences under ~2 cards/day on one week are within noise — §Three numbers for three questions
+- Three metrics, three questions (trees: AUC won on the unreachable straight segment, AP lost because tied frauds are reached at the base rate, CP@100 a tie within 0.002); rule (KeyFact): report all three, CP@k at the team's k decides deployment, AP breaks ties when k uncertain; CP@k differences under ~2 cards/day on one week are within noise; closing in a <Conclusion> block — §Three numbers for three questions / What each disagreement means
 
 ## Notation
 - τ score threshold (alert iff score ≥ τ); t = day (course convention)
