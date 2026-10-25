@@ -19,6 +19,7 @@ own fast labels, nightly retraining beside hand-edited rules.
 - Aside: a model inside the deadline (one Belgian processor, precomputed profiles, nightly re-estimation) works only with features ready before the request and a blocking-grade threshold — §Where a learned model fits
 - Investigators' unit is the card (one call settles all recent payments; frauds ≈ 3× compromised cards every day, figure of 3 weeks); capacity k ≈ 100 cards/day — §A hundred cases a day
 - Thresholded yes/no fails: 1% FPR → ~4,000 flags vs 100 calls; output used as ranking, alerts A_t = payments on the top-k cards — §Ranking, then cutting at the capacity
+- Setup of the 15-card result (L0g): logistic regression at default settings, trained on one week of the Belgian stream's labelled payments, scored on a later week with cards already known compromised left out; count = compromised cards among each day's 100 highest-scored cards (card precision and the delay week NOT taught here → alert-budget-metrics) — §Ranking, then cutting at the capacity (anchor ranking-then-cutting-at-the-capacity)
 - k set by headcount; a better model buys a more precise top k; logistic regression ~15 fraud cards in top 100 vs 0.25 for 100 random cards (about 60×, in cards on both sides; <1 holds for any card count above 30,000) — same §
 - Scoring rule (first defined here, not in the clock figure; score from history features, alerts join the queue; example "previous transaction in a different continent AND < 1 h → 0.95"); rules: fast to change, readable, deletable, only known patterns; model: many features nonlinear, not editable, only retrained — §Rules beside the model
 - The five-row table is one bank's arrangement; the constraints fix the order (fast+precise before the answer, slower ranking after, people at the end, labels back) — same § KeyFact
@@ -36,7 +37,7 @@ own fast labels, nightly retraining beside hand-edited rules.
 ## Running cases
 - Belgian e-commerce stream 2018: ~400,000 payments/day, ~1,000 frauds (0.25%), ~300 compromised cards (~3 frauds/card), k = 100 → at most a third of compromised cards reachable
 - Assumed card count: ~120,000 distinct cards pay per day (a little over 3 payments/card; stated as an assumption, not a source figure) → compromised cards = 1 in 400 cards
-- Logistic regression: ~15 compromised cards in daily top 100; 100 random cards 0.25 (≈60×)
+- Logistic regression: ~15 compromised cards in daily top 100; 100 random cards 0.25 (≈60×) — setup given where first quoted; later uses lean on it
 - Threshold with 1% FPR: ~4,000 genuine flags/day
 - End of day t, δ = 7: ~7,000 frauds in last 7 days, ~300 labelled (45/day)
 - In-body exercise: 2M payments/day, 0.1% fraud, 4/card, 25×12 = 300 calls → 500 cards, 60% reachable, ~20,000 false flags (67×)

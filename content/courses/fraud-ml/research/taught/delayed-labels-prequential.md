@@ -65,7 +65,7 @@ even by AUC on the forward weeks.
 - fraud-detection-system: verification latency δ and delayed samples D_{t−δ} (Ref id what-the-model-gets-back-two-kinds-of-label-on-two-clocks), cards blocked when found (investigators-fast-labels-on-the-alerted-cards)
 - financial-crime-typology: time-evolving trait (rarity-is-one-difficulty-out-of-five), laundering label = STR, incomplete, mules within months (where-the-laundering-label-comes-from)
 - canonical-datasets: simulator days, scenarios (terminal 28 days, leaked card 14 days, ~2 payments/day, 1/3 fraud), instant labels (what-the-calendar-shows-and-what-it-leaves-out), test-week continuation exercise (exercises)
-- alert-budget-metrics: CP@100 = 0.241 and the five baselines' test numbers, detected-card removal (a-detected-card-is-a-blocked-card), tie convention (what-the-team-sees-at-each-fraud), full-depth tree's two scores / one-corner ROC, CP noise ~2 cards/day (what-each-disagreement-means), removal-date exercise (exercises), V = €360 pricing
+- alert-budget-metrics: the fifteen inputs the depth sweep trains on (Ref five-models-scored-on-a-test-week, at "Train trees of depth 2, 3, …"), CP@100 = 0.241 and the five baselines' test numbers, detected-card removal (a-detected-card-is-a-blocked-card), tie convention (what-the-team-sees-at-each-fraud), full-depth tree's two scores / one-corner ROC, CP noise ~2 cards/day (what-each-disagreement-means), removal-date exercise (exercises), V = €360 pricing
 - classical-ml: cross-validation, overfitting, decision-tree depth, GridSearchCV
 
 ## Left open

@@ -31,7 +31,7 @@
 - Exercises: 1 in 200 → 33%, 1 in 10,000 → 1%; FPR 0.01% → 50% precision at ~1 in 9,900 (even odds needs TPR/FPR > (1−π)/π; rarer crimes put the burden on FPR — exercise only, no body Remark); hit-rate 80% at k=20 (€7,800) vs 40% at k=100 (€19,000); general stopping rule p*(u's); insurer (hypothetical, unsourced figures): tree TP58/FN9/FP32 vs kNN TP59/FN8/FP88, $60,302 claim, $4,214 investigation → $921,978 vs $1,101,874 (16.3%), at $400 kNN wins; three rankings with AUC 0.625 and different top-1/top-3 precision
 
 ## Assumed
-- fraud-detection-system: k ≈ 100 ranking cut, blocking-rule precision argument, Belgian stream, ~15 compromised cards in LR top 100
+- fraud-detection-system: k ≈ 100 ranking cut, blocking-rule precision argument, Belgian stream, ~15 compromised cards in LR top 100 (recalled in the staffing example with a <Ref> to fraud-detection-system#ranking-then-cutting-at-the-capacity and a one-clause reminder: trained on one week, scored on each day of a later one)
 - financial-crime-typology: five crimes and their label sources (mixed-review exercise)
 - classical-ml: precision, recall, confusion matrix, ROC area
 

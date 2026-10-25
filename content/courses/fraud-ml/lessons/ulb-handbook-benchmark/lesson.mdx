@@ -22,51 +22,27 @@ over.
 ## What the comparison holds fixed, and what it does not
 
 A ranking reversal can only be pinned on a cause if everything else was
-held still. Three things are held still here, on both streams.
-
-### One cut of the history
-
-The split is the one <Ref lesson="delayed-labels-prequential"
-id="where-the-training-set-must-end-the-delay-block">the delayed-labels
-lesson</Ref> derived: a training week, a delay week whose labels are not
-yet known, and a test week from which each day's payments on cards
-already known to be compromised are removed. On the simulator that is
-25 to 31 July 2018 for training, 67,240 payments with 598 frauds, and 8
-to 14 August for testing, 58,264 payments with 385 frauds after removal,
-a base rate of 0.66%. On the real stream the training week holds
-2,858,663 payments with 6,605 frauds (0.23%), and after removal the test
-week's base rate is about 0.2%.
+held still. Here that is the setup of <Ref lesson="alert-budget-metrics"
+id="five-models-scored-on-a-test-week">the five models scored on a test
+week</Ref>, unchanged on both streams: the same training, delay and test
+weeks, with the delay the <Ref lesson="delayed-labels-prequential"
+id="where-the-training-set-must-end-the-delay-block">delayed-labels
+lesson</Ref> derived and the payments of already-known cards removed
+from each test day, and the same five models at their library defaults,
+nothing tuned and nothing rebalanced. The full-depth tree is called the
+unpruned tree below. Two details of the models matter here: the depth-2
+tree has three splits and four leaves, and the analysis reads those
+leaves; the forest's trees differ in more than their resample, because
+each split tries only a random subset of the inputs.
 
 ### Fifteen inputs, built the same way
 
-Every model sees the same fifteen numbers for each payment:
-
-- the **amount**, and whether the payment fell on a weekend or at night;
-- for the **card**: its number of payments and their average amount over
-  the last 1, 7 and 30 days;
-- for the **terminal**: its number of payments and its fraud rate over
-  windows of 1, 7 and 30 days, the rate counting only labels the bank
-  already held when the payment was scored. How that is done without
-  leaking future labels is the problem of <Ref
-  lesson="point-in-time-features">point-in-time features</Ref>.
-
-Nothing else enters: no merchant category, no country, no card
-identifier.
-
-### Five models at their library defaults
-
-- **Logistic regression**, a linear score on the fifteen inputs.
-- **A depth-2 tree**: three splits, four leaves; a payment's score is the
-  fraud share of its leaf in training.
-- **An unpruned tree**: depth unlimited, split until every leaf holds
-  training payments of one class only, so its scores are 0 and 1.
-- **A random forest**: 100 unpruned trees, each grown on a bootstrap
-  sample of the training week with a random subset of inputs tried at
-  each split; the score is the average of the trees' outputs.
-- **XGBoost**: 100 boosted trees of depth up to 6, each fitted to the
-  errors left by the ones before it.
-
-No hyperparameter is tuned and nothing is rebalanced.
+Both streams give every model the same fifteen numbers per payment, and
+nothing else: no merchant category, no country, no card identifier. The
+terminal's fraud rate counts only labels the bank already held when the
+payment was scored; how that is done without leaking future labels is the
+problem of <Ref lesson="point-in-time-features">point-in-time
+features</Ref>.
 
 ### What changes between the streams
 
@@ -259,8 +235,11 @@ id="what-a-ranking-with-no-information-scores">the floor of average
 precision</Ref>), and for $CP@100$ the share of a day's cards that are
 compromised, about 0.0025 here. Against those floors every model has
 learned something, and the one that has learned least is the unpruned
-tree. (The depth-2 tree's 0.077 is the week's average; the "about 0.10"
-quoted for it in the alert-budget lesson was read off its daily chart.)
+tree. (The depth-2 tree's 0.077 is the week's average, about eight
+compromised cards a day; the "about ten" a day that <Ref
+lesson="alert-budget-metrics" id="on-real-card-data">the alert-budget
+lesson</Ref> gave for it was read off its daily chart, where most days
+fall between 5 and 12.)
 
 AP divided by the base rate puts both streams on one scale: how many
 times better than chance the model concentrates fraud at the top.
@@ -472,7 +451,7 @@ uses the amount; the simulator's amount rule was a script.
 | real, training | 256 of 6,605 (4%) | 64% | 4,740 (72%) | 0.17% |
 
 On the real week nearly three frauds in four end in a leaf that holds
-99.4% of the payments at a fraud share below the stream's 0.23%. This
+99.4% of the payments at a fraud share below the training week's 0.23%. This
 measures the overlap that <Ref lesson="imbalance-techniques-revisited"
 id="the-real-stream">the rebalancing lesson</Ref> could only infer, as a
 sign, from AP's lower multiple on real data. The tie
