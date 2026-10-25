@@ -283,6 +283,17 @@ describe.skipIf(!hasUv)("lab build", () => {
     expect(existsSync(staleDir)).toBe(false);
     expect(existsSync(built.privatePath)).toBe(true);
   }, MINUTES);
+
+  it("skips a lab whose inputs are unchanged and reruns one whose inputs changed", () => {
+    const before = statSync(built.privatePath).mtimeMs;
+    expect(buildFixtureIn(built.root).diags).toEqual([]);
+    expect(statSync(built.privatePath).mtimeMs).toBe(before);
+
+    const solution = join(built.root, "content", "courses", "lint-course", LAB_DIR, "solution.py");
+    writeFileSync(solution, `${readFileSync(solution, "utf8")}\n`);
+    expect(buildFixtureIn(built.root).diags).toEqual([]);
+    expect(statSync(built.privatePath).mtimeMs).toBeGreaterThan(before);
+  }, MINUTES);
 });
 
 describe("a machine without uv", () => {

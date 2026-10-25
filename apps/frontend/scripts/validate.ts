@@ -1,10 +1,12 @@
 #!/usr/bin/env tsx
 /**
- * Content validator: `npm run validate [-- <course> [<lesson>]]`
+ * Content validator: `npm run validate [-- <course> [<lesson>]] [--no-labs]`
  *
  * Schema-validates and pedagogy-lints everything under content/courses/, and
  * builds every drafted lab in check mode — a lab whose reference solution is
- * not green is invalid content, exactly like unparsable MDX. Exit code 1 on
+ * not green is invalid content, exactly like unparsable MDX. `--no-labs` is
+ * for the image build alone: `make deploy` runs the labs on the host before
+ * it, so the gate holds without a second execution inside the image. Exit code 1 on
  * any error-level diagnostic. Every authoring skill must run this after
  * generating content and fix failures before reporting done.
  *
@@ -19,7 +21,9 @@ import { runCourseLabs } from "../lib/labs/build";
 import { reportCourses, selectCourseDirs } from "./content-cli";
 import { appRoot, contentRoot, repoRoot } from "./paths";
 
-const [courseArg, lessonArg] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const skipLabs = args.includes("--no-labs");
+const [courseArg, lessonArg] = args.filter((arg) => !arg.startsWith("--"));
 
 const courseDirs = selectCourseDirs(courseArg);
 
@@ -35,7 +39,7 @@ const totalErrors = reportCourses(courseDirs, (dir) => {
     lessonDirsOnDisk: listLessonDirs(dir),
     allCourseSlugs: listCourseDirs(contentRoot).map((d) => basename(d)),
   });
-  diags.push(...runCourseLabs(loaded, { repoRoot, mode: "check", lesson: lessonArg }));
+  if (!skipLabs) diags.push(...runCourseLabs(loaded, { repoRoot, mode: "check", lesson: lessonArg }));
   if (lessonArg === undefined) return diags;
   const lessonPrefix = join(dir, "lessons", lessonArg);
   return diags.filter((d) => d.file.startsWith(lessonPrefix) || d.file.endsWith("course.yaml"));
