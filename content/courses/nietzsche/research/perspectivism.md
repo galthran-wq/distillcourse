@@ -1,78 +1,118 @@
-# Research brief: perspectivism (Perspectivism and the Will-less Subject of Knowledge)
+# Research brief: perspectivism (Perspectivism)
 
 status: planned
-module: third-treatise
+module: truth (6 of 9), lesson 29 of 45
 type: core
-goal: Formulate GM III:12's perspectivism — only a perspectival seeing, objectivity as the command of more perspectives — and distinguish it from the falsification thesis and from relativism.
+goal: Explain perspectivism, distinguish it from relativism, and assess the charge that it refutes itself
 
 ## ARC (L10)
 
-- **Inherits:** The ascetic ideal as a type's condition and the philosopher inside the priest's chrysalis (III:9–10); the reader has the Doctrine of Types and has met, in master-and-slave-morality, the relativist misreading refuted once on the ranking of valuations.
-- **Contributes:** III:12 reconstructed as an epistemological claim inside a treatise on asceticism: the 'pure, will-less, painless, timeless subject of knowledge' is the ascetic ideal in epistemology; against it, seeing is perspectival and affect-conditioned, and objectivity is the capacity to command more perspectives. Clark's reading: anti-foundationalism, not the falsification thesis — with 'Truth and Lie' (1873) as the abandoned early position, GS 354 and 374 as the mature statements, BGE 22 as the application to physics. Relativism refuted from III:12's own ranking; the self-refutation worry stated and deferred to Module 7.
-- **Hands off:** To will-to-truth (III:23–27 turns the same critique on the will to truth), to real-world-became-a-fable (the thing-in-itself's rejection as the ground Clark's reading needs), and to life-as-literature (the self-refutation problem).
+- **Spine step (10, "Truth turned on itself"):** "Without a view from nowhere there is only perspectival knowing, and the unconditional will to truth turns out to be the ascetic ideal's last form; untruth, art and illusion can serve life, and the young Nietzsche's essay on truth shows which part of this he got right first and which he later abolished."
+- **Inherits:** from real-world-became-a-fable, one world without the true/apparent contrast; from reason-in-philosophy, being as reason's fiction; from self-as-society-of-drives, drives as interpreters ("each has its perspective", 7[60]); from consciousness-and-language, GS 354's herd surface, where "perspectivism" is named.
+- **Contributes:** Nietzsche's positive account of knowing after the true world: all knowing is from a standpoint; objectivity is the ability to use many standpoints, including hostile ones, on one thing; some views are better than others and none is the view from nowhere. Answers "so everything is relative?" from GM III 12 and the self-refutation charge. Introduces perspectivism; EH I 1's "reversing perspectives" names the skill the course has practised since the drive-self.
+- **Hands off:** to will-to-truth: if objectivity is more eyes, why want more eyes at any cost, and what does that unconditional wanting do to us?
 
-Spine step: "Third Treatise: the ascetic ideal is what a declining life does with suffering — the priest redirects 'someone is to blame' onto the sufferer — and modern science is its latest form because it rests on an unconditional faith in truth; the critique reaches Nietzsche's own will to truth, and The Antichrist runs the machinery on Jesus and Paul."
+## STANCE (binding)
 
-## Sources to consult
+- **Favorable:** Nietzsche saw that the demand for a view from nowhere is not a high standard we fail but a confusion, "an eye turned in no particular direction", and that the honest replacement is a discipline: see from more places, including the places you hate. The affects are not noise to be filtered out of knowing; they are its organs. Perspectivism is his account of how a creature made of drives could know anything at all.
+- **Hard passages this lesson must quote whole:** none from the course's hard list falls here. Lines to give intact: GM III 12's "to eliminate the will altogether, to suspend each and every affect, supposing we were capable of this—what would that mean but to castrate the intellect?" (p.119, genealogy--text.txt l.4164); Z II 15's "pure perceivers. I call you—lechers" and "You lack innocence in your desire and therefore you slander all desire" (pp.233-236, zarathustra-full.txt ll.4503-4540; illustration); BGE 2's "frog perspectives".
+- **What the words meant:** "castrate" denotes the removal of the affects the ascetic ideal demands (III 11-12 is about the ascetic's "contrariness" turned on the senses); the will-less knower is the ascetic ideal's epistemology, and III 12 is written against it. "Lechers" (Z II 15) names "immaculate perception" as a desire that denies itself. "Objectivity" in Nietzsche's mouth is a capacity of the knower ("the ability to control one's Pro and Con"), not a property of a view.
+- **Objection answered from his side:** self-refutation: "all knowing is perspectival" is either from a perspective (so possibly false, not binding) or from nowhere (so false by its own lights). Reply: BGE 22 ends "Granted that this also is only interpretation—and you will be eager enough to make this objection?—well, so much the better" (bge-zimmern.txt ll.799-800): he takes the first horn and denies it bites, because "possibly false" is not "false", and perspectivism never claimed to bind everyone regardless, which is dogmatism's claim (BGE 43: "my judgment is my judgment"). GS 374 states the thesis modally: "we cannot reject the possibility that it may include infinite interpretations" (p.336). Second objection: relativism. Reply: III 12's measure, more affects and more eyes make the concept "more complete"; comprehensiveness and the integration of opposed perspectives, applied from within, with no neutral court (GS 380: the outside position is "a minor madness"). Gap sentence: Nietzsche gives the measure but no procedure for cases where perspectives conflict rather than add.
+- **Humanizing reading to test:** (a) perspectivism as about values only; the text does not confine it (III 12 is about "knowing"; GS 354 names it about consciousness; BGE 22 applies it to physics). (b) The "no facts, only interpretations" overreading, which turns it into relativism about the world; the note that says it (7[60]) also says "the world is knowable", and it is unpublished.
+- **Facts against the popular image:** "there are no facts, only interpretations" is a notebook line, not a sentence of any book; GM III 12, BGE 22 and GS 374 keep knowledge and objectivity and redefine them.
 
-- **GM III:12:** research/texts/onthe-gutenberg-samuel.txt; German in research/texts/digitalcriti-s1-GM.txt — 'reines, willenloses, schmerzloses, zeitloses Subjekt der Erkenntniss'; 'Es giebt nur ein perspektivisches Sehen, nur ein perspektivisches „Erkennen"'; 'je mehr Augen… um so vollständiger wird unser „Begriff" dieser Sache, unsre „Objektivität" sein'; 'ein Auge, das gar keine Richtung haben soll'.
-- **BGE 22 (physics as interpretation), 6 (philosophy as confession), 14:** research/texts/beyondgood-full.txt.
-- **GS 354 (consciousness as surface; 'perspectivism as I understand it') and GS 374 ('we cannot see around our corner'; the world 'infinite' in interpretations):** research/texts/digitalcriti-s1-FW.txt lines 2165, 2225 (German; translate).
-- **'On Truth and Lie in an Extra-Moral Sense' (1873, German):** research/texts/digitalcriti-s2-pw-WL.txt — the opening fable, 'truths are illusions', the leaf, Chladni's figures.
-- **Clark 1990 Ch. 5 'Perspectivism' (pp. 127–158), Ch. 3 (Truth and Lie, pp. 63–94), Ch. 2 §3 (Neurath's boat, pp. 53–54):** research/texts/nietzscheon-.txt — the neo-Kantian/anti-foundationalist reading; the eye-and-object metaphor unpacked; rivals surveyed (Nehamas, Schacht, Danto, Magnus); the boat rebuilt at sea.
-- **SEP §6.2 (Perspectivism):** research/texts/friedrichnie-.txt — the neo-Kantian background (Lange, Spir, Teichmüller), epistemological vs. psychological (Gemes) vs. ontological construals; the unresolved tension with Nietzsche's own truth-claims.
-- **Z II 'On Immaculate Perception' (line 5338):** research/texts/thusspoke-full.txt — the dramatized critique of disinterested contemplation (the moon as the 'pure' knower).
-- **Kirwin dossier (Janaway chs. 11–12: disinterestedness and objectivity; perspectival knowing and the affects):** research/texts/phil414-syllabus.txt.
-- **Nehamas Ch. 2 'Untruth as a Condition of Life' (pp. 42–73; research/texts/nietzschelif-full.txt):** the self-refutation charge stated and rebutted (pp. 66–68: that (P) 'every view is an interpretation' is POSSIBLY false, being itself an interpretation, does not make it actually false — a refutation needs an actual counterexample); and pp. 69–72: perspectivism does not entail 'every view is as good as any other'. Preview only — the rival's answer belongs to life-as-literature; here the lesson states the charge and the naturalist's own answer (Clark), and notes that Nehamas's differs.
-- **Blackburn, 'Perspectives, Fictions, Errors, Play' (Leiter & Sinhababu 2007, Ch. 11, pp. 283–285; research/texts/nietzscheand-full.txt):** the St Paul's Cathedral case — a view from the front and a view from the back are both views of the cathedral and neither is an error; perspective-talk entails error only with Mackie's 'argument from relativism' smuggled in, which itself needs the discredited 'argument from queerness'. The cleanest modern statement of Clark's point that perspectivism is not the falsification thesis.
-- **Railton (Janaway & Robertson Ch. 2, pp. 43–44; research/texts/nietzschenat-full.txt):** the rat/bat cave and 'the insect or the bird perceives an entirely different world… which of these perceptions is correct is quite meaningless' (from WL) — perspectivism about representation without relativism about truth; and **Poellner 2007 Ch. 9 (pp. 227–261; research/texts/nietzscheand-full.txt):** emotions as perceptions of value, 'phenomenal objectivity' (McDowell) — forward pointer to value-creation.
-- **Heidegger Vol. I §25 (p. 213; research/texts/nietzschevol-s1.txt):** 'the perspectival is the basic condition of all life' with the lizard that hears a rustle in the grass and not a pistol shot — Nietzsche's own image for affect-conditioned seeing, in the reading that takes III:12 as ontology (the ontological construal in SEP §6.2's list).
+## Primary passages (exact)
 
-## Key points the lesson must cover
+- GM III 12 (pp.118-119; Kaufmann n.1 p.119) — genealogy--text.txt ll.4138-4166 — "resolute reversals of accustomed perspectives"; objectivity "not as 'contemplation without interest' (which is a nonsensical absurdity), but as the ability to control one's Pro and Con"; the "pure, will-less, painless, timeless knowing subject"; "an eye turned in no particular direction"; the perspective-seeing sentence; "castrate the intellect" — read from text.
+- GM III 24 (p.151: "renunciation of all interpretation" as asceticism), III 9-10 (pp.111-116), II 11 (pp.73-76: "the eye of justice"; a parallel, not Nietzsche's cross-reference to III 12) — read from text.
+- BGE Preface — bge-german.txt l.114 — "das Perspektivische, die Grundbedingung alles Lebens" (adjective as noun) — verify eKGWB JGB-Vorrede.
+- BGE 2 ("frog perspectives", bge-zimmern.txt ll.195-196), 22 ("interpretation, not text", ll.787-800; German l.877, l.892), 34 ("perspective estimates"; "degrees of seemingness", ll.1189-1195), 10, 43, 211 ("many eyes and consciences" as the philosopher's training), 207 (the objective man as mirror), 108 ("only a moral interpretation of phenomena", the nearest published cousin of the slogan) — verify eKGWB JGB-n.
+- GS 354 (pp.297-300) — gayscience-s2-bk4-bk5-appendix.txt l.3312 — "This is the essence of phenomenalism and perspectivism as I understand them"; "We simply lack any organ for knowledge, for 'truth'" (l.3334) — read from text.
+- GS 374 (p.336) — ll.4898-4920 — "Our new 'infinite'": "We cannot look around our own corner"; "infinite interpretations"; Kaufmann n.138 — read from text.
+- GS 380 (pp.342-343: "a minor madness"; "specific gravity"), 299 (pp.239-240: "architectural perspectives", n.22), 373 (p.335, n.136), 162 (p.199: "Egoism is the law of perspective applied to feelings"), 143 (pp.191-192: "no eternal horizons and perspectives"), 54, 57, 106 — gayscience-s2, gayscience-s1 — read from text.
+- Notebook 7[60] (p.139) — latenotebooks-full.txt ll.7200-7212 — "facts are just what there aren't, there are only interpretations"; "the 'subject' is ... a fiction added on"; "the world is knowable: but it is variously interpretable ... countless meanings. 'Perspectivism'"; "Every drive is a kind of lust for domination, each has its perspective" — unpublished, notebook 7, 1886-87 (= Portable Notes 1888 no. 481, p.458).
+- Notebooks 36[20] (p.25: "the core of perspectivism" as proximity of forces; ontological), 2[?] (pp.90-91: "no 'fact-in-itself'"), 14[93] (pp.250-251), 1[115] (p.63), 5[12] (p.107) — unpublished; the "no facts" line is NOT in BGE.
+- EH I 1 (pp.222-223: "Now I know how to reverse perspectives: the first reason why a revaluation of values is perhaps possible for me alone"), I 3 (p.225: "an eye beyond all merely local, nationally conditioned perspectives") — eccehomo-full.txt — read from text.
+- A 9 (p.575: the theologian's "faulty perspective"), TI "Reason" 2 (p.481), 6 (p.484), "Anti-Nature" 5 (page: confirm in portable-late.txt) — read from text.
+- D 117 (p.73), 426 (pp.182-183: every thinker paints his world in fewer colours), 243 (p.141), 210 (p.133), 553 (p.223), 483 (p.199) — Daybreak ... ocr.txt — read from text.
+- Z II 2 (p.198), II 15 (pp.233-236), II 17 (pp.238-241: "the poets lie too much ... But Zarathustra too is a poet"), I 22 §1 (p.187) — illustration only; Z states no doctrine of perspectivism.
+- GT Self-Crit 2 ("optics of the artist ... optics of life"), 5 — early-gt.txt; WA Epilogue — early-wa.txt — "'true' and 'untrue' ... no sense in optics", in tension with WA 8's "Wagner's music is never true".
 
-1. **III:12 line by line.** The ascetic priest's 'philosophy' turns on 'the pure, will-less, painless, timeless subject of knowledge' — Kant's 'pure reason', Schopenhauer's will-less knower. Against it: 'let us guard against the tentacles of such contradictory concepts as… "absolute spirituality", "knowledge in itself"' — an eye 'turned in no direction' is an absurdity; the affects are the condition of seeing, not its distortion; 'there is only a perspectival seeing, only a perspectival knowing'; 'the more affects we allow to speak about a matter, the more eyes… the more complete will be our concept of it, our objectivity'. Reconstruct: (P) knowing is done by an embodied, affect-driven type; (P) 'objectivity as disinterest' would require an eye with no direction — a contradiction; (C) objectivity must be redefined as the command of many perspectives — 'to have one's for and against in one's control'. The link to the treatise: the will-less subject is the ascetic ideal's epistemology.
-2. **Two things III:12 is not.** (a) Not the falsification thesis: the passage does not say every perspective falsifies; it says more of them see more. (b) Not relativism: perspectives are ranked (more eyes = more complete), and the ability to shift them is a virtue of a type. The relativist misreading refuted from the 'more complete' sentence and from BGE 6/GM III's own practice of ranking.
-3. **Clark's developmental reading.** 'Truth and Lie' (1873): truths as 'illusions we have forgotten are illusions', language as metaphor (nerve stimulus → image → sound), the leaf, Chladni's sound figures — a denial of truth that rests on a metaphysical correspondence theory (truth = correspondence to the thing-in-itself). The mature position abandons the thing-in-itself (real-world-became-a-fable) and with it the reason to deny truth; perspectivism becomes anti-foundationalism — no self-justifying, context-free beliefs; Neurath's boat rebuilt at sea. GS 354's 'phenomenalism and perspectivism as I understand it' (consciousness as a surface- and sign-world — a claim about consciousness, not about all knowledge) and GS 374 ('we cannot see around our corner'; the world 'infinite' in possible interpretations) as the mature statements.
-4. **BGE 22: the application.** Physics' 'conformity to law' as interpretation, not text — a 'democratic instinct' reading nature; 'supposing this too is only interpretation — and you will be eager enough to make this objection? — well, so much the better' — the self-application in Nietzsche's own hand. State it; defer the self-refutation question to Module 7, naming it.
-5. **The rival readings, in one paragraph each (SEP §6.2).** Epistemological (Clark, Leiter: about justification), psychological (Gemes: about affects and drives), ontological (Deleuze, Richardson: perspectives as will-to-power centres). What each needs III:12 to say; the naturalist reading's choice (epistemological plus psychological — affects as type-facts).
-6. **'On Immaculate Perception' as dramatization.** The moon as the hypocritical pure knower ('to look upon life without desire'); 'where is innocence? Where there is a will to beget' — the critique of disinterest staged. Map to III:12 and III:6; note what the speech adds (the charge of hypocrisy — desire disguised) that III:12 argues as absurdity rather than dishonesty.
+## Secondary (References only)
 
-## Set pieces and worked examples to recreate
+- Nehamas, Nietzsche: Life as Literature, Ch. 2 (pp.42-73, esp. 49-53, 66-69): not relativism; the self-refutation reply; the fresco at three distances.
+- Clark & Dudrick, in Leiter & Sinhababu (eds.), Nietzsche and Morality, Ch. 8 (pp.192-226): many eyes, linked by them to GM II 11. Blackburn, Ch. 11 (pp.281-296): perspective does not imply error.
+- Reginster, The Affirmation of Life, Ch. 2 III (pp.69-85). Tanner, Nietzsche: A Very Short Introduction, Ch. 7 (pp.72-75): the value-only reading.
+- Janaway & Robertson (eds.), Nietzsche, Naturalism, and Normativity, Ch. 2 ss.8-10; Gemes & Richardson (eds.), The Oxford Handbook of Nietzsche, ch. 24 (toc only).
 
-- **The eye turned in no direction** — Clark's eye-and-object metaphor (pp. 128–130) drawn: one eye, one direction; many eyes, one object.
-- **Truth and Lie's metaphor chain** (nerve stimulus → image → sound; Clark pp. 77–79) as a three-arrow diagram — the early position that III:12 is not.
-- **The leaf** (Clark pp. 75–77): 'no leaf is identical to another, so the concept "leaf" is formed by discarding differences' — reconstructed and refuted as Clark refutes it (inconsistent nominalism).
-- **Neurath's boat** (Clark pp. 53–54) — anti-foundationalism's image.
-- **BGE 22's last sentence** ('so much the better') as the self-application.
-- **The moon in 'On Immaculate Perception'** as the dramatized will-less knower.
-- **St Paul's from the front and from the back** (Blackburn) as the lesson's discriminating example for 'perspective ≠ error': two eyes, one cathedral, no falsification — set beside III:12's 'more eyes'.
-- **The lizard** (Heidegger I §25): selective hearing as a perspective that is a condition of life, not a distortion of it.
-- **The self-refutation charge as a small proof tree** (Nehamas pp. 66–68): premise (P), the inference 'possibly false', the invalid step to 'actually false' — drawn once here, answered twice (Clark now, Nehamas in Module 7).
+## The reconstruction
 
-## Pitfalls / subtleties to flag
+- **Claim and where.** GM III 12: only a perspective seeing and knowing; objectivity is the use of many perspectives on one thing. GS 374: the perspective character of existence may be unlimited. BGE 22: Nietzsche's own reading is interpretation too.
+- **Argument in plain steps.** (1) No true world seen from nowhere. (2) Every act of knowing is done by a knower with interests, affects and a position; in his psychology, a society of drives each with its for and against. (3) A knower with no interest and no direction sees nothing: the "eye turned in no particular direction" lacks "the active and interpreting forces, through which alone seeing becomes seeing something". (4) So all knowing is perspectival. (5) Perspectives differ in how much they take in; a knower trained in "resolute reversals" has a more complete concept. (6) So objectivity is a discipline of the knower: control of one's Pro and Con, more eyes on one thing. (7) Hence some views are better than others, and none is the view from nowhere.
+- **Unstated premise.** That "more complete" can be judged from within, by comprehensiveness and by surviving rival perspectives; the step that separates perspectivism from relativism, stated as a measure without a procedure.
+- **Strongest objection and Nietzsche's reply.** As in STANCE.
+- **Connections.** consciousness-and-language (GS 354); self-as-society-of-drives (the eyes are affects); will-to-truth; value-of-untruth (BGE 34); creating-values (BGE 211's "many eyes and consciences"; value perspectives); on-truth-and-lies (the essay's "no correct perception" is perspectivism with a thing in itself still behind it); ecce-homo (EH I 1).
 
-- The reader's course must not reach 'Nietzsche denied truth'; Clark's reading is the working one and it says the opposite for the mature works. State the rival (the deconstructionist 'new Nietzsche') once and its cost (it cannot state the Genealogy's own claims).
-- Truth and Lie is a Nachlass-adjacent early essay (unpublished, 1873); the published-works rule applies — it dates a position Nietzsche did not publish.
-- GS 354 is about consciousness, not knowledge as such; the lesson must not let it become the falsification thesis by the back door.
-- 'Objectivity' in III:12 is in scare-quotes in the German; the redefinition is the point — say so.
-- The self-refutation problem is Module 7's; here it is named, its two texts given (BGE 22; GS 374), and deferred.
+## Where the claim forks (named by content)
+
+(a) A thesis about knowledge: standpoints are better or worse, objectivity is their disciplined multiplication (GM III 12, GS 374, BGE 22). (b) A thesis about the world: nothing but interpretations, "countless meanings" (notebooks; unpublished). (c) A thesis about value only. The lesson centres (a), states (b) as what the notebooks try and the books do not need, and sends (c) to creating-values.
+
+## Set pieces and gems
+
+- "There is only a perspective seeing, only a perspective 'knowing'; and the more affects we allow to speak about one thing, the more eyes, different eyes, we can use to observe one thing, the more complete will our 'concept' of this thing, our 'objectivity,' be" (GM III 12, p.119).
+- "an eye turned in no particular direction ... an absurdity and a nonsense"; "what would that mean but to castrate the intellect?" (III 12, p.119).
+- "Granted that this also is only interpretation ... well, so much the better" (BGE 22, Zimmern; "um so besser", verify eKGWB JGB-22).
+- "We cannot look around our own corner" (GS 374, p.336); "Now I know how to reverse perspectives" (EH I 1, p.223).
+- "facts are just what there aren't, there are only interpretations ... the world is knowable: but it is variously interpretable" (7[60], unpublished, notebook 7, 1886-87, Bittner p.139).
+- The fresco at three distances (bricks and splashes; a colour patch; a landscape), no distance "the real painting": a drawn figure from a Secondary example, unattributed in the body.
+
+## Pitfalls
+
+- L13 target (documented, prevalent): "everything is relative / there are no facts". Refute with III 12's measure and the rejection of "contemplation without interest"; mark the slogan unpublished and quote its "the world is knowable".
+- GM II 11's "eye of justice" is a parallel, not Nietzsche's link to III 12. BGE 219 is about moral judging as revenge, not perspectival objectivity; the "many eyes" passage is 211.
+- The Preface's German is "das Perspektivische" (the perspectival); keep the form in English.
+- Zarathustra carries no doctrine here; II 15 and II 17 are illustrations with the speaker named. WA Epilogue's "no sense in optics" sits beside WA 8's "never true"; name the tension.
+- Keep value perspectivism for creating-values and the thing in itself for on-truth-and-lies. No scholars' names in the body.
 
 ## FIGURE PLAN
 
-1. `draw:` single `<Figure>` — **the eye with no direction**: left, the ascetic ideal's knower (an eye with all directions struck — 'absurdity'); right, III:12's knower (several eyes on one object, each with a direction and an affect label) — Clark's metaphor drawn.
-2. `draw:` `<FigureSequence>` (3 frames) — **more eyes, more complete**: frame 1 one perspective on an object (a partial outline); frame 2 three; frame 3 many — the 'concept' filling in; caption: objectivity as command, not absence.
-3. `draw:` single `<Figure>` — **Truth and Lie's chain**: nerve stimulus → image → sound (word), each arrow labeled 'metaphor', with the thing-in-itself as a dashed box the chain never reaches — the 1873 position (Clark Ch. 3).
-4. `draw:` single `<Figure>` — **two theses, one word**: 'perspectivism' split into the falsification thesis (all views false — struck, 1873) and anti-foundationalism (no view from nowhere — boxed, 1887), with the passages under each.
-5. `draw:` single `<Figure>` — **Neurath's boat**: the foundationalist repairs on dry dock (struck); the anti-foundationalist rebuilds afloat — Clark's import (Ch. 2 §3).
-6. `draw:` single `<Figure>` — **three construals of III:12**: epistemological / psychological / ontological as three columns with what each needs the passage to say and the naturalist reading's pick highlighted (SEP §6.2).
-7. `source:` none.
+1. `draw:` single `<Figure>`: **the eye turned in no direction**: a sightless eye with no focal line beside an eye whose line of sight is labelled "interest, affect, position" (GM III 12).
+2. `draw:` single `<Figure>`: **more eyes on one thing**: viewpoints converging on one object, each eye labelled by an affect, the integrated concept in the middle (GM III 12).
+3. `draw:` `<FigureSequence>` (3 frames): **one wall, three distances**: brick and splashes; colour patches; a landscape; caption: no frame is "the real painting".
+4. `draw:` single `<Figure>`: **dogmatism, relativism, perspectivism**: one view from nowhere; many views, none comparable; many views compared and joined (GM III 12, GS 374).
+5. `draw:` single `<Figure>`: **the self-refutation argument**: three steps with the cut between "possibly false" and "false", and BGE 22's "so much the better" at the cut.
 
-## EXERCISE PLAN (floor: ≤1 warm-up; ≥2 of boundary / refute / derivation / research; one FORWARD)
+## EXERCISE PLAN
 
-1. (warm-up) Reconstruct III:12's argument against the will-less subject in three premises and a conclusion, citing the 'eye turned in no direction' sentence for the key premise.
-2. (refute) "Perspectivism means every view is as good as any other." Break it with III:12's 'more eyes… more complete' and BGE 6's ranking of philosophies as confessions; state what the passage ranks by (breadth of command over affects) and why that is not 'anything goes'.
-3. (derivation) Clark refutes the leaf argument as inconsistent nominalism. Reconstruct the leaf argument's strongest form (Morgenbesser's version, Clark pp. 75–77), then derive the inconsistency: what must be true of 'leaf' for the argument to say the concept 'discards differences' — and state why the mature Nietzsche does not need the argument.
-4. (boundary probe) Take III:12's rule to its limit: a knower who could command every perspective. Is that the will-less subject returned by another route? State the difference III:12 draws (command of perspectives is still directed and affect-laden; it is not the absence of direction) and what the limit case shows about 'objectivity' in scare-quotes.
-5. (research-shaped, corroboration) Compare GS 354's 'perspectivism as I understand it' with III:12 as two sources: which is about consciousness, which about knowledge; where they agree (the surface- and sign-character of what is shared) and whether GS 354 supports or undercuts the anti-foundationalist reading. Report the sentence that decides it.
-6. (dramatization) Map Z II 'On Immaculate Perception' onto III:12 and III:6: the moon, 'to look without desire', 'where there is a will to beget'; state what the speech charges (hypocrisy) that III:12 does not (absurdity), and which charge the argued register can support.
-7. (FORWARD → will-to-truth) BGE 22 ends: 'supposing this too is only interpretation… so much the better'. Write the objection this invites (the reflexive one) and Nietzsche's one-sentence reply as an argument; then say what III:12's redefinition of objectivity would need to add for the reply to work. The solution says the next lesson turns the same critique on the will to truth and Module 7 (life-as-literature) takes the reflexive problem.
+Floor check: claim to refute (ex. 2), boundary probe (ex. 4), derivation (ex. 3).
+
+1. Retrieval (E3 from real-world-became-a-fable and consciousness-and-language): restate stage 6 and GS 354's "average", then say why perspectivism is the account of knowing both require.
+2. Claim to refute: "Perspectivism means every opinion is as good as every other." Name the sentence of GM III 12 that gives the measure and the sentence of GS 380 that explains why it is applied from within.
+3. Derivation: derive from "more eyes" a working rule for investigating a contested historical event (a revolt reported by the victors), and state which perspective a perspectivist must seek first.
+4. Boundary probe: a single perspective so comprehensive it includes all others. Would it be a view from nowhere? Use GS 374 and III 12's affects to say whether it could exist and what "objectivity" means if not.
+5. Sourcing drill: 7[60] (private, 1886-87, unpublished), BGE 22 (1886) and GM III 12 (1887). Metadata, prediction, records/argues/omits, use: why does the slogan's provenance change what it can carry?
+6. FORWARD (reaches will-to-truth): write the strongest case for wanting to know a thing as fully as possible even when the knowledge harms you and helps no one. The solution says the next lesson asks what this unconditional valuing of truth is and where it came from, with `<Ref>` to will-to-truth.
+
+## Corrections applied
+
+- APPLIED — genealogy: the "eyes" text is III 12 (p.119); II 11 cited for "the eye of justice" as a parallel; the link is a reading's, not Nietzsche's.
+- APPLIED — bge: Preface German "das Perspektivische, die Grundbedingung alles Lebens" (adjective-noun); BGE 22 and 34 confirmed with lines.
+- APPLIED — bge: "no facts, only interpretations" is not in BGE; cited as 7[60] (unpublished) with BGE 108 and 22 as nearest published cousins.
+- APPLIED — task note (bge): BGE 219 dropped; BGE 211 used instead.
+- APPLIED — zarathustra: no stated doctrine in Z; Z II 2, II 15, II 17, I 22 §1 kept as illustrations with pages and voice.
+- APPLIED — gay-science-2: GS 374 and 380 confirmed; GS 354's "perspectivism" sentence located (p.299, l.3312).
+- APPLIED — late-notebooks pedagogy: 7[60] quoted with "the world is knowable"; 36[20] marked ontological; all notes unpublished.
+- APPLIED — portable-late chapter map: Notes 1888 no. 481 identified with 7[60]; A 9, TI "Reason" 2 and 6, "Anti-Nature" 5, EH I 1 added.
+- APPLIED — early-works and daybreak chapter maps: Self-Crit 2 and 5, WA Epilogue (with its tension), D 117, 426, 243, 210, 553 added.
+- APPLIED — stance rule: the secondary-led "Sources to consult" replaced by primary passages; readings moved to Secondary; the fork named by content.
+- 10 applied, 0 declined.
+
+## Verification debts
+
+- eKGWB: BGE Preface (JGB-Vorrede); BGE 22 "Interpretation, nicht Text", "um so besser" (JGB-22); BGE 34, 43, 211 (JGB-n); GT Self-Crit 2 (GT-Vorwort-2).
+- Notebooks 2[?] pp.90-91 and 36[20]: confirm fragment numbers in the printed Bittner. TI "Anti-Nature" 5: Portable page to confirm.
+- EH I 3 restored page: not used (EH I 3 cited only for p.225). Oxford Handbook ch. 24: toc only. Nothing from Young.
+
+## Revision
+
+Carried over: the seven-step argument, the premise, both replies, the fork, figures 1-5, exercises 1-4 and 6 (revised). Replaced: "Sources to consult" rebuilt from primary chapter maps; GM II 11 demoted; BGE 219 removed; Zarathustra marked illustration; STANCE, Corrections, Verification new.

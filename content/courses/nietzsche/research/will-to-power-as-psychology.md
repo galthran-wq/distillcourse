@@ -1,79 +1,122 @@
-# Research brief: will-to-power-as-psychology (Will to Power as Psychology and as Metaphysics)
+# Research brief: will-to-power-as-psychology (Will to power against survival and the will to live)
 
 status: planned
-module: psychology-beneath-genealogy
+module: the-human-being (2 of 9), lesson 9 of 45
 type: core
-goal: Formulate BGE 36's argument for the world as will to power step by step, locate the step Clark shows to beg the question, and state the psychological doctrine that survives in Reginster's three conditions.
+goal: Explain will to power as a psychological principle and evaluate it against Darwin's self-preservation and Schopenhauer's will to live
 
 ## ARC (L10)
 
-- **Inherits:** The society of drives with command as its relation; BGE 23's programme; will-to-power-the-book's result (WP 1067's indicative has no published counterpart); GM II:12's 'reinterpretation by a will to power' used as method since Module 2.
-- **Contributes:** The doctrine's three readings sorted by what they need: BGE 36 reconstructed in seven steps with the question-begging step located (Clark Ch. 7); the psychological doctrine stated in Reginster's three conditions (a determinate first-order end, resistance, its overcoming — a second-order and self-perpetuating desire) with Richardson's 'growth in control' as the rival; A §2's definitional use; BGE 13's anti-preservation premise; BGE 259's 'exploitation'. The line drawn: what the genealogy needs (psychological) vs. what only the cosmological would license.
-- **Hands off:** To real-world-became-a-fable (the metaphysics the cosmological reading would need was itself abolished by Nietzsche); to self-overcoming-staged (Zarathustra's 'Life' asserts the cosmology); to eternal-recurrence and heidegger-one-thought (the two thoughts as one).
+- **Spine step (5, "Will to power"):** "One principle runs through the drives: each wants to grow and overcome resistance, not merely to survive or to stop wanting; that will to power can be spiritualized rather than extirpated, and the Four Great Errors show the whole psychology turned on morality and religion."
+- **Inherits:** from self-as-society-of-drives: drives that each want to rule (BGE 6), BGE 19's affect of command; from schopenhauer-and-the-birth-of-tragedy: the will to live, the pendulum of pain and boredom, the verdict that the wise man stops wanting; from doer-behind-the-deed (read): GS 360's dammed-up energy.
+- **Contributes:** the course's most cited and most misread principle, fixed in the form the published books give it: a living thing wants above all to discharge its strength and overcome resistance; survival and pleasure are results, not aims. Introduces `will-to-power`, `overcoming-resistance`. Mechanism behind ressentiment, internalization, the priest, the will to truth, the higher type and the order of rank.
+- **Hands off:** to sublimation (next): if every drive wants to discharge its strength, morality's alternatives are discharge and extirpation, and Nietzsche's third way is to spiritualize. To genealogy-as-method: GM II 12. The cosmological fork returns in the-system-assembled.
 
-Spine step: "The psychology beneath the genealogy: no soul-atom but a society of drives, willing as command among under-wills, will to power as the principle — defensible as psychology, question-begging as cosmology — and the two-world metaphysics that had to become a fable first; Zarathustra's 'Life' speaks the doctrine the argument cannot prove."
+## STANCE (binding)
 
-## Sources to consult
+- **Favorable:** against the two great nineteenth-century accounts of striving, Nietzsche proposed a third that predicts what they cannot: risk sought when safety is had, asceticism, the martyr, cruelty that costs the agent, boredom amid satisfied need; and he saw before the biologists that "struggle for existence" names an exception, not the rule (GS 349, TI Skirmishes 14).
+- **Hard passages this lesson must quote whole:** BGE 259 (bge-zimmern.txt line 5110ff; life as "appropriation, injury, overpowering of the strange and weaker ... exploitation"); A 2 (Portable p.570; the definitions of good, bad and happiness; "The weak and the failures shall perish ... And they shall even be given every possible assistance"); D 189 (p.110; the feeling of power named "good" by its owner and "evil" by those it is discharged on); D 113 (p.68; the ladder from the barbarian to the ascetic); GM II 12 (pp.76-79; purposes as signs that a will to power has become master; the "democratic idiosyncrasy"); Z II 12 (pp.225-228; "even in the will of those who serve I found the will to be master").
+- **What the words meant:** Macht is power as capacity and as mastery; Daybreak's word is Machtgefühl, and the phrase "will to power" does not occur in D. "Discharge its strength" (Kraft auslassen, BGE 13) is 1880s physiological vocabulary. "Appropriation", "incorporation", "exploitation" (Ausbeutung) in BGE 259 are organic functions described without moral charge. Zimmern's "Psychologists" in BGE 13 is Physiologen (bge-german.txt line 564), his "instinct" is Trieb. Domination of others is one form of the principle, named at length (BGE 259, D 113, D 189), not an aberration to explain away.
+- **Objection answered from his side:** the principle explains everything, so nothing: any action can be redescribed as power-seeking (the demand for ice cream rises on hot days). Reply, texts first: the published form is contrastive and predictive. BGE 13 argues by economy of principles; GS 349 and Skirmishes 14 predict overflow, squandering and the survival of the cunning weak where Darwin predicts economy; GS 13 and D 113 predict the martyr and the ascetic where hedonism predicts their absence; A 2 defines happiness as resistance overcome, testable against boredom and against the satisfaction that ends a game (Z III 12 §30). The universal claim, that all driving force is will to power, is in the notebooks (14[121], spring 1888, Bittner pp.256-258) and in BGE 36 only inside a chain of "supposing". The gap, in one sentence: in its universal form the principle cannot be falsified, and the books' uses of it as something that can be lacking (A 6, Skirmishes 38) are incompatible with its being everything; the honest form is the hedged one.
+- **Humanizing reading to test:** the reading on which will to power is at bottom self-overcoming or sublimation, "power over self", so that domination is a misunderstanding (Kaufmann, Ch. 6 III, Ch. 9; the Z I 15 note, p.119). A second reading, a second-order desire for overcoming resistance in pursuing some end (Reginster), fits the most texts and the course uses its structure, but it is a reading. The text: BGE 259 and GM II 12 describe overpowering the weaker; D 113 and D 189 make domination the first rung; Z II 12 finds the will to be master in servants. The lesson states that self-overcoming and mastery over others are both forms, that the text ranks neither as the "real" meaning, and does not make sublimation the default.
+- **Facts against the popular image:** the sister's story that the phrase came from watching Prussian cavalry in 1870 is a legend (Kaufmann p.179); it first appears in Z I 15 (1883, p.170); D has only the feeling of power.
 
-- **BGE 13, 36, 259, 22, 23, 230; also 9 (the Stoics imposing their morality on nature):** research/texts/beyondgood-full.txt; German in research/texts/digitalcriti-s1-JGB.txt — §36 'Gesetzt, dass nichts Anderes als real „gegeben" ist als unsre Welt der Begierden und Leidenschaften…', 'Gewissen der Methode', 'die Welt von innen gesehen… wäre eben „Wille zur Macht" und nichts ausserdem'; §13 'Leben selbst ist Wille zur Macht'; §259 'Ausbeutung'.
-- **Antichrist §2 ('What is good?…'), §6; Twilight 'Expeditions' §14 ('Anti-Darwin'):** research/texts/twilightof-.txt.
-- **GM II:12 (will to power as the form-imposing force in reinterpretation); GM III:7 (the philosopher's power).**
-- **Z II 'On Self-Overcoming' (line 5033):** research/texts/thusspoke-full.txt — for the one contrasting quotation ('not will to life, will to power'); the mapping is the module closer's.
-- **Clark 1990 Ch. 7 'The will to power' (pp. 205–244):** research/texts/nietzscheon-.txt — the cosmological doctrine as a priori metaphysics illegitimate by Nietzsche's own standards; BGE 36 judged question-begging and a priori (§2, pp. ~212–227); Kaufmann's empirical/psychological reading as the defensible route (§4).
-- **Reginster Ch. 3 'The Will to Power', read in full (research/texts/theaffirmati-full.txt):** 3.I — Schopenhauer's pessimism as two arguments, from origin (desire born of lack) and from boredom (the pendulum between pain and boredom; the jail-cell counterexample refining it; lines ~5108–5273); 3.II.1–2 — will to power defined as a SECOND-ORDER desire for the overcoming of resistance in the pursuit of some determinate first-order desire, after rejecting reductionism, one-drive-among-others, Clark's 'capacity to satisfy desires' and Richardson's 'development'; 3.II.3 — the paradox: willing the overcoming of resistance wills the resistance, so suffering is built into the good; 3.II.4 — cruelty and asceticism as the two case studies refuting psychological hedonism.
-- **SEP §6.1 (The Will to Power) and §3.2.1 (Power and Life):** research/texts/friedrichnie-.txt — the reading families (Heidegger/Jaspers/Richardson metaphysical; Nehamas/Poellner anti-essentialist; Kaufmann/Clark/Reginster/Katsafanas psychological-evaluative; Abel/Moore biological); Richardson's growth-in-control vs. Reginster's overcoming-resistance; Leiter's 'Millian' worry and Hussain's reply.
-- **Heidegger Vol. I §7 (will as mastery-out-beyond-itself, 'will to will'), §10 (the protoplasm/pseudopodia example, WP 702; anti-Darwin):** research/texts/nietzschevol-s1.txt — one paragraph, for the metaphysical reading's own definition; the full reading is Module 7's.
-- **Clark & Dudrick Ch. 8 'The Other Doctrines of the Will to Power' (research/texts/thesoul-full.txt):** BGE 13, 22 and 36 argued to be about the soul, not a power-biology, power-physics or power-ontology — 8.1: BGE 13's 'life' is normative (living by values, as BGE 9 established) and the self-preservation drive is superfluous specifically as a replacement for Plato's 'reason'; 8.2: BGE 22's 'physical reality as will to power' is about competing interpretations in Nietzsche's value-laden sense; 8.3: BGE 36. The third reading of §36 beside Clark 1990's (question-begging) and Heidegger's (metaphysics) — and it sides with Clark 1990 on the cosmology while denying that §36 ever asserted one.
-- **Reginster, 'The Will to Power and the Ethics of Creativity' (Leiter & Sinhababu 2007, Ch. 2, pp. 32–56; research/texts/nietzscheand-full.txt):** the definition again (pp. 35–41) with the agon/victory paradox — 'who was not vanquished in his victory?' (Z III 12[30]): winning the game satisfies the will to power and ends the game one wanted to keep playing (pp. 40–41); the four practical entailments (suffering intrinsically valued; loss of one's past creations; impermanence over final satisfaction; the inevitability of failure — the creative life as tragic, pp. 44–55) — the last three are higher-type-and-sublimation's.
-- **Poellner, 'Aestheticist Ethics' (Janaway & Robertson Ch. 3, pp. 53–55; research/texts/nietzschenat-full.txt):** will to power as second-order desire UNDER-DETERMINES first-order value — it rules out will-lessness but is compatible with most value systems Nietzsche rejects (ascetic Christianity included), so it cannot ground his substantive commitments; the objection the psychological doctrine must answer before it is used normatively.
-- **Kaufmann Ch. 6 'The Discovery of the Will to Power' (pp. ~178–200; research/texts/nietzschephi-s2.txt):** the concept's genesis from late-1870s notes on fear and power, initially repudiated (the Wagner experience), through HAH's psychology (dreams, gratitude, pity as disguised will to power), Daybreak's 'Striving for Excellence' scale (M 113: from the barbarian who tortures others to the ascetic who tortures himself; the Vishvamitra/God-of-love passage), to Zarathustra's proclamation; the Epimenides self-reference problem for 'the will to truth is a will to power' (§III) — the published-works-first history of the doctrine, and its own reflexivity problem.
+## Primary passages (exact)
 
-## Key points the lesson must cover
+- BGE 13 — bge-zimmern.txt line 510; German line 564 — "a living thing wants above all to discharge its strength; life itself is will to power; self-preservation is only one of its indirect and most frequent results"; against superfluous teleological principles — read from text; verify eKGWB JGB-13.
+- BGE 36 — line 1211 — the conditional chain; "conscience of method" commands the attempt; "will can only act on will"; own translation of the decisive sentence in bge.json notes ("Supposing finally that it succeeded in explaining our whole drive-life as the development and ramification of ONE basic form of the will, namely of the will to power, as my thesis states ... The world seen from inside ... would be precisely will to power and nothing besides"); QUOTE WITH ITS SUBJUNCTIVES — read from text; verify JGB-36.
+- BGE 259 (line 5110), 23 (802; psychology as "morphology and development-doctrine of the will to power"), 9 (333), 22 (774; "so much the better"), 19, 51, 230, 211 (3450; pointer) — read from text; verify JGB-259, 23.
+- GS 349 (pp.291-292) — gayscience-s2 — self-preservation "a symptom of a condition of distress"; "the struggle for existence is only an exception"; Darwin's "English overpopulation" (Kaufmann n.34-36) — read from text.
+- GS 13 (pp.86-88 + n.10), 118 (pp.175-176), 14 (pp.88-89), 127 (pp.183-184 + n.22) — gayscience-s1 — "the doctrine of the feeling of power" (benefiting and hurting; the martyr; pity among "those who have little pride"); benevolence as assimilation; love and avarice one drive; GS 127 never harmonized with the later doctrine — read from text; the earliest published power-psychology.
+- GS 360 (pp.315-316), 290 (pp.232-233) — dammed-up energy; power as self-constraint — read from text.
+- Z II 12 (pp.225-228; zarathustra-full.txt line ~4264) — "Whatever lives, obeys"; "not will to life but will to power"; "I am that which must always overcome itself" — read from text (illustration). Z I 15 (p.170; first appearance), II 7 (p.213), III 10 §2, III 12 §30 (p.326).
+- A 2 (p.570; portable-late.txt line ~4833; Kaufmann's wording, not Ludovici's "botched"), A 6 (p.572; "where the will to power is lacking there is decline"), A 16-17 (pp.582-583); TI Skirmishes 14 (pp.522-523; line ~3071; "Anti-Darwin"), 20 (p.526), 38 (page: confirm), Ancients 3 (p.559) — read from text.
+- D 113 (p.68), 23 (p.19), 189 (p.110), 262 (p.146), 348 (p.165), 356 (p.166), 112 (pp.66-67), 140 (p.88), 245 (p.142) — Daybreak OCR — the ladder; power grown subtle out of impotence; "the love of power is the demon of men" — read from text.
+- GM II 12 (pp.76-79), II 18 (p.87; "the instinct for freedom (in my language: the will to power)"), III 14 (p.123), III 18 (p.135), I 13 (p.45) — read from text.
+- EH III 5 (p.266), IV 4 (p.329), III BT 4 (p.275 + n.5); HH I 103, 50, 45, 107 — read from text.
+- Notebook 14[121], spring 1888, Bittner pp.256-258 ("all driving force is will to power"); 36[31], 1885, pp.26-27 (force needs "an inner world which I call will to power"); 38[12], 1885, pp.38-39 (latenotebooks-full.txt lines ~664, 3130; "a monster of force ... This world is the will to power, and nothing besides!"; the note printed as WP 1067; never "discarded", the book project was abandoned Sept 1888, Bittner x-xi); 14[79], 1888, pp.245-247 ("not a being, not a becoming, but a pathos"); 34[208], 1885, p.13 ("the rule is the struggle for power"); 14 p.264 (resistance as stimulus) — all unpublished.
 
-1. **The doctrine's uses, sorted.** Four appearances in BGE's opening (§9 philosophy, §13 life, §22 physics, §23 the psyche — Clark & Dudrick's count) plus GM II:12 (reinterpretation), A §2 (a definition of good), BGE 259 (life as exploitation), Z 'On Self-Overcoming' ('where I found the living, there I found will to power'). Three readings: psychological (a claim about human motivation), biological (a claim about all life), cosmological (a claim about everything). State what each needs the texts to say.
-2. **BGE 13: the anti-preservation premise.** 'A living thing wants above all to discharge its strength — life itself is will to power; self-preservation is only one of the indirect and most frequent consequences.' Against Spinoza's conatus and (Twilight 'Expeditions' §14) Darwin's struggle: 'where there is struggle, it is a struggle for power'; the protoplasm's pseudopodia (WP 702 via Heidegger §10 — Nachlass, corroborating only). Reconstruct: (P) organisms take risks preservation would forbid; (C) the basic drive is not preservation. Grade: an empirical claim with anecdotal support.
-3. **BGE 36 reconstructed in seven steps.** (1) Suppose nothing is 'given' as real except our world of desires and passions. (2) Suppose we cannot get down or up to any other 'reality' than the reality of our drives. (3) Is it not permitted to make the experiment of asking whether this given is sufficient to understand the so-called mechanistic world? (4) Not as an illusion but as 'a more primitive form of the world of affects' — 'a pre-form of life'. (5) The 'conscience of method' demands not several kinds of causality until one has been pushed to its limit. (6) The question whether will can act on will — 'will' as the only causality we know. (7) Then all efficient force would be 'will to power' — 'the world seen from inside… would be just this will to power and nothing else'. Note the mood at every step: 'suppose', 'is it not permitted', 'would be'. Clark's diagnosis (Ch. 7 §2): step (1) assumes the drives are the only given (already denied by BGE 16–19's dismantling of the will as a datum — the cosmological argument uses the very 'will' the psychology denies is simple); step (5)'s 'one causality' is an a priori demand; step (7) generalizes from the one case we 'know' — which is not knowledge on Nietzsche's own account. Verdict: the argument begs the question; Nietzsche frames it as an experiment and closes BGE 22 saying physics too is 'only interpretation' — the cosmological doctrine is offered as an interpretation, not proved.
-4. **The psychological doctrine that survives.** Reginster's three conditions: (i) a determinate first-order desire (an end); (ii) genuine resistance to its satisfaction; (iii) success in overcoming that resistance — 'the will to power is the will to the overcoming of resistance'. Second-order (about how satisfaction occurs, not what is achieved); self-perpetuating (satisfaction regenerates dissatisfaction; a new resistance is sought — the paradox). Richardson's rival: growth in control/mastery of the environment and the other drives. Katsafanas's constitutivism named. What the doctrine explains in the Genealogy: the priest's power (III:7, III:15), reinterpretation (II:12), the noble's pathos of distance; what it does not need: the cosmos.
-5. **A §2 and BGE 259: the definitional and the political uses.** 'What is good? All that heightens the feeling of power' — a definition, not an argument; the is–ought bridge from antichrist-applied-genealogy now has its standard named (feeling of power) and still no defence. BGE 259: life as 'appropriating, injuring, overpowering… exploiting' — 'a consequence of the essence of what is living'; state that this is the biological reading in the published text, that it is asserted, and that the higher-type lesson will ask how much of it the ideal needs.
-6. **The line.** What the genealogy's arguments require of the doctrine (a psychology of drives that seek to command; a criterion — power, resistance overcome — for ranking types) vs. what only the cosmological doctrine would license (that the world 'is' will to power; that value is written into being). The naturalist reading keeps the first and treats the second as Nietzsche's own overreach, flagged by his own mood; Heidegger's reading keeps the second (forward). Leiter's 'Millian' worry (an argument from 'everything seeks power' to 'power is good' is Mill's fallacy) stated with Hussain's reply (a naturalist ethics needs no such inference).
+## Secondary (References only)
 
-## Set pieces and worked examples to recreate
+- Reginster, Ch. 3 II (pp.124-147): overcoming resistance; the jail cell (p.125), the Olympic motto (p.137); Reginster in Leiter & Sinhababu, Ch. 2.
+- Clark & Dudrick, Ch. 8 §8.1 (pp.213-223), §8.3 (pp.229-243): BGE 13; BGE 36 as conditional.
+- Kaufmann, Ch. 6 (pp.178-207; p.179 the legend; D 113 pp.195-197), Ch. 9 (pp.257-283): the sublimation reading to test.
+- Leiter, SEP §3.1 (WP 1067; A 6, 17, TI IX 38). Bittner, Introduction pp.xvii-xxiii (ice cream p.xxii; latenotebooks-full.txt lines 757-762). Janaway & Robertson, Ch. 3 §1. Tanner, Ch. 6.
 
-- **BGE 36 in seven steps** with the mood of each step marked — the course's central worked reconstruction for this module; the dossier calls §36 'the closest thing in his corpus to a formal argument for will-to-power metaphysics'.
-- **The three conditions as a loop** — the dossier's suggested figure: end → resistance → success → renewed dissatisfaction.
-- **The protoplasm's pseudopodia** (WP 702, via Heidegger §10) — the anti-Darwin anecdote, marked Nachlass.
-- **'What is good?'** (A §2) typeset as the definition it is.
-- **The four BGE appearances** as a countable fact (Clark & Dudrick).
-- **The pendulum and the jail cell** (Reginster 3.I.6): Schopenhauer's 'between pain and boredom' as a two-state oscillation, then the prisoner bored while still desiring release — the counterexample that turns 'desire to desire' into 'desire for resistance in the pursuit of an end'; the lesson's derivation of the three conditions, carried through.
-- **'Who was not vanquished in his victory?'** (Reginster 2007 pp. 40–41): the chess game won — the paradox as a worked case.
-- **M 113's scale of the striving for excellence** (Kaufmann 6.II): a one-line ladder from barbarian to ascetic — the doctrine's psychological content before the word existed.
-- **Poellner's under-determination objection** as a two-column table: value systems will to power excludes (Schopenhauerian will-lessness) vs. those it permits (ascetic Christianity, Kantian duty) — the reader sees why 'what is good? all that heightens the feeling of power' (A 2) needs a further premise.
+## The reconstruction
 
-## Pitfalls / subtleties to flag
+- **Claim and where.** BGE 13: "life itself is will to power." A 2: happiness is "the feeling that power is growing, that resistance is overcome." Z II 12: "not will to life but will to power."
+- **Against self-preservation.** (1) If the aim were survival, organisms would economize once safe (GS 349). (2) They do not: "overflow and squandering"; human beings seek risk and die for it (GS 13). (3) A principle explaining both beats one needing exceptions; a cardinal drive to self-preservation is "superfluous" (BGE 13). (4) "Discharge, grow, overcome" explains survival as a by-product and the squandering directly. (5) So "the struggle for existence is only an exception" (GS 349; Skirmishes 14).
+- **Against the will to live and hedonism.** (1) Schopenhauer: satisfaction is relief, so life swings between pain and boredom. (2) Boredom also occurs while a want is unmeetable (the jail cell) and vanishes when something difficult is pursued. (3) So what is wanted is the activity of overcoming obstacles in pursuit of something (A 2). (4) That activity contains displeasure, the resistance, and is still sought (notebook 14 p.264, unpublished). (5) So the pessimist's premise misdescribes desire.
+- **Unstated premise.** That "power" names the overcoming of resistance and not only mastery over others; without it step 2 of the first argument proves nothing. Z II 12 and A 2 state it; BGE 259 and D 113 keep domination at the centre. The lesson shows where the texts fall.
+- **Strongest objection and Nietzsche's reply.** As in STANCE.
+- **Connections.** sublimation; slave-revolt-and-ressentiment (blocked will to power); cruelty-and-culture (BGE 229); bad-conscience (GM II 18); ascetic-priest (GM III 14-18); creating-values (BGE 211); order-of-rank (BGE 257-259); the-system-assembled.
 
-- Reginster's three conditions are known through reviewers' quotations; the wording must be verified by the human before it is quoted as Reginster's. State the structure; mark the quotation.
-- Clark's page numbers are from the OCR and match the print; cite them.
-- BGE 36 is in the conditional throughout; any translation that flattens 'gesetzt' to 'given that' changes the argument — a translation exercise.
-- Do not resolve the is–ought bridge here; name the standard (feeling of power) and defer the defence to value-creation-and-normativity.
-- Heidegger's definition appears in one paragraph as a rival to be reconstructed in Module 7; do not evaluate it here.
-- The 'exploitation' sentence (BGE 259) is quoted verbatim; the register does not soften it.
+## Where the claim forks (named by content)
+
+Will to power is (a) a psychology of living things, (b) a biology of all life, or (c) a claim about the whole world. The books support (a) and (b) (BGE 13, 259; GM II 12; Z II 12; A 2, 6; GS 349). (c) appears in BGE 36 under "supposing", though the section calls it "my thesis" and says method commands the attempt; the notebooks state it unhedged (38[12], 36[31], 14[121]). A 6 and Skirmishes 38 treat will to power as something that can be lacking, which cuts against (c). The lesson takes (a) as its subject, states (c) fairly, quotes BGE 36 with its subjunctives and the notebook without them, and says both are Nietzsche's words, one published and one not.
+
+## Set pieces and gems
+
+- BGE 13 ("Physiologists", not Zimmern's "Psychologists"): "a living thing wants above all to discharge its strength."
+- GS 349 (p.292): "The struggle for existence is only an exception, a temporary restriction of the will to life."
+- A 2 (p.570): "What is happiness? The feeling that power is growing, that resistance is overcome."
+- Z II 12 (pp.226-227), illustration: "Where I found the living, there I found will to power; and even in the will of those who serve I found the will to be master"; "I am that which must always overcome itself."
+- D 262 (p.146): "Not necessity, not desire, no, the love of power is the demon of men."
+- D 113 (p.68): "man split asunder into a sufferer and a spectator."
+- Z III 12 §30 (p.326): "Alas, who was not vanquished in his victory?"
+- BGE 36 whole, beside notebook 38[12] (unpublished, 1885): "This world is the will to power, and nothing besides!"
+- The jail cell, the Olympic motto and the ice cream as the lesson's own illustrations, unattributed.
+
+## Pitfalls
+
+- "Will to power" is not simply "will to dominate others" (L13, prevalent), and the correction is not that it is "really" self-overcoming: the text has both forms.
+- Never say Nietzsche "discarded" the "monster of force" note; the book project was abandoned, the note stands; "WP 1067" only as a compilation number.
+- BGE 36 quoted with its subjunctives and with "my thesis".
+- D has no phrase "will to power"; do not quote D 113 or D 262 as statements of it.
+- The old brief's "tickling and sexual rhythm" argument (WP 699) is known only by a compilation number; use notebook 14 p.264 or omit.
+- Reginster's "second-order desire" needs plain glossing; Bittner's objection is Bittner's; no names in the body.
+- A 2's "shall perish" is quoted with its next sentence because that is the text, not as softening.
 
 ## FIGURE PLAN
 
-1. `draw:` single `<Figure>` — **three readings, what each needs**: psychological / biological / cosmological as three nested regions, with the passages that support each placed inside (A §2, GM II:12 innermost; BGE 13, 259 middle; BGE 36, WP 1067 outermost — WP dashed).
-2. `draw:` `<FigureSequence>` (7 frames) — **BGE 36 step by step**: one step per frame, the mood word ('suppose', 'is it permitted', 'would be') in the accent colour, and at steps 1, 5 and 7 Clark's objection appearing as a side note.
-3. `draw:` single `<Figure>` — **the question-begging step**: step 1's 'the drives are the only given' beside BGE 16–19's 'the will is not a simple datum' — the argument's premise and the psychology's result in conflict.
-4. `draw:` single `<Figure>` — **Reginster's loop**: a determinate end → resistance → overcoming → satisfaction → renewed dissatisfaction → new resistance — the self-perpetuating structure as a cycle (the dossier's figure suggestion).
-5. `draw:` single `<Figure>` — **preservation vs. power**: BGE 13's claim as two arrows from 'a living thing' — 'preserve' (thin, 'a consequence') and 'discharge strength' (thick, 'above all') — with the pseudopodia as the marginal example tagged 'Nachlass'.
-6. `draw:` single `<Figure>` — **the line**: what the Genealogy uses (left: a criterion for ranking types; command among drives; reinterpretation) vs. what only the cosmology would give (right: 'the world is will to power'; value in being) — with the naturalist reading's and Heidegger's choices marked.
-7. `source:` none.
+1. `draw:` `<FigureSequence>` (4 frames): **the will-to-power loop**: aim; resistance; overcoming; a harder aim; set against Schopenhauer's pendulum from lesson 2.
+2. `draw:` single `<Figure>`: **three principles, one table**: self-preservation, pleasure, will to power predicting four behaviours (eating when hungry, climbing a mountain, fasting, a martyr's death); divergent rows highlighted.
+3. `draw:` single `<Figure>`: **D 113's ladder of distinction**, one force from the barbarian to the ascetic.
+4. `draw:` single `<Figure>`: **psychology, biology, cosmology**: nested scopes with the published passages in each ring, BGE 36's "supposing" at the outer boundary, notebook 38[12] outside it, unpublished.
+5. `draw:` single `<Figure>`: **what the word covers**: one circle with its forms as sectors (A 2 overcoming; BGE 259/D 113 mastery over others; Z II 12 self-overcoming; GM II 12 interpretation; BGE 51 the saint); none marked "real".
+6. `draw:` single `<Figure>`: **the Olympic motto from inside and outside the game** (Z III 12 §30).
 
-## EXERCISE PLAN (floor: ≤1 warm-up; ≥2 of boundary / refute / derivation / research; one FORWARD)
+## EXERCISE PLAN
 
-1. (warm-up) Write BGE 36 in seven steps in your own words, marking the mood of each.
-2. (refute) "BGE 36 proves that the world is will to power." Break it at the step Clark identifies: show that step 1 assumes what BGE 16–19 deny (a simple 'will' as datum) and that step 7 concludes from one 'known' case — then state what BGE 36 does establish (an interpretation offered under a stated method).
-3. (derivation) Derive Reginster's 'paradox' (satisfaction regenerates dissatisfaction) from the three conditions alone, and state which condition makes will to power second-order; then show what the psychological doctrine predicts about a being with no resistance available (the last human being of Z Prologue §5) — a forward doorstep to overman-staged, but the FORWARD slot is exercise 7.
-4. (boundary probe) Suppose only the psychological doctrine is true (nothing about the cosmos). Which of the Genealogy's reconstructed arguments (I:10's ressentiment, II:12's reinterpretation, III:7's philosopher, III:15's priest) still go through? State the one that would need more and what it would need.
-5. (research-shaped) Count will to power's appearances in BGE's opening sections yourself (Clark & Dudrick claim four: §§9, 13, 22, 23) and classify each by domain (philosophy / life / physics / psyche); report whether any is in the indicative mood, and what that shows.
-6. (missing premise) A §2 defines good as 'all that heightens the feeling of power'. Write the premise that connects 'everything seeks power' (descriptive) to 'power is good' (evaluative), state Leiter's objection to it (Mill's fallacy) and Hussain's reply (no inference is needed if the doctrine is a naturalist ethics), and say which the text supports.
-7. (FORWARD → real-world-became-a-fable) BGE 36's step 4 says the mechanistic world is 'a more primitive form of the world of affects', not an illusion, and BGE 22 says physics is 'only interpretation'. Write what Nietzsche must have already rejected for 'interpretation' not to mean 'false' (a true world behind the interpreted one), and find the Twilight section that stages that rejection in six sentences; the solution says the next lesson reads it.
+Floor check: claim to refute (ex. 2), boundary probe (ex. 3), derivation (ex. 4), research-shaped (ex. 5).
+
+1. Retrieval (E3 from schopenhauer-and-the-birth-of-tragedy): restate the pendulum and name the premise the will-to-power argument attacks.
+2. Claim to refute: "Will to power means everyone secretly wants to rule other people." One behaviour the domination reading cannot explain (GS 13's martyr); one passage where domination is the form named (BGE 259); the correct statement.
+3. Boundary probe: a game you always win; what A 2 predicts you will feel, and why this is the principle's paradox (Z III 12 §30).
+4. Derivation: from "will to power wants resistance", what Nietzsche must say of a world in which all suffering has been abolished (BGE 225 preview); compare the last man.
+5. Research-shaped (sourcing drill on BGE 36): metadata first; list every conditional; rewrite the conclusion unconditionally, name the premise added, set it beside notebook 38[12] and say which text says which.
+6. FORWARD (E7, reaches sublimation): a strong aggressive drive becomes a ruthless debater rather than a brawler; what changed and what stayed. Solution: sublimation names the change (`<Ref>`; TI "Morality as Anti-Nature" 1-3, BGE 189).
+
+## Corrections applied
+
+- APPLIED — gay-science-1: GS 13, 118, 127 added as the earliest published statements.
+- APPLIED — zarathustra: Z III 12 §30 (p.326), Z II 12 (p.226), Z I 15 confirmed and kept.
+- APPLIED — late-notebooks (ice cream): tied to 14[121], spring 1888; Bittner's reply and rejection marked as his.
+- APPLIED — late-notebooks (38[12]): "discarded" removed; the book was abandoned, the note stands.
+- APPLIED — bge: BGE 36 conditional and "my thesis"; BGE 13's Physiologen and Trieb noted.
+- APPLIED — daybreak: D 113 verified; D 262, 189 added; D has no phrase "will to power".
+- APPLIED — portable-late: Kaufmann's chapter names and wording.
+- APPLIED — architect's stance note: sublimation/self-overcoming no longer the default; the fork stated hedged vs unhedged.
+7 reader corrections applied, 0 declined.
+
+## Verification debts
+
+- eKGWB: JGB-13 ("Physiologen", "Kraft auslassen"), JGB-36 ("Gesetzt ... als mein Satz lautet"), JGB-259 ("Ausbeutung"), JGB-23, JGB-9.
+- WP 699 (tickling): KSA number and Bittner page unknown; concordance or omit.
+- TI Skirmishes 38's page; Z I 15's Kaufmann note p.119.
+- Notebook labels lost to OCR (34 p.15, 11 p.213, 14 p.264, 40 pp.46-47, 14[123?]).
+
+## Revision
+
+Carried over: the two arguments, the unstated premise, the fork section, the jail cell, Olympic motto and ice cream, figures 1-4 and 6, exercises 1-4, 6. Changed: overcoming-resistance no longer the sole "defensible form"; BGE 259, D 113, D 189, GM II 12 quoted whole as forms; "discarded" removed; GS 13/118/127, D 189/262, A 6, Skirmishes 14 added; WP 699 demoted to a debt; "Sources to consult" replaced.

@@ -1,74 +1,111 @@
-# Research brief: real-world-became-a-fable (How the Real World Became a Fable)
+# Research brief: real-world-became-a-fable (How the true world became a fable)
 
 status: planned
-module: psychology-beneath-genealogy
+module: truth (6 of 9), lesson 27 of 45
 type: core
-goal: Formulate Twilight's six-stage 'History of an Error' and 'Reason in Philosophy' as the argument that abolishing the true world abolishes the apparent one too, and connect it to Clark's account of why Nietzsche stopped denying truth.
+goal: Explain the six stages by which, on Nietzsche's account, Plato's true world became a fable, and why abolishing it abolishes the apparent world too
 
 ## ARC (L10)
 
-- **Inherits:** Perspectivism as anti-foundationalism with the thing-in-itself's rejection promised as its ground; BGE 22's 'physics is interpretation'; BGE 36's 'not an illusion'; the Four Great Errors' 'thing in itself' as a fiction of false causality; the reader's forward question — what must go for 'interpretation' not to mean 'false'.
-- **Contributes:** Twilight's 'Reason in Philosophy' (§§1–6: Egyptianism; the senses do not lie; the four theses) and 'How the "Real World" at last Became a Myth' reconstructed as a six-stage ladder and as an argument: once the true world is abolished, 'apparent' has nothing to contrast with — stage six is not an inversion but the end of the pair. Clark Ch. 4: this is the developmental turning point — without a thing-in-itself, the early falsification thesis has no ground, and the mature works affirm ordinary truth. Heidegger's rival gloss (twisting free, Vol. I §24) previewed in one paragraph.
-- **Hands off:** To self-overcoming-staged ('On the Hinterworldly' stages the two-world error as a sufferer's invention); to heidegger-one-thought (the fable as Heidegger reads it).
+- **Spine step (9, "The true world dismantled"):** "The true world goes the way of God: the history of Platonism ends with the true world a fable, and philosophy's 'reason' turns out to be hatred of becoming plus faith in grammar."
+- **Inherits:** from death-of-god, "God is dead" as a belief become unbelievable (GS 343); from nihilism, the highest values devaluing themselves through Christianity's own truthfulness (GS 357, GM III 27); from the reader's background, Plato's two worlds.
+- **Contributes:** the death of God extended from morality to metaphysics. Heaven, the Forms and Kant's thing in itself are one idea with one function (a world by which this one is judged and found wanting) and one history, told in six stages ending at noon. Introduces true-world and platonism ("Christianity is Platonism for the people") and gives the module its map.
+- **Hands off:** to reason-in-philosophy, why clever people wanted a world that does not change; to perspectivism, stage 6's one world with no view from nowhere.
 
-Spine step: "The psychology beneath the genealogy: no soul-atom but a society of drives, willing as command among under-wills, will to power as the principle — defensible as psychology, question-begging as cosmology — and the two-world metaphysics that had to become a fable first; Zarathustra's 'Life' speaks the doctrine the argument cannot prove."
+## STANCE (binding)
 
-## Sources to consult
+- **Favorable:** Nietzsche is the first to see that the Forms, the Christian beyond and the thing in itself are the same move, that the move has a biography, and that the biography ends by itself: the idea is used up, stage by stage, by the demand for truth it bred. He alone drew the conclusion: when the true world goes, "apparent" has nothing left to mean.
+- **Hard passages this lesson must quote whole:** none from the course's hard list falls here. Lines to give intact: stage 2's parenthesis, "it becomes more subtle, insidious, incomprehensible—it becomes female, it becomes Christian" (TI Fable 2, p.485, portable-late.txt l.1693); EH IV 8's "the true world invented in order to devaluate the only world there is" (p.334); Z I 3's "their body is to them their thing-in-itself" (p.145); A 15's list of imaginary causes, effects and beings (pp.581-582).
+- **What the words meant:** "female" (stage 2) names the veiled, promise-making form of an idea, the figure of the Preface's "truth is a woman"; stage 2 is where the idea learns to obligate without being shown. "Platonism for the people": the two-world picture translated from an aristocratic discipline of reason (BGE 14) into a faith anyone can hold. "Fable" (Fabel): a story one tells and no longer takes as a report, not a lie told knowingly.
+- **Objection answered from his side:** the history is a caricature; the Forms, heaven and the thing in itself do different jobs. Reply from the text: the fable tracks a function, not a doctrine; each stage is defined by what the true world does to this one (EH Pref 2: value placed in the ideal is subtracted from reality), and "Reason" 6's fourth thesis names the lineage, "whether in the Christian manner or in the manner of Kant (in the end, an underhanded Christian)" (p.484). Second objection: stage 6 leaves no standard for "false". Reply: BGE 34's "degrees of seemingness" and GS 54's dreaming that knows itself a dream; the standard is comparative and internal to appearance. Gap sentence: the fable shows that the true world lost its grip, not that nothing could play its role, and Nietzsche's own "reality" (EH Pref 2) is a word he must earn in the next lessons.
+- **Humanizing reading to test:** the "merely anti-metaphysical" reading, on which stage 6 leaves science and common sense untouched. The text goes further: stage 6 abolishes the apparent world too, "Reason" 6 calls the distinction "a symptom of the decline of life", and A 15 counts "matter, atoms" among the fictions (p.581).
+- **Facts against the popular image:** the fable ends with "INCIPIT ZARATHUSTRA" and the tragic artist "who says Yes to everything questionable"; the dismantling is written as a dawn (GS 343's "open sea").
 
-- **Twilight, 'Reason in Philosophy' §§1–6 and 'How the "Real World" at last Became a Myth' (Hollingdale: 'Real World'; others 'True World'):** research/texts/twilightof-.txt; German in research/texts/digitalcriti-s1-GD.txt — 'Wie die „wahre Welt" endlich zur Fabel wurde. Geschichte eines Irrthums'; the six numbered stages with their parenthetical glosses; 'INCIPIT ZARATHUSTRA'; 'Reason' §4's four theses.
-- **Clark 1990 Ch. 4 'The development of Nietzsche's later position on truth' (pp. 95–126) — esp. §1 'The rejection of the thing-in-itself' and §3 'The error of the "true world"' (pp. 95–117), §4 on GS 354 (pp. 117–126):** research/texts/nietzscheon-.txt.
-- **Clark Ch. 2 §3 (Descartes vs. Kant; the 'neo-Kantian' label; pp. 51–62):** same file — the reader has Kant; the lesson uses Clark's framing of what 'rejecting the thing-in-itself' means.
-- **Heidegger Vol. I §24 'Nietzsche's Overturning of Platonism' (~pp. 200–210) and §25:** research/texts/nietzschevol-s1.txt — the six stages glossed one by one; inversion vs. 'twisting free' (Herausdrehung); dated to 1888; and Vol. III Part One §§19–21 ('truth as justice') in research/texts/nietzschevol-s3-vol3.txt — one line.
-- **BGE 2 (the metaphysicians' faith in opposite values), 22, 34 ('why not a world of appearance… the antithesis "apparent" and "thing-in-itself"'), 36:** research/texts/beyondgood-full.txt.
-- **GS 354 (consciousness as surface — not a thing-in-itself claim: 'we have no organ for knowledge'); GS 374:** research/texts/digitalcriti-s1-FW.txt.
-- **Z I 'On the Hinterworldly' (line 2315):** research/texts/thusspoke-full.txt — for one sentence; the mapping is the closer's.
-- **Beckman discussion notes (Twilight section — the longest):** research/texts/phil370-discussionnotes.txt.
-- **Heidegger Vol. III Part One §20 (p. 135; research/texts/nietzschevol-s3-vol3.txt):** the full six-paragraph fable quoted with 'INCIPIT ZARATHUSTRA' paired to GS 342's 'Incipit tragoedia', and the charge that the WM editors misfiled WM 749 ('the European princes… we immoralists') — the fable's own philology, for one paragraph.
-- **Reginster Ch. 2.II.1–3 (research/texts/theaffirmati-full.txt):** the rejection of Platonism and of Kantian rationalism reconstructed as arguments, with 'nihilism' (disorientation) as the consequence — the metaethical reading of the fable's stages 1–3, so the reader sees that the fable is a history of value-foundations as much as of truth.
-- **Kaufmann Ch. 9 §I (research/texts/nietzschephi-s2.txt):** the 'physics' notes (WM 618–639) on atomism and causality as the Nachlass background to 'Reason in Philosophy' §5's 'metaphysics of language' — corroboration only, per the published-works rule.
+## Primary passages (exact)
 
-## Key points the lesson must cover
+- TI Fable 1-6 (pp.485-486) — portable-late.txt ll.1676-1726 — the whole page, six stages with stage directions — read from text.
+- TI "Reason" 6 (p.484) — ll.1644-1676 — four propositions; the fourth is the fable in a sentence — read from text. "Reason" 1-5 belong to reason-in-philosophy.
+- TI "Four Great Errors" 3 (p.495) — ll.2076-2086 — "the 'thing-in-itself,' the horrendum pudendum of the metaphysicians"; the phrase lives here, not in the Fable — read from text.
+- A 10 (pp.576-577: Kant's "true world" among the "most malignant errors"), A 15 (pp.581-582: imaginary causes, effects, beings; "neither morality nor religion has any point of contact with reality") — portable-late.txt — read from text.
+- BGE Preface — bge-german.txt ll.108-122 — "Plato's Erfindung vom reinen Geiste und vom Guten an sich"; "das Perspektivische, die Grundbedingung alles Lebens"; "Christenthum ist Platonismus für's 'Volk'"; the drawn bow closes it — verify eKGWB JGB-Vorrede.
+- BGE 2 (antitheses; the thing in itself as refuge), 10, 14 (Plato's aristocratic resistance to the senses), 34 ("a moral prejudice that truth is worth more than semblance"; "degrees of seemingness", bge-zimmern.txt ll.1186-1195), 54 — read from text; verify eKGWB JGB-n.
+- GS 54 (p.116, Kaufmann n.44: no thing in itself, only appearance in a perspective) — gayscience-s1-intro-books1-3.txt l.4851; GS 109 (pp.167-169), 151 (p.196: the other world from an interpretation error) — read from text.
+- GS 344 (pp.280-283: truth-seekers "affirm another world"), 346 (pp.285-287: "Either abolish your reverences or yourselves"), 372 (pp.332-333: idealism a disease; Plato's as "caution of an over-rich health", n.133), 374 (p.336) — gayscience-s2-bk4-bk5-appendix.txt — read from text.
+- EH Pref 2 (pp.217-218) — eccehomo-full.txt ll.595-610 — "the mendaciously invented world and reality"; "The lie of the ideal has so far been the curse on reality"; EH IV 8 (pp.333-335: the inventory of invented concepts); III TI 1 (p.314: idol = "what has been called truth so far") — read from text.
+- Z I 3 (pp.142-145: "It was suffering and incapacity that created all afterworlds"), Prologue 3 (p.125), II 2 (pp.197-200), III 12 §15 (p.317); "great noon": I 22 §3 (pp.190-191), III 5 §3 (p.284), III 10 §3 (p.303), IV 20 (p.439) — zarathustra-full.txt — illustration.
+- D 117 (p.73: "no backway or bypath into the real world"), 474 (p.196), 43 (p.30), 448 (p.188: Plato flees reality), 33 (pp.24-25) — Daybreak ... ocr.txt — read from text.
+- HH 1-2 — early-ma.txt (Zimmern pp.14-15 approx.), early-ma-de.txt — metaphysics' "miraculous origin" from the thing in itself; "no eternal facts ... no absolute truths" — verify eKGWB MA-1, MA-2.
+- GT 4, 18, Self-Crit 5 — early-gt.txt — the Primordial Unity behind "appearance", Kant's "work of Maya": the stage Nietzsche himself once occupied; "all life rests on appearance, art, illusion, optics, necessity of perspective and error" (own translation).
+- Notebooks 11[50] (p.209), 8[2] (pp.141-142: the "psychology of metaphysics"), 14[93] (pp.250-251: "a world of relationships"), 6[23] (pp.125-126), 7[?] (p.136) — latenotebooks-full.txt — unpublished, 1885-88, Bittner pages.
 
-1. **'Reason in Philosophy' §§1–4: the diagnosis.** Philosophers' 'Egyptianism' — dehistoricizing, mummifying, 'conceptual mummies'; the senses do not lie — 'reason' is what falsifies (unity, thinghood, substance, duration); Heraclitus right against the Eleatics; the 'highest concepts' as the last vapour of evaporating reality; God as the 'ens realissimum' at the end of the chain. §5: the seduction of grammar — 'I fear we are not getting rid of God because we still believe in grammar' (the doer fiction at the level of metaphysics). §6's four theses reconstructed: (1) the reasons for calling this world 'apparent' are the reasons for its reality; (2) the 'true world' is constructed from the attributes of nothingness — a 'moral-optical illusion'; (3) inventing another world makes sense only as revenge on life; (4) dividing the world into 'true' and 'apparent' is a symptom of declining life (with the artist's appearance as the exception).
-2. **The six stages as a ladder.** (1) Plato: the true world attainable by the wise and virtuous — 'I, Plato, am the truth'. (2) Christianity: unattainable now but promised — 'it becomes woman, it becomes Christian'. (3) Kant: unattainable, undemonstrable, unpromisable, but a consolation and an obligation — 'the idea grown pale, Nordic, Königsbergian'. (4) Positivism: unattained, therefore unknown, therefore not consoling or obligating — 'grey morning; cockcrow of positivism'. (5) The true world refuted: useless, superfluous, therefore abolished — 'Plato's embarrassed blush'. (6) 'The true world we have abolished: what world has remained? the apparent one perhaps? But no! with the true world we have also abolished the apparent one!' — 'Midday; moment of the shortest shadow; end of the longest error; zenith of mankind; INCIPIT ZARATHUSTRA.' Quote each stage in Hollingdale with the German for the glosses; the six-line text is the most anthologized in the book.
-3. **Stage six as an argument, not an inversion.** Reconstruct: (P) 'apparent' is a relative term — apparent as against a true world. (P) The true world has been abolished (stages 4–5). (C) Nothing is left to be 'merely apparent'; the pair is gone, not reversed. Contrast the inversion reading (sensuous on top, supersensuous below — still two slots): stage six removes the slots. This is where Clark's and Heidegger's readings converge on the structure and diverge on what it means.
-4. **Clark's turning point.** The early Truth and Lie denied truth because truth was correspondence to the thing-in-itself and our concepts cannot reach it; the mature Nietzsche rejects the thing-in-itself (BGE 34's 'why not a world of appearance… the antithesis is untenable'; Twilight's stage six) — and with it the only reason to call our beliefs false; the mature position keeps ordinary truth and rejects only metaphysical truth ('neo-Kantian': truth is not independent of all cognitive capacities). GS 354 read as Clark reads it (a claim about consciousness's usefulness, not a residual thing-in-itself). The consequence for the course: perspectivism's result (Module 4) has its ground; the falsification thesis is dated and dropped.
-5. **Heidegger's rival gloss, previewed.** Vol. I §24: stage six is a 'twisting free' of Platonism, not an escape — the new hierarchy of sensuous/non-sensuous (§25) still ranks; the whole is Nietzsche's final move, dated 1888. One paragraph: what the reading needs (that Nietzsche remains inside the guiding question); its full statement is heidegger-one-thought's.
-6. **What the fable does for the module.** With no true world, 'interpretation' (BGE 22) is not 'false', 'will to power' cannot be a claim about a world behind the interpreted one (the cosmological reading loses its object), and the drives are not 'appearances' of anything — the psychology is the only world. State it as the module's own result.
+## Secondary (References only)
 
-## Set pieces and worked examples to recreate
+- Kaufmann, Nietzsche: Philosopher, Psychologist, Antichrist, Ch. 3 III (p.112): Twilight's title, the hammer as tuning fork.
+- Clark & Dudrick, The Soul of Nietzsche's BGE, Ch. 1 (pp.13-29): Plato's "worst error", the Kant parallel, the bow.
+- Reginster, The Affirmation of Life, Ch. 1 II.2-3 (pp.44-49): Platonic vs Christian negation of life.
+- Bittner, Introduction to Writings from the Late Notebooks (pp.xxv-xxviii): used by the gap sentence.
 
-- **The six stages with their parenthetical glosses** — the canonical ladder; the dossier calls it 'the passage every secondary-literature summary redraws'.
-- **'Plato's embarrassed blush'** and **'the idea grown Königsbergian'** as the two wittiest glosses — quoted, not imitated.
-- **The four theses of 'Reason' §6** as a numbered list.
-- **Inversion vs. removal** — the two-slot picture with the slots erased (the dossier's Heidegger-inspired figure).
-- **BGE 34's sentence** on the antithesis 'apparent'/'thing-in-itself' being untenable — Clark's textual anchor.
-- **Two glosses of stage six side by side**: Clark (abolishing the true world abolishes the apparent one — no falsification thesis survives) and Heidegger I §24 (a twisting-free that keeps the discordance raging) — the same sentence, two readings, and the test the lesson runs (does 'apparent' survive as a term in Twilight after the fable? — 'Reason in Philosophy' §6's four theses decide).
+## The reconstruction
 
-## Pitfalls / subtleties to flag
+- **Claim and where.** TI Fable: the true world has, in six stages, become a fable; with it the apparent world is abolished. "Reason" 6 states it as four propositions; EH Pref 2 gives the slogan.
+- **Argument in plain steps.** (1) Plato: the true world is reachable by the wise now; the philosopher "is it". (2) Christianity: reachable after death, by the repentant; the idea obligates by promising. (3) Kant: unreachable and unprovable, yet its mere thought commands (duty, God, freedom, immortality as what we must act as if). (4) Positivism: unreached, so unknown, so unable to console or oblige. (5) The free spirits: useless, therefore refuted; abolish it. (6) Zarathustra: "apparent" meant falling short of the true; with no true world there is nothing to fall short of; one world remains. Each stage holds the idea with less confidence; the steps are driven by the demand for truth the idea fostered (GS 357).
+- **Kant in a paragraph.** Appearances (the world for minds like ours, in space, time, causality) and the thing in itself (unknowable); the moral law as the bridge to freedom, God and immortality. Stage 3 is that bridge; "Königsbergian": the old sun through Baltic mist (Königsberg, Kant's city for life).
+- **Unstated premise.** Stage 6 assumes "apparent" is a contrast term. A critic: "appearance" can mean "how things look to us", needing a viewpoint, not a second world. Reply: exactly, there are only viewpoints (perspectivism), and degrees of seemingness are compared inside appearance (BGE 34).
+- **Strongest objection and Nietzsche's reply.** As in STANCE.
+- **Connections.** death-of-god (stage 2 is heaven); nihilism (stages 4-5 are GS 346's crisis); reason-in-philosophy; perspectivism; creating-values (no other world to receive values from); eternal-recurrence (the great noon); on-truth-and-lies (the essay's X is a stage-3 assumption).
 
-- Hollingdale's 'Real World' vs. Kaufmann's 'True World' — one translation note; the German is 'wahre'.
-- Stage six's 'INCIPIT ZARATHUSTRA' places Zarathustra as the book after the error; the course's dramatization rule still applies — the fable ends where a character begins.
-- Clark's 'neo-Kantian' is her label and is contested; state it as hers with the page.
-- Do not let the lesson become a history of metaphysics; the reader has Plato and Kant and needs one sentence each.
-- The four theses in 'Reason' §6 contain the is–ought again (thesis 4: 'a symptom of declining life') — flag, defer.
+## Set pieces and gems
+
+- The stage directions (pp.485-486, Kaufmann): "A circumlocution for the sentence, 'I, Plato, am the truth.'"; "it becomes female, it becomes Christian"; "the old sun, but seen through mist and skepticism ... elusive, pale, Nordic, Königsbergian"; "Gray morning. The first yawn of reason. The cockcrow of positivism"; "Bright day; breakfast; return of bon sens and cheerfulness; Plato's embarrassed blush; pandemonium of all free spirits"; "Noon; moment of the briefest shadow; end of the longest error; high point of humanity; INCIPIT ZARATHUSTRA".
+- Stage 6 (p.486): "The true world—we have abolished. What world has remained? The apparent one perhaps? But no! With the true world we have also abolished the apparent one."
+- "The lie of the ideal has so far been the curse on reality" (EH Pref 2, p.218).
+- "I must go on dreaming lest I perish—as a somnambulist must go on dreaming lest he fall" (GS 54, p.116); "We sit within our net, we spiders" (D 117, p.73).
+- 8[2]: "This world is illusory—consequently there is a true world ... inspired by suffering" (unpublished, notebook 8, 1887, Bittner p.141).
+
+## Pitfalls
+
+- Stage 6 does not say "only appearance remains"; it says appearance goes too. The portable-late reader lists the first as the standard misreading: refute it (L13) with stage 6 and "Reason" 6's first proposition.
+- "Fable" is not "lie"; "horrendum pudendum" is in "Four Great Errors" 3, not the Fable.
+- Quote Kaufmann (Portable pp.485-486); Ludovici (twilightof.txt) is superseded. GS 54 (1882) and 372 (1887) are five years apart. Zarathustra is illustration. No scholars' names in the body.
 
 ## FIGURE PLAN
 
-1. `draw:` `<FigureSequence>` (6 frames) — **the History of an Error**: one stage per frame — the 'true world' box moving from 'attainable' to 'promised' to 'postulated' to 'unknown' to 'abolished', and in frame 6 the 'apparent world' box vanishing with it; each frame carries the stage's gloss and its figure (Plato / Christianity / Kant / positivism / the free spirit / Zarathustra). The dossier's timeline suggestion, as a sequence.
-2. `draw:` single `<Figure>` — **inversion vs. removal**: (a) Plato's two slots (true above, apparent below); (b) a naive inversion (occupants swapped, slots intact — struck); (c) stage six (no slots) — the reader's dossier proposes exactly this from Heidegger Vol. I §24.
-3. `draw:` single `<Figure>` — **'Reason' §6's four theses**: numbered, each with its one-line content and a tag (epistemic / metaphysical / psychological / physiological).
-4. `draw:` single `<Figure>` — **Clark's turning point**: a timeline 1873 → 1886 → 1888 with 'Truth and Lie: truths are illusions (thing-in-itself assumed)' at the left, BGE 34 in the middle, the fable at the right — and 'ordinary truth kept' as the result.
-5. `draw:` single `<Figure>` — **the seduction of grammar** ('Reason' §5): 'we still believe in grammar' beside I:13's lightning — the doer fiction at the metaphysical scale, one small comparison panel.
-6. `draw:` single `<Figure>` — **what the fable does for the module**: three consequences (interpretation ≠ false; the cosmological reading has no object; the drives are not appearances) as three lines from stage six.
-7. `source:` none.
+1. `draw:` `<FigureSequence>` (6 frames): **the history of an error**: the true world as a sun, reachable (1), promised beyond death (2), misted over Königsberg (3), unseen at gray morning (4), gone at breakfast (5), noon with the shortest shadow and no "apparent" label left (6). TI Fable.
+2. `draw:` single `<Figure>`: **two worlds and one**: Plato's divided line beside stage 6, "apparent" crossed out because its contrast term is gone. Stage 6, GS 54.
+3. `draw:` single `<Figure>`: **Kant in a diagram**: the thing in itself behind a veil; appearances; the moral law as a bridge to freedom, God, immortality; caption "stage 3". TI Fable 3, A 10.
+4. `draw:` single `<Figure>`: **what the ideal costs reality**: EH IV 8's inventory (God / beyond / soul / sin and free will / the selfless) against what each devalues. EH Pref 2, IV 8.
+5. `source:` no pool candidate; hunt: Raphael, The School of Athens, detail of Plato pointing up (public-domain photograph, Wikimedia Commons). Reader must see the gesture read as "the true world is above". Float left at stage 1. Optional.
 
-## EXERCISE PLAN (floor: ≤1 warm-up; ≥2 of boundary / refute / derivation / research; one FORWARD)
+## EXERCISE PLAN
 
-1. (warm-up) Reproduce the six stages with the figure and the one-word verdict of each (attainable / promised / postulated / unknown / abolished / both gone).
-2. (refute) "Stage six makes Nietzsche a phenomenalist: only appearances exist." Break it with the argument's own premise (apparent is relative to true) and BGE 34; state what survives ('this world', no longer 'apparent') and why the label 'phenomenalist' reintroduces the pair.
-3. (derivation) Derive from stage six alone why the early falsification thesis cannot be stated in 1888: write Truth and Lie's premise ('truth = correspondence to the thing-in-itself'), show that stage six removes its term, and state what 'true' must then mean (Clark Ch. 4; the equivalence principle from Ch. 2 §1 as the minimal constraint).
-4. (boundary probe) Suppose a philosopher stops at stage five (true world abolished, apparent world kept). What position is that — and which of Nietzsche's own sentences (BGE 22 'only interpretation'; 'Reason' §6 thesis 1) would it force him to read as 'false'? State why stage six is needed for BGE 22 to be consistent.
-5. (research-shaped, corroboration) Compare 'Reason' §6's thesis 4 ('a symptom of declining life') with GM III:12's ascetic 'will-less subject' as two statements of the same charge (the true world as the ascetic ideal's metaphysics); report whether Clark's Ch. 6 §3 ('metaphysics and the ascetic ideal') supports reading the fable as a genealogical, not only an epistemological, result.
-6. (translation comparison) 'Wahre Welt' as 'True World' (Kaufmann) vs. 'Real World' (Hollingdale): state which English word keeps the contrast with 'scheinbar' ('apparent') tight and which drifts toward 'existing'; then say what the sixth stage's punchline loses under 'real'.
-7. (FORWARD → self-overcoming-staged) The fable ends 'INCIPIT ZARATHUSTRA'. Read Z I 'On the Hinterworldly' and write the one sentence in it that states the two-world error as a sufferer's invention ('it was suffering and incapacity that created all hinterworlds'); state which stage of the fable it dramatizes and what it adds (a motive); the solution says the next lesson maps the speech.
+Floor check: claim to refute (ex. 2), boundary probe (ex. 4), derivation (ex. 5).
+
+1. Retrieval (E3 from death-of-god and nihilism): place GS 343's "God is dead" and GS 346's "Either abolish your reverences or yourselves" on the six-stage ladder, and say why GS 125's madman is "too early" by the fable's clock.
+2. Claim to refute: "In the last stage Nietzsche concludes that only the world of the senses is real." Name the sentence of stage 6 that breaks it and the first proposition of "Reason" 6.
+3. Sourcing drill: EH Pref 2 (1888, for publication) and notebook 8[2] (1887, unpublished) make the same claim. Metadata, prediction, records/argues/omits, use: what may each establish about Nietzsche's considered view?
+4. Boundary probe: a philosopher holds that a true world exists but plays no role in judging this one. Is that view on the ladder at all? Use "Reason" 6's fourth proposition to say what function the fable tracks.
+5. Derivation: from stage 6, derive what becomes of "values are only human projections" once there is no true world for values to be projected onto; show that "only" and "projection" borrow the abolished contrast.
+6. FORWARD (reaches reason-in-philosophy): list the properties Plato gives the Forms (unchanging, one, eternal, grasped by reason) and write a paragraph on what kind of person would most need a world with exactly those properties. The solution says the next lesson answers from Socrates' instincts and from grammar, with `<Ref>` to reason-in-philosophy.
+
+## Corrections applied
+
+- APPLIED — portable-late misreading (6): stage 6 is not "only appearance remains"; quoted whole and made the L13 target.
+- APPLIED — bge: Preface wording "Plato's invention of the pure spirit and the good in itself" with the German; the bow image added.
+- APPLIED — portable-late wording note: all TI pointers moved from Ludovici to Kaufmann's pages and chapter names.
+- APPLIED — portable-late chapter map: A 10 and A 15 added with pages.
+- APPLIED — ecce-homo chapter map: EH Pref 2 (p.218), IV 8, III TI 1 added.
+- APPLIED — gay-science-1/2 chapter maps: GS 54 (n.44), 151, 344, 346, 372 (n.133), 374 added.
+- APPLIED — zarathustra chapter map: Z I 3 and the "great noon" passages as illustration.
+- APPLIED — late-notebooks chapter map: 11[50], 8[2], 14[93], 6[23] by Bittner page, unpublished.
+- APPLIED — early-works and daybreak chapter maps: HH 1-2, GT 4/18, Self-Crit 5, D 117/474/43/448/33 added.
+- 9 applied, 0 declined.
+
+## Verification debts
+
+- eKGWB: BGE Preface's three German phrases (JGB-Vorrede); HH 1-2 (MA-1, MA-2); GT Self-Crit 5 (GT-Vorwort-5); TI Fable German stage directions (GD-Welt) if printed.
+- Notebooks 7[?] p.136 and 11[50]: labels partly lost in OCR; confirm KSA numbers in the printed Bittner.
+- EH I 3 restored page: not used here. Nothing from Young.
+
+## Revision
+
+Carried over from the old brief: the six-step argument, the Kant paragraph, the contrast-term premise, both objections, figures 1-3, exercises 2, 4-6 (revised). Replaced: every Ludovici pointer; "Sources to consult" rebuilt from the primary chapter maps; STANCE, Corrections, Verification new.
