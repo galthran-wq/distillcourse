@@ -1,0 +1,53 @@
+# Taught: frege-sense-and-reference
+
+## Problem
+Why is 'Hesperus is Phosphorus' informative and 'Hesperus is Hesperus' not, and why does Twain→Clemens substitution fail under 'John believes that', if a name only stands for its object? Answer: every expression has a sense (mode of presentation, objective) as well as a reference; a sentence expresses a thought (sense) and refers to a truth-value; under 'believes that' words refer to their customary sense (indirect reference), so substitution of co-referring expressions never actually fails.
+
+## Explained
+- Hesperus/Phosphorus = evening star / morning star = Venus; identity found by observation of the cycle (evening star sinks into Sun's glare, morning star emerges days later), not word study — intro paragraphs
+- Cognitive value (Erkenntniswert): what you learn by accepting a sentence; a=a a priori, a=b often extends knowledge; three pairs 253=253 / 117+136=253, Hesperus, Twain/Clemens — "Identity: a relation between objects, or between names?"
+- Attempt 1, identity between objects: makes a=b say what a=a says — ### First attempt
+- Attempt 2, identity between names (1879 identity-of-content sign ≡): makes a=b a fact about arbitrary notation, no knowledge of things; 1892 essay (concept-script's author, 26 pages) gives it up — ### Second attempt
+- Each attempt puts the content in one place (object / sign) and gets the wrong answer; difference only from "the way what is designated is given" (Quote p. 26, German + own translation); triangle medians a, b, c: 'intersection of a and b' = 'intersection of b and c' is a theorem (figure medians.svg); KeyFact boundary: two signs giving the object the same way ('the evening star is der Abendstern') are as uninformative as a=a — ### What is left
+- Substitution rule from S(n), n=m infer S(m) = Leibniz's law; valid 4>3, 4=8/2 ⇒ 8/2>3 and Twain author argument; invalid John-believes argument; the opening's 'never heard of Samuel Clemens' is explicitly sharpened: John has heard both names (else the Clemens report would be empty, not false) — learned 'Mark Twain' from the title page, 'Samuel Clemens' from a survey; figure substitution.svg — "Substitution fails under 'believes that'"
+- 'Belief contexts are exceptions' describes, doesn't explain; on standing-for both reports relate John to the same man and book — same puzzle as identity — ### Why 'belief contexts are exceptions'…
+- Seam: the way of being given made a second thing every name has, besides its object. Definition: reference (Bedeutung) = object; sense (Sinn) = mode of presentation; name expresses sense, refers to reference; sense determines reference. 'Name' = any expression designating one object (incl. 'the intersection of a and b', '8/2'); Bedeutung also translated meaning/nominatum/denotation — "Sense: the second thing a name carries"
+- Example solving identity puzzle (Hesperus senses: bright body in west after sunset / east before sunrise; 4 vs 8/2); figure two-routes.svg (key_image) — ### The puzzle of identity solved
+- Sign→one sense→one reference; reference has many senses; sense many signs (word and its exact translation); sense illuminates reference one-sidedly; complete knowledge would decide every sense — same subsection
+- Sense ≠ idea (Vorstellung): private, varies; Bucephalus painter/rider/zoologist; objectivity needed for communication and for mathematics; telescope analogy (Moon = reference, image in tube = sense, retinal image = idea), figure telescope.svg — ### A sense is not an idea
+- 'Aristotle' footnote: speakers may attach different descriptive senses; tolerable if reference same; theory does NOT require a description in mind; 'the description theory of names' named as later doctrine (Ref kripke-against-descriptivism) — same subsection
+- Sense without reference: 'the least rapidly convergent series' (provably none, proof in exercise), 'Odysseus', 'the present King of France'; figure no-reference.svg — ### Sense without reference
+- Thought = objective content, the sentence's sense: 'the morning star / the evening star is a body illuminated by the Sun' differ in thought, same reference (Quote p. 32) — ### The thought is the sentence's sense
+- Truth-value = sentence's reference. Positive case: Odysseus/epic argument (reference matters only when truth is asked; Quote p. 33 'striving for truth'). Then a test: truth-value survives co-referring substitution (Leibniz salva veritate); elimination question 'what else could it be?' presented explicitly as a challenge, not a proof (grammatical form also survives but is a feature of the sign). Recall frege-function-and-quantifier 'every true sentence names the True' (its price: reference erases everything particular), now argued; two truth-values, infinitely many thoughts — ### The truth-value is the sentence's reference
+- Predicates: reference concept, plus sense; Example 'John loves Mary' with d[ ], s[ ]; figure tree.svg; Remark compositionality (reference of whole fn of references of parts; sense of whole fn of senses of parts); cognitive value belongs to the thought (4=4 vs 4=8/2); judgement = advance from thought to truth-value; no KeyFact — ### Two values for every part
+- Problem: truth-value reference + composition would let any true sentence replace the that-clause; quotation (words refer to words) as model; indirect speech: words refer to customary sense; Quote p. 28 'indirect reference = customary sense'; 'believes' = relation person–thought; 3-frame sequence indirect-1..3 + Task — "Indirect reference: what 'believes that' is about"
+- Twain argument resolved; substitution never fails, what fails is reference being position-independent; type-shift reading ('John believes that ( )' takes thoughts); KeyFact: the price, nested 'Mary believes that John believes that…' → hierarchy of senses of senses, not explored — ### The puzzle of substitution solved
+- Aftermath: defect of empty names; stipulated reference (divergent series := 0); 1905 objection quoted ('plainly artificial', On Denoting) — the objection is to the stipulation only; what removes senses is the alternative: 'the theory of descriptions' named, phrase not a name so needs no reference; ordinary proper names read as disguised descriptions ('Hesperus' ≈ 'the star seen at evening'), so 'Hesperus is Phosphorus' becomes a quantified claim, which is how it answers both puzzles without senses (points to the Waverley exercise for the quantified form) → russell-theory-of-descriptions; description theory of names: sense's two jobs (what the speaker grasps / what decides the reference) come apart when the speaker's only description is wrong or fits someone else; 1970 attack → kripke-against-descriptivism — "What came of the distinction"
+- ### Meaning is not reference: what survives is the bare distinction (same reference, different meaning), argued by a one-clause callback to the puzzles (standing-for cannot separate co-referring pairs, so every successor theory must); descriptions keep it ('Scott' vs 'the author of Waverley' enter differently); a view rejecting meanings as entities keeps it too, via evening/morning star → two-dogmas-analyticity. Twin Earth / 'grasp fixes reference' NOT mentioned (cut).
+- Remark: *analysis* defined (stating what a concept consists in); paradox of analysis on HP's analysis of 'F and G have the same number' as 'F ≈ G' (Ref frege-logicism#the-same-number-without-counting): correct because references agree (same truth-value for every pair of concepts), informative because senses differ (counting results vs existence of a pairing). 'Water is H₂O' NOT used.
+
+## Notation
+- d[e] reference of expression e, s[e] sense; j John, m Mary, L loves; d[Lm] concept '( ) loves Mary', s[jLm] thought
+- a, b, c medians of a triangle (local to that figure)
+- Exercise only: r_n tails of a convergent series; Wx 'x wrote Waverley', s Scott
+- Names used in body: Leibniz (law, salva veritate formula), Bucephalus/Alexander, Odysseus, Kepler (exercise), George IV and Scott/Waverley (exercise, 1814), Venus tablet of Ammisaduqa (exercise). Frege, Russell, Kripke never named in body; the author is 'the concept-script's author', the text 'the 1892 essay'; Russell = 'the English logician whose letter ended the logicist programme' (name only in Quote source). Quotes of the 1892 essay are German original + translation 'for this course' (no published translation quoted).
+
+## Running cases
+- Hesperus/Phosphorus/Venus; 117+136=253; 4 = 8/2, 4 > 3; triangle medians; Twain/Clemens with John's two sources; Bucephalus; telescope; Odysseus; least rapidly convergent series; King of France; John loves Mary tree
+- Keeper facts: a=b informative because senses differ, reference shared (the True for both identities); sentence: sense = thought, reference = truth-value; indirect reference = customary sense
+- Exercises: sense/reference of 8/2=4 parts; refute sense = mental image; proof Σ a_n/√r_n converges more slowly (no least convergent series); King of France: no truth-value, presupposition (Kepler), loss of bivalence/excluded middle, stipulated reference; concept horse problem (E3, levels); FORWARD Scott/author of Waverley → quantified analysis ∃x(Wx ∧ ∀y(Wy→y=x) ∧ x=s), Ref russell-theory-of-descriptions; solution (c) also says proper names are read as disguised descriptions; research: Venus tablet, 47° elongation, 584-day cycle
+
+## Assumed
+- frege-function-and-quantifier: function–argument analysis, concept = function to truth-values, object/concept, unsaturated, levels, 1879 identity-of-content sign, 'sentences name truth-values' Remark
+- frege-logicism: Hume's principle, F ≈ G, the waiter (analysis Remark), and HP's informative identities (its Conclusion's open question), a priori defined (recalled with Ref + gloss 'knowable without appeal to experience')
+
+## Left open
+- Russell's theory of descriptions and his rejection of senses → russell-theory-of-descriptions (forward exercise wrote the formula)
+- Presupposition / truth-value gaps for empty descriptions (exercise only) → strawson-on-referring
+- Description theory of names; rigid designation; necessity of Hesperus=Phosphorus (NOT discussed) → kripke-rigid-designation, kripke-against-descriptivism, necessary-a-posteriori
+- The concept horse problem stated, not solved
+- Hierarchy of indirect senses named in a KeyFact only
+- Context principle vs compositionality tension: not mentioned
+- Paradox of analysis given one Remark (HP example) → moore-common-sense may develop
+- Whether what a speaker grasps fixes reference (Twin Earth) not raised → putnam-twin-earth starts fresh
+- Empirical identities like 'water is H₂O' not used → necessary-a-posteriori

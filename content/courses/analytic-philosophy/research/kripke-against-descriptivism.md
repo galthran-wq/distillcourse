@@ -1,0 +1,75 @@
+# Research brief: kripke-against-descriptivism (The refutation of descriptivism and the causal picture of reference)
+
+status: planned
+module: kripke-and-putnam
+type: core
+goal: Formulate the description theory of names as six theses, refute each with Kripke's counterexamples, and explain the causal-historical picture that replaces it.
+
+## ARC (L10)
+
+- **Inherits:** From kripke-rigid-designation: rigidity and the modal test (and the FORWARD exercise: 'Aristotle taught Alexander' is not necessary); reference-fixing vs meaning-giving. From frege-sense-and-reference: the sense of a name as what a speaker grasps — the view that became descriptivism. From russell-theory-of-descriptions: names as abbreviated descriptions (the Apollo paragraph). From family-resemblance-and-grammar: Moses and the cluster (§79). From neptune-vulcan-web-of-belief: 'Neptune' fixed by description.
+- **Contributes:** The description theory as six theses plus a non-circularity condition; thesis 6 falls to rigidity; thesis 5 survives only for reference-fixing; theses 2–4 fall to cases (Feynman, Cicero, Gödel–Schmidt, Peano–Dedekind, Columbus, Jonah); the 'commonly attributed' repair is circular; the causal-historical picture (baptism, chain, intention to co-refer) and its limits (Santa Claus, Madagascar, the aardvark).
+- **Hands off:** To necessary-a-posteriori (kind terms get the same treatment), to putnam-twin-earth (reference fixed socially — the division of linguistic labour is the chain picture for kind terms), to gettier-problem ('the man who will get the job' read attributively — descriptions still do descriptive work).
+
+Spine step: as for kripke-rigid-designation ("… reference runs through a causal chain …").
+
+## Sources to consult
+
+- **Kripke NN Lecture I pp. 24–34, 57–70** (namingand-s2-lecture1.txt): Mill vs Frege–Russell; four arguments for descriptivism; Frege, Wittgenstein's Moses (PI §79), Searle's cluster, Ziff; the cluster theory as meaning vs as reference; the six theses (1)–(6) and condition (C) (pp. 64–66, 68); Searle's corporation with weighted votes; Moses/Jonah (pp. 66–67; n. 28 'the Hitler of Nazi propaganda never existed'); Kneale's 'the man called Socrates' (pp. 68–70).
+- **Lecture II** (namingand-s3-lecture2.txt pp. 71–105): recap; thesis 6 refuted by rigidity — Aristotle, Hitler in Linz, the metre, King Henry's yard (pp. 74–77); 'important is not essential'; rigidity clarified (pp. 77–78); thesis 5 survives for baptism by description — Hesperus, Neptune, Jack the Ripper (pp. 78–80, n. 33); theses 2, 3, 4 fail — Cicero/Feynman (pp. 80–82), Gödel–Schmidt (pp. 83–84), Peano–Dedekind, Columbus, Einstein (pp. 84–85), Jonah (pp. 86–87), the random-atoms Gödel variant; the 'commonly attributed' repair fails twice (pp. 87–89); 'transcendental deduction of the existence of encyclopedias' (p. 82); Strawson's footnote vs the actual chain (p. 92); the causal-historical picture (pp. 90–97): baptism, chain, intention; Butler's maxim; Santa Claus, Napoleon the aardvark, George Smith squaring the circle; 'a better picture', 'too lazy at the moment'.
+- **Addenda (c)–(e)** (namingand-s4-lecture3-addenda.txt pp. 160–163): the noncircularity condition, 'passing the buck'; the layman's 'Gödel is the man experts credit' and its failure; initial baptism oversimplified; Madagascar (Evans), reference shift; a present intention may override the chain.
+- **PI §79** (Moses and the props) — the target text, `<Ref>`.
+- **Russell 'On Denoting'**, the Apollo/Hamlet paragraph — names as abbreviated descriptions.
+- **Bayer syllabus**: 'Kripke as a somewhat unwitting return to Frege' — the historiographical claim to weigh in an exercise.
+
+## Explanation plan
+
+1. **The problem.** Gödel and Schmidt. On the description theory 'Gödel' refers to Schmidt; 'everyone saying "Gödel" would be talking about the thief'. Sub-problem: how does a name reach its bearer if not through what its users know? Obvious attempt (Frege, Russell, Searle, Wittgenstein §79): a name abbreviates, or has its reference fixed by, a description or a weighted cluster of them — the only account that explains how a name can be learned, how 'Hesperus = Phosphorus' is informative, and how 'Aristotle existed' is not trivial (the four arguments for descriptivism, Lecture I). State the theory at its strongest first.
+2. **The six theses and (C).** (1) to every name a speaker associates a cluster of properties $\varphi$; (2) the speaker believes the $\varphi$s pick out one individual uniquely; (3) if most, or a weighted most, of the $\varphi$s are satisfied by a unique object, that is the referent; (4) if nothing satisfies most, the name does not refer; (5) the speaker knows a priori that if $X$ exists, $X$ has most of the $\varphi$s; (6) 'if $X$ exists, $X$ has most of the $\varphi$s' is necessary. (C) the $\varphi$s must not themselves use the notion of reference for the name in a way that makes the account circular (Kneale's 'the man called Socrates' fails it: 'called Socrates' presupposes reference). Searle's corporation with weighted votes. The because: the theses are what a cluster theory needs to turn knowledge into reference without circularity.
+3. **Thesis 6 falls to rigidity.** 'Aristotle might not have taught Alexander; he might have died young' — true; so 'Aristotle' is not synonymous with the cluster, since the cluster-sentence would be necessary. Hitler might have stayed in Linz. The metre bar and King Henry's yard (reference fixed, not meaning given). 'Important is not essential' against the counterpart move. The because: names are rigid (previous lesson), clusters are not.
+4. **Thesis 5 survives only where a description fixed the reference.** 'Hesperus' fixed as 'the evening star'; 'Neptune' as the perturber of Uranus (`<Ref>` neptune-vulcan); 'Jack the Ripper' as the murderer — here the baptiser knows a priori that if Neptune exists it perturbs Uranus; but this is reference-fixing, and contingent, and most names were not introduced that way.
+5. **Theses 2–4 fall to cases.** (2) uniqueness: most people's 'Feynman' is 'a physicist'; 'Cicero' is 'a Roman orator' — not unique, yet they refer; and the descriptions that are unique are often circular ('the man who denounced Catiline' — who is Catiline?). (3) majority fit: Gödel–Schmidt — most people's cluster for 'Gödel' is satisfied by Schmidt, and 'Gödel' still refers to Gödel; Peano's axioms were Dedekind's; Columbus did not discover America; Einstein is 'the man who invented the bomb' to many — misinformation does not shift reference. (4) if nothing fits, no referent: Jonah — scholars hold he existed though everything the book says of him is legend; 'the Hitler of Nazi propaganda never existed' but Hitler did. The repair — 'the man *commonly attributed* with the theorem' — fails twice: Peano is commonly attributed with Dedekind's axioms (so the name would refer to Dedekind), and 'attributed to Gödel' presupposes reference to Gödel (circularity; Addendum (c)'s layman who defers to experts who themselves know it was Schmidt). The 'transcendental deduction of the existence of encyclopedias'.
+6. **The picture.** An initial baptism — by ostension or by a reference-fixing description; the name passed from link to link, each speaker intending to use it with the same reference as the person from whom it was received; the referent is determined by the *actual* chain, not by what the speaker believes about it (Strawson's footnote — 'the speaker refers to whatever the person he got the name from referred to' — fails if the speaker misremembers the source; the Smith/Jones case). Not a theory: no necessary and sufficient conditions (Butler's maxim: 'everything is what it is and not another thing'); 'a better picture'. Limits, stated: Santa Claus (the chain leads to a saint; the name now refers to no one — a present intention can override); Madagascar (Marco Polo's error shifted the name from the mainland to the island — Evans); George Smith who 'squared the circle'; the aardvark named Napoleon. The because: reference is a social and historical fact about the use of the name, not a fact about the individual's mind — the externalist thesis stated for the first time.
+7. **Why it mattered / what refuted or refined it.** Mattered: externalism — meaning is not in the head begins here; the sense of a name, as Frege had it, loses its job of determining reference (keeping, perhaps, the job of cognitive significance — the belief-context puzzle Kripke leaves open). Refined: causal descriptivism (a name's reference fixed by 'the thing at the origin of this chain' — a description after all; Kripke's reply that this is parasitic on the picture); Evans's reference shift and the role of *dominant source* (Madagascar); Dummett's defence of sense as what a speaker must know to understand a name — the dispute over whether 'understanding' needs more than the chain. Bayer's 'Kripke as a return to Frege' weighed in an exercise. Survived: the Gödel case as the standing test for any theory of names; the picture as what every later theory starts from.
+
+## Set pieces and worked examples to recreate
+
+- **Gödel and Schmidt** (Lecture II pp. 83–84) as the opening and the lesson's Example 1 — with the random-atoms variant (arithmetic actually complete) as the boundary case.
+- **The six theses** as a numbered list, each with the counterexample that kills it in a table.
+- **Searle's corporation** with weighted votes and non-voting stock.
+- **Feynman / 'a physicist'**; **Cicero / Catiline** (the circular description).
+- **Peano–Dedekind, Columbus, Einstein and the bomb** (pp. 84–85).
+- **Jonah** (pp. 66–67, 86–87) and **n. 28's Hitler**.
+- **Kneale's 'the man called Socrates'** and the horses/'quarks' parody (pp. 69–70).
+- **The chain** drawn, with Strawson's dashed mistaken-memory arrow.
+- **Santa Claus, Madagascar, the aardvark** as the picture's stated limits.
+- **'Transcendental deduction of the existence of encyclopedias'** (p. 82) as a `<Quote>`.
+- **'Too lazy at the moment' / 'a better picture'** — Kripke's own disclaimers, one each.
+
+## Pitfalls / subtleties to flag
+
+- State descriptivism at its strongest (the four arguments for it) before refuting; the reader must feel the theory's pull or the refutation is a strawman.
+- Keep the two uses of the cluster apart (meaning-giving vs reference-fixing); the modal argument kills only the first; the case arguments kill the second.
+- The picture is not a theory; do not supply the necessary and sufficient conditions Kripke refuses, and state the limits as Kripke states them.
+- Belief contexts (Frege's second puzzle) are *not* solved here; say so — Kripke's 'A Puzzle About Belief' is not in the dossier.
+- Do not reduce Frege to descriptivism without the caveat that Frege's 'sense' was objective and not necessarily a description; the lesson's target is the theory Frege's heirs built.
+
+## FIGURE PLAN
+
+1. `draw:` `<FigureSequence>` (3 frames) — **Gödel and Schmidt**: frame 1 the actual history (Gödel proves the theorem; 'Gödel' refers to Gödel); frame 2 the counterfactual (Schmidt proves it, Gödel steals it) — the description 'the prover of incompleteness' now points at Schmidt; frame 3 'Gödel' still points at Gödel, the description's arrow crossed in warning colour. Inspired by Lecture II pp. 83–84.
+2. `draw:` single `<Figure>` — **six theses, six counterexamples**: a table — (1)–(6) with the case that refutes each (Feynman; Cicero/Catiline; Gödel–Schmidt; Jonah; Neptune (survives, as reference-fixing); Aristotle/Hitler) — and (C) with Kneale. Inspired by Lecture I pp. 64–66 and Lecture II pp. 74–89.
+3. `draw:` single `<Figure>` — **Searle's corporation**: the cluster as shareholders with weighted votes; 'the referent is whoever wins the vote'; a non-voting share for 'called Socrates'. Inspired by Lecture I p. 65.
+4. `draw:` single `<Figure>` — **the chain**: baptism → link → link → speaker, each link labelled 'intends to use it as the previous speaker did'; a dashed arrow from the speaker's mistaken memory of his source ('I got it from Jones' — actually Smith) that the reference does not follow. Inspired by Lecture II pp. 90–92.
+5. `draw:` single `<Figure>` — **the picture's limits**: three mini-chains — Santa Claus (chain to a saint; present intention overrides), Madagascar (Marco Polo's shift), the aardvark named Napoleon — each with where the chain's rule gives the wrong or no answer. Inspired by Lecture II pp. 93–97, Addendum (e).
+6. `draw:` single `<Figure>` — **the repair that fails twice**: 'the man commonly attributed with the theorem' → points at Dedekind for 'Peano' (counterexample) and presupposes 'attributed to *Gödel*' (circularity). Inspired by Lecture II pp. 87–89 and Addendum (c).
+7. `source:` none.
+
+## EXERCISE PLAN
+
+1. (warm-up) For 'Feynman', 'Cicero', 'Jack the Ripper', 'Neptune', state the cluster a typical speaker has, whether it is unique, and whether the name's reference was fixed by it.
+2. (refute) "Kripke's cases show only that speakers can be ignorant; the *expert* community's cluster fixes the reference." Break it with the Gödel–Schmidt variant in which the experts themselves are wrong (Addendum (c)) and with the circularity of 'attributed to Gödel'; say what the expert move gets right (the division of labour — the doorstep of Putnam).
+3. (derivation — the modal argument in full) Let 'Aristotle' mean 'the teacher of Alexander'. Show that 'if Aristotle exists, Aristotle taught Alexander' would then be necessary; show it is not (Aristotle might have died young); conclude which thesis fails and why reference-fixing by the description would survive the argument.
+4. (boundary probe — Jonah) Everything the book says of Jonah is legend. On thesis (4) the name does not refer; scholars say it does. Construct the minimal history that lets 'Jonah' refer to a real person though no description is true of him, and say what the chain picture needs (a baptism and a chain) and what it does not (a true description).
+5. (claim–evidence — 'a return to Frege'?) Bayer's syllabus calls Kripke 'a somewhat unwitting return to Frege'. Using Frege's objective sense (not a speaker's description) and Kripke's chain, write one paragraph for and one against the claim, and name the one thing both deny (that reference is fixed by what the individual speaker has in mind).
+6. (FORWARD → necessary-a-posteriori) 'Gold' and 'tiger' are not names of individuals. Try to state the cluster for 'gold' (yellow, metallic, valuable) and construct a case in which something satisfies all of it and is not gold. The solution says the next lesson extends rigidity and the chain to kind terms, with a `<Ref>`.
+7. (research-shaped — Madagascar) Marco Polo's report shifted 'Madagascar' from a part of the African mainland to the island. State what the chain picture predicts (the name should still refer to the mainland), what happened, and the amendment (Evans: the dominant source of the name's use) that the case forces; then say whether the amendment reintroduces a description.
