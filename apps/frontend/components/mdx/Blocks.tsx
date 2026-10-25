@@ -113,6 +113,21 @@ export function KeyFact({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * The lesson's closing (L10c): what the reader can now do, and the problem
+ * left open. Set apart so the end of a long chapter reads as an end, not as
+ * one more paragraph; accent, because it is the lesson's own voice rather
+ * than one of the role colors.
+ */
+export function Conclusion({ children }: { children: ReactNode }) {
+  return (
+    <section className="callout callout-conclusion">
+      <p className="callout-label">Conclusion</p>
+      <div className="env-body">{children}</div>
+    </section>
+  );
+}
+
 /** Green = something the reader does right now (compute, try, check). */
 export function Task({ children }: { children: ReactNode }) {
   return (

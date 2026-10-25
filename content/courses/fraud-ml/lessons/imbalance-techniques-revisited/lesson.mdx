@@ -1,0 +1,869 @@
+The standard toolkit for rare classes — class weights, oversampling, synthetic minority points, undersampling, rebalanced ensembles — was mostly judged by ROC-AUC and balanced accuracy. Under precision at the top hundred and average precision, on a forward-in-time split, which of those techniques still help a fraud detector, and why would a technique raise one metric while lowering another?
+
+Every one of these remedies is a line of
+code in a standard library, and a fraud team reaches for them by reflex:
+the training set holds one fraud per hundred payments, the model seems to
+ignore the frauds, so the classes get rebalanced. The published evidence
+says this works. It was measured, though, with two numbers that fail a fraud queue:
+balanced accuracy, which judges one cut nobody
+chose, and ROC-AUC, most of whose area lies where a hundred alerts a day
+never reach (<Ref lesson="alert-budget-metrics"
+id="how-much-of-the-curve-a-hundred-alerts-can-reach">the alert-budget
+metrics</Ref>). The last exercise of <Ref
+lesson="undersampling-calibration" id="exercises">undersampling and
+calibration</Ref> already showed the symptom on one model: undersampling
+lifted balanced accuracy from 0.56 to 0.79 and left ROC-AUC and average
+precision exactly where they were.
+
+One number describes how rare the frauds are in a training set, and every
+remedy is tuned by it.
+
+<Definition title="imbalance ratio">
+The imbalance ratio of a set of labelled payments is
+$$
+\mathrm{IR} = \frac{\text{number of frauds}}{\text{number of genuine payments}} .
+$$
+A rebalancing technique is set by the ratio $r$ it should leave in the
+training set: $r = 1$ is "balanced", one fraud per genuine payment.
+</Definition>
+
+The convention runs frauds over genuine, so IR is small. On the stretch
+of <Ref lesson="canonical-datasets"
+id="what-the-calendar-shows-and-what-it-leaves-out">the transaction
+simulator</Ref> that holds every prequential fold and test week below, it
+is about 0.009; on the Belgian e-commerce stream, at 0.25% fraud, it is
+about 0.0025. Undersampling to a
+target $r$ keeps every fraud and a share $\beta = \mathrm{IR}/r$ of the
+genuine payments, which is the keep rate β of <Ref
+lesson="undersampling-calibration" id="reading-β-off-a-training-set">the
+previous lesson</Ref>: balancing the simulator's training set keeps about
+one genuine payment in 110.
+
+## What every remedy does to the decision boundary
+
+Asked what a rebalancing technique does, most people answer that it makes
+the classes equal. That describes the training set. The detector is
+judged on the stream, where nothing was rebalanced, so the question is
+what changes in the fitted model: which payments it now puts above a
+threshold, and in what order.
+
+### The remedies, side by side on one toy
+
+A small task with two features makes the change visible. Draw 5,000
+points, 5% of them in the minority class, from two clouds that overlap
+(scikit-learn's `make_classification` with `class_sep=0.5`); call the
+minority points frauds. Fit a decision tree of depth 5 on four fifths of
+them and look at the other 1,000, of which 54 are frauds. Then refit the
+same tree in two rebalanced ways:
+
+- **Class weight.** Each training row's contribution to the tree's
+  impurity is multiplied by a weight for its class. Write ω for the ratio
+  of the fraud weight to the genuine weight: a fraud counts as ω genuine
+  payments. The usual default, called "balanced", is $\omega =
+  1/\mathrm{IR}$, here $0.95/0.05 = 19$, so that the frauds' total weight
+  equals the genuine payments'.
+- **Random undersampling.** Keep every fraud and draw genuine rows at
+  random until there are as many as frauds: 216 of each, from 3,784
+  genuine training rows.
+
+<FigureSequence
+  name="surface"
+  alt="Three frames of the same scatter plot: 1,000 test points, grey genuine points in a large cloud on the left, 54 amber frauds in a band on the right overlapping its edge. The region where the depth-5 tree scores 0.5 or more is shaded blue. Frame 1, no rebalancing: the shaded region hugs the fraud band; 68 flagged, 36 frauds, balanced accuracy 0.82, ROC-AUC 0.90, average precision 0.49. Frame 2, class weight 19: the region widens slightly into the grey cloud; 106 flagged, 48 frauds, balanced accuracy 0.91, ROC-AUC 0.90, average precision 0.44. Frame 3, undersampled to one genuine per fraud: the region covers the whole lower right of the plot, a darker blue block where the score is exactly 1; 139 flagged, 52 frauds, balanced accuracy 0.94, ROC-AUC 0.94, average precision 0.42; the score-1 block holds 51 test points, 20 of them fraud"
+  caption="Each remedy pushes the 0.5 region into the genuine cloud: more payments flagged, more frauds among them, and more genuine ones."
+/>
+
+<Task>
+Step through the three frames and, before reading the side panels, count
+roughly how many grey points each widening of the blue region swallows
+compared with the amber points it gains. Then check the numbers: from the
+first frame to the third, 71 more payments flagged, 16 more of them fraud.
+</Task>
+
+### Why every remedy moves the boundary the same way
+
+The tree chooses its splits and leaf values to make the training labels
+as pure as possible, and in the overlap it must choose: call a leaf fraud
+and pay for its genuine rows, or call it genuine and pay for its frauds.
+Each remedy changes that price in the same direction.
+
+- A **class weight** ω makes each fraud in a leaf count ω times.
+- **Random oversampling** copies frauds until the target ratio is
+  reached, which in expectation is the same as weighting each fraud by
+  the number of its copies.
+- **Undersampling** keeps a share β of the genuine rows, which in
+  expectation weights each genuine row by β, the same ratio
+  $\omega = 1/\beta$ obtained by deletion instead of multiplication.
+
+With frauds dearer relative to genuine rows, a leaf that held one fraud
+for every five genuine payments, a sure "genuine" before, now holds 19
+weighted frauds against five at $\omega = 19$ and is labelled fraud. The boundary moves
+until the weighted counts balance, and that happens deep inside the
+genuine cloud.
+
+<KeyFact>
+Weights, copies and deletions are one move: they make a missed fraud
+dearer than a false alarm in the training loss, and a learner pays for
+that by labelling more of the overlap as fraud. The question for a fraud
+team is never whether the boundary moved, but whether the order of the
+payments at the top improved.
+</KeyFact>
+
+### Synthetic frauds: SMOTE
+
+Copying a fraud twenty times adds no new information: the tree sees the
+same point with a heavier weight. The *synthetic minority oversampling
+technique*, SMOTE, tries to do better by inventing new frauds between the
+existing ones.
+
+<FigureSequence
+  name="smote"
+  alt="Three frames of a scatter plot of age against income. Grey genuine points fill the upper middle; six amber fraud squares lie around them. Frame 1: the fraud at age 30, income 1,000 is outlined and its five fraud neighbours are circled. Frame 2: the neighbour at age 62, income 3,200 is picked and a dashed segment joins the two; u = 0.75. Frame 3: a hollow amber square at age 54, income 2,650 sits on the segment, three quarters of the way along, among grey genuine points"
+  caption="SMOTE places a new fraud on the segment between a fraud and a random fraud neighbour; the genuine payments it lands among play no part in the choice."
+/>
+
+<Example title="one synthetic fraud">
+A fraud has age 30 and income 1,000; one of its five nearest neighbours
+among the frauds, drawn at random, has age 62 and income 3,200. Draw
+$u$ uniformly from $[0, 1]$; say $u = 0.75$. The synthetic fraud is
+$$
+x_{\text{new}} = x + u\,(x_{\text{nb}} - x):
+\quad 30 + 0.75 \times (62 - 30) = 54,
+\quad 1{,}000 + 0.75 \times (3{,}200 - 1{,}000) = 2{,}650 .
+$$
+The number of synthetic frauds is set by the target ratio. In the toy's
+training set, 216 frauds and 3,784 genuine rows, a target $r = 0.5$ needs
+$3{,}784 \times 0.5 = 1{,}892$ frauds, so SMOTE invents
+$1{,}892 - 216 = 1{,}676$ of them, almost eight per real fraud.
+</Example>
+
+The rule never looks at the genuine payments. When two frauds sit on
+either side of a stretch of genuine payments, the segment between them
+runs through it, and the synthetic frauds placed there teach the model
+that this stretch is fraud. In an overlapping task such as card fraud,
+many segments do.
+
+<Exercise>
+The same fraud, (30, 1,000), has another neighbour at (36, 1,700). (a)
+Compute the synthetic fraud for $u = 0.25$. (b) SMOTE to $r = 0.5$ is
+followed by random undersampling to $r = 1$. How many genuine rows does
+the toy's training set keep, and what share β of its genuine rows is
+that?
+
+<Solution>
+**(a)** Age $30 + 0.25 \times 6 = 31.5$; income $1{,}000 + 0.25 \times
+700 = 1{,}175$. The new point is (31.5, 1,175), a quarter of the way to
+the neighbour.
+
+**(b)** After SMOTE there are 1,892 frauds. Undersampling to one genuine
+row per fraud keeps 1,892 of the 3,784 genuine rows, so $\beta = 0.5$:
+the combined pipeline trains on 1,892 frauds, 216 real and 1,676
+invented, against half of the genuine payments.
+</Solution>
+</Exercise>
+
+## Which metrics see the move
+
+The three frames give three verdicts. Balanced accuracy climbs from 0.82
+to 0.91 to 0.94, a large and steady gain. Average precision falls from
+0.49 to 0.44 to 0.42. ROC-AUC stays at 0.90 and then jumps to 0.94. The
+remedies are judged better, worse or unchanged depending on which number
+is read.
+
+### Balanced accuracy rewards any cut that moves toward the base rate
+
+*Balanced accuracy* is the mean of the recall on frauds and the recall
+on genuine payments, at a fixed cut, usually 0.5:
+$\mathrm{BA} = \tfrac12\left(\mathrm{TP}/n_1 + \mathrm{TN}/n_0\right)$,
+with $n_1$ frauds and $n_0$ genuine payments. Add one payment to the
+flagged set. If it is fraud with probability $q$, the expected change is
+$$
+\tfrac12\left(\frac{q}{n_1} - \frac{1-q}{n_0}\right),
+\qquad\text{positive exactly when}\qquad
+\frac{q}{1-q} > \frac{n_1}{n_0} = \mathrm{IR} .
+$$
+Balanced accuracy therefore keeps rising as long as the flagged payments
+are more likely to be fraud than the base rate; its best cut flags every
+payment above the base rate. On the simulator that means flagging any
+payment more suspicious than about one in a hundred, thousands a day
+against a budget of a hundred cards. That is also where the remedies put
+the 0.5 cut. A cut at 0.5 on a
+balanced training set is a cut at the base rate on the stream, as <Ref
+lesson="undersampling-calibration" id="a-threshold-priced-in-euros">the
+previous lesson</Ref> showed for undersampling, and weights and copies
+shift the cut the same way. Balanced accuracy is the metric a balanced
+training set is built to win.
+
+The cleanest case is a logistic regression on the toy, averaged over five
+folds. With $\omega = 19$, balanced accuracy goes from 0.641 to 0.899.
+ROC-AUC is 0.937 both times, and average precision moves from 0.535 to
+0.536. For a logistic regression whose log-odds really are linear in the
+features, as they nearly are on the toy, weighting the classes only adds $\ln\omega$ to the intercept,
+as the lesson on imbalance and leakage in the classical-ml course proved
+for any well-specified weighted fit, so every payment's
+score moves by the same amount on the log-odds scale and the order does not change. The weights
+moved the cut, and only a metric that reads the cut noticed.
+
+### The ranking metrics: one number unmoved, one falling
+
+A tree is different. Its weighted splits are not the unweighted splits
+shifted: the weights change which split looks purest, so the tree
+partitions the space differently and the order of the payments changes.
+Over the five folds of the toy, every remedy behaves the same way on one
+metric and not on the other.
+
+| depth-5 tree, five-fold mean | ROC-AUC | average precision | balanced accuracy |
+|---|---|---|---|
+| no rebalancing | 0.906 | 0.528 | 0.786 |
+| class weight $\omega = 19$ | 0.887 | 0.471 | 0.898 |
+| random oversampling to $r = 1$ | 0.880 | 0.456 | 0.888 |
+| SMOTE to $r = 1$ | 0.913 | 0.499 | 0.910 |
+| random undersampling to $r = 1$ | 0.913 | 0.408 | 0.896 |
+| SMOTE to $r = 0.5$, then undersampling to $r = 1$ | 0.915 | 0.494 | 0.912 |
+
+Balanced accuracy rises for every remedy. Average precision falls for
+every remedy. ROC-AUC goes either way: down by 0.02 to 0.03 for weights
+and copies, up by less than 0.01 for SMOTE and undersampling, all inside
+the spread of the folds, whose standard deviations run from 0.02 to 0.04.
+
+<KeyFact>
+The three verdicts disagree because the metrics read different parts of
+the ranking: balanced accuracy one cut, ROC-AUC every threshold with equal
+weight, average precision mostly the top, since it averages the precision
+at which each fraud is reached. Only the last reads the part a budgeted
+queue works, and on the toy it says that no remedy helped.
+</KeyFact>
+
+## Why a remedy can raise ROC-AUC and lower average precision
+
+ROC-AUC and average precision have split before. In <Ref
+lesson="alert-budget-metrics"
+id="what-a-ranking-with-no-information-scores">the alert-budget
+metrics</Ref> the full-depth tree beat the depth-2 tree on ROC-AUC, 0.788
+against 0.763, and lost on average precision, 0.309 against 0.496. Its
+area came from a straight ROC segment through false-positive rates the
+budget never reaches, and its precision was dragged down by a tied block:
+every fraud it scored 0 sat with nearly all the genuine payments and was
+reached at the base rate (<Ref lesson="delayed-labels-prequential"
+id="what-auc-sees-in-the-fully-grown-tree">the delayed-labels
+lesson</Ref> took that two-score model apart). Undersampling produces the
+same split from one tree trained two ways: on the fold of the
+step-through, ROC-AUC rises from 0.90 to 0.94 while average precision
+falls from 0.49 to 0.42. Since a ranking that dominates another wins both
+metrics (<Ref lesson="alert-budget-metrics"
+id="dominance-survives-the-change-of-axes">dominance survives the change
+of axes</Ref>), the two curves must cross. The question is what the
+remedy did to the order of the payments on either side of the crossing.
+
+<Figure
+  src="./figures/curves.svg"
+  alt="Two panels for the depth-5 tree on one fold of the toy, blue without rebalancing and amber undersampled. Left, ROC curves: the amber curve rises more slowly at first, crosses the blue near a false-positive rate of 0.05 and then stays above it, reaching 0.96 near 0.1 while blue flattens at about 0.88; a dashed vertical line at 0.05 is labelled 50 alerts reach here. AUC 0.90 blue, 0.94 amber. Right, precision–recall curves drawn as steps: blue starts at 0.67 and holds about 0.55 out to recall 0.75; amber starts flat at 0.39 up to recall 0.37, then about 0.48. AP 0.49 blue, 0.42 amber"
+  caption="The undersampled tree wins the ROC curve to the right of the budget line and loses the top of the ranking, where precision lives."
+/>
+
+### Where the undersampled tree wins ROC area
+
+The toy has no days and no investigators, so the dashed line marks a
+notional budget: 50 alerts on a fold of 1,000 payments, about 5% of it,
+which reaches a false-positive rate of about $50/946 \approx 0.05$. That
+is generous. On the simulator a hundred alerts a day reach a
+false-positive rate of 0.012 at most, as <Ref
+lesson="alert-budget-metrics"
+id="how-much-of-the-curve-a-hundred-alerts-can-reach">the alert-budget
+lesson</Ref> computed.
+
+Read the left panel from the right. Without rebalancing, a handful of
+frauds sit inside the genuine cloud, in leaves the tree calls nearly
+certainly genuine; they are ranked below almost every genuine payment,
+and the blue curve creeps from a true-positive rate of about 0.89 to
+0.94 across almost the whole false-positive axis. The undersampled tree's
+large fraud region takes in the lower tail of the fraud band, so those
+frauds now rank above about nine genuine payments in ten.
+
+ROC-AUC is the share of fraud–genuine pairs ranked in the right order, so
+moving one fraud from below the whole cloud to above 90% of it adds about
+$0.9/54 \approx 0.017$ to the area. Three such frauds add about 0.05,
+more than the whole jump of 0.04; the difference is the area the
+undersampled tree loses to the left of the crossing, where its curve runs
+below the blue one. Every one of those gains lies at false-positive rates
+of 0.05 and beyond, at or past the notional budget line and four times
+past the simulator's reach: area no investigator ever works.
+
+### Where it loses the top
+
+The right panel shows the price, and it is the tie mechanism that sank
+the full-depth tree, moved to the other end of the list. The undersampled
+tree's top is a flat stretch of precision 0.39 that runs to recall 0.37:
+a single block of 51 test payments tied at score exactly 1, of which 20
+are fraud. The unrebalanced tree's top six payments hold four frauds, and
+its precision stays above 0.5 to recall 0.75.
+
+The score is exactly 1 because of what undersampling deleted. The tree
+was fitted to 216 genuine rows, one in 17.5 of those it was given, and in
+the lower right of the plot, where genuine payments are thin, the draw
+kept none. A leaf with frauds and no genuine rows says 1. On the test
+fold the same region holds genuine payments at the stream's rate, 31 of
+them, and they all tie with the 20 frauds at the top. By <Ref
+lesson="alert-budget-metrics" id="what-the-team-sees-at-each-fraud">the
+tie convention</Ref>, every fraud in a tied block is reached at the
+block's end precision. The full-depth tree's frauds tied at 0 were all
+reached at the base rate; these twenty, tied at 1, are all reached at
+0.39, though the plain tree finds its first four at precision 0.67 and
+above. The same happens on every fold of the toy: the undersampled tree's
+top block holds between 51 and 72 test payments, with precision between
+0.32 and 0.56, while the unrebalanced tree's top block holds two to seven.
+
+<KeyFact>
+A remedy can buy ROC area by lifting frauds from the bottom of the
+ranking into the middle, at false-positive rates the budget never
+reaches, while blurring the top into large mixed blocks. ROC-AUC counts
+both moves alike; average precision and precision at k see only the
+second.
+</KeyFact>
+
+## On card data, under forward-in-time folds
+
+The toy is a picture, not evidence: its folds are shuffled, its classes
+are two Gaussian-like clouds, and its budget is notional. The test that
+matters runs the remedies on payment streams, scored by average precision
+and card precision at 100 on <Ref lesson="delayed-labels-prequential"
+id="prequential-folds-a-spread-across-weeks">prequential folds</Ref>,
+which choose each remedy's setting, and on four forward test weeks, which
+score the choice.
+
+### The simulated stream
+
+Start with the depth-5 tree on the simulated transactions, the depth the
+prequential folds of <Ref lesson="delayed-labels-prequential"
+id="what-prequential-selection-picks">the delayed-labels lesson</Ref>
+picked for card precision. Without rebalancing, over the four test weeks,
+it scores ROC-AUC 0.810, average precision 0.600 and $CP@100$ 0.284.
+Now apply SMOTE inside the training block at five target ratios.
+
+| SMOTE target ratio $r$ | ROC-AUC | average precision | $CP@100$ |
+|---|---|---|---|
+| none (IR ≈ 0.009) | 0.810 | **0.600** | 0.284 |
+| 0.01 | 0.805 | 0.587 | 0.282 |
+| 0.05 | 0.824 | 0.573 | 0.285 |
+| 0.1 | 0.827 | 0.544 | 0.290 |
+| 0.5 | 0.843 | 0.558 | 0.289 |
+| 1 | **0.845** | 0.546 | 0.295 |
+
+ROC-AUC climbs almost steadily with the ratio, from 0.805 to 0.845.
+Average precision is below the unrebalanced tree at every ratio. Card
+precision drifts from 0.282 to 0.295, about one card a day, while the
+weekly standard deviations run from 0.007 to 0.016. Two settings closer
+than about one fold standard deviation are not separated, so on card
+precision SMOTE did nothing measurable.
+
+The other remedies repeat the pattern.
+
+- **Class weights**, ω from 1 to 100: the tree's average precision is
+  best at $\omega = 1$, 0.600, against 0.537 at $\omega = 100$. A logistic
+  regression loses slightly less, 0.623 at $\omega = 1$ against 0.571 at
+  $\omega = 100$, while its ROC-AUC rises from 0.868 to 0.871. On these
+  features its log-odds are not linear, so the weights changed the
+  slopes, not only the intercept, and the order moved.
+- **Random undersampling**, $r$ from 0.01 to 1: ROC-AUC is best at full
+  balance, 0.83; average precision at the mildest ratio, 0.594, still
+  below no rebalancing.
+- **SMOTE to 0.1, then undersampling**: as the undersampling target goes
+  from 0.1 to 0.5 to 1, ROC-AUC goes from 0.827 to 0.848 to 0.847, and
+  average precision from 0.544 to 0.471 to 0.385.
+
+### The real stream
+
+On the Belgian e-commerce payments the prequential folds pick a tree of
+depth 6, and without rebalancing it scores ROC-AUC about 0.87, average
+precision 0.068 and $CP@100$ 0.232: 23 compromised cards found a day among
+the top 100. These sit well above the numbers <Ref
+lesson="alert-budget-metrics"
+id="what-a-ranking-with-no-information-scores">the alert-budget
+lesson</Ref> gave for this stream, APs of 0.003 to 0.035 and $CP@100$
+about 0.10 for the depth-2 tree and 0.15 for logistic regression, and the
+setup accounts for the gap. Those five models ran with untuned default
+settings, trained on one week and scored on one. Here every model's
+hyperparameters are chosen on prequential folds and its scores averaged
+over four forward test weeks.
+
+Every remedy raises the tree's ROC-AUC, to between 0.88 and 0.89 at its
+best ratio. To compare the precision metrics across the two streams on
+equal terms, take for each remedy its best test-week value over the same
+grid of settings, separately for each metric. That flatters the remedies:
+no selection procedure can do better than the best cell.
+
+| depth-5 / depth-6 tree, best setting per metric | simulator AP | simulator $CP@100$ | real AP | real $CP@100$ |
+|---|---|---|---|---|
+| no rebalancing | **0.600** | 0.284 | **0.068** | **0.232** |
+| class weight | **0.600** ($\omega = 1$) | 0.289 ($\omega = 100$) | **0.068** ($\omega = 1$) | **0.232** ($\omega = 1$) |
+| random undersampling | 0.594 ($r = 0.01$) | 0.292 ($r = 0.5$) | 0.066 ($r = 0.01$) | 0.201 ($r = 0.01$) |
+| SMOTE | 0.587 ($r = 0.01$) | 0.295 ($r = 1$) | 0.056 ($r = 0.01$) | 0.168 ($r = 0.01$) |
+| SMOTE then undersampling | 0.544 ($r = 0.1$) | **0.300** ($r = 0.5$) | 0.046 ($r = 0.5$) | 0.119 ($r = 0.1$) |
+
+Read across a row. On the simulator the resamplers' best average
+precision is 1% to 9% below the plain tree's, and their best card
+precision is up to 0.016 above it, 1.6 cards a day: under the two cards a
+day below which, as <Ref lesson="alert-budget-metrics"
+id="what-each-disagreement-means">the alert-budget lesson</Ref> found, a
+different week could reverse a gap, and inside the weekly spreads
+of about 0.01 to 0.02. On the real stream the
+same remedies lose 3% to 32% of average precision, and on card precision
+they lose 3 to 11 cards a day, beyond the two-card line, the two larger
+losses beyond the weekly spread of about 0.04. For class weights the best
+precision setting on real data is "no weights", and for every resampler
+it is the mildest ratio tried. The combined pipeline at its best finds 12
+compromised cards a day where the plain tree finds 23.
+
+The real stream punishes the same remedies harder, and the likely reason
+is overlap. Every mechanism of the last two sections works through it:
+synthetic frauds land among genuine payments, deleted genuine rows leave
+regions the tree calls certain fraud, and the more genuine payments sit
+among the frauds, the more of them those mistakes reach. There is a sign
+that the real classes are more mixed. An AP is read as a multiple of its
+stream's fraud share, the score of a ranking with no information (<Ref
+lesson="alert-budget-metrics"
+id="what-a-ranking-with-no-information-scores">the floor of average
+precision</Ref>): the plain tree's 0.068 is about $0.068/0.0025 \approx
+27$ times the real stream's share, its 0.600 about $0.600/0.009 \approx
+67$ times the simulator's. It is only a sign, since weaker features or
+noisier labels would lower that multiple just as well.
+
+## Balanced ensembles: the gain is not the balance
+
+One family of remedies does better than the rest on card data, and its
+name credits the rebalancing. *Bagging* fits many trees, each on a
+bootstrap sample of the training rows (drawn with replacement, about
+63% of distinct rows each), and averages their scores. *Balanced
+bagging* undersamples each bootstrap sample to a target ratio before its
+tree is fitted, so every tree sees all, or most, of the frauds and a
+different small subset of the genuine payments. A *balanced random
+forest* does the same inside a random forest, whose trees also draw a
+random subset of features at each split.
+
+This is the repair for the waste <Ref lesson="undersampling-calibration"
+id="what-undersampling-still-costs-precision-at-the-top">the previous
+lesson</Ref> priced. Balancing a card chunk at 0.4% fraud deletes about
+99.6% of its genuine payments, and the model fitted to what is left is
+noisy, most of all at the top of the scale. Fitting several models, each
+on a different undersample, and averaging them recovers part of the
+deleted information: on card streams retrained daily, an ensemble of
+five undersampled models per day beats plain undersampling on average
+precision.
+
+### Six ensembles, two streams
+
+| | simulated: ROC-AUC | AP | $CP@100$ | real: ROC-AUC | AP | $CP@100$ |
+|---|---|---|---|---|---|---|
+| bagging | 0.856 | 0.678 | 0.293 | 0.912 | 0.072 | 0.209 |
+| balanced bagging | 0.879 | 0.680 | 0.305 | 0.919 | 0.086 | 0.248 |
+| random forest | 0.870 | 0.678 | 0.299 | 0.912 | 0.080 | 0.227 |
+| balanced random forest | 0.872 | 0.677 | 0.302 | 0.925 | 0.093 | 0.254 |
+| XGBoost | 0.872 | **0.687** | 0.302 | **0.928** | 0.095 | 0.235 |
+| XGBoost, fraud weight ω tuned | 0.872 | **0.687** | 0.300 | **0.928** | **0.097** | 0.249 |
+
+Each balanced or weighted row is at the setting its prequential folds
+picked for each metric, scored on the test weeks; the dots of the
+ratio-sweep figure below mark instead the best test-week ratio, which is
+why balanced bagging's real-stream bests there, ROC-AUC 0.922 and AP
+0.090, sit a little above this table's 0.919 and 0.086. The real-stream XGBoost row, AP 0.095, sits
+above the 0.035 of the alert-budget lesson for the same reason the
+depth-6 tree does: tuned on prequential folds, scored over four weeks.
+
+Reading the card-precision columns needs the same noise scale: on the
+real stream these models' $CP@100$ varies from one test week to the next with standard
+deviations of 0.03 to 0.07. Balanced bagging finds about four more
+compromised cards a day than bagging, 0.248 against 0.209, and balanced
+random forest about three more than random forest, 0.254 against 0.227:
+above the two-card line, though inside one weekly standard deviation. On
+the simulator the six card precisions, 0.293 to 0.305, all sit within
+the weekly spread of about 0.01.
+
+### Why the balance is not what helps
+
+The natural reading is that rebalancing, useless for a single tree,
+works once the trees are averaged. The test is to vary the ratio and
+watch the gain. Balanced bagging was run at five target ratios on both
+streams.
+
+<Figure
+  src="./figures/ir-sweep.svg"
+  alt="Six small line charts in two rows, simulated stream above and real card data below, columns ROC-AUC, average precision and CP@100, each plotted against the imbalance ratio each tree is trained at on a log axis from 0.01 or 0.02 to 1. The amber balanced-bagging line is compared with a dashed blue line for plain bagging. Simulated: ROC-AUC rises from 0.869 to a best 0.879 at 0.5; average precision is best 0.680 at 0.02 and falls to 0.631 at 1; CP@100 is best 0.305 at 0.1 to 0.5. Real: ROC-AUC best 0.922 at 0.5; average precision best 0.090 at 0.05 and falls to 0.069 at 1; CP@100 best 0.248 at 0.01 and falls to 0.189 at 1, below plain bagging's 0.209"
+  caption="The best ratio differs by metric: near balance for ROC-AUC, the mildest ratios for average precision and, on real data, card precision."
+/>
+
+On the real stream balanced bagging's card precision is 0.248 at the
+mildest ratio, 0.01, and it falls steadily as the trees are trained
+closer to balance, to 0.189 at $r = 1$, below plain bagging. If balance
+were the active ingredient the gain would grow toward $r = 1$; it
+shrinks, and turns into a loss. Average precision tells the same story
+on both streams.
+
+What the mildest ratio does do is subsample. At $r = 0.01$ on a stream
+with $\mathrm{IR} \approx 0.0025$, each tree keeps $\beta = 0.0025/0.01$,
+a quarter of the genuine rows, a different quarter for every tree. One
+explanation fits that: a hundred trees fitted on a hundred different
+subsets disagree more than a hundred trees fitted on overlapping
+bootstrap samples, and averaging trees that disagree cancels more of
+their individual overfitting. On that reading the gain is diversity
+among the trees, supplied cheaply by undersampling and partly cancelled
+by the balance that comes with it.
+
+The sweep is consistent with that reading; it does not demonstrate it.
+It rules balance out as the cause, but nowhere does it compare balanced
+bagging with an ensemble whose trees see subsets of the same size drawn
+at the stream's own mix, and only that comparison could credit the
+subsampling. The exercise on diversity and rebalancing designs it.
+
+### Boosting without rebalancing: near-best, not the pick
+
+XGBoost with no rebalancing at all has the best or near-best average
+precision on both streams, 0.687 on the simulator and 0.095 on the real
+one against 0.097 for its weighted version, and the best ROC-AUC on the
+real stream. Its only rebalancing knob is a weight on each fraud's loss,
+`scale_pos_weight`, which plays the role of ω. The heuristic $\omega =
+1/\mathrm{IR}$ would set it at about 110 on the simulator and 400 on the
+real stream; the prequential folds pick 1 on the simulator and 5 on the
+real stream, and weights of 10 to 100 do no better than 5.
+
+On the metric that decides, plain XGBoost is not the pick. On the real
+stream its $CP@100$ is 0.235, against 0.249 with $\omega = 5$, 0.248 for
+balanced bagging and 0.254 for balanced random forest: 1.3 to 1.9 fewer
+compromised cards a day. Every one of those gaps is under the two-card
+line and under a third of the weekly standard deviations of 0.03 to
+0.07, so none is separated. The card-precision pick on real data is a
+mild fraud weight or a balanced ensemble, and the margin by which it
+beats unweighted boosting is noise-sized.
+
+Why boosting gains so little from rebalancing, and why the weight that
+helps at all is 5 rather than 400, likely lies in how it fits. Each round fits a new tree to
+the current model's errors, the gradients of the log-loss, which for a
+payment are its label minus its predicted probability. On a rare-class
+stream the largest errors belong mostly to frauds the model still scores
+low, so each round concentrates on them: an implicit weighting of the
+minority, applied where the model is wrong and fading as those frauds
+get fitted. A fixed class weight keeps pushing after the frauds are
+fitted, and what it then pushes is genuine payments over the line.
+
+<Aside>
+Undersampling still has a use the precision tables do not show:
+training time. On the real stream, balanced random forest trained in
+about 115 to 140 seconds per setting and plain XGBoost in about 480 to
+640, and undersampling cut the ensembles' training time by up to a
+fifth. Where the retraining window is tight, a mild ratio that costs
+nothing measurable on the precision metrics can be worth it for speed
+alone.
+</Aside>
+
+## The ratio is a hyperparameter, chosen by the metric that decides
+
+A common recipe for choosing the class mix starts from the original
+distribution, shifts it five points at a time toward balance, 95/5 to
+90/10 to 85/15, records ROC-AUC on a validation set at each step and
+stops when it stagnates; 80/20 is a frequent industry choice. Every step
+of the recipe is sound except its metric: stopping on ROC-AUC walks the
+mix toward the balance that metric rewards.
+
+<KeyFact>
+There is no right ratio to look up: its best value changes with the
+metric, the model and the stream. Treat the target ratio or the class
+weight exactly as <Ref lesson="delayed-labels-prequential"
+id="what-prequential-selection-picks">the delayed-labels lesson</Ref>
+treated tree depth: a grid of candidates that includes "no
+rebalancing", prequential folds, and a pick by card precision at the
+team's k, with average precision to break ties.
+</KeyFact>
+
+### Where the sampler runs
+
+Choosing the ratio on validation folds needs the sampler to stay out of
+them, the rule the classical-ml course established for cross-validation:
+resample training rows only, and score validation rows at the stream's own
+base rate. On prequential folds the sampler is therefore fitted on each
+fold's training block, after the split in time, and the validation and
+test weeks are scored exactly as they arrive.
+
+<Figure
+  src="./figures/pipeline.svg"
+  alt="One prequential fold drawn as a row of three blocks: a training block, a dashed delay block and a blue validation block. The training block flows down into an amber sampler, then a model, which scores the untouched validation payments for AUC, AP and CP@100"
+  caption="The sampler is a step of the model, refitted on each fold's training block; the validation block keeps the stream's own payments and base rate."
+/>
+
+imbalanced-learn's `Pipeline` makes this automatic: it applies a sampler
+during `fit` and skips it during `predict`, so a grid search over the
+pipeline, run on the prequential splits, resamples only training blocks.
+
+If the chosen setting does undersample, the model's outputs carry the
+cut's distortion: with $\beta = \mathrm{IR}/r$, the correction of <Ref
+lesson="undersampling-calibration">undersampling and calibration</Ref>
+returns them to the stream's scale for any decision that reads the
+probability's value.
+
+<Conclusion>
+You can now read a rebalancing result: name the boundary move every
+remedy makes, explain why balanced accuracy rewards it whatever happened
+to the ranking, find in the ROC and precision–recall curves the part of
+the ranking a remedy improved and the part it damaged, and check whether
+a reported gain in ROC-AUC lies beyond the budget. On card data under
+forward folds the honest metrics favour little or no rebalancing, the
+target ratio is a hyperparameter chosen by card precision on prequential
+folds with the sampler inside each fold, and balanced ensembles gain
+most at their mildest ratios, so not through balance; diversity among
+their trees fits that, but no experiment here has confirmed it. A boosted tree without
+rebalancing reaches the best or near-best average precision on both
+streams; on real card data card precision at 100 prefers a mild fraud
+weight or a balanced ensemble, by a margin inside the noise.
+
+Every comparison here counted frauds, each worth one. A missed fraud
+costs the bank its amount, and resampling multiplies every fraud's weight
+by the same factor whether it stole ten euros or ten thousand; <Ref
+lesson="example-dependent-cost">example-dependent cost-sensitive
+learning</Ref> builds the decision rule and the measure that count the
+money.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+The simulator's days 71 to 166 hold 919,767 payments, 8,195 of them
+fraud. (a)
+Compute its imbalance ratio and the "balanced" class weight ω. (b) A
+training week of 67,240 payments has 598 frauds. Undersampling it to
+$r = 0.1$: what keep rate β, and how many rows remain? (c) A model fitted
+on that set outputs 0.5 for a payment. What is the payment's probability
+of fraud on the stream?
+
+<Solution>
+**(a)** $\mathrm{IR} = 8{,}195/(919{,}767 - 8{,}195) = 8{,}195/911{,}572
+\approx 0.00899$; $\omega = 1/\mathrm{IR} \approx 111$.
+
+**(b)** The week's ratio is $598/66{,}642 \approx 0.00897$, so $\beta =
+\mathrm{IR}/r \approx 0.0897$. The set keeps 598 frauds and $598/0.1 =
+5{,}980$ genuine payments, 6,578 rows in all, about a tenth of the week.
+
+**(c)** Multiply the odds by β: odds 1 become 0.0897, so $p' =
+0.0897/1.0897 \approx 0.082$. A model trained at $r = 0.1$ calls 0.5 a
+payment that is fraud about one time in twelve.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague writes: "SMOTE raised the tree's ROC-AUC on the simulator
+from 0.81 to 0.845, so it will catch more fraud in the top hundred."
+Refute it with the numbers of the lesson, and name the step that fails.
+
+<Solution>
+**The numbers.** At $r = 1$, where ROC-AUC is 0.845, average precision is
+0.546 against 0.600 without SMOTE, and $CP@100$ is 0.295 against 0.284, a
+difference of about one card a day inside a weekly spread of about 0.01
+to 0.016. Over the four test weeks the top of the ranking got worse by
+average precision and did not measurably improve by card precision.
+
+**The failing step.** "Higher AUC, so more fraud in the top hundred"
+assumes the AUC gain happened at the top. A simulator day has about 8,250
+genuine payments, so a hundred alerts reach a false-positive rate of at
+most $100/8{,}250 \approx 0.012$. ROC-AUC averages the true-positive rate
+over all false-positive rates from 0 to 1, and a gain anywhere on that
+axis counts. SMOTE's synthetic frauds widen the fraud region, lifting
+frauds from the bottom of the ranking into the middle, where the gain in
+area lies beyond 0.012. The step from "AUC rose" to "the top improved"
+holds only when one ROC curve dominates the other, and here they cross.
+</Solution>
+</Exercise>
+
+<Exercise>
+Push the overlap to zero. The two classes are separated by a line: every
+fraud lies on one side, every genuine payment on the other. (a) Suppose
+the learner, with or without a remedy, separates them, scoring every
+fraud above 0.5 and every genuine payment below. Show that ROC-AUC,
+average precision and balanced accuracy are all 1, whatever the remedy.
+(b) Why can SMOTE not break the separation here, though it can on card
+data? (c) Which steps of the lesson's explanation of the AUC-up, AP-down
+pattern needed overlap?
+
+<Solution>
+**(a)** Every fraud scores above every genuine payment, so every
+fraud–genuine pair is in order and ROC-AUC is 1. The frauds take the
+first $m$ ranks, the precision at the $j$-th fraud is $j/j = 1$, and
+average precision is 1. At the 0.5 cut both recalls are 1, so balanced
+accuracy is 1. No remedy can improve on any of them, and by hypothesis
+none damages them.
+
+**(b)** The fraud side of a line is a half-plane, and a half-plane
+contains the whole segment between any two of its points. Every
+synthetic fraud therefore lands on the fraud side, never among genuine
+payments. On card data the frauds do not occupy a region of their own,
+and segments between them cross genuine territory.
+
+**(c)** All of them. The boundary moved because leaves holding both
+classes had to be labelled one way or the other and the weights changed
+which; with no mixed leaves there is nothing to relabel. The undersampled
+tree's top block mixed frauds with genuine payments because deleting
+genuine rows emptied regions where the stream still has genuine payments;
+between separated classes such regions lie on the fraud side, where the
+test set has none either. And the remedies lifted frauds out of the
+genuine cloud, which needs frauds inside it. The whole pattern is a
+property of overlapping classes, which card fraud is.
+</Solution>
+</Exercise>
+
+<Exercise>
+Recall from the lesson on imbalance and leakage in the classical-ml
+course that a well-specified fit to the log-loss with each fraud weighted
+ω times targets odds ω times the true odds, so a logistic regression whose
+log-odds really are linear only gains $\ln\omega$ on its intercept, and
+its ranking cannot change. Weighting nonetheless moved the average
+precision of the toy's depth-5 tree, 0.528 to 0.471, and of the logistic
+regression on the simulator's features, 0.623 to 0.571. (a) Why does the
+argument not protect the tree, although for a fixed set of splits a
+weighted leaf value is an increasing function of the unweighted one? (b)
+Why does it not protect the simulator's logistic regression?
+
+<Solution>
+**(a)** For fixed splits a leaf's weighted fraud share is
+$w_1 n_1/(w_1 n_1 + w_0 n_0)$, which rises with the unweighted share
+$n_1/(n_1+n_0)$, so the leaves would keep their order. But the argument
+needs a model free to output any value at each $x$, and a tree's freedom
+is chosen by the splits. The weights change the impurity of every
+candidate split, so the tree picks different splits and the partition
+itself changes; payments that shared a leaf are separated, payments that
+were apart now share one, and the order moves.
+
+**(b)** On the simulator's features the logistic regression is
+misspecified: no line follows the true log-odds, so the fitted line is a
+compromise among errors made at different points. The weighted loss
+prices those errors differently, a fraud's error ω times a genuine
+payment's, so the best compromise under weights has different slopes,
+not only a different intercept. A change of slope reorders payments, and
+average precision, read from the order, moves with it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Design the experiment that separates "diversity" from "rebalancing" as
+the source of balanced bagging's gain. State the arms, what each holds
+fixed, and what result would favour each explanation. Then check your
+design against this result on the toy, five-fold means, depth-5 trees,
+100 per ensemble:
+
+| ensemble | ROC-AUC | AP | balanced accuracy |
+|---|---|---|---|
+| bagging, full bootstrap | 0.943 | 0.597 | 0.748 |
+| bagging, each tree on a random draw of 432 rows | 0.938 | 0.592 | 0.713 |
+| balanced bagging, $r = 1$ (each tree on 432 rows) | 0.947 | 0.586 | 0.920 |
+
+<Solution>
+**The confound.** Balanced bagging changes two things at once: each tree
+sees fewer rows, and a different mix of them. A gain could come from
+either.
+
+**The arms.** (1) Plain bagging. (2) Size control: bagging in which each
+tree sees a random subsample of the same size as a balanced bag, drawn
+without regard to class, so the class mix stays at the stream's IR. (3)
+Balanced bagging at ratio $r$. Repeat (2) and (3) across several $r$,
+matching sizes each time, and score all arms on the same prequential
+folds with ROC-AUC, average precision and card precision at 100.
+
+**Reading it.** First compare both subsampled arms with (1): if neither
+beats plain bagging, there is no ensemble gain to attribute. If they do,
+and (2) matches (3) on the ranking metrics, the gain is the subsampling,
+diversity; if (3) beats (2) at equal size, the change of
+mix contributes. If (3)'s advantage over (2) grows as $r$ goes to 1,
+balance helps; if it shrinks or reverses, balance hurts. One caution: on
+a rare-class stream a 10% random subsample holds 10% of the frauds,
+which also changes what each tree can learn, so a third control keeps
+all frauds and subsamples only genuine rows at the stream's own ratio,
+which is undersampling with $r = \mathrm{IR}$, no rebalancing at all.
+
+**The toy.** The second row is arm (2), the third arm (3). They agree on ROC-AUC (0.938 against 0.947) and average precision (0.592
+against 0.586) within the folds' spread; only balanced accuracy separates
+them, 0.713 against 0.920, which is the boundary move and nothing else.
+On the toy the rebalancing adds nothing to the ranking. Neither does
+the subsampling: row 1, arm (1), beats both subsampled arms on average
+precision, 0.597 against 0.592 and 0.586, and sits between them on
+ROC-AUC, so the toy has no ensemble gain to attribute to diversity or
+anything else. On the real stream, where balanced bagging does beat
+bagging, the ratio sweep shows only that balance is not the cause: the
+gain is largest at the mildest ratio and turns into a loss at balance.
+Only arm (2), run there at matched sizes, could confirm diversity.
+</Solution>
+</Exercise>
+
+<Exercise>
+A balanced-bagging ensemble averages trees each trained on an
+undersample with $\beta = 0.05$. For one payment, two trees output
+$p_s = 0.9$ and $0.1$. (a) Correct each output with $p' =
+\beta p_s/(\beta p_s - p_s + 1)$ and average, and separately correct the
+average of the two outputs. (b) Which should the team report, and why
+do the two disagree? (c) Is the order of the payments affected by the
+choice?
+
+<Solution>
+**(a)** Correcting each: $0.9$ has odds 9, times 0.05 gives 0.45, $p' =
+0.45/1.45 \approx 0.310$; $0.1$ has odds 0.111, times 0.05 gives 0.00556,
+$p' \approx 0.0055$. Their average is about 0.158. Correcting the
+average: the outputs average 0.5, odds 1, times 0.05 gives 0.05, $p'
+\approx 0.048$. The two answers differ by a factor of three.
+
+**(b)** Correct the average once. Every tree estimates the same
+undersampled probability $p_s$, since every tree was cut with the same β,
+and averaging is how the ensemble reduces their noise; the correction
+then maps the averaged estimate back to the stream. Correcting each tree
+first and averaging applies the correction $g$ to noisy estimates, and
+$g$ is convex: its slope rises from β at the bottom to $1/\beta$ at the
+top, as the slope of the correction in <Ref
+lesson="undersampling-calibration"
+id="what-undersampling-still-costs-precision-at-the-top">the previous
+lesson</Ref> showed. By Jensen's inequality the average of $g$ over
+noisy estimates exceeds $g$ of their average, so per-tree correction
+inflates the probability, most of all where the trees disagree near the
+top, the payments that get called first.
+
+**(c)** Correcting the average is one increasing map applied to the
+ensemble's score, so it keeps the order. Averaging per-tree corrections
+is a different score, which weights confident trees more heavily, and it
+can reorder payments whose trees disagree differently. Ranking metrics
+can therefore differ between the two, and only the first is the ensemble
+whose ranking was validated.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two detectors raise ten alerts each in a day. Detector A, without
+rebalancing, catches four frauds, of €900, €650, €400 and €350.
+Detector B, trained with SMOTE, catches five, of €450, €60, €45, €30
+and €25. An alert costs €5 of investigator time, and a caught fraud
+saves its amount. (Made-up figures.) (a) Which detector has the higher
+precision at 10? (b) How many euros does each save, net of the alerts?
+(c) What would have to change in the way the models were trained, and in
+the way they are scored, for the comparison to see the money?
+
+<Solution>
+**(a)** B: 5 of 10 against A's 4 of 10.
+
+**(b)** A saves $900 + 650 + 400 + 350 = €2{,}300$ and pays $10 \times 5 =
+€50$ in alerts: €2,250. B saves $450 + 60 + 45 + 30 + 25 = €610$ and pays
+€50: €560. A saves four times as much with one fraud fewer.
+
+**(c)** Both the training loss and the metric count each fraud as one.
+SMOTE then multiplies the count of every fraud alike, so nothing steers
+the model toward the large ones, and its extra catches can be the small
+frauds of a dense region. To see the money, the score must be measured
+in euros against the bank that does nothing, the value of <Ref
+lesson="economics-of-detection"
+id="what-a-detector-is-worth-the-cost-it-removes">the economics of
+detection</Ref> with each miss priced at its own amount, and the
+decision rule must compare each payment's expected loss, probability
+times amount, with the alert cost. That rule, and the savings measure
+built on it, are the subject of <Ref lesson="example-dependent-cost">the
+next lesson</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 6.1 (cost-sensitive and resampling families; the imbalance ratio), 6.2 (cost matrix with the imbalance ratio as the false-positive cost; `class_weight`; the two-feature toy with 5,000 points and 5% minority; class weights for trees and logistic regression on simulated transactions), 6.3 (random oversampling, SMOTE, random undersampling, edited nearest neighbours, SMOTE followed by undersampling; samplers in an imbalanced-learn pipeline inside prequential validation; results on simulated transactions), 6.4 (bagging, balanced bagging, random forest, balanced random forest, XGBoost and `scale_pos_weight`; imbalance-ratio sweeps; the diversity explanation), 6.5 (the same experiments on real Worldline e-commerce data), 6 Summary (XGBoost's robustness, residuals weighting the minority); Ch. 5 (prequential model selection on simulated and real data, the depth-5 and depth-6 baselines). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+2. A. Dal Pozzolo, O. Caelen, Y.-A. Le Borgne, S. Waterschoot, G. Bontempi, "Learned Lessons in Credit Card Fraud Detection from a Practitioner Perspective," *Expert Systems with Applications* 41(10), 2014, pp. 4915–4928 — Sec. 3.2 (undersampling, SMOTE, EasyEnsemble), 7.2.4 (frauds about 0.4% of a chunk, balancing removes about 99.6% of genuine transactions; SMOTE and an ensemble of five undersampled models beat plain undersampling; SMOTE's computational cost), 7.2.5 (the best balancer depends on the retraining strategy). https://doi.org/10.1016/j.eswa.2014.02.026
+3. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015 — Ch. 4, pp. 190–193 (oversampling and undersampling only on training data; staying close to the original distribution; the stepwise search over class mixes by AUC and the common 80/20 mix; SMOTE and its interpolation worked by hand), pp. 199–200 (sampling and cost-sensitive learning found roughly equivalent).
+4. N. V. Chawla, K. W. Bowyer, L. O. Hall, W. P. Kegelmeyer, "SMOTE: Synthetic Minority Over-sampling Technique," *Journal of Artificial Intelligence Research* 16, 2002, pp. 321–357 — the interpolation rule between a minority sample and one of its k nearest minority neighbours. https://doi.org/10.1613/jair.953
+5. G. Lemaître, F. Nogueira, C. K. Aridas, "Imbalanced-learn: A Python Toolbox to Tackle the Curse of Imbalanced Datasets in Machine Learning," *Journal of Machine Learning Research* 18(17), 2017, pp. 1–5 — samplers and the pipeline that applies them only when fitting. https://jmlr.org/papers/v18/16-365.html
+6. Y. Lucas, J. Jurgovsky, "Credit Card Fraud Detection Using Machine Learning: A Survey," arXiv:2010.06479, 2020 — Sec. 2.1 (undersampling, oversampling, SMOTE and its blindness to neighbouring majority examples), 2.2 (EasyEnsemble, UnderBagging, SMOTEBoost, cost-sensitive learners). https://arxiv.org/abs/2010.06479
+7. A. Correa Bahnsen, D. Aouada, A. Stojanovic, B. Ottersten, "Feature Engineering Strategies for Credit Card Fraud Detection," *Expert Systems with Applications* 51, 2016, pp. 134–142 — Sec. 4.3 (neither undersampling nor oversampling improved financial savings, because sampling changes the distribution of example-dependent costs). https://doi.org/10.1016/j.eswa.2015.12.030
+</References>

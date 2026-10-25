@@ -3,10 +3,10 @@ export const meta = {
   description: 'Research-driven course production: canon discovery, source-reading swarm, structure synthesis with a resumable research dossier; then per-lesson write→demo→QA iteration',
   whenToUse: 'Invoked by the /course-architect (phase: structure) and /lesson-factory (phase: lessons) skills. Args: {phase, slug, topic?, count?}.',
   phases: [
-    { title: 'Canon', detail: 'perplexity deep research: the mainstream sources', model: 'sonnet' },
+    { title: 'Canon', detail: 'perplexity deep research: the mainstream sources; then the taught courses and their coursework', model: 'opus' },
     { title: 'Read', detail: 'scope → readers (big books shard by ToC) → merge; readers capture image candidates and the source\'s own assignments', model: 'sonnet' },
-    { title: 'Synthesize', detail: 'course.yaml (chapters + the labs the canon\'s assignments justify) + research dossier (session model)' },
-    { title: 'Lessons', detail: 'write → figures (drawn + sourced, in parallel) → demo → QA(opus) → fix → re-QA(opus), per lesson; a lab lesson goes to lab-author instead of the writer' },
+    { title: 'Synthesize', detail: 'course.yaml (chapters + the labs the canon\'s assignments justify) + research dossier', model: 'fable' },
+    { title: 'Lessons', detail: 'write(opus) → figures (drawn + sourced, in parallel) → demo → QA(opus) → (fix → re-QA(opus)) ×2, per lesson; a lab lesson goes to lab-author instead of the writer' },
   ],
 }
 
@@ -36,7 +36,9 @@ const SUMMARY_SCHEMA = {
   required: ['title', 'topics', 'key_results', 'chapter_map'],
   properties: {
     title: { type: 'string' },
-    access: { type: 'string', description: 'full | toc-only | summary-based' },
+    access: { type: 'string', description: 'full | partial | toc-only | summary-based — full ONLY if every line of your range was read' },
+    chars_total: { type: 'integer', description: 'characters of extracted text in your range' },
+    chars_read: { type: 'integer', description: 'characters of that text you actually read — sampled, grepped or truncated text does not count' },
     topics: { type: 'array', items: { type: 'string' }, description: 'ToC-order topic list, chapter/section granularity' },
     key_results: { type: 'array', items: { type: 'string' }, description: 'central theorems/definitions with chapter pointers' },
     pedagogy: { type: 'string', description: 'proof style, exercise style, assumed prerequisites' },
@@ -97,12 +99,12 @@ const SCOPE_SCHEMA = {
     where: { type: 'string', description: 'best reading location found: URL(s), archive.org id, mirror — enough that a reader needs no re-hunting; for not-found, what you tried' },
     shards: {
       type: 'array',
-      description: '1 entry = no split; 2-4 entries only for big fully-accessible sources, split on chapter boundaries',
+      description: '1 entry = no split; otherwise one entry per ~150 KB of extracted text, split on chapter (or, for a legal act, title/chapter) boundaries; a source bundling several documents shards per document first',
       items: {
         type: 'object',
         required: ['range'],
         properties: {
-          range: { type: 'string', description: 'explicit chapter/page range, e.g. "chs. 1-9 (pp. 1-310)"' },
+          range: { type: 'string', description: 'explicit document and chapter/page range, e.g. "chs. 1-9 (pp. 1-310)" or "AMLR Arts. 1-49"' },
           note: { type: 'string', description: 'what this stretch of the book covers, one line' },
         },
       },
@@ -130,6 +132,8 @@ const FIGLIST_SCHEMA = {
     },
   },
 }
+
+const FIX_ROUNDS = 2
 
 const QA_SCHEMA = {
   type: 'object',
@@ -188,7 +192,7 @@ if (phaseArg === 'structure') {
   phase('Canon')
   const canon = await run(
     `${at}Identify the canonical mainstream materials for learning "${topic}" at the level of a busy engineer (no prior expertise, comfortable with math). Use ToolSearch to load mcp__perplexity__perplexity_research and run ONE deep research query, then curate its output yourself. If that MCP server is not connected in this session, fall back to WebSearch — several targeted queries (standard textbooks, university syllabi, primary sources, best visual resources) — and say in your output which route you took. Source count is subject-dependent — no fixed cap; for a rich subject expect roughly 10-15 items: the standard textbooks, strong university course syllabi/lecture notes (with URLs), the load-bearing primary papers, good surveys, and 1-2 exceptional visual/interactive resources. Every item must earn a distinct role (a lesson or module it grounds) — no padding with redundant near-duplicates. Prefer freely accessible materials, but NEVER omit a canonical source just because you found no accessible copy — include it anyway; inaccessible sources are reported to the human, who can obtain copies from the publishers. Return via structured output; put verified URLs where you have them.${stagedNote}${brief}`,
-    { label: 'canon-scout', model: 'sonnet', schema: CANON_SCHEMA },
+    { label: 'canon-scout', model: 'opus', schema: CANON_SCHEMA },
   )
   // The human may stage copies after a run — the books the swarm reported as
   // toc-only. On resume every unchanged scope/read replays from cache, so
@@ -199,7 +203,14 @@ if (phaseArg === 'structure') {
   const rereadNote = (s) => reread.some((t) => s.title.toLowerCase().includes(t))
     ? ' RE-READ: the human has since staged a copy of this source under research/texts/ — it is there now; find it and confirm it against its first pages.'
     : ''
-  const sources = [...canon.sources, ...(argv.extraSources ?? [])]
+  // Labs are justified only by what the canon makes students build, and a
+  // canon of papers and statutes assigns nothing — so a second scout hunts the
+  // taught courses and their coursework, on top of the (cached) canon.
+  const coursework = argv.coursework === false ? { sources: [] } : await run(
+    `${at}A canon for learning "${topic}" has been chosen (JSON): ${JSON.stringify(canon.sources.map((s) => s.title))}. It is mostly books, papers and primary texts, which assign no coursework. Find what it lacks: university courses, bootcamps and practitioner trainings on this subject that make students BUILD things — homework notebooks, programming assignments, projects, competition-style tasks — whose syllabus AND assignment handouts (or the notebooks themselves) are publicly readable. Use WebSearch (and GitHub search for course repos). Return only courses whose assignments you actually located (put the URL of the assignments, not just the course page, in \`url\`; kind "syllabus"), each with \`why\` naming what its students build. Nothing already in the canon list; no course whose assignments you could not see. Five strong ones beat fifteen thin ones; an empty list is an honest answer.${brief}`,
+    { label: 'coursework-scout', model: 'opus', schema: CANON_SCHEMA },
+  )
+  const sources = [...canon.sources, ...(coursework?.sources ?? []), ...(argv.extraSources ?? [])]
   log(`canon: ${sources.length} sources — ${sources.map((s) => s.title).join('; ')}`)
 
   phase('Read')
@@ -220,7 +231,7 @@ if (phaseArg === 'structure') {
       sources,
       (s) =>
         run(
-          `${at}Scope ONE source for a reading swarm: "${s.title}"${s.author ? ` by ${s.author}` : ''} (${s.kind})${s.url ? `, URL: ${s.url}` : ' — locate it yourself (WebSearch), prefer official/legal copies'}. Before searching the web, list content/courses/${slug}/research/texts/: if a file there IS this source (confirm against the PDF’s own first pages, not just the filename), that is your answer — access "full", \`where\` = that file’s absolute path, and say in \`where\` that the human staged it. Only hunt online when nothing on disk matches. Otherwise, find where it can actually be read, fetch its table of contents, and decide the split. Shard ONLY when the full text is accessible AND the source is big (roughly 350+ pages or 25+ chapters): 2-4 shards along chapter boundaries, balanced by page count. Otherwise return a single shard covering everything. Report access honestly (full | toc-only | summary-based | not-found) and pass on the best reading location you found so readers do not re-hunt. If you cannot find the source at all, do NOT invent a location and do NOT quietly settle for second-hand descriptions of it — return access "not-found" with \`where\` describing what you tried; the human will obtain a copy from the publisher.${rereadNote(s)}`,
+          `${at}Scope ONE source for a reading swarm: "${s.title}"${s.author ? ` by ${s.author}` : ''} (${s.kind})${s.url ? `, URL: ${s.url}` : ' — locate it yourself (WebSearch), prefer official/legal copies'}. Before searching the web, list content/courses/${slug}/research/texts/: if a file there IS this source (confirm against the PDF’s own first pages, not just the filename), that is your answer — access "full", \`where\` = that file’s absolute path, and say in \`where\` that the human staged it. Only hunt online when nothing on disk matches. Otherwise, find where it can actually be read, fetch its table of contents, and decide the split. The split is by SIZE OF TEXT, never by page or chapter count: extract the full text (pdftotext, or the flattened HTML) into the texts cache and measure it with \`wc -c\`. A source bundling several documents (three regulations, a book plus its notebooks) shards per document first. Then any document over ~150 KB of text is cut into shards of at most ~150 KB each along chapter/section boundaries (titles/chapters for a legal act), however many that takes; a document under that is one shard. State each shard's size in its \`note\`. Report access honestly (full | toc-only | summary-based | not-found) and pass on the best reading location you found so readers do not re-hunt. If you cannot find the source at all, do NOT invent a location and do NOT quietly settle for second-hand descriptions of it — return access "not-found" with \`where\` describing what you tried; the human will obtain a copy from the publisher.${rereadNote(s)}`,
           { label: `scope: ${s.title.slice(0, 28)}`, phase: 'Read', model: 'sonnet', schema: SCOPE_SCHEMA },
         ).then((scope) => {
           accessLog.push({ title: s.title, access: scope ? scope.access : 'scope-failed', where: scope ? scope.where : '' })
@@ -232,17 +243,19 @@ if (phaseArg === 'structure') {
         parallel(
           scope.shards.map((shard, i) => () =>
             run(
-              `${at}Source to summarize: "${s.title}"${s.author ? ` by ${s.author}` : ''} (${s.kind}). Reason it is canon: ${s.why}. Access per the scoper: ${scope.access}; read it at: ${scope.where}. ${scope.shards.length > 1 ? `YOUR SHARD (${i + 1}/${scope.shards.length}): ${shard.range} — read ONLY this range, report ONLY from it, and stay silent about the rest of the book; the swarm covers it.` : 'You cover the whole source.'} Follow your source-reader briefing.\n\n${capNote} For this source use the tag \`${(s.title.match(/[A-Za-z0-9]+/g) || ['src']).slice(0, 2).join('').toLowerCase().slice(0, 12)}${scope.shards.length > 1 ? `-s${i + 1}` : ''}-\`.`,
+              `${at}Source to summarize: "${s.title}"${s.author ? ` by ${s.author}` : ''} (${s.kind}). Reason it is canon: ${s.why}. Access per the scoper: ${scope.access}; read it at: ${scope.where}. ${scope.shards.length > 1 ? `YOUR SHARD (${i + 1}/${scope.shards.length}): ${shard.range} — read ONLY this range, report ONLY from it, and stay silent about the rest of the book; the swarm covers it.` : 'You cover the whole source.'} Follow your source-reader briefing.\n\nREAD EVERY LINE of your range, in order, in consecutive windows (Read with offset/limit, or \`sed -n\` ranges that tile the file with no gaps). Never \`cut -c\`, \`head -c\`, \`head -n\` or \`grep\` your way through it in place of reading: sampling is not reading, and what the course is built from is what you actually saw. Measure your range with \`wc -c\` and report chars_total, and chars_read as the text you really read. access is "full" only when chars_read covers the whole range; anything less is "partial" — say what you skipped and why, and the human will see it.\n\n${capNote} For this source use the tag \`${(s.title.match(/[A-Za-z0-9]+/g) || ['src']).slice(0, 2).join('').toLowerCase().slice(0, 12)}${scope.shards.length > 1 ? `-s${i + 1}` : ''}-\`.`,
               { label: `read: ${s.title.slice(0, 22)}${scope.shards.length > 1 ? ` [${i + 1}/${scope.shards.length}]` : ''}`, phase: 'Read', agentType: 'source-reader', schema: SUMMARY_SCHEMA },
             ),
           ),
         ),
       (parts, s) => {
         const kept = (parts || []).filter(Boolean)
+        const short = kept.filter((p) => !String(p.access ?? '').startsWith('full') || (p.chars_total && (p.chars_read ?? 0) < 0.9 * p.chars_total))
+        if (short.length) accessLog.push({ title: s.title, access: 'partial', where: short.map((p) => `${p.access ?? '?'} — read ${p.chars_read ?? '?'} of ${p.chars_total ?? '?'} chars`).join('; ') })
         if (kept.length === 0) return null
         if (kept.length === 1) return kept[0]
         return run(
-          `${at}Merge these shard summaries of ONE source — "${s.title}"${s.author ? ` by ${s.author}` : ''} — into a single source summary of the same shape. Concatenate topics, chapter_map and assignments in book order; keep EVERY key_result, gem, assignment and figure idea with its chapter pointer (dedupe only true duplicates); rank image_candidates across shards and keep at most 8 (do NOT delete the losing captures from disk — just omit them from the list); synthesize one pedagogy note. Shard summaries (JSON): ${JSON.stringify(kept)}`,
+          `${at}Merge these shard summaries of ONE source — "${s.title}"${s.author ? ` by ${s.author}` : ''} — into a single source summary of the same shape (chars_total and chars_read are the shard sums; access is "full" only if every shard's is). Concatenate topics, chapter_map and assignments in book order; keep EVERY key_result, gem, assignment and figure idea with its chapter pointer (dedupe only true duplicates); rank image_candidates across shards and keep at most 8 (do NOT delete the losing captures from disk — just omit them from the list); synthesize one pedagogy note. Shard summaries (JSON): ${JSON.stringify(kept)}`,
           { label: `merge: ${s.title.slice(0, 28)}`, phase: 'Read', model: 'sonnet', schema: SUMMARY_SCHEMA },
         )
       },
@@ -252,32 +265,35 @@ if (phaseArg === 'structure') {
   if (summaries.length === 0) throw new Error('no source could be read — aborting before synthesis')
   const degraded = accessLog.filter((a) => a.access !== 'full')
   if (degraded.length) log(`ATTENTION — sources NOT fully read (report to the human, never silently omit; they can obtain copies from the publishers): ${degraded.map((d) => `"${d.title}" [${d.access}]`).join('; ')}`)
+  // A halt here lets the human refine the brief against what the canon
+  // actually says; resuming the run without `until` serves the reads from cache.
+  if (argv.until === 'read') return { phase: 'structure', until: 'read', sources: sources.length, read: summaries.length, not_fully_read: degraded, summaries }
 
   phase('Synthesize')
   const synthesis = await run(
     [
-      `${at}You are the course architect for the course "${topic}" (slug: ${slug}) in this repo. Read docs/pedagogy.md (C rules AND L2/L10/L15/L16, E6/E7, D1 — they constrain what you plan), docs/content-model.md, docs/playbook-core.md, the domain overlay (docs/playbook-math.md for a mathematical subject, docs/playbook-history.md for a historical one), docs/voita-playbook.md (lesson skeleton, framework-first + flaw-driven sequencing, density norms), and the example .claude/skills/course-architect/examples/course.yaml.${brief}`,
+      `${at}You are the course architect for the course "${topic}" (slug: ${slug}) in this repo. Read docs/pedagogy.md (the clarity-first preamble, L0 and L3 above all — every opening and every brief you write is the problem a newcomer meets, never the conclusion — plus the C rules AND L2/L8a/L10/L15/L16, E6/E7, D1 — they constrain what you plan), docs/content-model.md, docs/playbook-core.md, the domain overlay (docs/playbook-math.md for a mathematical subject, docs/playbook-history.md for a historical one), docs/voita-playbook.md (lesson skeleton, framework-first + flaw-driven sequencing, density norms), and the example .claude/skills/course-architect/examples/course.yaml.${brief}`,
       `Source summaries from the reading swarm (JSON): ${JSON.stringify(summaries)}`,
       `Produce, in content/courses/${slug}/:`,
-      `1. course.yaml — outcomes first (Bloom), then modules/lessons per the pedagogy rules (no lesson-count cap — scope follows the material; no padding or micro-slicing, every lesson has one substantive goal) (easy openers, acyclic prerequisites, spiral reinforces, technical noun-phrase titles, declarative openings, demo specs only where the concept is dynamic AND the reader can DO something in it per D1 — sliders on a curve the lesson already plots do not qualify). Mark advanced off-path chapters \`type: extra\` — the core path must survive skipping them; no non-extra lesson may list one as a prerequisite (lint: extra-prereq). Include intro, course-level prerequisites, key_results, sources.`,
+      `1. course.yaml — outcomes first (Bloom), then modules/lessons per the pedagogy rules (no lesson-count cap — scope follows the material; no padding or micro-slicing, every lesson has one substantive goal; a lesson carrying two problems that each need full treatment for a newcomer is two lessons — a lesson may run an hour to an hour and a half when every part is needed, never because the sources hold that much) (easy openers, acyclic prerequisites, spiral reinforces, technical noun-phrase titles, openings that state each lesson's PROBLEM in plain words for a reader who knows only the prerequisites — a concrete situation and what makes it hard, using no term the lesson has yet to define and never the lesson's conclusion compressed (pedagogy L0, L3), demo specs only where the concept is dynamic AND the reader can DO something in it per D1 — sliders on a curve the lesson already plots do not qualify). Mark advanced off-path chapters \`type: extra\` — the core path must survive skipping them; no non-extra lesson may list one as a prerequisite (lint: extra-prereq). Include intro, course-level prerequisites, key_results, sources.`,
       `1a. REQUIRED — \`spine\`: the course's argument as an ordered chain of moves (pedagogy L10), each step with its \`step\` sentence, display \`label\`, \`years\`/range where meaningful, a concrete \`caption\`, and the \`lessons\` that carry it. Every lesson must appear in exactly one step. The spine is what makes lesson N+1 feel like it follows from lesson N; if a lesson cannot be placed in the chain, the chain or the lesson is wrong.`,
       `1b. REQUIRED — \`intro\`: an INTRODUCTION, not a description of the course. It states the question the course answers and the shape of the answer, in the voice the lessons use. "This course covers entropy, coding, channels and applications" is a table of contents and fails.`,
       `1c. REQUIRED — one APPLICATION lesson at the end of every module (L16): a deployed system, a paper's result reproduced, or a computational study that cashes out that module's theorems on something real (for information theory: JPEG/WebP quantisation, zstd's entropy stage, an LLM's tokenizer and bits-per-byte, a channel-coding standard). It names which module results the artifact uses and where the artifact departs from the idealisation. Give these lessons real goals and briefs like any other.`,
       `1g. LABS — a module MAY close with a lab: a \`type: lab\` lesson, a 3-5 hour notebook assignment the learner solves in Jupyter while the platform verifies checkpoints (docs/content-model.md "Lab lessons" for the schema, .claude/skills/lab-author/SKILL.md for the genre norms). Decide this per module FROM THE DOSSIER: the reader summaries' \`assignments\` say what the canon makes students build by hand. Each lab you plan must name that grounding ("YSDA's homework 2 has students write attention from scratch"); a module whose canon assigns nothing gets no lab, a course whose canon assigns nothing anywhere gets none at all, and there is never more than one lab per module. Labs are never invented to fill a quota — an unfounded lab is worse than no lab, because it burns 4 hours of the learner's time on work nobody teaching this subject asks for. A lab does not replace the module's APPLICATION lesson (1c) and does not absolve it: the application lesson reads a real artifact, the lab makes the learner build one, and where a module has both the lab comes last.`,
       `1h. A planned lab is a lesson entry like any other — \`status: planned\`, \`type: lab\`, goal, opening, key_ideas, prerequisites, a spine step — with two differences: \`est_minutes\` is the time to READ THE BRIEF (the assignment's own length is \`lab.est_hours\`), and it carries a \`lab\` block: \`est_hours\` (3-5) plus \`checkpoints\`, the drafted plan. The checkpoint plan follows the progression norm: 2-4 warm-up \`exact\` checkpoints (one function each, instant verdict) -> middle checkpoints that COMPOSE (a later one consumes what an earlier one built) -> exactly one open \`metric\` task last, \`required: false\`; \`review\` checkpoints are optional garnish and always \`required: false\`; at least one checkpoint must stay required. Each id is a kebab-case slug and its \`text\` names a step of the build ("gradient of the log-loss"), never an ordinal ("part 2"). State in the lab's \`goal\` the ONE artifact the learner ends up with — a tour of disconnected exercises is not a lab. The plan is a plan: the lab-author skill executes it later and may split or deepen a checkpoint, so aim the set at an honest 3-5 hours rather than at a count.`,
-      `1d. Lesson depth target: a core lesson is planned at 30-40 est_minutes of substantial reading (L2a) — derivations carried through, worked examples, boundary cases — with genuinely optional material planned as \`## ★\` starred sections inside the lesson rather than as thin extra chapters. Do NOT split coherent lessons to hit a number, and do not pad.`,
+      `1d. Lesson depth target: a core lesson is planned at 30-40 est_minutes of substantial reading (L2a) as a guideline, not a goal — clarity is the metric (L0), so a lesson whose problem needs it may be planned at 60-90 minutes, and one carrying two problems is split — derivations carried through, worked examples, boundary cases — with genuinely optional material planned as \`## ★\` starred sections inside the lesson rather than as thin extra chapters. Do NOT split coherent lessons to hit a number, and do not pad.`,
       `1f. Math in metadata (docs/content-model.md): tagline, goal, outcome and key_result text are typeset with KaTeX — write inline LaTeX between single dollars ($\\sum_i 2^{-l_i} \\le 1$), never ASCII mangling like "2^-li <= 1" or "sigma^2". Short and inline only.`,
       `1e. SLUG CONTINUITY — this course already exists and has drafted lessons. Read the current content/courses/${slug}/course.yaml FIRST. Where your new plan keeps a lesson whose subject matches an existing one, REUSE its exact slug and keep \`status: drafted\` plus any \`key_image\` (its prose will be revised later against the new plan; the brief must say what has to change). Only genuinely new or re-scoped lessons are added with \`status: planned\`. Never rename a drafted slug. In your final message, list explicitly: kept slugs, new slugs, and any existing lesson your plan drops (with the reason) — dropping requires the human's decision, so leave dropped lessons in place and flag them instead of deleting.`,
       `2. concepts.yaml — skeleton registry for every introduced concept.`,
       `3. research/sources.yaml — the canon list with URLs, access notes, and one-line roles.${degraded.length ? ` Sources the swarm could NOT fully read (JSON): ${JSON.stringify(degraded)} — record each with its access status, and flag them prominently in your final message: the human will obtain full copies from the publishers, so the research can be re-run for them later.` : ''}`,
       `4. research/images.yaml — the index of the captured image pool: every image_candidate the readers surfaced, deduplicated, each with its \`id\`, \`capture\` path under research/images/, what it shows, source, exact location, URL/PDF pointer, licence as stated, and quality note. The files are already on disk — nobody re-reads the source later. Delete captures you drop as duplicates so the pool and the index agree.`,
-      `5. research/<lesson-slug>.md for EVERY lesson — the resumable brief: which source chapters/sections to consult (from the chapter maps), the key points the lesson must cover, and any pitfalls. Mine the reader summaries' figures and gems: name the concrete worked examples and set pieces (with source pointers) the lesson should recreate — do not let them evaporate between reading and writing. Include a FIGURE PLAN section: 4-8 planned visuals for the lesson, each tagged \`draw:\` or \`source:\`. \`draw:\` (the default, most of them) — one line on what it shows, whether it is a single <Figure> or a <FigureSequence> step-through (processes/algorithms should be sequences), and which source figure inspired the idea (recreate ideas, never copy drawings — docs/figures.md). \`source:\` — a real artefact from research/images.yaml that a redrawing would falsify (photograph, apparatus, scan of the original statement, published plot of measured data): give the images.yaml id (its capture is already on disk), the file stem to save the finished crop under, what the reader must be able to see in it, and placement (centered, or float left/right beside the prose). How many \`source:\` entries a lesson earns depends on the subject: for a technical course 1-2 is plenty, because the house voice is drawn figures; for a subject whose artefacts ARE the material (history, art, biology, medicine — photographs, documents, maps, specimens) sourced images can carry half the visuals. Never source what a clean drawing would explain better, and never pad a lesson with decoration. These briefs are what lesson-writer agents will be grounded in later — make them specific.`,
+      `5. research/<lesson-slug>.md for EVERY lesson — the resumable brief: which source chapters/sections to consult (from the chapter maps), and the EXPLANATION PLAN — the lesson's problem as a newcomer meets it, then the chain of sub-problems that leads to the answer, each with the obvious attempt, why it fails, and the answer with its "because" (pedagogy L0): every arrangement, procedure or convention the lesson presents appears in that chain as the answer to something, never as a fact to list. Phrase the plan in the material's own terms, never as "source X says": the sources are where the writer learns the material, and the lesson names none of them outside References (L8a). Add the pitfalls — above all, the terms a newcomer will not know and where each must be explained. Mine the reader summaries' figures and gems: name the concrete worked examples and set pieces (with source pointers) the lesson should recreate — do not let them evaporate between reading and writing. Include a FIGURE PLAN section: 4-8 planned visuals for the lesson, each tagged \`draw:\` or \`source:\`. \`draw:\` (the default, most of them) — one line on what it shows, whether it is a single <Figure> or a <FigureSequence> step-through (processes/algorithms should be sequences), and which source figure inspired the idea (recreate ideas, never copy drawings — docs/figures.md). \`source:\` — a real artefact from research/images.yaml that a redrawing would falsify (photograph, apparatus, scan of the original statement, published plot of measured data): give the images.yaml id (its capture is already on disk), the file stem to save the finished crop under, what the reader must be able to see in it, and placement (centered, or float left/right beside the prose). How many \`source:\` entries a lesson earns depends on the subject: for a technical course 1-2 is plenty, because the house voice is drawn figures; for a subject whose artefacts ARE the material (history, art, biology, medicine — photographs, documents, maps, specimens) sourced images can carry half the visuals. Never source what a clean drawing would explain better, and never pad a lesson with decoration. These briefs are what lesson-writer agents will be grounded in later — make them specific.`,
       `5a. Every brief also carries an EXERCISE PLAN (pedagogy E6/E7 + the domain overlay's difficulty floor): 4-8 planned exercises, each one line, and the plan must clear the floor — at most one mechanical warm-up, and at least two of {boundary probe at the degenerate case; plausible false claim to refute; derivation the lesson skipped (corollary, reverse direction, second proof, tight case); research-shaped task (reproduce a number from the source, estimate from real data, design the distinguishing experiment)}. Exactly one exercise is marked FORWARD (E7): it lands the reader on the doorstep of a later lesson's result — computing the object that lesson will name, or hitting the wall its mechanism removes — and the plan says which lesson it reaches. Plugging numbers into the formula just displayed is not an exercise; if the plan reads like a drill sheet, rewrite it.`,
-      `5b. Every brief carries an ARC block (L10): what the lesson inherits from the spine, what it contributes, what it hands off — quoted from the spine step it belongs to — plus, for module-final lessons, the APPLICATION spec (the artifact, the module results it uses, the departure from the idealisation). For briefs of lessons that already exist as drafts (kept slugs), add a REVISION block: what the current lesson.mdx must gain (arc/seams/hand-off, exercise overhaul against the floor, application section, deeper derivations toward the depth target) and what it must lose (tautological KeyFacts per L15, citation theatre per L8a, knob-only demos per D1, obvious-narration per L9a).`,
+      `5b. Every brief carries an ARC block (L10): what the lesson inherits from the spine, what it contributes, what it hands off — quoted from the spine step it belongs to — plus, for module-final lessons, the APPLICATION spec (the artifact, the module results it uses, the departure from the idealisation). For briefs of lessons that already exist as drafts (kept slugs), add a REVISION block: what the current lesson.mdx must gain (arc/seams/hand-off, exercise overhaul against the floor, application section, deeper derivations toward the depth target) and what it must lose (tautological KeyFacts per L15, every source named in the body per L8a, recap prose that states conclusions before problems per L0, knob-only demos per D1, obvious-narration per L9a).`,
       `5c. A LAB lesson's brief (1g) replaces the FIGURE PLAN and the EXERCISE PLAN with a LAB PLAN — the ARC block still applies, and this brief is what the lab-author skill is grounded in later. The LAB PLAN states: the one artifact the learner builds; the CANON GROUNDING, quoted from the dossier's \`assignments\` with its source pointer (which assignment of which source this lab is modelled on, and where it departs); the dataset or inputs, small enough to ship, with where they come from and their licence; one line per planned checkpoint — what the learner writes, what verifies it, and which earlier checkpoint's output it consumes; the final open task with its metric and a rough threshold to calibrate against; and the canonical bugs worth declaring as known-wrong variants (the sign a learner drops, the normalization they forget). Say what is deliberately NOT blanked (plotting helpers, data loading) — those ship complete.`,
       `Then run \`npm run validate ${slug}\` and fix everything. Final message: outcomes, one-line module arc, per-source role, which modules end with a lab and the canon assignment each is grounded in (or, when the canon assigns nothing, that no labs were planned and why), assumptions made.`,
     ].join('\n\n'),
-    { label: 'synthesize-structure' },
+    { label: 'synthesize-structure', model: 'fable' },
   )
   return { phase: 'structure', sources: sources.length, read: summaries.length, not_fully_read: degraded, synthesis }
 }
@@ -307,10 +323,10 @@ if (phaseArg === 'lessons') {
     // lab-author skill's write -> uv run -> green loop, never lesson-writer.
     const isLab = lesson.type === 'lab'
     const draft = await (isLab
-      ? run(labPrompt(lesson.slug), { label: `lab: ${lesson.slug}`, phase: 'Lessons' })
+      ? run(labPrompt(lesson.slug), { label: `lab: ${lesson.slug}`, phase: 'Lessons', model: 'opus' })
       : run(
         `${at}Write the lesson: course-slug ${slug}, lesson-slug ${lesson.slug}. Follow your lesson-writer briefing (lesson-author skill + research brief).`,
-        { label: `write: ${lesson.slug}`, phase: 'Lessons', agentType: 'lesson-writer' },
+        { label: `write: ${lesson.slug}`, phase: 'Lessons', agentType: 'lesson-writer', model: 'opus' },
       ))
     // No draft means nothing downstream has a subject, and every later lesson
     // is written against this one's final text — stop here rather than plod on.
@@ -368,24 +384,27 @@ if (phaseArg === 'lessons') {
         { label: `demo: ${lesson.slug}`, phase: 'Lessons' },
       )
     }
-    const qaPrompt = `${at}Execute this repo's course-qa skill, non-interactively: read .claude/skills/course-qa/SKILL.md and follow it exactly for course-slug ${slug}, lesson-slug ${lesson.slug} (read-only, ${isLab ? 'lab lesson — build the notebook and score it against the rubric\'s lab section B1-B8, reading it as the learner before you open solution.py; report nothing `npm run validate` already reports' : 'full rubric'}). Then produce structured output: ready=true only if no REQUIRED fixes remain; fixes = prioritized required fixes (max 5).`
+    const qaPrompt = `${at}Execute this repo's course-qa skill, non-interactively: read .claude/skills/course-qa/SKILL.md and follow it exactly for course-slug ${slug}, lesson-slug ${lesson.slug} (read-only, ${isLab ? 'lab lesson — build the notebook and score it against the rubric\'s lab section B1-B8, reading it as the learner before you open solution.py; report nothing `npm run validate` already reports' : 'full rubric — the newcomer test U1-U8 first'}). Then produce structured output: ready=true only if no REQUIRED fixes remain; fixes = prioritized required fixes (max 5).`
     const qa = await run(qaPrompt, {
       label: `qa: ${lesson.slug}`, phase: 'Lessons', model: 'opus', schema: QA_SCHEMA,
     })
     // The recorded verdict must describe the lesson as it stands: when a fix
     // agent ran, re-QA and record the post-fix verdict, not the stale one.
+    // Two rounds, because under the newcomer test one was never enough: the
+    // first fix exposes the next gap in the same explanation.
     let finalQa = qa
     let revised = false
-    if (qa && !qa.ready && qa.fixes.length > 0) {
+    for (let round = 1; round <= FIX_ROUNDS && finalQa && !finalQa.ready && finalQa.fixes.length > 0; round++) {
+      const tag = round === 1 ? '' : ` #${round}`
       await (isLab
-        ? run(labPrompt(lesson.slug, qa.fixes), { label: `fix: ${lesson.slug}`, phase: 'Lessons' })
+        ? run(labPrompt(lesson.slug, finalQa.fixes), { label: `fix${tag}: ${lesson.slug}`, phase: 'Lessons', model: 'opus' })
         : run(
-          `${at}Revise the lesson ${slug}/${lesson.slug}: apply these required QA fixes — ${JSON.stringify(qa.fixes)} — following your lesson-writer briefing (revision mode, same hard limits). Validate after.`,
-          { label: `fix: ${lesson.slug}`, phase: 'Lessons', agentType: 'lesson-writer' },
+          `${at}Revise the lesson ${slug}/${lesson.slug}: apply these required QA fixes — ${JSON.stringify(finalQa.fixes)} — following your lesson-writer briefing (revision mode, same hard limits). Where a fix points at an argument that is not actually forced, rewrite that section from the problem up rather than patching the sentence. Update the lesson's ledger entry to match. Validate after.`,
+          { label: `fix${tag}: ${lesson.slug}`, phase: 'Lessons', agentType: 'lesson-writer', model: 'opus' },
         ))
       revised = true
       finalQa = await run(qaPrompt, {
-        label: `re-qa: ${lesson.slug}`, phase: 'Lessons', model: 'opus', schema: QA_SCHEMA,
+        label: `re-qa${tag}: ${lesson.slug}`, phase: 'Lessons', model: 'opus', schema: QA_SCHEMA,
       })
     }
     written.push({ slug: lesson.slug, type: lesson.type, qaReady: finalQa ? finalQa.ready : null, revised })

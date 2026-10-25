@@ -24,11 +24,18 @@ rubric's lab section.
    at the top of the report; mechanical failures don't need prose review.
 
 2. Read the course.yaml (whole-course context: outcomes, arc, statuses), the
-   target lesson(s) — `lesson.mdx` — and each target's
-   prerequisite lessons (to judge continuity and review-question quality).
+   target lesson(s) — `lesson.mdx` — and what the newcomer already knows:
+   the ledger `research/taught/<slug>.md` of every earlier lesson, plus the
+   full text of the target's prerequisite lessons and of the immediately
+   preceding one (open any other earlier lesson the ledger points to).
+   That decides both what may be assumed and what would be repetition.
+   Check the target's own ledger entry too: it must exist and match what
+   the lesson actually explains — a missing or wrong entry is a required
+   fix (U7).
    Compare against the gold example
    (`content/courses/information-theory/lessons/what-is-surprise/`) for
-   density and voice.
+   apparatus density only — its opening and second paragraph predate the
+   newcomer rule (L0) and are not the standard.
 
 3. A lab lesson (`type: lab`) is scored against the rubric's lab section
    (B1–B8) in place of the chapter items, minus the carry-overs that section
@@ -38,7 +45,10 @@ rubric's lab section.
    cannot judge the scaffold from the version that still has the answers in
    it.
 
-4. Score every rubric item **PASS / WEAK / FAIL / N-A** with one line of
+4. Run the newcomer test (rubric U1–U8) FIRST, before any other item and
+   before your judgment is anchored by the checklist: you are the reader
+   who knows the prerequisites and nothing else. Then score every rubric
+   item **PASS / WEAK / FAIL / N-A** with one line of
    quoted evidence each. Judgment items deserve real judgment — a lesson can
    satisfy every mechanical rule and still be boring; say so.
 
@@ -49,7 +59,13 @@ rubric's lab section.
 6. End with:
    - **Verdict:** ready for `reviewed` / needs revision / needs rewrite.
    - A prioritized fix list (max 5 items, most damaging first), each with the
-     file and the concrete change.
+     file and the concrete change. Newcomer-test (U1–U4, U6, U8) failures rank above
+     everything else; a lesson with an open U item is never "ready".
+     The list is not a quota: a fix belongs on it only if you would hold
+     the lesson back from a human reader over it. When what remains is
+     polish, say so and mark the lesson ready — the fix loop has two
+     rounds, and every round spent on polish is a rewrite that can open a
+     new gap.
    - What to spot-check by hand in `npm run dev` — for a lab, which cells to
      run in Colab.
 

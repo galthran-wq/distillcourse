@@ -1,0 +1,837 @@
+A terminal's fraud rate over the last month is a strong feature, but the frauds of the last week are not yet known when today's payment is scored. If the training table is built from the final labels, the feature there contains information the live system will never have, and the offline score is a fiction. How do you build every feature so that each training row holds only what was knowable at that row's moment, and the serving path computes the same value?
+
+<Ref lesson="transaction-aggregates"
+id="the-terminals-past-and-the-fifteen-inputs">Entity history
+aggregates</Ref> left one slot of the fifteen inputs empty: the share of a
+terminal's recent payments that turned out to be fraud. On the simulator
+that slot is what finds compromised terminals: with it, two thirds of the
+frauds at compromised terminals reach the daily top 100; without it, 1%.
+It is also the first feature in the course built
+from labels rather than from payments, and labels run on their own clock:
+<Ref lesson="fraud-detection-system"
+id="what-the-model-gets-back-two-kinds-of-label-on-two-clocks">the
+verification latency</Ref> $\delta$ means the labels of a day's payments
+arrive about $\delta$ days later.
+
+A training table is assembled weeks or months after the payments in it,
+when every label has arrived. The obvious way to compute the terminal's
+rate on that table uses those final labels. Nothing in the table marks
+which of them existed on the morning of each payment, and the model
+cannot tell either.
+
+## A feature built from labels: what the bank knew that morning
+
+The question is which numbers a training row may contain. For windows
+over payments the answer was already settled: only the entity's earlier
+payments. For a feature over labels it needs one more condition.
+
+### The obvious rate, and the labels it reads
+
+Take one terminal with steady traffic, compromised 12 days before the
+payment being scored. Every payment since the compromise is fraud. Its
+fraud rate over the last 30 days, computed on the final table, counts 12
+fraud days out of 30: 0.40.
+
+<FigureSequence
+  name="shift"
+  alt="Three frames of one terminal's last 40 days as daily bars, blue for genuine days and amber for fraud days from t − 12 on, with the payment marked at t. Frame 1: an amber band covers the 30 days ending at t; the readout says the rate from the final labels is 12 fraud days of 30, 0.40. Frame 2: the same band, and the last 7 days are boxed as labels not yet arrived, their fraud bars greyed with question marks; the readout says the 0.40 counts 7 fraud days whose labels did not exist on the morning of the payment. Frame 3: the band moved to t − 37 to t − 7; the readout says the delayed rate is 5 fraud days of 30, 0.17, every one labelled by the time of the payment"
+  caption="The rate the final table computes and the rate the bank could have computed differ by the labels of the last δ days."
+/>
+
+<Task>
+Step to the second frame and count the fraud days inside the window whose
+labels had arrived by the payment. Predict the rate over a 30-day window
+that ends where those labels end, then check it on the third frame.
+</Task>
+
+On the morning of the payment the bank had the labels of the payments up
+to about seven days earlier. Of the 12 fraud days in the window, the last
+7 were still unlabelled; their payments sat in the log as payments with
+no verdict. The live system, scoring this payment, could count 5 fraud
+days. The training table counts 12. A model fitted on the table learns
+what a rate of 0.40 means, and in service it is never shown one: the
+same terminal on the same morning reads 0.17 at best, and a terminal
+compromised 6 days earlier reads 0.
+
+### Two ways a training row can know too much
+
+<Ref lesson="transaction-aggregates"
+id="computing-a-window-from-earlier-rows-only">The windowed
+aggregates</Ref> were protected against one leak: a window that reaches
+past the row reads payments from the row's future. The terminal's rate
+fails differently. Every payment it reads is earlier than the row. What
+is from the future is the **label** attached to some of those earlier
+payments: it was decided after the row's moment.
+
+<Definition title="point-in-time correct feature">
+A feature value for payment $i$ at time $t_i$ is *point-in-time correct*
+when it is a function only of what the bank held at $t_i$: the fields of
+payment $i$, the fields of payments with $t_j < t_i$, and the labels that
+had arrived by $t_i$.
+</Definition>
+
+The leak is invisible in the code: both versions of the terminal rate are
+a group-by and a rolling sum over earlier rows, and the only difference is
+where the window ends.
+
+## The delayed terminal risk: a window that ends δ days ago
+
+The third frame already shows the repair: end the window where the
+arrived labels end. The rest of the work is to state that window
+exactly and compute it without a filter per row.
+
+### The definition
+
+The label clock gives the shift. A label arrives about $\delta$ days
+after its payment, so at time $t_i$ the labels known are those of
+payments before $t_i - \delta$. A window of length $w$ that ends there
+covers $(t_i - \delta - w,\ t_i - \delta]$.
+
+<Definition title="delayed terminal risk">
+For payment $i$ at terminal $e_i$, with label delay $\delta$ and window
+$w$, count the terminal's payments and frauds in the shifted window:
+$$
+N^{\delta}_w(i) = \#\{\, j : e_j = e_i,\ t_i - \delta - w < t_j \le t_i - \delta \,\},
+\qquad
+F^{\delta}_w(i) = \sum_{j :\ e_j = e_i,\ t_i - \delta - w < t_j \le t_i - \delta} y_j ,
+$$
+where $y_j$ is the label of payment $j$. The *delayed terminal risk* is
+$R^{\delta}_w(i) = F^{\delta}_w(i) / N^{\delta}_w(i)$, set to 0 when
+$N^{\delta}_w(i) = 0$.
+</Definition>
+
+$N^{\delta}_w$ is <Ref lesson="transaction-aggregates" id="the-rule">the
+aggregates lesson's count $N_w$</Ref>, which counted the entity's
+payments strictly earlier than the row, in $(t_i - w,\ t_i)$, moved back
+by $\delta$, and $F^{\delta}_w$ sums labels where $S_w$ summed amounts. Here $\delta$ is the verification latency of the
+course, seven days in every simulator example, and $w$ runs over the
+same 1, 7 and 30 days as the card windows. The zero for an empty window
+merges two different terminals: one with no payments in the window and
+one with payments and no fraud. That is why the count
+$N^{\delta}_w(i)$ goes into the feature vector beside the rate, so the
+model can tell a clean busy terminal from one it knows nothing about.
+
+### Two rolling sums
+
+The direct computation filters, for each payment, the terminal's history
+between two dates. On a terminal with $n$ payments that is $n$ filters of
+up to $n$ rows each, which on a few million payments does not finish in a
+notebook. A rolling window does not help directly either, because it
+always ends at the current row. The way around it is that a window ending
+$\delta$ days ago is the difference of two windows that end now.
+
+<Example title="the delayed rate on day 21, by two sums">
+A terminal receives the payments below; it is compromised from day 10 on,
+so every payment from day 10 is fraud. A payment arrives early on day 21.
+Take $w = 7$ days and $\delta = 7$ days: the window is days 7 to 13.
+
+| day | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| payments | 9 | 11 | 10 | 12 | 8 | 10 | 9 | 11 | 10 | 9 | 12 | 10 | 8 | 11 |
+| frauds | 0 | 0 | 0 | 12 | 8 | 10 | 9 | 11 | 10 | 9 | 12 | 10 | 8 | 11 |
+
+**Long sum, the last $\delta + w = 14$ days (days 7 to 20).** Payments
+$9 + 11 + 10 + 12 + 8 + 10 + 9 = 69$ on days 7 to 13, plus
+$11 + 10 + 9 + 12 + 10 + 8 + 11 = 71$ on days 14 to 20: 140 payments.
+Frauds: days 10 to 13 give $12 + 8 + 10 + 9 = 39$, days 14 to 20 give 71:
+110.
+
+**Short sum, the last $\delta = 7$ days (days 14 to 20).** 71 payments, 71
+frauds.
+
+**Difference.** $N^{\delta}_w = 140 - 71 = 69$ and
+$F^{\delta}_w = 110 - 71 = 39$, so $R^{\delta}_w = 39/69 = 0.565$. The
+direct count over days 7 to 13 gives the same 69 and 39.
+
+The rate from the final labels, over days 14 to 20, would be
+$71/71 = 1.0$.
+</Example>
+
+<Figure
+  src="./figures/two-sums.svg"
+  alt="A row of day cells 7 to 20 with payment counts 9, 11, 10, 12, 8, 10, 9, 11, 10, 9, 12, 10, 8, 11; cells from day 10 on are amber for fraud; day 21 is marked as the payment. Below, a bar over days 7 to 20 labelled the last delta plus w equals 14 days reads 140 payments, 110 frauds; minus a bar over days 14 to 20 labelled the last delta equals 7 days reads 71 payments, 71 frauds; equals an amber bar over days 7 to 13 reading 69 payments, 39 frauds, rate 39 over 69 equals 0.565"
+  caption="The window that ends δ days ago is the long window minus the short one, for the counts and for the frauds separately."
+/>
+
+Each rolling sum runs once along the terminal's payments sorted by time,
+so the whole column costs one sort and a few passes. In pandas, with the
+terminal's payments indexed by timestamp:
+
+```python
+f = s["fraud"]
+n_long  = f.rolling(f"{delta + w}d").count();  n_short = f.rolling(f"{delta}d").count()
+f_long  = f.rolling(f"{delta + w}d").sum();    f_short = f.rolling(f"{delta}d").sum()
+risk = ((f_long - f_short) / (n_long - n_short)).fillna(0)
+```
+
+<Exercise>
+Same terminal, a payment early on day 17, $w = 3$ days, $\delta = 7$
+days. Write down the window's days first, then compute $N^{\delta}_w$ and
+$F^{\delta}_w$ as the difference of two sums. Compare with the 3-day rate
+from the final labels.
+
+<Solution>
+**Window.** It ends 7 days before day 17 and lasts 3 days: days 7, 8 and 9.
+
+**Long sum, days 7 to 16 (10 days).** Payments
+$9 + 11 + 10 + 12 + 8 + 10 + 9 + 11 + 10 + 9 = 99$. Frauds: days 10 to 16,
+$12 + 8 + 10 + 9 + 11 + 10 + 9 = 69$.
+
+**Short sum, days 10 to 16 (7 days).** 69 payments, 69 frauds.
+
+**Difference.** $N^{\delta}_w = 99 - 69 = 30$, $F^{\delta}_w = 69 - 69 = 0$,
+so $R^{\delta}_w = 0$. Seven days into its compromise, the terminal looks
+clean to every label the bank has.
+
+**Final labels.** Days 14 to 16: 30 payments, all fraud, a rate of 1.0.
+The two versions of the feature give the two extreme values on the same
+row.
+</Solution>
+</Exercise>
+
+### Which edges are open
+
+A rolling window in pandas covers $(t - \text{length},\ t]$, so both sums
+include the current payment. It cancels in the difference: the current
+payment's label is in the long sum and in the short sum, and the
+subtraction leaves $(t_i - \delta - w,\ t_i - \delta]$, which never holds
+it. This differs from the card windows of <Ref
+lesson="transaction-aggregates"
+id="three-ordinary-table-operations-that-break-the-rule">the aggregates
+lesson</Ref>, where including the current payment only diluted the
+reference. In a feature built from labels, the current row's own label
+inside the window is the target itself.
+
+One more convention has to be written down, because two pipelines that
+leave it implicit compute different numbers: day or timestamp. <Ref
+lesson="delayed-labels-prequential" id="the-label-clock">The label
+clock</Ref> counted whole days: a model scoring day $d$ uses labels up to
+day $d - \delta - 1$. The timestamp window treats a label as known exactly
+$\delta \times 24$ hours after its payment. The two differ by less than a
+day at each edge; a training table built one way and a serving path built
+the other give different values wherever a fraud falls in that gap.
+
+The shifted window also reaches further back. A 30-day risk with a 7-day
+delay reads 37 days of history, so by <Ref lesson="transaction-aggregates"
+id="a-window-has-to-fill-before-it-means-anything">the window-filling
+argument</Ref> the first training rows come 37 days after the data
+begins, not 30.
+
+## What the delay costs, and what the leak costs
+
+Shifting the window throws information away. Two questions follow: how
+much signal is left, and how wrong would the offline number have been
+without the shift.
+
+### Fresh compromises fall out of sight
+
+With steady traffic, a terminal compromised $c$ days ago has a 30-day
+risk of $c/30$ from final labels and $\max(0, c - 7)/30$ from the labels
+of the bank, the formula of <Ref lesson="transaction-aggregates"
+id="exercises">the aggregates lesson's last exercise</Ref>. Every terminal
+in its first week of compromise reads 0. On the simulator, which draws
+two new terminals a day and keeps each compromised for 28 days, that is a
+quarter of the compromised terminals on any day. No feature built from
+labels can see them; something else has to, such as the card windows or
+a burst in the terminal's traffic.
+
+The other three quarters stay visible because a compromise outlasts the
+delay. A terminal compromised for 28 days spends 21 of them with a
+nonzero delayed rate. The same argument covers the real stream: <Ref
+lesson="ulb-handbook-benchmark" id="a-compromised-terminal-and-a-burst">the
+benchmark's depth-2 tree on real Belgian payments</Ref> chose, as its first
+question, a terminal 30-day risk above 0.075, and that feature was the
+delayed one. A threshold learned on it is one the live system can apply.
+
+### Three pipelines on one simulator run
+
+How large is the fiction? The measurement uses a different seeded run
+from the one in <Ref lesson="transaction-aggregates"
+id="on-the-simulator-one-scenario-found-one-not">the aggregates
+lesson</Ref>: the simulator re-implemented from its stated rules and run
+for 140 days, so its test week holds other payments and other frauds, and
+its numbers do not compare one-to-one with that lesson's table. On this run, train a random forest of 100 trees on the training week, days 115 to 121, and
+score the test week, days 129 to 135, behind the delay block and with
+known cards removed, as in <Ref lesson="delayed-labels-prequential"
+id="which-cards-count-as-known-on-a-given-day">the delayed-labels
+lesson</Ref>. The test week holds 435 frauds, 276 of them at compromised
+terminals and 78 of those at terminals compromised within the previous
+week. The fifteen inputs are fixed except for the terminal's three rates,
+built two ways: from final labels over the window ending just before the
+payment, or delayed by seven days. Three pipelines follow.
+
+| pipeline | trained on | scored on | average precision | $CP@100$ | new compromises in top 100 |
+|---|---|---|---|---|---|
+| offline estimate | final-label rate | final-label rate | 0.92 | 0.41 | 72% |
+| deployed | final-label rate | delayed rate | 0.62 | 0.33 | 3% |
+| honest | delayed rate | delayed rate | 0.74 | 0.33 | 1% |
+
+<Figure
+  src="./figures/fiction.svg"
+  alt="Three small bar charts with three bars each. Average precision: offline 0.92 in blue, deployed 0.62 in amber, honest 0.74 in green. Card precision at 100: 0.41, 0.33, 0.33. New compromises in the top 100: 72%, 3%, 1%. Legend: offline, trained and tested on the final-label rate; deployed, the same model served the rate the bank can compute; honest, trained and served the delayed rate"
+  caption="The leaky pipeline promises 41 compromised cards a day in its top 100; deployed, it finds 33, the same as the honest pipeline, and ranks the rest of the list worse."
+/>
+
+The first row is the number a team would have reported. The second is
+what the bank would have got: the same model, fed in service the only rate
+the live system can compute. The gap in $CP@100$ is 8 cards a day, four
+times the <Ref lesson="alert-budget-metrics"
+id="what-each-disagreement-means">two-cards-a-day noise line</Ref>; two
+further seeds give 0.41 against 0.31. The last column shows where it comes
+from. The test week holds 78 frauds at freshly compromised terminals; the
+offline model puts 72% of them, about 56, in its daily top 100, about 8 a
+day, while the deployed model finds about 2 in the whole week. Those 8 a day are
+the gap, and no deployed model can see them: their terminals read 0.
+
+The second and third rows differ too. The leaky model's average
+precision is 0.62 against the honest model's 0.74: trained on rates that
+jump to 0.5 and 1.0 within days of a compromise, it learned thresholds
+that the delayed rates of service reach later or never. A depth-2 tree
+fitted on the same two training tables shows the thresholds directly:
+on the final-label table it split the 7-day rate at 0.61, on the delayed
+table at 0.35. The leak does not only inflate the estimate; it fits the model to
+a feature that does not exist in production.
+
+<KeyFact>
+No offline metric can show this leak. An offline score reads the model on
+the same leaky values it was trained on, where they work as signal; the
+leak appears only when the model is scored on the values the live system computes.
+</KeyFact>
+
+## Every statistic of labels: target encoding
+
+The terminal's rate is one member of a larger family: target encoding,
+which the feature-engineering lesson of the classical-ml course gave as a
+category's mean label, made safe there by out-of-fold encoding (each
+fold's rows encoded from the other folds' rows only). Merchant, country
+or card type can be encoded the same way, and each is a feature built
+from labels.
+
+Out-of-fold encoding looks safe here too: no row's encoding contains its
+own label. On a stream it is not. The other folds are drawn from the whole training period, so a row's
+encoding averages labels of payments made after it, and of payments made
+before it whose labels arrived only later. Encoding on the training rows
+only, and applying the result to the test rows, has the same fault inside
+the training set. Out-of-fold encoding removes a row's own label; it says
+nothing about when the other labels became known. The rule that covers
+every case is the definition above applied to labels: a statistic of
+labels, for row $i$, uses only the labels that had arrived by $t_i$.
+
+<KeyFact>
+The delayed terminal risk is a target encoding of the terminal
+identifier, computed point in time over a window. It is the legitimate
+form of the lookup table that <Ref lesson="transaction-aggregates"
+id="the-identifier-as-a-lookup-table">a forest built from raw terminal
+numbers</Ref> learned: the same memory of which terminals had fraud,
+recomputed for every payment from labels the bank held.
+</KeyFact>
+
+## Which value belongs to a row: the as-of join
+
+So far each feature was computed inside the training table, row by row.
+A deployed system does not work that way. The 30-day windows cannot be
+recomputed from raw history inside <Ref lesson="fraud-detection-system"
+id="could-the-model-refuse-payments">the time the system has to score a
+payment</Ref>, so a separate job computes them ahead of time and stores
+them, entity by entity, each value with the time it was computed. The
+training table then has to look values up in that store, and the lookup
+can leak too.
+
+### Joining on the entity
+
+A stored feature has many values over time, one per computation. The
+store answers serving's question, the current value of a card, and the
+obvious lookup asks it the same question for training: it reads the
+card's latest value and attaches it to every training row of that card.
+Rows from before that value existed then hold a number computed from
+payments after them: the second of <Ref
+lesson="transaction-aggregates"
+id="three-ordinary-table-operations-that-break-the-rule">the aggregates
+lesson's three broken table operations</Ref>, reappearing at the join.
+
+### The last value up to the row's timestamp
+
+<FigureSequence
+  name="asof"
+  alt="Two frames. Above, a feature log for card 4471 holds the number of payments in the last 24 hours: 3 recorded at 09:00 and 5 at 14:00. Below, training rows at 08:30, 12:00 and 15:00. Frame 1, the latest value per card: arrows run from the 14:00 value to all three rows, dashed for 08:30 and 12:00, noted as a value from the future. Frame 2, as-of join: an arrow from the 09:00 value to the 12:00 row and from the 14:00 value to the 15:00 row; the 08:30 row has no earlier value and is missing, not 0"
+  caption="Each training row takes the last value recorded at or before its own timestamp."
+/>
+
+<Task>
+On the second frame, find the row that receives no value. Before reading
+on, decide what the live system would have read for a payment at 08:30,
+and why 0 would be the wrong thing to write there.
+</Task>
+
+<Definition title="as-of join">
+Let a feature log hold, for each entity, values $v$ recorded at times
+$\tau$. The *as-of join* (point-in-time join) attaches to a row with
+entity $e$ and timestamp $t$ the value with the largest $\tau \le t$ among
+that entity's records, and a missing value if there is none.
+</Definition>
+
+The rows to be filled come from a small table of (entity, timestamp,
+label), one line per payment to train on; the join reads the log at each
+line's timestamp and carries the label through untouched. In pandas it is
+`merge_asof` with `by` set to the entity column. The 08:30 row of the
+figure gets a missing value, because the live system at 08:30 had
+nothing stored for this card; writing 0 there would claim a card with no
+payments in the last day.
+
+The boundary $\tau \le t$ needs one more decision. If the stored value
+recorded at a payment's own timestamp was computed with that payment
+inside its window, a join that includes equality hands the row its own
+payment, and, for a feature built from labels, possibly its own label.
+The store has to say whether a value recorded at $\tau$ covers the events
+up to $\tau$ or strictly before it, and the join has to match.
+
+The join is also only as honest as the times in the log. It hands a row
+the last value stamped at or before $t$, and that is what the live system
+would have read only if every value stamped $\tau$ was readable by serving
+at $\tau$. A job that computes values later and stamps them with an
+earlier time breaks the condition, and the as-of join copies the break
+into the training table.
+
+## One definition for training and serving
+
+A training table can now be point-in-time correct. That fixes half of the
+problem the opening posed. The other half is that the live system
+computes the same features again, by other code, and the model sees
+whatever that code produces.
+
+### Two implementations of the same feature
+
+The usual arrangement has two code paths: a batch query over the payment
+history builds the training table, and the serving application computes
+or fetches the features for one payment at a time. Both implement "the
+card's number of payments in the last 24 hours", and nothing forces them
+to agree.
+
+<Definition title="training–serving skew">
+*Training–serving skew* is a difference between the value a model was
+trained on and the value it receives in production for the same logical
+feature of the same payment.
+</Definition>
+
+Skew is not drift. Drift is the data changing over time; <Ref
+lesson="concept-drift">concept drift</Ref> takes it up. Skew is the same
+payment, at the same moment, getting two values from two computations.
+One openly published end-to-end fraud pipeline on a cloud platform shows
+how naturally it arises, without any single line being wrong:
+
+- The minute-level features (the card's payments in the last 15, 30 and
+  60 minutes) are computed only by the streaming job. To keep the batch
+  table's columns aligned with the serving payload, the batch query
+  creates those columns and fills them with 0. Every training row has 0
+  there; live payments get real counts.
+- The serving handler replaces any missing feature with 0.0, so a card
+  never seen before is served as a card with no activity, whatever the
+  training table did with the same case.
+- The list of 25 feature names is typed out by hand in the training
+  notebook, the inference notebook, the serving application and, in part,
+  the monitoring configuration.
+
+<Example title="a burst, as trained and as served">
+A card paid yesterday at 18:00 and 21:00, and today at 10:00, 10:05 and
+10:12. The day features are computed by a nightly job, each payment inside
+its own 24-hour window, and written stamped with the payment's time; the
+minute features exist only in the stream.
+
+**Training table.** The job writes today's values tonight, after midnight,
+stamped
+10:00, 10:05 and 10:12: values serving could not read at those times. The
+as-of read at each of today's payments finds the value stamped at that
+payment, 24-hour counts 3, 4 and 5. The join did what it was defined to
+do; the stamps were wrong. The 15-minute column holds the placeholder 0 on
+all three rows.
+
+**Serving.** At 10:12 the store's latest card value is the one computed
+last night, at yesterday's 21:00 payment: a 24-hour count of 2, the same
+for all three payments. The stream supplies 15-minute counts of 0, 1 and
+2 over the earlier payments.
+
+**What the model does with it.** It learned nothing from the 15-minute
+column, because that column was constant in training; the burst the
+stream measures is computed and then ignored. It did learn the 24-hour
+count, on values that include the burst, and in service that count stays
+at 2. A rule like <Ref lesson="ulb-handbook-benchmark"
+id="a-compromised-terminal-and-a-burst">the real-data tree's "more than
+13 payments in the last day"</Ref> can never fire on a stale nightly
+value.
+</Example>
+
+### One log, written once, read two ways
+
+The repair is structural: one definition of each feature, computed by one
+job, written to one place, and read by both paths.
+
+<Definition title="feature store">
+A *feature store* is a time-keyed log of entity features: every value is
+written once, with the entity and the time it became readable by
+serving. Training reads
+it as of each row's timestamp through the as-of join; serving reads the
+latest value of each entity.
+</Definition>
+
+<Figure
+  src="./figures/two-reads.svg"
+  alt="Left, two writers: a nightly batch job computing day windows and the delayed terminal risk, and a stream job computing minute windows and today's update of the day windows. Both arrows point into a central table, one time-keyed feature log, with rows of entity, feature time and values for card 4471 and terminal 9023. Two arrows leave it to the right: training, read as of each row's timestamp for a table of entity, time and label; serving, read the latest value per entity for the payment being scored. Captions: written once, read two ways"
+  caption="Batch features over days and streaming features over minutes land in the same log; training and serving are two reads of it."
+/>
+
+Two reads of one log cannot disagree about a value, so the skew of the
+example can only come from what is written. Stamped with the time it
+became readable, the nightly job's value for today's payments lands after
+midnight, and the as-of read at 10:12 returns 2, as serving did: the skew
+is gone and the staleness is left. To remove that, the log must hold, for
+every moment a payment can be scored, the value serving would use: the stream
+has to update the day windows with today's payments as they arrive, not
+leave them at last night's value, and the batch job must not write
+placeholders the stream will later overwrite. Every value is written once,
+so the training table reads whatever serving read, including a delayed
+terminal risk that used only the labels arrived by then.
+
+The arrangement covers both clocks the features run on. The terminal's
+risk changes as labels arrive and can be computed nightly; a card's
+15-minute count changes with each payment and has to come from the
+stream. Both end up as timestamped rows of the same log, which is what
+lets the as-of join read them together; how the stream meets the scoring
+deadline is the subject of <Ref
+lesson="real-time-scoring-architecture">the real-time scoring
+architecture</Ref>.
+
+### The parity check
+
+A shared log removes the second implementation of each feature, but
+something still has to show that serving reads what training reads: the
+serving application can fill a missing value, rename a column, or read
+the wrong entity. A comparison of distributions does not show it. A
+column whose training values are all 0 and whose serving values are
+mostly 0 has similar distributions and is wrong on every burst.
+
+The check that does show it works row by row:
+
+1. Take a past day whose payments are in the training table.
+2. Replay those payments, in time order, through the serving path,
+   recording the feature vector the model would have received for each.
+3. Join the replayed vectors to the training rows on the payment, and
+   count, feature by feature, the rows where the two values differ.
+
+<FigureSequence
+  name="skew"
+  alt="Three frames of two small tables for the payments at 10:00, 10:05 and 10:12, with columns card last 24 h, card last 15 min and terminal risk 7 d. Frame 1: the training table only, with 24-hour counts 3, 4, 5, 15-minute counts 0, 0, 0 and terminal risk 0.00, and a note that the 15-minute column is a placeholder filled with 0 and the 24-hour count includes each payment in its own window. Frame 2: the serving table added below, 24-hour counts 2, 2, 2, 15-minute counts 0, 1, 2, terminal risk 0.00. Frame 3: the two disagreeing columns are outlined, with tallies 3 of 3 rows differ, 2 of 3 rows differ, and agrees for the terminal risk"
+  caption="A parity check replays known payments through the serving path and counts disagreements per feature."
+/>
+
+<Task>
+Before stepping to the last frame, name for each column of the second
+frame the cause of the disagreement, if any: a stale value, a window
+convention, or a placeholder.
+</Task>
+
+A feature with zero disagreements is served as trained. A feature with
+disagreements on every row is a different feature in service. The count
+per feature points at the implementation to fix, and the check runs again
+after every change to either path. Watching the live values for a change
+in distribution after deployment is a separate task, monitoring; <Ref
+lesson="fraudfinder-monitoring-read">a monitoring read of the same
+pipeline</Ref> takes it up.
+
+<KeyFact>
+A model is evaluated on the training path and deployed on the serving
+path. Only a row-by-row replay through the serving path shows that the
+two are the same model.
+</KeyFact>
+
+## Assembling a training set on a given day
+
+The pieces come together on the night the model is retrained. Two clocks
+run in the training table, and they are read at different moments.
+
+- **Features are read at each row's timestamp**, through the as-of join,
+  so that each row holds what the live system would have held.
+- **Labels are read at the training date.** A row from three weeks ago
+  should carry its settled label, which arrived later; that label is
+  the target, not an input, and the model is meant to learn it.
+
+The two meet at the edge of the table. Rows from the last $\delta$ days
+before the training date have no settled labels yet; most of their
+frauds would enter as genuine. They are left out, which is <Ref
+lesson="delayed-labels-prequential"
+id="what-the-delay-block-is-and-is-not">the delay block</Ref> seen from
+the pipeline's side: their payments still feed the windows of later rows,
+and their labels feed nothing. A demonstration pipeline whose labels are
+complete the moment a payment happens can train up to yesterday; on a
+bank's data the same code would train on a week of mislabelled frauds.
+
+Two more things leave the feature vector. The card identifier stays
+out, for <Ref lesson="delayed-labels-prequential"
+id="why-the-cards-identity-stays-out-of-the-features">the reason the
+delayed-labels lesson gave</Ref>: a blocked card does not pay again, so
+whatever the model learns about it is worthless in service. And no
+feature may depend on what happened to the payment after it was scored,
+such as whether it was later reversed or disputed; that is the label
+again, arriving through a side door.
+
+<Conclusion>
+You can now build a feature from labels that the live system can
+compute: a terminal's fraud rate over a window ending δ days before the
+payment, as the difference of two rolling sums, with its count beside it.
+You can recognise the same leak in any statistic of labels, target
+encodings included, and you can attach stored feature values to training
+rows with an as-of join that reads each row's own moment. You can explain
+how two implementations of one feature give the same payment two values, why one time-keyed log
+read two ways removes the second implementation, and how a replayed day
+shows whether serving computes what training saw. On the simulator, the
+leak would have promised 41 compromised cards a day in the top 100 where
+the deployed model finds 33.
+
+The δ in all of this was one number, a week. Real labels do not arrive
+on one date: an investigator's call settles a card the same day and a
+dispute may come a month later, so the share of a day's frauds that is
+labelled grows over weeks. <Ref lesson="label-maturation">Label
+maturation</Ref> takes up how a pipeline handles labels that settle at
+different speeds. Next, <Ref lesson="paysim-feature-matrix">the PaySim
+feature matrix</Ref> applies the module's features to a mobile-money log
+whose fraud flag was written by a script.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+A terminal receives 4 payments every day on days 0 to 39, and from day 20
+on, one of each day's payments is fraud. A payment arrives early on day
+40. (a) Compute its 30-day risk with a 7-day delay by the two-sum method,
+writing the days each sum covers. (b) Check it by counting the shifted
+window directly. (c) What would the rate from final labels, over the 30
+days before the payment, have been?
+
+<Solution>
+**(a)** The shifted window is days 3 to 32 (30 days ending 7 days before
+day 40). Long sum, the last $\delta + w = 37$ days, days 3 to 39:
+$37 \times 4 = 148$ payments; frauds on days 20 to 39, 20 of them. Short
+sum, the last 7 days, days 33 to 39: 28 payments, 7 frauds. Difference:
+$N = 148 - 28 = 120$, $F = 20 - 7 = 13$, risk $13/120 \approx 0.108$.
+
+**(b)** Days 3 to 32 hold $30 \times 4 = 120$ payments; frauds on days 20
+to 32, 13. The same 13/120.
+
+**(c)** Days 10 to 39: 120 payments, frauds on days 20 to 39, 20 of them:
+$20/120 \approx 0.167$. The final-label rate is half as large again,
+because 7 of its 20 frauds had no label yet.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two edge settings of the delay. (a) Set $\delta = 0$ in the pandas code of
+the two-sums section, with windows that include the current payment.
+What does the 1-day risk contain for a terminal that receives one payment
+a day, and what would a model do with it? (b) On the simulator a terminal
+stays compromised for exactly 28 days. Show that with $\delta \ge 28$ the
+delayed risk of a terminal is 0 on every payment of its current
+compromise, whatever $w$. (c) What do the two edges say about when a
+feature built from labels can carry signal at all?
+
+<Solution>
+**(a)** With $\delta = 0$ the short sum covers $(t, t]$, which is empty,
+and the long sum covers $(t - w, t]$, which contains the current
+payment. For a terminal with one payment a day, the 1-day window holds
+only the current payment, so the risk equals its own label: 1 for fraud,
+0 for genuine. A model learns to read the answer off that column and
+scores near-perfectly offline; in service the label is unknown at
+scoring time and the column is unavailable. The current payment cancels
+in the difference only when the short window is not empty.
+
+**(b)** Let the current compromise start at time $c$, so the payment is at
+$t_i \in [c, c + 28)$. The shifted window ends at
+$t_i - \delta \le t_i - 28 < c$: it lies wholly before the compromise
+began, so it holds none of its frauds. Unless the same terminal was
+compromised before, $F^{\delta}_w = 0$ and the risk is 0 for every $w$.
+
+**(c)** The feature carries signal only for patterns that outlast the
+delay. A compromise of 28 days leaves $28 - \delta$ days in which the
+delayed rate points at it: 21 days at $\delta = 7$, none at
+$\delta \ge 28$. At the other edge, $\delta = 0$ turns the feature into the
+label. The useful range is a delay at least the real label latency, so
+the feature can be served, and shorter than the patterns it should
+find.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague says: "I target-encode the terminal out of fold: the training
+rows are split into five random folds, and each row is encoded from the
+other four. No row sees its own label, so the feature is point-in-time
+correct." Refute the claim with a terminal in a training week of days 115
+to 121, name the clause of the definition that fails, and give the
+computation that satisfies it.
+
+<Solution>
+**The counterexample.** Take a terminal compromised on day 118: its
+payments of days 118 to 121 are fraud. The folds are random, so the other
+four folds of any of its rows hold payments from all seven days. Its row
+from day 116 receives a fraud share built from the frauds of days 118 to
+121, two to five days in its future. Its row from day 121 receives a
+value built in part from frauds of days 118 to 120 whose labels, on day
+121, had not arrived (with $\delta = 7$, a payment on day 121 sees labels
+only up to day 113). Neither row contains its own label, and both rows
+carry a rate near the terminal's true share that no live system had on
+those days: on day 121 the delayed rate of this terminal is still 0.
+
+**What fails.** Out-of-fold encoding separates a row from its own label;
+it says nothing about time. The clause that fails is "labels that had
+arrived by $t_i$": each row's encoding uses labels of later payments and
+of earlier payments still within the delay.
+
+**The fix.** Compute, for each row, the terminal's fraud share over a
+window ending $\delta$ before the row: the delayed terminal risk. No folds
+are needed, because a window that ends $\delta$ before the row never holds
+the row's own label. On test rows use the same computation, which reads
+training-period labels where the window reaches them, exactly as the live
+system would.
+</Solution>
+</Exercise>
+
+<Exercise>
+A training table has $n$ rows (entity, timestamp) and a feature log has
+$m$ records (entity, time, value). (a) Show that the naive as-of join, for
+each row scanning the log for the latest record of its entity at or
+before its timestamp, costs $O(nm)$. (b) Derive an algorithm costing
+$O((n + m) \log(n + m))$, and say where the logarithm comes from. (c) What
+does the algorithm need to do with ties, a log record whose time equals a
+row's timestamp?
+
+<Solution>
+**(a)** Each of the $n$ rows reads up to all $m$ records to find the
+maximum time not after its own: $O(m)$ per row, $O(nm)$ in total.
+
+**(b)** Sort the rows and the log records together by (entity, time),
+which costs $O((n + m)\log(n + m))$. Sweep the merged sequence once,
+keeping for the current entity the value of the last log record passed.
+At each row, output that value (missing if no record of the entity has
+been passed yet); at a new entity, reset it. The sweep touches each item
+once, $O(n + m)$. The logarithm comes only from the sort; with both inputs
+already sorted, as a log written in time order usually is, the join is
+linear. This is the forward-pointer sweep of <Ref
+lesson="transaction-aggregates" id="exercises">the aggregates lesson's
+window exercise</Ref>, which computed every window in one pass because
+each pointer only moved forward, with the window replaced by "the latest record so far".
+
+**(c)** When a record and a row share a time, the order in the sort
+decides whether the row sees the record. Records first gives
+"time $\le t$", rows first gives "time $< t$". The choice has to match
+what the record means: if a value recorded at $t$ was computed including
+the payment at $t$, a row at $t$ that reads it sees its own payment, and
+for a feature built from labels, possibly its own label.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce the three-pipeline comparison. Run the simulator for at least
+140 days, build the fifteen inputs, and build the terminal's three rates
+twice: from final labels over $(t_i - w,\ t_i)$, excluding the current
+payment, and delayed by 7 days. Train a random forest of 100 trees on days
+115 to 121, test on days 129 to 135 with known cards removed, and report
+average precision and $CP@100$ for the three pipelines of the table.
+State in advance what result would count as agreement with the lesson,
+and what would not.
+
+<Solution>
+**What to expect.** Agreement is the ordering and the size of the gaps,
+not the digits: offline $CP@100$ above deployed by well over the
+two-cards-a-day line, deployed and honest within it, honest average
+precision above deployed. A run in which the offline and deployed numbers
+coincided would mean the final-label rate was never built from labels
+the live system lacks; check that the delay was applied in one version
+only.
+
+**One set of results.** Three seeded runs of the simulator, about 1.35
+million payments over 140 days, test weeks of 412 to 435 frauds after
+known-card removal:
+
+| seed | offline AP / $CP@100$ | deployed AP / $CP@100$ | honest AP / $CP@100$ |
+|---|---|---|---|
+| 0 | 0.92 / 0.41 | 0.62 / 0.33 | 0.74 / 0.33 |
+| 1 | 0.90 / 0.41 | 0.56 / 0.31 | 0.68 / 0.31 |
+| 2 | 0.90 / 0.41 | 0.51 / 0.31 | 0.66 / 0.31 |
+
+The offline estimate overstates $CP@100$ by 8 to 10 cards a day on every
+seed; the honest and deployed models tie on $CP@100$, and the honest one
+leads on average precision by 0.11 to 0.15.
+
+**Where the gap comes from.** Count the test frauds at terminals
+compromised within the previous seven days (78, 102 and 94 on the three
+seeds) and the share of them in the daily top 100: 72% to 82% offline,
+under 5% in either deployable pipeline.
+</Solution>
+</Exercise>
+
+<Exercise>
+Suppose the leaky model of the deployed row had been trained on an
+undersampled training set with keep rate $\beta = 0.05$. A colleague
+proposes to fix its production shortfall by applying the undersampling correction and
+then the prior factor for the current base rate. (a) What would each
+correction change in the deployed row of the table? (b) Why can no
+correction of the output repair this model?
+
+<Solution>
+**(a)** The correction $p' = \beta p_s / (\beta p_s - p_s + 1)$ and the
+prior factor are both increasing functions of the score, so they leave
+the order of the payments unchanged, as <Ref
+lesson="undersampling-calibration">the undersampling lesson</Ref> showed.
+Average precision and $CP@100$ depend only on the order: the deployed
+row stays at 0.62 and 0.33. The corrected probabilities would be better
+calibrated, which helps decisions that read a probability's value, such
+as the per-payment cost rule; they do not rank fresh compromises any
+higher.
+
+**(b)** The shortfall is a ranking error caused by the inputs. In
+service, a fraud at a freshly compromised terminal arrives with a
+terminal risk of 0 instead of 0.5 or 1.0: the distribution of the
+features given fraud differs between training and service. The prior
+factor corrects a change in the base rate with that distribution held
+fixed; <Ref lesson="undersampling-calibration"
+id="where-the-current-base-rate-comes-from">the same lesson</Ref> noted
+that it cannot fix a change in the features' distribution given the
+class. The model has to be retrained on the delayed feature.
+</Solution>
+</Exercise>
+
+<Exercise>
+Suppose that on a card stream 40% of each day's frauds are labelled the
+same day by investigators' calls, and the rest are reported by
+cardholders after a delay that is exponentially distributed with a mean
+of 20 days. (a) What share of a day's frauds is labelled 7, 30 and 90
+days later? (b) A terminal's delayed risk uses $\delta = 7$, so the newest payments in
+its window are 7 days old. What share of their frauds does the window
+count, and is the rate over the whole window biased up or down? (c) What would raising
+$\delta$ to 30 buy, and what would it cost?
+
+<Solution>
+**(a)** Labelled by day $+a$: $0.4 + 0.6\,(1 - e^{-a/20})$. At 7 days,
+$0.4 + 0.6 \times 0.295 = 0.58$; at 30 days,
+$0.4 + 0.6 \times 0.777 = 0.87$; at 90 days,
+$0.4 + 0.6 \times 0.989 = 0.99$.
+
+**(b)** At the window's recent edge, 58% of the frauds carry a label;
+older payments in the window are better labelled, 87% at 30 days. Every
+fraud without a label is counted as genuine, so the rate is biased low,
+most strongly by its newest days. The delay shifts the window and still
+leaves it incomplete.
+
+**(c)** With $\delta = 30$ the counted frauds are 87% complete, but the
+window ends a month ago: a terminal compromised three weeks ago reads 0.
+A single δ trades completeness against freshness. A pipeline can instead
+treat labels by their age, keeping several windows or weighting by how
+complete a day's labels are known to be, and that requires knowing the
+curve of part (a) for the stream. Measuring and using that curve is
+the subject of <Ref lesson="label-maturation">label maturation</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 3.3 "Baseline feature transformation" (the terminal risk score over windows of 1, 7 and 30 days shifted back by a delay period of one week, computed by `get_count_risk_rolling_window` as the difference of rolling sums over delay + window and over the delay, 0 for an empty window); Ch. 3.5 "Real-world data" (the depth-2 tree on one real week splitting on the 30-day terminal risk at 0.075 and the card's 1-day count at 13.5). The simulator of Ch. 3.2 was re-implemented from its stated rules for the three-pipeline comparison. https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+2. Google Cloud Platform, *FraudFinder* (open-source labs for a real-time fraud detection system), 2023 — `02_feature_engineering_batch.ipynb` (customer windows and the delayed terminal risk index in SQL, zero-filled placeholder columns for the minute features, feature store entity types and ingestion with a feature time); `03_feature_engineering_streaming.ipynb` (minute-window features from the stream); `bqml/04_model_training_and_prediction.ipynb` (the read-instances table of entities and timestamps, batch serving of the last value up to but not after each timestamp, the note on time-travelling to a date when labels are settled); `scripts/cloud_run_model_inference/main.py` (online feature lookup, missing values replaced by 0.0, the hand-written payload schema); `bqml/06_model_deployment.ipynb` (skew and drift monitoring configuration). https://github.com/GoogleCloudPlatform/fraudfinder
+3. A. Dal Pozzolo, G. Boracchi, O. Caelen, C. Alippi, G. Bontempi, "Credit Card Fraud Detection: A Realistic Modeling and a Novel Learning Strategy," *IEEE Transactions on Neural Networks and Learning Systems* 29(8), 2018 — Sec. II-B (feature augmentation; aggregated features precomputed offline per cardholder) and Sec. VI-A (the card identifier used only to compute aggregates, because a card is blocked after its first detected fraud). https://doi.org/10.1109/TNNLS.2017.2736643
+4. Y. Lucas, J. Jurgovsky, "Credit Card Fraud Detection Using Machine Learning: A Survey," arXiv:2010.06479, 2020 — Sec. 4.1 (likelihood or target encoding requires class labels and is feature engineering rather than encoding). https://arxiv.org/abs/2010.06479
+</References>

@@ -21,6 +21,7 @@ import { LABEL_CLASS } from "@/components/ui/styles";
 import { loadCredits } from "@/lib/content/credits";
 import {
   Aside,
+  Conclusion,
   Definition,
   Example,
   Exercise,
@@ -122,6 +123,7 @@ export default async function LessonPage({
     Remark,
     KeyFact,
     Task,
+    Conclusion,
     Exercise,
     Solution,
     // Sourced images cite themselves at the end of References, not under the

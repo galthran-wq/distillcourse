@@ -1,0 +1,73 @@
+# Sequence models over an entity's transactions — research brief
+
+Lesson: `sequence-models-for-transactions` (module: sequences-drift, type: core, status: planned). NEW — full re-synthesis, no draft exists, so no REVISION block.
+Goal: Construct fixed-length transaction sequences per cardholder and evaluate 1-D convolutions, LSTMs and attention against hand-built aggregates on card-present and e-commerce data
+Opening (verbatim, the lesson must start with it): A payment of EUR 60 at a petrol station is ordinary; the same payment thirty minutes after one in another country is not. Aggregates summarise a card's past in fixed windows, but the order of events is lost. Can a model read a card's last ten payments as a sequence, and on which kind of payments does the order carry information that the aggregates do not?
+
+## Sources to consult
+- Handbook Ch7 "Sequential modeling" (research/texts/reproducible-Chapter_7_DeepLearning_SequentialModeling.md; shard reproducible-s5-… holds the start): context-aware detection, the landmark variable (customer id), sliding window vs recurrent model, the padding-transaction trick and the groupby/shift construction (customer 0's 12 transactions, seq_len 5, −1 padding), FraudSequenceDataset, Conv1d shape walk-through (5,15) → (4,100) → (3,50), LSTM with batch_first, the attention demo with weights [0.25, 0.26, 0.24, 0.15, 0.10] vs [≈0, ≈0, 1e-6, 1.2e-3, 0.9988], single-split and prequential results, grid-search costs (CNN 26,905 s, LSTM 14,751 s, LSTM+Attn 16,736 s). NOTE: this shard was read only to 130,000 of 146,768 chars; the seq2seq autoencoder stub and the tail of the benchmark are unverified — do not quote numbers beyond the summary.
+- Handbook Ch7.5 "Real-world data" (reproducible-Chapter_7_DeepLearning_RealWorldData.md): FFNN/CNN/LSTM/LSTM+attention sweeps on Worldline data; the global table DT .869/.068/.232, LR .816/.054/.211, RF .912/.080/.227, XGB .928/.095/.235, FFNN .894/.084/.236, CNN .882/.093/.221, LSTM .892/.104/.220, LSTM+Attn .898/.105/.232 (AUC/AP/CP@100).
+- Jurgovsky et al. 2018 (research/texts/staged-jurgovsky2018-sequence-classification.txt): Sec 3.1 eqs 1–3 (recurrence, BPTT, vanishing/exploding gradients), Sec 3.2 eqs 4–7 (tdelta, aggregation sets S_k, 14 AGG features at 24 h), Sec 3.3 (the F2F vs ECOM hypothesis), Sec 4.1 and Table 1 (splits, account-level undersampling p_g = 0.9, the w = 9 alignment, one-week gap for delayed labels), Sec 4.4 (AUCPR, AUCPR@0.2, Jaccard of true positives), Sec 5 Tables 4–5 and Fig 2, Sec 5.2 Fig 5, Sec 6.1 (regularisation under drift).
+- Lucas & Jurgovsky 2020 survey (research/texts/creditcard-.txt): Sec 5.1.1 HMM features (Srivastava's <50 / 50–200 / >200 EUR buckets; the 2×2×2 = 8 multi-perspective HMMs, +15% over aggregates), Sec 5.1.2 (aggregates beat LSTM overall), Sec 5.2 t-STIDE window counts (eqs 6–8).
+- Dal Pozzolo et al. 2014 Sec 4 (research/texts/staged-dalpozzolo2014-*): the formalisation of an entity's history X^H over a window T — the aggregate side of the comparison.
+
+## EXPLANATION PLAN
+### The problem as the newcomer meets it
+The reader has module 3's aggregates: counts and sums over a card's last hour, day, week. Those features answer "how much, how often" but not "in what order, how far apart". The opening's two payments have identical aggregates over a day and different meanings. The newcomer does not yet have: a landmark, a padding row, a 1-D convolution over time, an LSTM's hidden state, an attention weight, AUCPR@0.2, the F2F/ECOM split, a Jaccard overlap of true positives. None may appear before it is built.
+
+### Chain of sub-problems
+1. **Which rows form "the sequence" of a payment?** — Obvious attempt: all the card's history. Why it fails: lengths differ per card, most history is irrelevant, and a model needs a fixed shape. Answer: fix a landmark (the customer id) and take the previous seq_len payments of that landmark, ending at the payment to score; seq_len 5 or 10. Because: a compromised account carries about four frauds on average, so a window of 5–10 spans the fraudulent run; longer (10 vs 5) did not help.
+2. **What about a card with fewer than seq_len past payments?** — Obvious attempt: drop it. Why it fails: new cards are exactly where fraud starts, and two models evaluated on different rows cannot be compared. Answer: append one padding row (zeros or the training mean) to the feature matrix and map every missing position to its index; build all index sequences with groupby('CUSTOMER_ID').shift(k) for k = seq_len−1…0, no Python loop. Because: one code path serves padded and unpadded rows, and (for the comparison) the paper's alternative — dropping rows with fewer than 9 predecessors so RF and LSTM see identical test sets — shows what fairness costs.
+3. **How does a network read a (seq_len, features) block?** — Obvious attempt: flatten it into a long vector for the MLP of module 4. Why it fails: the position of each feature is tied to its slot, so the same event one slot earlier is a different input; nothing is shared across time. Answer: a 1-D convolution slides filters along time — 100 filters of length 2 turn (5,15) into (4,100), 50 more turn it into (3,50), left padding of filter_size−1 keeps the length causal; or a recurrent cell carries a state $s_t = W\sigma(s_{t-1}) + Ux_t + b$ and the final state is the sequence's representation. Because: weights shared across time positions, and a state that summarises everything before.
+4. **Why an LSTM and not the plain recurrence?** — Answer: the gradient of the loss at the end with respect to an early input is a product of T−k Jacobians; it vanishes when the largest eigenvalue is below 1 and explodes above (state the condition, defer the cell equations). The LSTM's memory cells, gradient clipping and a careful init are the remedies. Because: a vanishing gradient means the model cannot learn that the payment five steps back mattered.
+5. **Which past payment did the model look at?** — Obvious attempt: read the hidden state. Why it fails: it mixes everything. Answer: attention — a score per position by dot product with a context vector, a softmax, a weighted sum; with the last transaction as context the weights come out [≈0, ≈0, 1e-6, 1.2e-3, 0.9988], with a random context near-uniform. Because: the weights are a per-prediction statement of where the signal came from (forward: `alert-explanations`).
+6. **Does the sequence carry anything the aggregates do not?** — Obvious attempt: compare on one dataset. Why it fails: the answer depends on the stream. Answer: on card-present (F2F) data the LSTM lifts AUCPR 0.138 → 0.200 (SHORT BASE) over a random forest; on e-commerce 0.179 vs 0.180 — nothing. Add the 14 aggregates and the gap closes (F2F AGG 0.241 vs 0.246; ECOM 0.394 vs 0.380). Because: card-present payments obey opening hours and geography, so the order is consistent; e-commerce is unconstrained, and the aggregates already encode what a consistent order would say.
+7. **Are the two models finding the same frauds?** — Answer: fix recall at 0.2 so both return the same number of true positives (470 of 2,350 F2F frauds) and take the Jaccard overlap: 50.8% within RF runs, 37.8% within LSTM runs, 25.2% between the families on F2F (35.0% on ECOM). Because: low overlap means the models disagree on which frauds, so combining them is worth more than picking one — the stacking argument of module 4 made concrete.
+8. **What else turns a sequence into features without a network?** — Answer: likelihoods under HMMs fitted per perspective (genuine vs fraud-containing × cardholder vs merchant × amount vs time delta = 8 features, +15% over aggregates); t-STIDE counts of rare windows. Because: a likelihood ratio under "this card's normal grammar" is a sequence feature a tree can use.
+9. **Why does the simulator show no gain?** — Answer: prequential results CNN 0.872/0.599/0.288, LSTM 0.876/0.665/0.297, LSTM+Attn 0.874/0.667/0.295 against XGBoost 0.869/0.687/0.303 and FFNN 0.876/0.675/0.303. Because: the simulator's frauds are scripted on terminal and customer aggregates the hand-built features already contain; on real Worldline data the sequential models beat the trees on AP (0.104–0.105 vs 0.095) and lose on AUC.
+
+### Set pieces and worked examples to recreate
+- The rolling-window padding table for customer 0: 12 transactions, seq_len 5, sequences [−1,−1,−1,−1,1888], … (Handbook Ch7 SequentialModeling, data processing).
+- Conv1d shape arithmetic (5,15) → (4,100) → (3,50); with padding (5,100) → (5,50) (Handbook Ch7 CNN).
+- The attention weight contrast [0.25,0.26,0.24,0.15,0.10] vs [≈0,≈0,1e-6,1.2e-3,0.9988] (Handbook Ch7 Attention).
+- Tables 4–5: F2F SHORT BASE 0.138/0.200, TDELTA 0.170/0.231, AGG 0.241/0.246; ECOM BASE 0.179/0.180, AGG 0.394/0.380; AUCPR@0.2 with its ceiling 0.2 (Jurgovsky Sec 5).
+- The Jaccard overlap numbers 50.8 / 37.8 / 25.2 (F2F), 47.5 / 50.8 / 35.0 (ECOM) (Jurgovsky Sec 5.2, Fig 5).
+- Table 1's splits: train 1 Mar–25 Apr, validation 26–30 Apr, test 8–31 May 2015 — the week-long gap is the label delay of module 2 (Jurgovsky Sec 4.1).
+- The 8-HMM recipe and Srivastava's three amount buckets (Lucas & Jurgovsky Sec 5.1.1).
+- Grid-search cost: CNN 7.5 h, LSTM 4.1 h, LSTM+Attn 4.6 h at n_jobs = 10 (Handbook Ch7 SequentialModeling).
+
+### Pitfalls and terms to define
+- "Landmark": the entity whose history is the sequence; define at first use. A merchant could be a landmark too.
+- "F2F / ECOM": card-present vs e-commerce; use the course's own words first, the abbreviations after.
+- AUCPR@0.2: the area under the PR curve up to recall 0.2, maximum 0.2 — relate it to module 2's budget argument before quoting a value.
+- Account-level undersampling (p_g = 0.9 of genuine accounts dropped) because transactions in a sequence cannot be dropped independently; explain why ordinary row undersampling would break the sequences.
+- The "sequence beats aggregates" expectation: state it, then show the data breaks it on ECOM (a reversal seam, L10b).
+- Do not write the LSTM cell equations; the paper defers them and so does the lesson.
+- Sequence results are single runs without error bars on the Worldline data; say so.
+
+### Recalled, not re-taught
+- Windowed and conditional aggregates (<Ref> `transaction-aggregates`), the time-since-previous feature (<Ref> `behavioural-profiles`), the FFNN pipeline, Adam, early stopping, dropout (<Ref> `neural-tabular-detectors`), AP and the budget (<Ref> `alert-budget-metrics`), the delay gap in a time split (<Ref> `delayed-labels-prequential`), backpropagation and the chain rule (classical-ml).
+
+## FIGURE PLAN
+- draw (key image): <FigureSequence>, 4 frames — a card's timeline of 12 payments; frame 1 the raw row to score, frame 2 the window of the previous 5 lit up, frame 3 the padded case for a new card (padding row inserted), frame 4 the index matrix produced by the shift trick. Inspired by the handbook's landmark/rolling-window diagram.
+- draw: Conv1d over a (5,15) block — filters of length 2 sliding along time, output (4,100), then (3,50); one filter highlighted. Inspired by the handbook's 2-D convolution figure, redrawn as 1-D.
+- draw: the recurrent cell unrolled over 5 steps with the final state feeding the sigmoid; a second row showing the gradient path product of Jacobians fading. Inspired by Jurgovsky Fig 1.
+- draw: attention weights as two bar charts over the 5 positions — random context (near-uniform) vs last-transaction context (near one-hot).
+- draw: grouped bars of AUCPR for RF vs LSTM × BASE/TDELTA/AGG, two panels F2F and ECOM — the gain that appears on the left and vanishes on the right (Tables 4–5 recreated as bars).
+- source: `sequenceclas-fig5-jaccard` — stem `tp-overlap-jaccard`; the reader must see the 9×9 block structure: bright blocks within the RF family and within the LSTM family, dim between them; float right beside the overlap paragraph (computed on proprietary data, cannot be regenerated).
+- draw: the 8-model, 3-metric table of module 4's application redrawn as three small leaderboards with the sequential models highlighted where they win (AP) and lose (AUC).
+
+## EXERCISE PLAN
+1. Warm-up: compute the output shapes of a Conv1d stack on a (10, 20) sequence with 64 filters of length 3 then 32 of length 2, with and without causal padding.
+2. [derivation skipped] Write the gradient of the loss at step T with respect to $x_1$ as the product of Jacobians and show that a largest eigenvalue below 1 makes it vanish; state why clipping fixes the exploding case and not the vanishing one.
+3. [boundary probe] Set seq_len = 1: show the LSTM reduces to the FFNN of module 4 on the current row, and explain what the padding row does to a card's first payment under seq_len = 10.
+4. [claim to refute] "The LSTM beat the random forest on card-present data, so sequence models are the better detector." Refute with the AGG columns (0.241 vs 0.246) and the ECOM table; name the step that fails (the comparison was on BASE features only).
+5. [research-shaped] On the simulator, build the 5-step sequences with the shift trick and train a small 1-D CNN and an XGBoost on the same prequential folds; report AP and CP@100 and whether the handbook's "no sequence gain on the simulator" reproduces.
+6. [mixed review] Account-level undersampling keeps 10% of genuine accounts: compute the β of <Ref> `undersampling-calibration` this implies and the corrected posterior for a model output of 0.5.
+7. FORWARD → `concept-drift`: using Jurgovsky Fig 3's description, compute the day-to-day AUCPR of both models over the 24 test days and the correlation between them; the reader finds that both move together with the day's fraud density — day difficulty is a property of the stream, the object the next lesson names.
+
+## ARC
+- Spine step 7 "Drift and sequence": "The transaction stream drifts and the fraud evolves, so a model trained once ranks last: the sequence of an entity's events is itself a feature, change is measured on the features before labels arrive and detected on the error stream once they do, and the learner remembers, forgets and replaces itself on a cadence that the stream's own evaluation has to score."
+- Inherits: aggregates and the time-delta feature (module 3), the FFNN pipeline and the stacking-diversity argument (module 4), AP/AUCPR@0.2 and the delay gap (module 2).
+- Contributes: the sequence as a feature, the card-present/e-commerce reversal, the overlap experiment, HMM likelihood features.
+- Hands off: the daily co-movement of both models (to `concept-drift`); attention weights as per-prediction explanations (to `alert-explanations`); the sequential models' row in the Worldline strategy ranking (to `drift-strategies-on-worldline`).

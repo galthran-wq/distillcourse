@@ -107,4 +107,6 @@ export const demos: Record<
   ReplicationWalker: () => import("./quant/ReplicationWalker"),
   ExerciseRuleExplorer: () => import("./quant/ExerciseRuleExplorer"),
   QuadraticVariationZoom: () => import("./quant/QuadraticVariationZoom"),
+  RankingBudgetExplorer: () => import("./fraud-ml/RankingBudgetExplorer"),
+  CircularMeanClock: () => import("./fraud-ml/CircularMeanClock"),
 };
