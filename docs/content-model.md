@@ -222,6 +222,10 @@ what it produces into two artefacts under `labs-dist/` (git-ignored):
   (`python -m app.content.ingest <index.json> <labs-private-dir>`) and
   compares against; it never becomes a `documents` row.
 
+A lab whose inputs — its sources, the build driver, the mirror URLs — match
+its last green run is skipped in both modes: the fingerprint is stamped in
+`labs-dist/stamps/`, and deleting that directory forces a full run.
+
 The lesson directory's `data/` is republished into that public half file for
 file, so anything a checkpoint is graded against — held-out labels above all —
 belongs in the lesson's `private/` instead: the build copies it into the run

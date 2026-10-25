@@ -20,8 +20,14 @@ logs:
 # Reindexing is part of it, not a step to remember afterwards: a build that
 # renames an h2 or unpublishes a lesson leaves `documents` naming anchors the
 # page no longer has, and the tutor hands out locators that scroll nowhere.
+#
+# The labs run here, on the host, before the image is built: a lab that is not
+# green stops the deploy before anything is replaced, the image validates with
+# --no-labs instead of executing every lab a second time, and the build-labs
+# in reindex finds them all stamped and executes none of them a third time.
 deploy:
 	git pull --ff-only
+	npm run build-labs
 	docker compose build
 	docker compose up -d --remove-orphans
 	$(MAKE) reindex

@@ -65,7 +65,11 @@ it mentions that the file no longer lists — that is how a renamed heading or a
 deleted lesson stops being a search result the tutor can quote.
 
 Reindexing also rebuilds the labs (`npm run build-labs`) and loads their answer
-keys, so the box needs `uv` as well wherever a lab lesson exists. The labs are
+keys, so the box needs `uv` as well wherever a lab lesson exists. `make deploy`
+runs that build once before the image build — a red lab stops the deploy
+before any container is replaced — and the image then validates with
+`--no-labs`; a lab whose inputs have not changed since its last green run is
+skipped by fingerprint, so the build in reindex executes nothing. The labs are
 rebuilt rather than assumed: the checkpoint API must compare against the
 outputs the notebooks on the mirror were generated from, and a stale key would
 grade a correct answer wrong. A build that produces nothing leaves

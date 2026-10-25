@@ -1,7 +1,18 @@
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 import { STATUS_RANK, type LoadedCourse, type LoadedLesson } from "../content/load";
 import type { Diagnostic } from "../content/lint";
 import { CLIENT_INSTALL, colabUrl, rawUrlBase } from "./mirror";
@@ -40,6 +51,9 @@ const LAB_SOURCES = [
 const TIMEOUT_MS = 30 * 60 * 1000;
 
 const PYTHON_DIR = join(__dirname, "python");
+
+/** The driver files a run copies or executes: an edit to either changes every lab's output. */
+const DRIVER_FILES = ["build_lab.py", "distill_capture.py"].map((name) => join(PYTHON_DIR, name));
 
 export type LabRunMode = "build" | "check";
 
@@ -89,15 +103,14 @@ export function runCourseLabs(loaded: LoadedCourse, options: LabRunOptions): Dia
   const outRoot =
     options.mode === "check" ? mkdtempSync(join(tmpdir(), "labs-check-")) : distRoot;
   try {
-    return targets.flatMap((entry) =>
-      buildLab(course, entry, outRoot, join(distRoot, ".venvs")),
-    );
+    return targets.flatMap((entry) => buildLab(course, entry, outRoot, distRoot));
   } finally {
     if (options.mode === "check") rmSync(outRoot, { recursive: true, force: true });
   }
 }
 
-const HALVES = ["private", "public"] as const;
+/** `stamps/` is swept with the halves: a stamp outliving its lab would vouch for nothing. */
+const SWEPT = ["private", "public", "stamps"] as const;
 
 /**
  * One directory of `labs-dist/`, cut back to the names that still exist. The
@@ -107,30 +120,74 @@ const HALVES = ["private", "public"] as const;
 function keepOnly(dir: string, kept: Set<string>): void {
   if (!existsSync(dir)) return;
   for (const entry of readdirSync(dir)) {
-    // A lab is `private/<slug>.json` on one side of the split and
-    // `public/<slug>/` on the other; a course is a bare name in both.
+    // A lab is `private/<slug>.json` (and `stamps/<slug>.json`) on one side
+    // of the split and `public/<slug>/` on the other; a course is a bare name.
     if (kept.has(basename(entry, ".json"))) continue;
     rmSync(join(dir, entry), { recursive: true, force: true });
   }
 }
 
 function retireLabs(distRoot: string, course: string, slugs: string[]): void {
-  for (const half of HALVES) keepOnly(join(distRoot, half, course), new Set(slugs));
+  for (const half of SWEPT) keepOnly(join(distRoot, half, course), new Set(slugs));
 }
 
 /** The same sweep one level up: a course whose directory is gone. */
 export function retireCourses(repoRoot: string, courses: string[]): void {
   const kept = new Set(courses);
-  for (const half of HALVES) keepOnly(join(repoRoot, "labs-dist", half), kept);
+  for (const half of SWEPT) keepOnly(join(repoRoot, "labs-dist", half), kept);
+}
+
+function filesUnder(path: string): string[] {
+  if (!statSync(path).isDirectory()) return [path];
+  return readdirSync(path)
+    .sort()
+    .flatMap((name) => filesUnder(join(path, name)));
+}
+
+/**
+ * A lab's artifacts are a function of its sources, the driver and the mirror
+ * URLs baked into the notebook, and nothing else (the environment is pinned
+ * by uv.lock and .python-version, both sources). So a lab whose fingerprint
+ * matches its last green run is not executed again: a deploy that touched no
+ * lab spends no time on labs. `rm -rf labs-dist/stamps` forces a full run.
+ */
+function fingerprint(labDir: string, settings: object): string {
+  const hash = createHash("sha256").update(JSON.stringify(settings));
+  const sources = LAB_SOURCES.map((name) => join(labDir, name)).filter(existsSync);
+  for (const file of [...sources.flatMap(filesUnder), ...DRIVER_FILES]) {
+    hash.update(`\0${relative(labDir, file)}\0`).update(readFileSync(file));
+  }
+  return hash.digest("hex");
 }
 
 function buildLab(
   course: string,
   entry: LoadedLesson,
   outRoot: string,
-  venvRoot: string,
+  distRoot: string,
 ): Diagnostic[] {
   const lab = `${course}/${entry.lesson.slug}`;
+  const publicDir = join(outRoot, "public", course, entry.lesson.slug);
+  const privatePath = join(outRoot, "private", course, `${entry.lesson.slug}.json`);
+  const settings = {
+    lab,
+    cell_timeout: TIMEOUT_MS / 1000,
+    colab_url: colabUrl(lab),
+    raw_url_base: rawUrlBase(lab),
+    client_install: CLIENT_INSTALL,
+  };
+  const stamp = fingerprint(entry.dir, settings);
+  const stampPath = join(distRoot, "stamps", course, `${entry.lesson.slug}.json`);
+  // Check mode discards its artifacts, so a matching stamp is all it needs;
+  // a build also needs the artifacts that stamp vouches for still on disk.
+  const artifactsPresent = outRoot !== distRoot || (existsSync(privatePath) && existsSync(publicDir));
+  if (artifactsPresent && existsSync(stampPath) && readFileSync(stampPath, "utf8") === stamp) {
+    console.log(`build-labs: ${lab} — unchanged since its last green run, skipped`);
+    return [];
+  }
+  // A run that fails midway may leave half-written artifacts behind.
+  rmSync(stampPath, { force: true });
+
   const runDir = mkdtempSync(join(tmpdir(), "lab-run-"));
   try {
     for (const name of LAB_SOURCES) {
@@ -141,15 +198,7 @@ function buildLab(
     const configPath = join(runDir, "build-config.json");
     writeFileSync(
       configPath,
-      JSON.stringify({
-        lab,
-        public_dir: join(outRoot, "public", course, entry.lesson.slug),
-        private_path: join(outRoot, "private", course, `${entry.lesson.slug}.json`),
-        cell_timeout: TIMEOUT_MS / 1000,
-        colab_url: colabUrl(lab),
-        raw_url_base: rawUrlBase(lab),
-        client_install: CLIENT_INSTALL,
-      }),
+      JSON.stringify({ ...settings, public_dir: publicDir, private_path: privatePath }),
     );
 
     console.log(`build-labs: ${lab} — executing the reference solution`);
@@ -172,12 +221,16 @@ function buildLab(
           ...process.env,
           // Keeps uv's environment out of the run directory, so the lab's deps
           // are resolved once and reused across builds.
-          UV_PROJECT_ENVIRONMENT: join(venvRoot, course, entry.lesson.slug),
+          UV_PROJECT_ENVIRONMENT: join(distRoot, ".venvs", course, entry.lesson.slug),
         },
       },
     );
     if (result.stdout) process.stdout.write(result.stdout);
-    if (result.status === 0) return [];
+    if (result.status === 0) {
+      mkdirSync(dirname(stampPath), { recursive: true });
+      writeFileSync(stampPath, stamp);
+      return [];
+    }
     return [
       {
         level: "error",
