@@ -1,0 +1,448 @@
+checkpoints:
+  equal-frequency-bins:
+    kind: exact
+    seed: 3101
+    atol: 1.0e-9
+    inputs_code: |
+      # A long-tailed amount with 40% of the rows at exactly zero: the
+      # first three quantiles coincide, and the zeros sit on an edge.
+      x = np.r_[np.zeros(160), np.round(rng.lognormal(3.0, 1.0, 240), 2)]
+      x = x[rng.permutation(len(x))]
+      inputs = (x, 8)
+    wrong:
+      - hint: "Cut the range into equal widths. Equal-frequency edges are quantiles of the data, so each bin holds about the same number of rows; equal widths leave a long tail's upper bins nearly empty."
+        code: |
+          import numpy as np
+          def f(x, n_bins):
+              x = np.asarray(x, float)
+              edges = np.linspace(x.min(), x.max(), n_bins + 1)[1:-1]
+              return edges, np.bincount(np.searchsorted(edges, x, side="left"), minlength=len(edges) + 1)
+      - hint: "Kept repeated quantiles. Where many rows share a value, several quantiles coincide; each edge is kept once, or the card gets empty bins."
+        code: |
+          import numpy as np
+          def f(x, n_bins):
+              x = np.asarray(x, float)
+              edges = np.quantile(x, np.arange(1, n_bins) / n_bins)
+              return edges, np.bincount(np.searchsorted(edges, x, side="left"), minlength=len(edges) + 1)
+      - hint: "Counted a value equal to an edge in the bin above it. A bin reads 'up to the edge': the zeros sit exactly on the first edge and belong to the first bin."
+        code: |
+          import numpy as np
+          def f(x, n_bins):
+              x = np.asarray(x, float)
+              edges = np.unique(np.quantile(x, np.arange(1, n_bins) / n_bins))
+              return edges, np.bincount(np.searchsorted(edges, x, side="right"), minlength=len(edges) + 1)
+
+  woe-iv:
+    kind: exact
+    seed: 3202
+    atol: 1.0e-9
+    inputs_code: |
+      genuine = rng.integers(50, 500, 8)
+      fraud = rng.integers(1, 30, 8)
+      fraud[3] = 0                     # a bin with no frauds: smoothing decides
+      inputs = (genuine, fraud, 0.5)
+    wrong:
+      - hint: "Flipped the sign. The course's weight of evidence is ln(genuine share / fraud share): a bin holding relatively more frauds gets a negative weight."
+        code: |
+          import numpy as np
+          def f(genuine, fraud, smooth=0.5):
+              g = np.asarray(genuine, float); fr = np.asarray(fraud, float)
+              gs = (g + smooth) / g.sum(); fs = (fr + smooth) / fr.sum()
+              w = np.log(fs / gs)
+              return w, float(np.sum((gs - fs) * w))
+      - hint: "Took both shares over all rows of the bin's variable. Each share is over its own class: the bin's genuine count over all genuine rows, its fraud count over all frauds."
+        code: |
+          import numpy as np
+          def f(genuine, fraud, smooth=0.5):
+              g = np.asarray(genuine, float); fr = np.asarray(fraud, float)
+              n = g.sum() + fr.sum()
+              gs = (g + smooth) / n; fs = (fr + smooth) / n
+              w = np.log(gs / fs)
+              return w, float(np.sum((gs - fs) * w))
+      - hint: "Added the smoothing to the totals as well. The constant goes on every bin's two counts; the shares are taken over the raw class totals."
+        code: |
+          import numpy as np
+          def f(genuine, fraud, smooth=0.5):
+              g = np.asarray(genuine, float); fr = np.asarray(fraud, float)
+              gs = (g + smooth) / (g + smooth).sum(); fs = (fr + smooth) / (fr + smooth).sum()
+              w = np.log(gs / fs)
+              return w, float(np.sum((gs - fs) * w))
+
+  chi2-binning-compare:
+    kind: exact
+    seed: 3303
+    atol: 1.0e-6
+    inputs_code: |
+      genuine = rng.integers(100, 3000, 7)
+      fraud = rng.integers(5, 200, 7)
+      groupings = [rng.permutation(np.r_[0, 1, 2, rng.integers(0, 3, 4)]) for _ in range(4)]
+      inputs = (genuine, fraud, groupings)
+    wrong:
+      - hint: "Divided each squared gap by the observed count. The statistic scales each gap by the count expected under independence."
+        code: |
+          import numpy as np
+          def f(genuine, fraud, groupings):
+              g = np.asarray(genuine, float); fr = np.asarray(fraud, float); out = []
+              for gr in groupings:
+                  obs = np.stack([np.bincount(gr, weights=g), np.bincount(gr, weights=fr)], axis=1)
+                  exp = obs.sum(1, keepdims=True) * obs.sum(0, keepdims=True) / obs.sum()
+                  out.append(np.sum((obs - exp) ** 2 / obs))
+              out = np.array(out)
+              return out, int(np.argmax(out))
+      - hint: "Expected the classes to split evenly over the groups. Under independence a group expects the population's fraud share of its own size: n_r * N_f / N frauds, not N_f / G."
+        code: |
+          import numpy as np
+          def f(genuine, fraud, groupings):
+              g = np.asarray(genuine, float); fr = np.asarray(fraud, float); out = []
+              for gr in groupings:
+                  obs = np.stack([np.bincount(gr, weights=g), np.bincount(gr, weights=fr)], axis=1)
+                  exp = np.broadcast_to(obs.sum(0, keepdims=True) / len(obs), obs.shape)
+                  out.append(np.sum((obs - exp) ** 2 / exp))
+              out = np.array(out)
+              return out, int(np.argmax(out))
+      - hint: "Summed the fraud cells only. χ² runs over every cell of the table, the genuine column as well as the fraud column."
+        code: |
+          import numpy as np
+          def f(genuine, fraud, groupings):
+              g = np.asarray(genuine, float); fr = np.asarray(fraud, float); out = []
+              for gr in groupings:
+                  obs = np.stack([np.bincount(gr, weights=g), np.bincount(gr, weights=fr)], axis=1)
+                  exp = obs.sum(1, keepdims=True) * obs.sum(0, keepdims=True) / obs.sum()
+                  out.append(np.sum(((obs - exp) ** 2 / exp)[:, 1]))
+              out = np.array(out)
+              return out, int(np.argmax(out))
+
+  scorecard-points:
+    kind: exact
+    seed: 3404
+    atol: 1.0e-6
+    inputs_code: |
+      sizes = [5, 3, 4, 2]
+      var_of_bin = np.repeat(np.arange(4), sizes)
+      woe = rng.normal(0, 1.2, len(var_of_bin))
+      coef = -rng.uniform(0.2, 1.2, 4)
+      # Anchors other than the lesson's: 600 points at fraud odds 1 to 30,
+      # 50 points per doubling.
+      inputs = (woe, var_of_bin, -4.2, coef, 600.0, 1 / 30, 50.0)
+    wrong:
+      - hint: "Added the whole Offset to every line. The offset belongs to no variable and is spread over the J lines, Offset / J each, so that the lines sum to the score."
+        code: |
+          import numpy as np
+          def f(woe, var_of_bin, intercept, coef, score0=100.0, odds0=1 / 50, pdo=20.0):
+              coef = np.asarray(coef, float); J = len(coef)
+              factor = pdo / np.log(2); offset = score0 - factor * np.log(odds0)
+              return factor, offset, factor * (coef[var_of_bin] * woe + intercept / J) + offset
+      - hint: "Added the whole intercept to every line. Like the offset, beta_0 is spread evenly: each line carries beta_0 / J."
+        code: |
+          import numpy as np
+          def f(woe, var_of_bin, intercept, coef, score0=100.0, odds0=1 / 50, pdo=20.0):
+              coef = np.asarray(coef, float); J = len(coef)
+              factor = pdo / np.log(2); offset = score0 - factor * np.log(odds0)
+              return factor, offset, factor * (coef[var_of_bin] * woe + intercept) + offset / J
+      - hint: "Used a base-10 logarithm. The log-odds of the regression are natural logs, so doubling the odds adds ln 2, and Factor = pdo / ln 2."
+        code: |
+          import numpy as np
+          def f(woe, var_of_bin, intercept, coef, score0=100.0, odds0=1 / 50, pdo=20.0):
+              coef = np.asarray(coef, float); J = len(coef)
+              factor = pdo / np.log10(2); offset = score0 - factor * np.log10(odds0)
+              return factor, offset, factor * (coef[var_of_bin] * woe + intercept / J) + offset / J
+      - hint: "Read the anchor's odds as genuine to fraud. odds0 is fraud to genuine, and a higher score means more suspicious: Offset = score0 - Factor * ln(odds0)."
+        code: |
+          import numpy as np
+          def f(woe, var_of_bin, intercept, coef, score0=100.0, odds0=1 / 50, pdo=20.0):
+              coef = np.asarray(coef, float); J = len(coef)
+              factor = pdo / np.log(2); offset = score0 - factor * np.log(1 / odds0)
+              return factor, offset, factor * (coef[var_of_bin] * woe + intercept / J) + offset / J
+
+  fit-scorecard:
+    kind: exact
+    seed: 3505
+    atol: 1.0e-3
+    inputs_code: |
+      import pandas as pd
+
+      def frame(n, levels):
+          a = np.round(rng.lognormal(3.0, 0.8, n), 2)
+          b = np.where(rng.random(n) < 0.5, 0.0, np.round(rng.random(n), 3))
+          cat = rng.choice(levels, n)
+          logit = -3.5 + 0.015 * a + 2.0 * (b > 0.7) + 1.2 * (cat == "D")
+          y = (rng.random(n) < 1 / (1 + np.exp(-logit))).astype(int)
+          return pd.DataFrame({"a": a, "b": b, "cat": cat}), y
+
+      train, labels = frame(4000, np.array(["A", "B", "C", "D"]))
+      # The scored table: values beyond the training range, and a category
+      # ("E") the training rows never had.
+      test, _ = frame(40, np.array(["A", "B", "C", "D", "E"]))
+      test.loc[:2, "a"] = [0.5, 900.0, 5000.0]
+      inputs = (train, labels, test, ["a", "b"], ["cat"], 6)
+    wrong:
+      - hint: "Re-estimated the bins on the scored table. Edges, levels and weights of evidence are learned on the training rows and frozen; the table being scored is only looked up."
+        code: |
+          import numpy as np
+          from sklearn.linear_model import LogisticRegression
+          def card(train, labels, test, numeric, categorical, n_bins, refit_edges_on_test):
+              y = np.asarray(labels, float); cols_tr, cols_te, woes, vob = [], [], [], []
+              for j, c in enumerate(numeric):
+                  x = train[c].to_numpy(float)
+                  e = np.unique(np.quantile(x, np.arange(1, n_bins) / n_bins))
+                  b = np.searchsorted(e, x, side="left"); k = len(e) + 1
+                  g = np.bincount(b, weights=1 - y, minlength=k); fr = np.bincount(b, weights=y, minlength=k)
+                  w = np.log(((g + .5) / g.sum()) / ((fr + .5) / fr.sum()))
+                  xt = test[c].to_numpy(float)
+                  et = np.unique(np.quantile(xt, np.arange(1, n_bins) / n_bins)) if refit_edges_on_test else e
+                  bt = np.minimum(np.searchsorted(et, xt, side="left"), k - 1)
+                  cols_tr.append(w[b]); cols_te.append(w[bt])
+              for c in categorical:
+                  lv, b = np.unique(train[c].to_numpy(), return_inverse=True); k = len(lv)
+                  g = np.bincount(b, weights=1 - y, minlength=k); fr = np.bincount(b, weights=y, minlength=k)
+                  w = np.log(((g + .5) / g.sum()) / ((fr + .5) / fr.sum()))
+                  xt = test[c].to_numpy(); i = np.minimum(np.searchsorted(lv, xt), k - 1)
+                  cols_tr.append(w[b]); cols_te.append(np.where(lv[i] == xt, w[i], 0.0))
+              m = LogisticRegression(C=1.0, max_iter=5000).fit(np.column_stack(cols_tr), y)
+              factor = 20 / np.log(2); offset = 100 - factor * np.log(1 / 50)
+              return offset + factor * m.decision_function(np.column_stack(cols_te))
+          def f(train, labels, test, numeric, categorical, n_bins):
+              return card(train, labels, test, numeric, categorical, n_bins, True)
+      - hint: "Gave an unseen category the weight of a neighbouring level. A value the training rows never had carries no evidence: its WOE is 0, the population's own odds."
+        code: |
+          import numpy as np
+          from sklearn.linear_model import LogisticRegression
+          def f(train, labels, test, numeric, categorical, n_bins):
+              y = np.asarray(labels, float); cols_tr, cols_te = [], []
+              for c in numeric:
+                  x = train[c].to_numpy(float)
+                  e = np.unique(np.quantile(x, np.arange(1, n_bins) / n_bins))
+                  b = np.searchsorted(e, x, side="left"); k = len(e) + 1
+                  g = np.bincount(b, weights=1 - y, minlength=k); fr = np.bincount(b, weights=y, minlength=k)
+                  w = np.log(((g + .5) / g.sum()) / ((fr + .5) / fr.sum()))
+                  cols_tr.append(w[b]); cols_te.append(w[np.searchsorted(e, test[c].to_numpy(float), side="left")])
+              for c in categorical:
+                  lv, b = np.unique(train[c].to_numpy(), return_inverse=True); k = len(lv)
+                  g = np.bincount(b, weights=1 - y, minlength=k); fr = np.bincount(b, weights=y, minlength=k)
+                  w = np.log(((g + .5) / g.sum()) / ((fr + .5) / fr.sum()))
+                  i = np.minimum(np.searchsorted(lv, test[c].to_numpy()), k - 1)
+                  cols_tr.append(w[b]); cols_te.append(w[i])
+              m = LogisticRegression(C=1.0, max_iter=5000).fit(np.column_stack(cols_tr), y)
+              factor = 20 / np.log(2); offset = 100 - factor * np.log(1 / 50)
+              return offset + factor * m.decision_function(np.column_stack(cols_te))
+      - hint: "Fitted the regression on the raw columns. The card's regression reads one WOE column per variable; the raw values never enter it."
+        code: |
+          import numpy as np
+          import pandas as pd
+          from sklearn.linear_model import LogisticRegression
+          def f(train, labels, test, numeric, categorical, n_bins):
+              y = np.asarray(labels, float)
+              tr = pd.get_dummies(train[numeric + categorical], columns=categorical, dtype=float)
+              te = pd.get_dummies(test[numeric + categorical], columns=categorical, dtype=float).reindex(columns=tr.columns, fill_value=0.0)
+              m = LogisticRegression(C=1.0, max_iter=5000).fit(tr.to_numpy(), y)
+              factor = 20 / np.log(2); offset = 100 - factor * np.log(1 / 50)
+              return offset + factor * m.decision_function(te.to_numpy())
+
+  tuned-gbm:
+    kind: exact
+    seed: 3606
+    atol: 1.0e-6
+    inputs_code: |
+      counts = rng.poisson(0.6, (42, 150)).ravel()
+      days = np.repeat(np.repeat(np.arange(42), 150), counts)
+      cards = np.repeat(np.tile(np.arange(150), 42), counts)
+      labels = np.zeros(len(days), dtype=np.int64)
+      for d0 in range(42):
+          for card in rng.choice(150, 2, replace=False):
+              window = (cards == card) & (days >= d0) & (days < d0 + 6)
+              labels[window & (rng.random(len(days)) < 0.5)] = 1
+      # One feature whose fraud signal drifts: frauds sit in both tails early
+      # and mostly in the upper tail late, so the folds and the test weeks
+      # disagree about the best histogram.
+      shift = np.where(days < 30, rng.choice([-2.5, 2.5], len(days)), rng.choice([-1.0, 3.0], len(days)))
+      x = rng.normal(0, 1, len(days)) + labels * shift
+
+      def fit_and_score(train_idx, cand):
+          n_bins, prior = cand
+          edges = np.quantile(x[train_idx], np.linspace(0, 1, n_bins + 1)[1:-1])
+          b = np.searchsorted(edges, x[train_idx])
+          rate = ((np.bincount(b, weights=labels[train_idx], minlength=n_bins) + prior * 0.05)
+                  / (np.bincount(b, minlength=n_bins) + prior))
+          return rate[np.searchsorted(edges, x)] + 1e-6 * x
+
+      grid = [(n, p) for n in (1, 2, 4, 8, 32) for p in (0.5, 20.0)]
+      inputs = (grid, 6, 11, fit_and_score, days, cards, labels, 30, 3, 5, 3, 4, 3)
+    wrong:
+      - hint: "Picked on the test folds. The choice is made on the validation folds only; reading the test means to pick turns the best-estimated score into the optimal one, a number nobody could have had on deployment day."
+        code: |
+          import numpy as np
+          import pandas as pd
+          from sklearn.metrics import roc_auc_score
+          def split(days, cards, labels, start, n_folds, dtr, ddel, dte):
+              roles = np.zeros((n_folds, len(days)), dtype=np.int64)
+              for j in range(n_folds):
+                  s = start - j * dte
+                  roles[j, (days >= s) & (days < s + dtr)] = 1
+                  for i in range(dte):
+                      d = s + dtr + ddel + i
+                      known = cards[(labels == 1) & (days >= s) & (days <= d - ddel - 1)]
+                      roles[j, (days == d) & ~np.isin(cards, known)] = 2
+              return roles
+          def ap(y, s):
+              o = np.argsort(-s, kind="stable"); s, y = s[o], y[o].astype(float)
+              last = np.r_[s[1:] != s[:-1], True]
+              tp = np.cumsum(y)[last]; n = np.flatnonzero(last) + 1
+              return float(np.sum(np.diff(np.r_[0.0, tp / y.sum()]) * tp / n))
+          def cp(days, cards, s, y, k):
+              fr = pd.DataFrame({"day": days, "card": cards, "score": s, "label": y})
+              gone, out = set(), []
+              for _, t in fr.groupby("day", sort=True):
+                  t = t[~t.card.isin(gone)]
+                  pc = t.groupby("card")[["score", "label"]].max().sort_values("score", ascending=False, kind="stable").head(k)
+                  found = pc.index[pc.label == 1]
+                  out.append(len(found) / k); gone.update(found)
+              return float(np.mean(out))
+          def table(roles, n_folds, cands, fit_and_score, days, cards, labels, k):
+              t = np.zeros((len(cands), n_folds, 2))
+              for j in range(n_folds):
+                  tr, te = np.flatnonzero(roles[j] == 1), np.flatnonzero(roles[j] == 2)
+                  for c, cand in enumerate(cands):
+                      s = fit_and_score(tr, cand)[te]
+                      t[c, j] = (ap(labels[te], s), cp(days[te], cards[te], s, labels[te], k))
+              return t.mean(axis=1)
+          def f(grid, n_draws, seed, fit_and_score, days, cards, labels, deploy_start, n_folds, dtr, ddel, dte, k):
+              drawn = np.random.default_rng(seed).choice(len(grid), n_draws, replace=False)
+              cands = [grid[i] for i in drawn]
+              V = table(split(days, cards, labels, deploy_start - ddel - dte, n_folds, dtr, ddel, dte), n_folds, cands, fit_and_score, days, cards, labels, k)
+              T = table(split(days, cards, labels, deploy_start, n_folds, dtr, ddel, dte), n_folds, cands, fit_and_score, days, cards, labels, k)
+              best = T.argmax(axis=0)
+              return drawn, V, T, drawn[best], T[best, [0, 1]], T.max(axis=0)
+      - hint: "Returned the picks as positions in the drawn list. The picks are grid positions: drawn[argmax], not argmax."
+        code: |
+          import numpy as np
+          import pandas as pd
+          from sklearn.metrics import roc_auc_score
+          def split(days, cards, labels, start, n_folds, dtr, ddel, dte):
+              roles = np.zeros((n_folds, len(days)), dtype=np.int64)
+              for j in range(n_folds):
+                  s = start - j * dte
+                  roles[j, (days >= s) & (days < s + dtr)] = 1
+                  for i in range(dte):
+                      d = s + dtr + ddel + i
+                      known = cards[(labels == 1) & (days >= s) & (days <= d - ddel - 1)]
+                      roles[j, (days == d) & ~np.isin(cards, known)] = 2
+              return roles
+          def ap(y, s):
+              o = np.argsort(-s, kind="stable"); s, y = s[o], y[o].astype(float)
+              last = np.r_[s[1:] != s[:-1], True]
+              tp = np.cumsum(y)[last]; n = np.flatnonzero(last) + 1
+              return float(np.sum(np.diff(np.r_[0.0, tp / y.sum()]) * tp / n))
+          def cp(days, cards, s, y, k):
+              fr = pd.DataFrame({"day": days, "card": cards, "score": s, "label": y})
+              gone, out = set(), []
+              for _, t in fr.groupby("day", sort=True):
+                  t = t[~t.card.isin(gone)]
+                  pc = t.groupby("card")[["score", "label"]].max().sort_values("score", ascending=False, kind="stable").head(k)
+                  found = pc.index[pc.label == 1]
+                  out.append(len(found) / k); gone.update(found)
+              return float(np.mean(out))
+          def table(roles, n_folds, cands, fit_and_score, days, cards, labels, k):
+              t = np.zeros((len(cands), n_folds, 2))
+              for j in range(n_folds):
+                  tr, te = np.flatnonzero(roles[j] == 1), np.flatnonzero(roles[j] == 2)
+                  for c, cand in enumerate(cands):
+                      s = fit_and_score(tr, cand)[te]
+                      t[c, j] = (ap(labels[te], s), cp(days[te], cards[te], s, labels[te], k))
+              return t.mean(axis=1)
+          def f(grid, n_draws, seed, fit_and_score, days, cards, labels, deploy_start, n_folds, dtr, ddel, dte, k):
+              drawn = np.random.default_rng(seed).choice(len(grid), n_draws, replace=False)
+              cands = [grid[i] for i in drawn]
+              V = table(split(days, cards, labels, deploy_start - ddel - dte, n_folds, dtr, ddel, dte), n_folds, cands, fit_and_score, days, cards, labels, k)
+              T = table(split(days, cards, labels, deploy_start, n_folds, dtr, ddel, dte), n_folds, cands, fit_and_score, days, cards, labels, k)
+              best = V.argmax(axis=0)
+              return drawn, V, T, best, T[best, [0, 1]], T.max(axis=0)
+      - hint: "Backtested on the validation folds. The test folds start on deploy_start itself, a delay and a block later than the validation folds; scored on the validation geometry, T repeats V."
+        code: |
+          import numpy as np
+          import pandas as pd
+          from sklearn.metrics import roc_auc_score
+          def split(days, cards, labels, start, n_folds, dtr, ddel, dte):
+              roles = np.zeros((n_folds, len(days)), dtype=np.int64)
+              for j in range(n_folds):
+                  s = start - j * dte
+                  roles[j, (days >= s) & (days < s + dtr)] = 1
+                  for i in range(dte):
+                      d = s + dtr + ddel + i
+                      known = cards[(labels == 1) & (days >= s) & (days <= d - ddel - 1)]
+                      roles[j, (days == d) & ~np.isin(cards, known)] = 2
+              return roles
+          def ap(y, s):
+              o = np.argsort(-s, kind="stable"); s, y = s[o], y[o].astype(float)
+              last = np.r_[s[1:] != s[:-1], True]
+              tp = np.cumsum(y)[last]; n = np.flatnonzero(last) + 1
+              return float(np.sum(np.diff(np.r_[0.0, tp / y.sum()]) * tp / n))
+          def cp(days, cards, s, y, k):
+              fr = pd.DataFrame({"day": days, "card": cards, "score": s, "label": y})
+              gone, out = set(), []
+              for _, t in fr.groupby("day", sort=True):
+                  t = t[~t.card.isin(gone)]
+                  pc = t.groupby("card")[["score", "label"]].max().sort_values("score", ascending=False, kind="stable").head(k)
+                  found = pc.index[pc.label == 1]
+                  out.append(len(found) / k); gone.update(found)
+              return float(np.mean(out))
+          def table(roles, n_folds, cands, fit_and_score, days, cards, labels, k):
+              t = np.zeros((len(cands), n_folds, 2))
+              for j in range(n_folds):
+                  tr, te = np.flatnonzero(roles[j] == 1), np.flatnonzero(roles[j] == 2)
+                  for c, cand in enumerate(cands):
+                      s = fit_and_score(tr, cand)[te]
+                      t[c, j] = (ap(labels[te], s), cp(days[te], cards[te], s, labels[te], k))
+              return t.mean(axis=1)
+          def f(grid, n_draws, seed, fit_and_score, days, cards, labels, deploy_start, n_folds, dtr, ddel, dte, k):
+              drawn = np.random.default_rng(seed).choice(len(grid), n_draws, replace=False)
+              cands = [grid[i] for i in drawn]
+              V = table(split(days, cards, labels, deploy_start - ddel - dte, n_folds, dtr, ddel, dte), n_folds, cands, fit_and_score, days, cards, labels, k)
+              T = V.copy()
+              best = V.argmax(axis=0)
+              return drawn, V, T, drawn[best], T[best, [0, 1]], T.max(axis=0)
+
+  which-to-ship:
+    kind: review
+    rubric: |
+      The question: the learner built a WOE points scorecard and tuned a
+      boosted tree by random search on prequential folds, then scored both
+      on the same three test folds of a simulated card log by average
+      precision, card precision at 20 and savings (Bayes-minimum-risk alerts
+      at an investigator cost C_a, against the cheaper trivial policy),
+      with savings also shown over C_a from 1 to 20 euros. They must
+      recommend one detector to a head of fraud operations.
+
+      On the reference run the boosted tree saves about 0.45 of the
+      baseline cost at C_a = 5 euros against about 0.19 for the card (fold
+      spreads 0.02 and 0.06); average precision about 0.47 against 0.14;
+      card precision at 20 about 0.30 against 0.19 (spreads 0.03-0.04). The
+      savings gap widens with the alert cost: about 0.54 against 0.37 at 2
+      euros, 0.28 against 0.05 at 15 euros. A learner's own numbers may
+      differ somewhat (different binning, shortlist or refit choices); judge
+      consistency with the numbers they quote, not equality with these.
+
+      Pass if the answer contains all three:
+      (a) numbers from a run — at least a savings figure (or cost in euros)
+          for each detector, plus at least one ranking metric (AP or CP@20);
+      (b) a money comparison: the savings gap stated and related to the
+          spread over folds (or otherwise argued to be real rather than
+          noise), and a statement of how the comparison moves with the
+          alert cost (e.g. at 2 and 15 euros) or why it does not;
+      (c) the named trade-off: what the losing detector buys that the
+          numbers do not price — for the card, reviewability /
+          line-by-line explanations / regulatory acceptability / visible
+          sign checks; for the tree, the extra savings or precision — and
+          a condition under which the choice would reverse.
+
+      Fail if the verdict has no cost or savings figure; if it is decided
+      on ROC-AUC or a single ranking metric alone; if it reads a gap
+      smaller than the fold spread as decisive; or if it names no
+      trade-off.
+
+  beat-holdout-week:
+    kind: metric
+    metric: roc_auc
+    threshold: 0.83
+    holdout: data/holdout_week.csv.gz
+    labels_code: |
+      labels = np.loadtxt("private/holdout_y.csv")
