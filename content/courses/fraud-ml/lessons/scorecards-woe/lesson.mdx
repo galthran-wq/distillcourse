@@ -1,0 +1,990 @@
+A regulator, an investigator and a customer all need to see why a payment scored high, and a model with hundreds of interacting splits cannot show them. A scorecard gives each value of each variable a number of points and adds them up. How are the points derived from data so that the card is both a valid classifier and a table a reviewer can check line by line?
+
+The simplest model the course has used is already close to a sum. The
+logistic regression of <Ref lesson="alert-budget-metrics"
+id="five-models-scored-on-a-test-week">the five-model test week</Ref>
+scores a payment by a weighted sum of its fifteen inputs, and on that week
+it had the best card precision at 100 of the five. Its explanation of one payment is a
+list of products, coefficient times input, one per variable. A reviewer
+cannot do much with that list. A coefficient on the amount is a slope:
+it claims that every extra euro moves the fraud odds by the same factor,
+whether the payment is €20 or €200, and nothing in the data is counted at
+"every extra euro". What a reviewer can check is a group of payments: the
+200 payments above €201.82 in the training week, of which 132 were fraud.
+A line of the explanation should point at such a group, its direction
+should agree with what the group's counts say, and the lines should add
+up to the score.
+
+The regression on raw inputs meets only the last of the three, and the
+other two cannot be added after the fit: they constrain what the model
+is allowed to look like. The card has to be built so that all three
+hold, and then scored on the same test week as the five models, to see
+what they cost.
+
+## A reviewer checks groups, not slopes: cutting variables into bins
+
+Start with the amount, the input every fraud analyst looks at first. In
+the training week of the simulator (25 to 31 July, 67,240 payments, 598
+fraud), the fraud rate barely moves with the amount over most of its
+range and then jumps.
+
+### What one slope does with a jump
+
+Cut the training week's amounts at €160, €183 and €202. Below €160 sit
+66,169 payments with 444 frauds, 0.67%. The next two slices hold 652
+payments at 2.1% and 219 at 3.7%. Above €201.82 sit 200 payments, and 132
+of them are fraud, 66%. That last slice is the simulator's scripted rule
+that every payment above €220 is fraud (<Ref lesson="canonical-datasets"
+id="three-scripted-frauds">the three scripted frauds</Ref>), plus the
+inflated payments of leaked cards that reach the same range.
+
+<Figure
+  src="./figures/amount-rate.svg"
+  alt="Fraud rate on a log scale from 0.1% to 100% against payment amount from 0 to 400 euros, training week of the simulator. Ten thin grey horizontal segments show the ten equal-frequency slices: between 0.45% and 0.9% up to 110 euros, then one segment at 2.9% spanning 110 euros to the right edge. Four amber segments show four bins: 0.67% up to 160 euros, 2.1% from 160 to 183, 3.7% from 183 to 202 and 66% above 202 euros, labelled 132 of 200 fraud"
+  caption="The fraud rate is flat over most of the amount range and jumps above €202. The top tenth of payments by amount mixes the jump with thousands of ordinary payments."
+/>
+
+A logistic regression puts the amount into the log-odds as one term,
+$\beta\,\mathrm{Amt}$. The fitted β has to serve the flat stretch and the
+jump at once: a slope steep enough to reach 66% above €202 claims that a
+€150 payment is far riskier than a €20 one, which the counts deny, and a
+slope that respects the flat stretch never reaches the jump. Whatever β
+comes out, the line "amount: β × €150" corresponds to no group of
+payments anyone counted.
+
+### A category has no slope at all
+
+Some variables have no order to put a slope on. A merchant's category or
+a payment's country takes dozens of values with no arithmetic between
+them, and a regression needs one indicator column per value but one, 49
+coefficients for 50 countries, each estimated from the few frauds that
+value holds.
+
+Both problems have one answer: replace the variable by a handful of
+groups of its values, and let each group carry its own number.
+
+<Definition title="coarse classification">
+*Coarse classification* (binning) replaces a variable by a small number
+of bins: ranges of values for a number, groups of values for a category.
+Every value falls in exactly one bin. A bin with no value of its own, such
+as "missing", is allowed.
+</Definition>
+
+Each bin is a group of payments with a count of frauds and a count of
+genuine payments, which is what a reviewer can look up. The reviewer's
+question "why did this €250 payment score high?" now has a line to point
+at: "it is in the amount bin above €201.82, where 132 of the 200 training
+payments were fraud".
+
+## Where to cut: bins that separate the classes
+
+Binning is only worth doing if the bins differ in fraud rate. Cutting
+the amount at €50 and €100 would produce three groups of payments, all
+near 0.7% fraud, and lose the jump. A cut is good when the groups it
+makes differ, and that can be measured.
+
+### Grouping categories: how far the counts sit from independence
+
+Take an online shop's 10,000 orders in six product categories, a sample
+in which 1,000 orders are fraud.
+
+| category | clothes | books | music | electronics | games | movies | all |
+|---|---|---|---|---|---|---|---|
+| genuine | 6,000 | 1,600 | 350 | 950 | 90 | 10 | 9,000 |
+| fraud | 300 | 400 | 140 | 100 | 50 | 10 | 1,000 |
+| genuine : fraud | 20 : 1 | 4 : 1 | 2.5 : 1 | 9.5 : 1 | 1.8 : 1 | 1 : 1 | 9 : 1 |
+
+Six groups are too many for 140 frauds in music and 10 in movies. Two
+candidate groupings into three:
+
+- **Option 1**: clothes | books and music | the other three.
+- **Option 2**: clothes | electronics | the other four.
+
+If a grouping told nothing about fraud, each group would hold frauds in
+the population's proportion, one in ten. That gives the counts expected
+under independence: a group of 6,300 orders expects
+$6{,}300 \times 9{,}000/10{,}000 = 5{,}670$ genuine and 630 fraud. The
+further the observed counts sit from those, the more the grouping
+separates the classes. The χ² statistic sums the squared gaps, each
+scaled by the expected count:
+$$
+\chi^2 = \sum_{\text{cells}} \frac{(\text{observed} - \text{expected})^2}{\text{expected}} .
+$$
+
+<Example title="two groupings of the product categories">
+**Option 1.** Observed counts, genuine / fraud: clothes 6,000 / 300;
+books and music 1,950 / 540; others 1,050 / 160. Expected:
+5,670 / 630; 2,241 / 249; 1,089 / 121.
+$$
+\chi^2 = \tfrac{330^2}{5670} + \tfrac{330^2}{630} + \tfrac{291^2}{2241}
++ \tfrac{291^2}{249} + \tfrac{39^2}{1089} + \tfrac{39^2}{121}
+= 19 + 173 + 38 + 340 + 1 + 13 \approx 584 .
+$$
+
+**Option 2.** Observed: clothes 6,000 / 300; electronics 950 / 100;
+others 2,050 / 600. Expected: 5,670 / 630; 945 / 105; 2,385 / 265.
+$$
+\chi^2 = 19 + 173 + 0.03 + 0.24 + \tfrac{335^2}{2385} + \tfrac{335^2}{265}
+= 19 + 173 + 0 + 0 + 47 + 423 \approx 663 .
+$$
+
+Each term is shown rounded to a whole number; the totals are the exact
+sums, 583.9 and 662.9, rounded.
+
+Option 2 sits further from independence and is the better grouping.
+Both options have three groups, so the two statistics have the same
+degrees of freedom and can be compared directly.
+</Example>
+
+<Figure
+  src="./figures/product-groupings.svg"
+  alt="Two panels side by side. Left, option 1: three groups clothes, books and music, others, each with a bar pair of observed fraud count in amber and fraud count expected under independence in grey outline: 300 against 630, 540 against 249, 160 against 121; tally chi-squared 584. Right, option 2: clothes, electronics, others: 300 against 630, 100 against 105, 600 against 265; tally chi-squared 663"
+  caption="Observed fraud counts against the counts independence predicts, for the two groupings."
+/>
+
+Option 2 wins although its middle group, electronics, is almost exactly
+at the population's odds. What it gains is a pure high-risk group: books,
+music, games and movies together run at 3.4 genuine per fraud, against
+9 for the population. Option 1 splits those risky categories between two
+groups and dilutes both.
+
+### Cutting a number: the edge that matters
+
+For a number the candidate groupings are cut points. Two rules need no
+labels. *Equal-width* bins split the range into equal intervals; on the
+amount they would put almost every payment into the first bins and leave
+the upper ones nearly empty. *Equal-frequency* bins put the same number
+of payments in each. The figure above shows what ten of them do: the top
+tenth of the training week runs from €110 to €789 and holds 6,723
+payments, 194 of them fraud, 2.9%. The 200 payments above €201.82, at
+66%, are inside it, mixed with 6,523 ordinary ones. Neither rule looks at
+the label, so neither can find the edge where the rate changes.
+
+The search that finds it tries every cut and keeps the one whose two
+sides differ most in fraud rate, the separation χ² measured for the
+product groupings. Repeated inside each side, that search is a decision
+tree with the variable as its only input; its split criterion is a
+different measure of the same separation. It needs two brakes.
+
+- **A minimum bin size.** A bin's number will be estimated from its
+  frauds, and a bin of 30 payments with 2 frauds gives a number that is
+  mostly noise. The simulator card below requires at least 200 training
+  payments per bin and at most five bins per variable.
+- **One direction.** A bin riskier than both its neighbours needs a
+  story a reviewer will accept; without one it is more likely noise than
+  fact. The card merges neighbouring bins until the fraud rate rises (or
+  falls) steadily across them.
+
+On the amount, the tree's cuts are €160.34, €182.62 and €201.82, the
+four bins of the figure, and they already run in one direction.
+
+<KeyFact>
+The minimum bin size sets how fine the card can see. The bin above
+€201.82 holds exactly 200 training payments, so a cut at €220, where the
+scripted rule sits, would leave bins of 77 and 123 and is not allowed:
+the card prints one line for a €205 payment and a €600 one, though every
+payment above €220 is fraud and 9 of the 77 between €202 and €220 were.
+</KeyFact>
+
+## One number per bin: the weight of evidence
+
+A binned variable still has to enter the regression. The obvious way is
+one indicator per bin, the dummy columns of the categorical case. The
+amount's four bins need three coefficients, a card of seven variables
+about twenty, each fitted from the frauds of one bin, and nothing makes
+the coefficients of neighbouring bins line up with their fraud rates. The
+card would be back to many numbers per variable, none of which a reviewer
+can tie to a count. What is wanted is one number per bin, computed from
+that bin's counts, so that the variable enters the regression as one
+column with one coefficient.
+
+### The definition, on a table of applications
+
+The cleanest case to compute by hand is a new-card application form. A
+fraudster applying for a card in a made-up or stolen identity is the
+subscription fraud of <Ref lesson="financial-crime-typology"
+id="superimposed-and-subscription-fraud">the typology</Ref>, and the
+applicant's stated age is one of the few fields the form offers. Take
+2,000 applications, 194 of them later found fraudulent, binned by age:
+
+| age | applications | genuine | share of genuine | fraud | share of fraud |
+|---|---|---|---|---|---|
+| missing | 50 | 42 | 2.33% | 8 | 4.12% |
+| 18–22 | 200 | 152 | 8.42% | 48 | 24.74% |
+| 23–26 | 300 | 246 | 13.62% | 54 | 27.84% |
+| 27–29 | 450 | 405 | 22.43% | 45 | 23.20% |
+| 30–34 | 500 | 475 | 26.30% | 25 | 12.89% |
+| 35–43 | 350 | 339 | 18.77% | 11 | 5.67% |
+| 44+ | 150 | 147 | 8.14% | 3 | 1.55% |
+| all | 2,000 | 1,806 | 100% | 194 | 100% |
+
+The two share columns are distributions over the bins: 24.74% says that a
+quarter of all fraudulent applications came from 18-to-22-year-olds. It is
+not a fraud rate. The fraud rate of that bin is 48 of 200, 24%, close to
+24.74% by coincidence; in the 44+ bin the share of fraud is 1.55% and the
+rate is 2%.
+
+<Definition title="weight of evidence">
+For a bin $i$ holding $g_i$ of the $N_g$ genuine cases (payments, or
+here applications) and $f_i$ of the $N_f$ frauds, the *weight of evidence* is
+$$
+\mathrm{WOE}_i = \ln\frac{g_i/N_g}{f_i/N_f} ,
+$$
+the log of the bin's share of the genuine payments over its share of the
+frauds. Positive means the bin holds relatively more genuine payments
+than frauds; negative, relatively more frauds. (Some texts use the
+inverse ratio and the opposite sign; this course keeps this one.)
+</Definition>
+
+<Example title="weight of evidence of two age bins">
+**18–22.** $\mathrm{WOE} = \ln(0.0842/0.2474) = \ln 0.340 = -1.078$. The
+bin holds three times its share of the frauds, so it is a risky bin.
+
+**44+.** $\mathrm{WOE} = \ln(0.0814/0.0155) = \ln 5.25 = +1.661$.
+
+The whole column, from missing to 44+: $-0.573$, $-1.078$, $-0.715$,
+$-0.034$, $+0.713$, $+1.197$, $+1.661$.
+</Example>
+
+<Figure
+  src="./figures/age-woe.svg"
+  alt="Bar chart of weight of evidence by age bin. A separate bar for missing at minus 0.57, then 18–22 at minus 1.08, 23–26 at minus 0.72, 27–29 at minus 0.03, 30–34 at plus 0.71, 35–43 at plus 1.20 and 44+ at plus 1.66. Negative bars are amber and labelled riskier than average, positive bars blue and labelled safer than average"
+  caption="Weights of evidence of the age bins. They rise steadily with age, and the missing bin, which has no place on the age axis, gets a number of its own: riskier than average."
+/>
+
+The missing bin shows the second thing bins buy. A blank age cannot enter
+a slope, and filling it with the average age would put it among the
+safest applicants. As a bin it gets its own weight, $-0.57$: applicants
+who leave the age blank are riskier than average.
+
+<Exercise>
+Compute the weight of evidence of the 35–43 bin from its counts, 339
+genuine and 11 fraud, and say in words what the number means.
+
+<Solution>
+Shares: $339/1{,}806 = 0.1877$ of the genuine applications and
+$11/194 = 0.0567$ of the frauds. $\mathrm{WOE} = \ln(0.1877/0.0567) =
+\ln 3.31 = 1.197$. The bin holds 3.3 times as large a share of the
+genuine applications as of the fraudulent ones: an applicant in it is
+safer than average.
+</Solution>
+</Exercise>
+
+### What the weight of evidence is: the bin's log-odds against the population's
+
+Why a log of shares, and not the bin's fraud rate? Write the bin's fraud
+odds and pull the population's odds out of them:
+$$
+\ln\frac{f_i}{g_i}
+= \ln\frac{N_f}{N_g} + \ln\frac{f_i/N_f}{g_i/N_g}
+= \ln\frac{N_f}{N_g} - \mathrm{WOE}_i .
+$$
+The weight of evidence is the amount by which the bin's log-odds of fraud
+fall below the population's. In the 18–22 bin, $\ln(48/152) = -1.153$;
+the population's is $\ln(194/1{,}806) = -2.231$; the gap is $1.078$, the
+bin's WOE with the sign flipped. Odds multiply where log-odds add: the
+bin's fraud odds are $e^{1.078} \approx 2.9$ times the population's.
+
+So a logistic regression with one input, the WOE of one binned variable,
+has a known answer. Its log-odds $\beta_0 + \beta_1\,\mathrm{WOE}_i$ can
+reproduce every bin's observed log-odds exactly with $\beta_1 = -1$ and
+$\beta_0 = \ln(N_f/N_g)$, and a maximum-likelihood fit that can match
+every group exactly does so. Fitted on the simulator's amount bins, the
+regression returns $\beta_1 = -1.00$ and $\beta_0 = -4.71$, against
+$\ln(598/66{,}642) = -4.71$.
+
+With several WOE columns in one regression, nothing pins the
+coefficients at $-1$. Each is fitted alongside the others, and where two
+variables carry the same evidence the fit can split it between them,
+leave one near zero, or push one above zero. A coefficient can land
+anywhere, which is why its sign has to be checked. What the coding fixes
+is the sign it should have:
+
+- **The expected sign is the same for every variable.** A bin with
+  relatively more frauds has a negative WOE and must raise the fraud
+  odds, so every $\beta_j$ should be negative, whatever shape the
+  variable's fraud rate has in its raw values. A positive $\beta_j$ gives
+  the variable's riskiest bins the fewest points, against the variable's
+  own counts.
+- **With a negative coefficient, the bins keep the order of their
+  weights of evidence.** A bin with a lower WOE adds more to the fraud
+  odds than one with a higher WOE, whatever the other variables do.
+
+## Which variables earn a line: information value
+
+A card with every available input on it is long, and most of the lines
+would carry nothing. A card fraud model typically ends up with ten to
+fifteen variables. Before any fit, a cheap measure of how much each
+binned variable separates the classes on its own sorts the candidates.
+
+### One number per variable
+
+The weight of evidence measures each bin; the variable's separation adds
+the bins up, each weighted by how different its two shares are.
+
+<Definition title="information value">
+For a binned variable with bins $i$,
+$$
+\mathrm{IV} = \sum_i \left(\frac{g_i}{N_g} - \frac{f_i}{N_f}\right)\mathrm{WOE}_i .
+$$
+</Definition>
+
+Each term is at least zero: when the bin's genuine share exceeds its
+fraud share, both the difference and the log of their ratio are positive;
+when it falls short, both are negative. A term is zero only when the two
+shares are equal. So the IV is zero exactly when the variable's bins hold
+the genuine payments and the frauds in the same proportions, and it grows
+as the two distributions pull apart.
+
+<Example title="information value of age">
+Term by term, from missing to 44+:
+
+| age | share genuine − share fraud | WOE | term |
+|---|---|---|---|
+| missing | −0.0179 | −0.573 | 0.0103 |
+| 18–22 | −0.1632 | −1.078 | 0.1760 |
+| 23–26 | −0.1422 | −0.715 | 0.1016 |
+| 27–29 | −0.0077 | −0.034 | 0.0003 |
+| 30–34 | +0.1341 | +0.713 | 0.0957 |
+| 35–43 | +0.1310 | +1.197 | 0.1568 |
+| 44+ | +0.0659 | +1.661 | 0.1095 |
+
+IV = 0.6502. The 27–29 bin contributes nothing: it holds 22% of each
+class.
+</Example>
+
+A rule of thumb from credit scoring, a convention and not something
+derived, reads the number as follows:
+
+- below 0.02, the variable separates nothing worth a line;
+- 0.02 to 0.1, weak;
+- 0.1 to 0.3, medium;
+- above 0.3, strong.
+
+<Figure
+  src="./figures/age-iv.svg"
+  alt="A horizontal stacked bar from 0 to 0.65 made of seven segments, one per age bin, widths 0.010, 0.176, 0.102, 0.000, 0.096, 0.157 and 0.110, the 18–22 segment amber and labelled 0.176. Below it a scale with ticks at 0.02, 0.1 and 0.3 dividing it into regions labelled useless, weak, medium and strong; the bar's end at 0.650 lies deep in strong"
+  caption="Age's information value is the sum of seven non-negative terms, 0.65 in all, well into the strong range. The youngest bin contributes most."
+/>
+
+### The simulator's fifteen inputs
+
+On the simulator's training week, binned as described above, the fifteen
+inputs of the five-model week fall into three groups.
+
+<Figure
+  src="./figures/iv-inputs.svg"
+  alt="Horizontal bar chart of information value on a log scale from 0.001 to 3 for the simulator's fifteen inputs. Terminal fraud rate over 7 days 2.38, over 30 days 1.87, over 1 day 1.36, amount 1.28, card average amount over 1 day 0.82, over 7 days 0.63, over 30 days 0.26, just left of the 0.3 line; then card count over 7 days 0.057, terminal count over 30 days 0.036, card count over 30 days 0.032, terminal count over 7 days 0.016, card count over 1 day 0.014, night 0.003, weekend 0.002, terminal count over 1 day 0.001. Dashed vertical lines at 0.02, 0.1 and 0.3; bars above 0.1 are amber"
+  caption="Seven of the fifteen inputs score 0.26 or more and eight score below 0.06. The calendar flags and the payment counts carry almost nothing on this simulator; the amounts and the terminal fraud rates carry nearly everything."
+/>
+
+The ordering is the simulator's script read back. The weekend and night
+flags score 0.002 and 0.003 because the script sets every customer's
+payment times around noon and uses neither in any fraud scenario. The
+counts score below 0.06 because no scenario changes how often a card
+pays: a leaked card's fraudulent payments are its owner's payments with
+the amount multiplied by five. The three terminal fraud rates score
+above 1.3 because a compromised terminal makes every payment there fraud
+for 28 days. The values leave a gap: seven inputs at 0.26 or above,
+eight at 0.057 or below. Where in that gap, or above it, the cut-off
+goes depends on what the filter can and cannot see.
+
+### What the filter cannot see
+
+The information value looks at one variable at a time. The card's three
+average-amount windows all sit above the gap, but they describe the same
+card's spending at three horizons, and a card can carry most of what
+they share in one line. Whether one of them adds anything once the
+others are in is a question only the fit can answer.
+
+The number also belongs to the binning: the same variable cut into
+different bins gets a different IV, and a variable that IV rates as
+useless may carry signal that only appears in combination with another.
+The filter shortlists; it does not decide.
+
+That blindness sets where the cut-off goes. The two ways of erring are
+not alike: a variable the filter keeps can still be weakened or thrown
+out by the fit, while a variable it drops never reaches the fit at all.
+So the cut-off goes low: at 0.1, the rule of thumb's line between weak
+and medium, rather than at its line for strong, 0.3, which would drop
+the card's 30-day average at 0.26 before the fit could say what it does
+in the company of the others. The 0.1 line keeps seven inputs:
+
+- the amount;
+- the card's average amount over 1, 7 and 30 days;
+- the terminal's fraud rate over 1, 7 and 30 days.
+
+The same sum, computed between this week's bin shares and the shares of
+the week a card was built on, measures how far a variable's distribution
+has moved since; it returns as a stability check in <Ref
+lesson="model-risk-monitoring">model risk monitoring</Ref>.
+
+## Fitting the card: one sign to check per line
+
+Fitted together, the seven variables share the evidence the filter
+judged one at a time, so each line has to be checked for whether it
+still points the way its own counts say.
+
+### The first fit: one line pointing the wrong way
+
+A logistic regression on the WOE columns of the seven inputs that passed
+the filter, fitted on the training week, gives six negative
+coefficients. The seventh, on the card's 30-day
+average amount, came out at $+0.22$. Its WOE column runs from $+0.20$ in
+the lowest bin to $-2.38$ in the highest, where 42 of 479 training
+payments were fraud, the riskiest group the variable has. With a
+positive coefficient, the card gives that group the fewest points of the
+line. A reviewer comparing the line with its own counts sees a
+contradiction.
+
+The fit is not wrong. Given the 1-day and 7-day averages and the amount,
+a high 30-day average says that the card has always spent a lot, so a
+large payment is its owner's habit. The variable entered the fit as a
+reference point for the others, which is the comparison that <Ref
+lesson="transaction-aggregates" id="exercises">the aggregates
+lesson</Ref> found the strongest single feature for leaked cards: the
+amount divided by the card's 30-day average. A card cannot print "this
+line counts against the others", but it can print the comparison
+itself. Binned the same way, the ratio has an information value of
+1.86, above every one of the card's spending inputs. Replacing the
+30-day average by it and fitting again gives $\beta_0 = -4.90$ and seven
+coefficients from $-0.22$ to $-1.02$, all negative. That second fit is
+the card the rest of the lesson prints.
+
+### Why the check is one rule for every line
+
+On a raw input, a fraud rate that rises with the value calls for a
+positive slope, because larger values should raise the log-odds: the
+opposite sign to the WOE convention, where the riskier bin is the one
+with the lower weight of evidence.
+
+Fitted on the card's own seven raw inputs, the ratio in place of the
+30-day average, the regression gives negative slopes to the amount and
+to the terminal's 30-day fraud rate. The amount's training fraud rate
+rises steadily, from 0.67% to 66% across its four bins, so its slope
+should be positive, and anyone who knows those counts sees that the
+negative one runs against them. That knowledge is what a raw slope
+needs: it has an expected sign only for a variable whose fraud rate
+rises or falls steadily in its raw values. The terminal's 30-day fraud
+rate has none, so its negative slope can be neither confirmed nor
+refuted: cut by the tree before any merging, its bins climb from 0.5% to
+56% fraud and then fall to 5% in the top one. A category's indicator
+columns have none, and a missing value has no raw value to put a slope
+on. The WOE columns need none of this, because the coding has already
+ordered every variable's bins by their own counts.
+
+## From log-odds to points
+
+The fitted card gives every payment a log-odds of fraud,
+$$
+\ln\frac{p}{1-p} = \beta_0 + \sum_{j=1}^{J} \beta_j\,\mathrm{WOE}_j(x),
+$$
+where $\mathrm{WOE}_j(x)$ is the weight of evidence of the bin that
+payment $x$ falls in on variable $j$. That is already a sum with one term
+per variable. But a log-odds of $-0.14$ means nothing to an investigator,
+and terms like $-0.806 \times (-5.216)$ are not something a reviewer
+reads off a table. The last step rescales the sum into whole points.
+
+### A linear scale, fixed by two anchors
+
+Any increasing linear function of the log-odds keeps the ranking exactly,
+so the scale can be chosen for readability alone:
+$$
+S = \mathrm{Offset} + \mathrm{Factor}\cdot\ln\frac{p}{1-p} .
+$$
+Two numbers fix it, and two conventions supply them. One anchor: a
+payment with fraud odds of 1 to 50 scores 100 points. One rate: every
+doubling of the fraud odds adds 20 points, the *points to double the
+odds*. The direction is chosen so that a higher score means more
+suspicious, the order in which the alert queue is read.
+
+The rate fixes the factor. Doubling the odds adds $\ln 2$ to the
+log-odds, and that must add 20 points:
+$$
+\mathrm{Factor}\cdot \ln 2 = 20
+\quad\Longrightarrow\quad
+\mathrm{Factor} = \frac{20}{\ln 2} = 28.85 .
+$$
+The anchor fixes the offset: $100 = \mathrm{Offset} + 28.85\,\ln(1/50)$,
+so $\mathrm{Offset} = 100 + 28.85 \times 3.912 = 212.87$.
+
+<Figure
+  src="./figures/score-line.svg"
+  alt="Score on the vertical axis from 0 to 220 against fraud odds on a log-2 horizontal axis from 1 to 400 up to 1 to 1. An amber straight line rises from 40 points at 1:400 to 213 points at 1:1. Two marked anchor points: 1:50 at 100 points and 1:25 at 120 points, with a step bracket labelled one doubling, plus 20 points. Small labels on the line at 1:100 (80) and 1:12.5 (140)"
+  caption="Score = 212.87 + 28.85 ln(odds). Every doubling of the fraud odds adds 20 points, so the points of a card can be read back as odds."
+/>
+
+The scale reads both ways. A payment with 120 points has fraud odds of
+1 to 25; one with 80 points, 1 to 100; and two payments 40 points apart
+differ in odds by a factor of four.
+
+### Points per line
+
+The score is a sum over variables, apart from the intercept and the
+offset, which belong to no variable. The convention spreads both evenly
+over the $J$ lines:
+$$
+S = \sum_{j=1}^{J}\Big[\mathrm{Factor}\,\big(\beta_j\,\mathrm{WOE}_j(x) + \tfrac{\beta_0}{J}\big) + \tfrac{\mathrm{Offset}}{J}\Big],
+$$
+and the bracket is the number printed on the card for the bin payment
+$x$ falls in. Bin $i$ of variable $j$ carries
+$$
+\mathrm{points}_{ij} = \mathrm{Factor}\,\Big(\beta_j\,\mathrm{WOE}_{ij} + \frac{\beta_0}{J}\Big) + \frac{\mathrm{Offset}}{J} .
+$$
+Scoring a payment is then a lookup per variable and one addition.
+
+### The simulator card
+
+The simulator card is the second fit: seven lines, the ratio in place of
+the 30-day average, $\beta_0 = -4.90$. Its weights of evidence are
+computed with 0.5 added to every bin's genuine and fraud count, a guard
+against a bin with no frauds; on bins that hold frauds it moves the
+number little, on the amount line by at most 0.06. With $J = 7$, every
+bin's points are
+$28.85\,(\beta_j\,\mathrm{WOE}_{ij} - 0.70) + 30.41$.
+
+<Example title="points of the amount line">
+The amount's coefficient is $\beta = -0.352$. Its top bin, above
+€201.82, holds 68 of the 66,642 genuine training payments and 132 of the
+598 frauds; with 0.5 added to each count its WOE is
+$\ln\big((68.5/66{,}642)/(132.5/598)\big) = \ln(0.001028/0.2216) = -5.373$.
+Its points:
+$$
+28.85\,\big((-0.352)(-5.373) - 0.700\big) + 30.41 = 28.85 \times 1.191 + 30.41 = 64.8 .
+$$
+The bottom bin, WOE $+0.283$, gets $28.85\,(-0.100 - 0.700) + 30.41 = 7.3$.
+</Example>
+
+<FigureSequence
+  name="amount-card"
+  alt="Three frames of the same four-column chart, one column per amount bin: up to 160 euros, 160 to 183, 183 to 202, above 202. Frame 1: the counts, 66,169 payments with 444 frauds, 652 with 14, 219 with 8, 200 with 132, and the fraud rates 0.67%, 2.1%, 3.7%, 66% as bars on a log scale. Frame 2 adds a row of weight-of-evidence bars: plus 0.28, minus 0.93, minus 1.50, minus 5.37. Frame 3 adds a row of points: 7, 20, 25, 65"
+  caption="One variable from counts to points: the amount's four bins, their weights of evidence, and the points the fitted card prints for them."
+/>
+
+<Task>
+Before the third frame, predict the order of the four bins' points from
+the second frame alone, and say which quantity decides how far apart the
+points of the first and last bin are. Then step through and check.
+</Task>
+
+The points follow the weights of evidence in reverse order, because the
+coefficient is negative, and their spread is the weights' spread times
+$28.85 \times 0.352 = 10.2$ points per unit of WOE: the amount's 5.66
+units of WOE between bottom and top bin become 58 points. A variable
+whose evidence the other lines already carry can get a coefficient near
+zero, and then its bins are printed close together.
+
+<Figure
+  src="./figures/scorecard.svg"
+  alt="A scorecard table with seven variable blocks and their bins and points. Amount: up to 160 euros 7, 160 to 183 20, 183 to 202 25, above 202 65. Amount divided by card's 30-day average: up to 2.04 minus 2, 2.04 to 2.26 44, 2.26 to 2.52 95, above 2.52 185. Card's average amount, 1 day: up to 125 9, 125 to 144 17, 144 to 156 21, 156 to 178 24, above 178 38. Card's average amount, 7 days: up to 99 5, 99 to 110 21, 110 to 122 31, 122 to 139 58, above 139 92. Terminal fraud rate, 1 day: up to 0.83 8, above 0.83 44. Terminal fraud rate, 7 days: up to 0.11 minus 4, 0.11 to 0.17 30, 0.17 to 0.55 56, above 0.55 131. Terminal fraud rate, 30 days: up to 0.07 5, 0.07 to 0.11 26, above 0.11 50. One row per block is highlighted in amber for a payment of 8.65 euros on 14 August: 7, minus 2, 9, 5, 8, 131, 50, summing to 208 points, odds about 1 to 1.2"
+  caption="The simulator card, and one payment read line by line: 208 points, 131 of them from a single line, the terminal's fraud rate over the week that ended seven days ago."
+/>
+
+<Example title="one payment, read off the card">
+A payment of €8.65 on 14 August, at a terminal whose fraud rate over the
+week ending seven days earlier was 0.70 and over the 30-day window 0.22.
+The card's spending is ordinary: €10.50 on average over the last day,
+€11.17 over seven, the amount 0.74 times its 30-day average.
+
+| line | value | bin | points |
+|---|---|---|---|
+| amount | €8.65 | up to €160 | 7 |
+| amount ÷ 30-day average | 0.74 | up to 2.04 | −2 |
+| average amount, 1 day | €10.50 | up to €125 | 9 |
+| average amount, 7 days | €11.17 | up to €99 | 5 |
+| terminal fraud rate, 1 day | 0 | up to 0.83 | 8 |
+| terminal fraud rate, 7 days | 0.70 | above 0.55 | 131 |
+| terminal fraud rate, 30 days | 0.22 | above 0.11 | 50 |
+| **total** | | | **208** |
+
+Read back: $\ln(\text{odds}) = (208 - 212.87)/28.85 = -0.17$, odds
+$e^{-0.17} \approx 0.84$, about 1 to 1.2, $p \approx 0.46$. The
+payment was fraud: the terminal was one of the simulator's compromised
+ones. The reviewer's account of the score is the card's own lines: 181
+of the 208 points come from the terminal's recent fraud rate, and none
+of the card's own behaviour is unusual.
+</Example>
+
+<Exercise>
+Score a payment of €879.25 whose card averaged €510.89 over the last day
+and €413.58 over seven days, with a 30-day average of €205.69, at a
+terminal with no labelled fraud in any window. Convert the score to a
+probability and say which lines carry it.
+
+<Solution>
+The ratio is $879.25/205.69 = 4.27$. Lines: amount above €201.82, 65;
+ratio above 2.52, 185; 1-day average above €178, 38; 7-day average above
+€139, 92; terminal rates 0, 0 and 0: 8, −4 and 5. Total
+$65 + 185 + 38 + 92 + 8 - 4 + 5 = 389$. Log-odds
+$(389 - 212.87)/28.85 = 6.10$, odds about 450 to 1, $p \approx 0.998$.
+Everything comes from the card's own spending: a large payment, more
+than four times the card's usual level, on a card whose last days were
+already far above that level. This is the simulator's leaked card,
+whose payments are inflated fivefold.
+</Solution>
+</Exercise>
+
+Two lines carry a negative number of points. That follows from spreading
+the intercept evenly: the safest bins of the two strongest lines fall a
+few points below zero. A common alternative gives every line's safest
+bin 0 points and moves the remainder into one base score printed at the
+top of the card; it changes no score.
+
+## The card on the test week: what the readable form costs
+
+### The card and the regression on one test week
+
+Every model below is fitted on the training week and scored on the test
+week of <Ref lesson="alert-budget-metrics"
+id="five-models-scored-on-a-test-week">the five-model setup</Ref>: 8 to
+14 August, 58,264 payments, 385 frauds after the known cards are
+removed. All are logistic regressions at the library's default settings;
+the cards differ only in their inputs.
+
+| model | ROC-AUC | AP | CP@100 |
+|---|---|---|---|
+| regression on all fifteen raw inputs (the five-model baseline) | 0.871 | 0.606 | 0.291 |
+| regression on the card's seven raw inputs | 0.861 | 0.636 | 0.291 |
+| first card: seven inputs passing the filter | 0.827 | 0.441 | 0.284 |
+| **the card**: 30-day average replaced by the ratio | 0.868 | 0.522 | 0.290 |
+| the card, terminal 30-day line left as the tree cut it | 0.868 | 0.604 | 0.279 |
+
+Against the regression on the same seven inputs, the card ties at the
+team's own number: card precision at 100 of 0.290 against 0.291, a tenth
+of a card a day, far inside the two-cards-a-day noise of <Ref
+lesson="alert-budget-metrics" id="what-each-disagreement-means">the
+alert-budget metrics</Ref>. It ties on ROC-AUC. It loses on average
+precision, 0.52 against 0.64, several times the spread of about 0.02 to
+0.03 that average precision showed across weeks in <Ref
+lesson="delayed-labels-prequential"
+id="prequential-folds-a-spread-across-weeks">the delayed-labels
+lesson</Ref>.
+
+### Where the average precision goes
+
+Average precision is a mean over the frauds of the precision at each
+fraud (<Ref lesson="alert-budget-metrics"
+id="what-the-team-sees-at-each-fraud">the alert-budget metrics</Ref>), so
+it splits into the shares of groups of frauds. Split the 385 test frauds
+by the simulator's scenario and the loss sits in one place: the frauds at
+compromised terminals, whose share of the average precision is 0.34 for
+the card and 0.45 for the regression. The
+card's terminal lines are where the one-direction rule did its merging.
+
+<Figure
+  src="./figures/terminal30.svg"
+  alt="Two rows of bars for the terminal's 30-day fraud rate, training week. Top row, the five bins the tree found before merging: up to 0.07 at 0.5% fraud, 0.07 to 0.11 at 4%, 0.11 to 0.40 at 43%, 0.40 to 0.67 at 56%, and above 0.67 at 5%, the last bar amber and labelled 12 of 229. Bottom row, the card's three monotone bins: 0.5%, 4%, and 35% for everything above 0.11, labelled 242 of 697"
+  caption="The terminal's 30-day fraud rate, before and after the one-direction rule. The top bin, terminals whose whole month was fraud, is almost clean, and merging it hides that."
+/>
+
+This is the variable whose tree bins rise and then fall: terminals whose
+fraud rate over the window exceeded 0.67 had 12 frauds in 229 training
+payments, 5%, against 56% in the bin below. The one-direction rule merged
+that top bin into its neighbours. With the line left as the tree cut it, the
+top bin on its own, the card's average precision returns to 0.604, at a card precision of 0.279, within
+noise of the others. The regression's negative coefficient on the same
+variable is the same fact, found without anyone being told.
+
+Whether to allow the bin is the reviewer's decision, and the card makes
+it one. A line that says "terminals with the highest 30-day fraud rate
+get fewer points than those with a moderate one" needs a reason. On this
+simulator there is one, in the script; whether a real fraudster's terminal behaves the same way is the
+question the reviewer has to ask before signing.
+
+### What else a reviewer checks
+
+The sign of each line is one check. Two more come from outside the data.
+
+- **When the input exists.** Every line of a card that scores payments
+  after authorisation must be computable from the payment's own fields,
+  earlier payments and labels already arrived. All seven lines here meet
+  that condition; the terminal rates meet it because they read only
+  labels at least seven days old, the delayed ones of <Ref
+  lesson="point-in-time-features">point-in-time features</Ref>. A card printed with names makes
+  an input that reads the future easier to spot than a column in a
+  matrix, though no easier to prove; the proof is still the pipeline's.
+- **Whether the input may be used at all.** A card names every variable
+  it uses, so a reviewer sees at once if one of them is an applicant's
+  age, nationality or a stand-in for something the law protects. Which
+  data a bank may process for fraud detection, and under what conditions,
+  is the subject of <Ref lesson="gdpr-financial-crime-data">the data
+  protection rules</Ref>; the card's contribution is that the question
+  cannot be missed.
+
+<Conclusion>
+You can now build a points scorecard from labelled data: cut each
+variable into bins that separate the classes, with a minimum size and,
+where the reviewer wants it, one direction; encode each bin by its
+weight of evidence, the gap between its log-odds of fraud and the
+population's; shortlist variables by information value; fit one
+coefficient per variable and check that every coefficient is negative;
+and rescale the fitted log-odds so that 20 points double the odds,
+spreading the intercept over the lines. You can also say what the card
+costs: on the simulator nothing in card precision at 100, about a fifth
+of the average precision where the one-direction rule overrides the
+data, and every interaction between variables that its additive form
+cannot hold except through a feature built by hand, like the ratio.
+
+The card is the readable end of the supervised detectors. At the other
+end, a boosted tree combines variables freely, and whether that buys
+enough card precision to give up the card's readability is measured in
+<Ref lesson="gbm-model-selection">tree ensembles and prequential model
+selection</Ref>. The card's points also serve as its own explanation of
+each alert; what a model with no such table has to do instead is the
+subject of <Ref lesson="alert-explanations">alert explanations</Ref>.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+From the age table's counts, compute the weight of evidence and the
+information-value term of the 30–34 bin, and check them against the
+worked table.
+
+<Solution>
+Shares: $475/1{,}806 = 0.2630$ of the genuine applications,
+$25/194 = 0.1289$ of the frauds. $\mathrm{WOE} = \ln(0.2630/0.1289) =
+\ln 2.041 = 0.713$. Term: $(0.2630 - 0.1289) \times 0.713 = 0.1341
+\times 0.713 = 0.0957$, as in the table. The bin holds about twice its
+share of the genuine applications, so it is a safe bin, and its weight
+in the information value comes from the large difference between the
+two shares, 13 points, multiplied by a moderate log ratio.
+</Solution>
+</Exercise>
+
+<Exercise>
+Suppose the three fraudulent applications in the 44+ bin had turned out
+genuine: 150 genuine, 0 fraud, with the totals becoming 1,809 genuine
+and 191 fraud. (a) What happens to the bin's weight of evidence and to the
+variable's information value? (b) A common repair adds 0.5 to every
+bin's genuine and fraud count before computing shares. Compute the bin's
+weight of evidence with 0.5, and again with 0.1. (c) What do the two
+answers say about the number the card would print, and what should be
+done with the bin instead?
+
+<Solution>
+**(a)** The fraud share is $0/191 = 0$, so
+$\mathrm{WOE} = \ln(\text{positive}/0) = +\infty$, and the bin's term
+$(g/N_g - 0)\times\infty$ makes the information value infinite. A
+regression on that column cannot be fitted: the coefficient would chase
+an infinite input.
+
+**(b)** With 0.5: genuine share $150.5/1{,}809 = 0.0832$, fraud share
+$0.5/191 = 0.00262$, $\mathrm{WOE} = \ln 31.8 = 3.46$. With 0.1:
+$150.1/1{,}809 = 0.0830$ and $0.1/191 = 0.000524$,
+$\mathrm{WOE} = \ln 158 = 5.07$.
+
+**(c)** The number moves from 3.5 to 5.1 with a constant nobody can
+justify, against 1.66 for the same bin with its three frauds. The
+constant decides only because the bin has no frauds: on bins that hold
+some, like the simulator card's, it moves the weight of evidence little. The data
+say only that frauds are rare in the bin, none in 150; how rare, the
+smoothing constant decides. The fix is a minimum count of
+frauds per bin, met by merging: the 35–43 and 44+ bins together hold
+$339 + 150 = 489$ genuine and 11 fraud, shares $0.2703$ and $0.0576$,
+$\mathrm{WOE} = \ln 4.69 = 1.55$, a number the counts support. The
+simulator card's rule of at least 200 payments per bin plays the same
+role.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague proposes: "Rank the candidate variables by information value
+and keep the top ones; a higher IV is always a better line for the card."
+Give two variables with a high information value that should not be on a
+card, and name the step of the argument that fails for each. Use, for
+one of them, the terminal fraud rate of <Ref
+lesson="point-in-time-features" id="three-pipelines-on-one-simulator-run">the
+three pipelines</Ref>.
+
+<Solution>
+**A rate computed from final labels.** The terminal fraud rate computed
+on the finished training table, with every label as it is known today,
+separates the training payments better than the delayed one: on that
+lesson's simulator run the leaky pipeline's offline average precision
+was 0.92 against 0.74 for the honest one, so its bins would show a
+higher information value too. But the leaky rate reads labels that did
+not exist when the payment was scored, and in deployment it reads none
+of them. The step that fails: IV measures how well the variable
+separates the classes in the table it is computed on, and if the table
+leaks, so does the IV. Admissibility is a property of how the column was
+built, which no statistic of the column can show.
+
+**A protected attribute or a stand-in for one.** An applicant's age has
+IV 0.65 on the application table. Whether a bank may score applications
+by age, or by a variable that tracks a protected characteristic, is a
+legal question; a strong separation makes such a variable more tempting,
+not more admissible. The step that fails is the same: IV is a measure of
+separation, and the card's content is also bound by what may be used.
+
+**The transferable point.** The filter shortlists variables that are
+already admissible; it cannot rule on admissibility.
+</Solution>
+</Exercise>
+
+<Exercise>
+Scorecards inherited from credit lending point the other way: they score
+the odds of a good outcome, genuine to fraud, so that a higher score is
+safer. (a) Derive the factor and offset for a card with 100 points at
+genuine-to-fraud odds of 50 to 1 and 120 at 100 to 1. (b) Show that for
+every payment this score $S_{\text{good}}$ and the lesson's fraud score
+$S$ satisfy $S_{\text{good}} = 200 - S$. (c) Show that any two anchors,
+a score $S_0$ at odds $o_0$ and a rate of $d$ points per doubling,
+determine exactly one scale, and write its factor and offset.
+
+<Solution>
+**(a)** $S_{\text{good}} = \mathrm{Offset}' + \mathrm{Factor}'\ln(\text{good odds})$.
+The two anchors: $100 = \mathrm{Offset}' + \mathrm{Factor}'\ln 50$ and
+$120 = \mathrm{Offset}' + \mathrm{Factor}'\ln 100$. Subtracting,
+$20 = \mathrm{Factor}'\ln 2$, so $\mathrm{Factor}' = 28.85$, and
+$\mathrm{Offset}' = 100 - 28.85 \ln 50 = 100 - 112.87 = -12.87$.
+
+**(b)** The good odds are the inverse of the fraud odds, so
+$\ln(\text{good odds}) = -\ln(\text{fraud odds})$. Then
+$S_{\text{good}} = -12.87 - 28.85 \ln(\text{fraud odds})$ and
+$S = 212.87 + 28.85\ln(\text{fraud odds})$; adding them gives
+$S_{\text{good}} + S = 200$. The two cards order the payments in
+opposite directions and carry the same information; a payment at 208 on
+the lesson's card scores −8 on the credit-style one.
+
+**(c)** A rate of $d$ points per doubling means
+$\mathrm{Factor}\cdot\ln 2 = d$, so $\mathrm{Factor} = d/\ln 2$, and the
+anchor gives $\mathrm{Offset} = S_0 - \mathrm{Factor}\ln o_0$. Both are
+determined, so the scale is unique: a line is fixed by one point and
+its slope. For 600 points at fraud odds 1 to 30 and 50 points per
+doubling: $\mathrm{Factor} = 72.13$,
+$\mathrm{Offset} = 600 + 72.13 \ln 30 = 845.3$.
+</Solution>
+</Exercise>
+
+<Exercise>
+The card's probabilities come from a logistic regression fitted on the
+full training week, without undersampling, so take them as calibrated.
+With an alert cost $C_a = €5$ and the amount as the cost of a miss, the
+Bayes minimum-risk rule of <Ref lesson="example-dependent-cost"
+id="the-decision-that-minimises-expected-cost">example-dependent
+cost</Ref> flags a payment when $C_a \le \mathrm{Amt}\cdot p$. (a) Turn
+the rule into a minimum score $S^*(\mathrm{Amt})$ on the card. (b)
+Compute it for €20, €100 and €1,000. (c) Does the rule flag the €8.65
+payment that scored 208? (d) What does (c) say about using one cut-off
+score for every payment?
+
+<Solution>
+**(a)** $C_a \le \mathrm{Amt}\cdot p$ is $p \ge C_a/\mathrm{Amt}$, and in
+odds $p/(1-p) \ge C_a/(\mathrm{Amt} - C_a)$ for $\mathrm{Amt} > C_a$.
+The score is increasing in the odds, so
+$$
+S^*(\mathrm{Amt}) = 212.87 + 28.85\,\ln\frac{C_a}{\mathrm{Amt} - C_a} .
+$$
+
+**(b)** €20: $\ln(5/15) = -1.099$, $S^* = 212.87 - 31.70 = 181$.
+€100: $\ln(5/95) = -2.944$, $S^* = 128$.
+€1,000: $\ln(5/995) = -5.293$, $S^* = 60$.
+
+**(c)** For €8.65, $\ln(5/3.65) = 0.315$ and $S^* = 222$. The payment
+scored 208, below: not flagged. In probabilities, $p \approx 0.46$ and
+the expected loss $0.46 \times €8.65 = €3.98$ is below the €5 call,
+though the payment was fraud.
+
+**(d)** The cost rule's cut-off falls by about 20 points for every
+doubling of the amount, so a single cut-off score is right for one amount
+only, the card version of the earlier lesson's finding that a fixed
+threshold suits one amount. The card does not remove the amount from
+the decision; it makes the probability readable, and the rule still has
+to multiply it by the euros at stake.
+</Solution>
+</Exercise>
+
+<Exercise>
+The regression on raw inputs gives the terminal's 30-day fraud rate a
+negative coefficient, and the unmerged tree bins show the training-week
+fraud rate falling from 56% to 5% at the top of that variable. Explain
+the pattern from the simulator's rules (a compromised terminal turns
+every payment there into fraud for 28 days; the terminal rates are
+computed from labels at least seven days old), say what you would
+measure on the test week to check your explanation, and decide whether
+the bin belongs on a card meant for real payments.
+
+<Solution>
+**Explanation.** The 30-day rate is computed over the 30 days that end
+seven days before the payment, so it reads days $t-37$ to $t-7$. A
+terminal whose rate over that window is above 0.67 had fraud on at least
+two thirds of its payments there, so its compromise covered about 20 or
+more of those 30 days and began at least 20 days before the window's
+end, 27 or more days before the payment. A compromise lasts 28 days. By
+the day of the payment, most such terminals are at or past the end of
+theirs, and their payments are genuine again. A moderate rate means the
+compromise began late in the window, with days left to run. The fraud rate therefore rises with the 30-day rate and
+then falls at the top, and the regression captures the fall with a
+negative coefficient (offset by the positive one on the 7-day rate).
+
+**Check.** The explanation makes a prediction on weeks the card was not
+built on: wherever the 30-day rate is high, the fraud rate of the
+payments should fall again, and it should fall at the top of the range.
+On the test week, binning the 30-day rate above 0.11 into
+(0.11, 0.3], (0.3, 0.5] and above 0.5 gives fraud rates of 54%, 43% and
+19%: the fall is there a week later, on payments the bins were not cut
+on. A sharper check uses the answer key: for each payment in the top bin,
+count the days since its terminal's compromise began, which the
+simulator's fraud-scenario column makes available to the analyst though
+never to the model; the explanation predicts that most exceed 28.
+
+**Decision.** The fall is a fact about the script's fixed 28-day
+compromise. On real payments a compromised terminal is cleaned when it
+is found, not after a fixed term, and a terminal whose month was full of
+fraud is more likely still dangerous than cured. A reviewer should keep
+the merged, one-direction bin on a card meant for real data, and accept
+that the simulator's test week scores it lower for it. The transferable
+move: before allowing a bin that breaks the direction, find what in the
+data-generating process makes it break, and ask whether that process is
+the one the card will meet.
+</Solution>
+</Exercise>
+
+<Exercise>
+On the training week, cross the amount's top bin (above €201.82) with
+the ratio's top bin (amount more than 2.52 times the card's 30-day
+average):
+
+| | ratio ≤ 2.52 | ratio > 2.52 |
+|---|---|---|
+| amount ≤ €201.82 | 66,537 genuine, 406 fraud | 37 genuine, 60 fraud |
+| amount > €201.82 | 61 genuine, 36 fraud | 7 genuine, 96 fraud |
+
+(a) Compute each cell's log-odds of fraud. (b) An additive card gives
+the ratio's top bin the same number of extra points whatever the
+amount bin. Check whether the data agree: how much does crossing into
+the ratio's top bin raise the log-odds among ordinary amounts, and how
+much among large ones? (c) What kind of model gives each of the four
+cells its own rate, and what does that say about what a card cannot
+represent?
+
+<Solution>
+**(a)** $\ln(406/66{,}537) = -5.10$; $\ln(60/37) = 0.48$;
+$\ln(36/61) = -0.53$; $\ln(96/7) = 2.62$.
+
+**(b)** Among amounts up to €201.82: $0.48 - (-5.10) = 5.58$. Among
+larger amounts: $2.62 - (-0.53) = 3.15$. The ratio multiplies the fraud
+odds by $e^{5.58} \approx 265$ for ordinary amounts and by
+$e^{3.15} \approx 23$ for large ones. An additive card has one number
+for the ratio's top bin, so it must choose something in between and
+miss both: the effect of one variable depends on the value of the
+other, an interaction.
+
+**(c)** A depth-2 tree that splits on the amount and then on the ratio
+gives each of the four cells its own leaf and its own fraud rate. More
+generally, trees model interactions by construction, and a card models
+them only through a variable built by hand for the purpose, as the
+ratio itself was built from the amount and the 30-day average. How much
+card precision the trees' freedom buys over a linear score, once both
+are tuned on prequential folds, is measured in <Ref
+lesson="gbm-model-selection">tree ensembles and prequential model
+selection</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015 — Ch. 2, "Categorization" (equal-interval and equal-frequency binning; the odds pivot table; Tables 2.5–2.7, the product-type groupings and their χ² values; Fig. 2.8, fraud risk against age), "Weights of evidence coding" (Table 2.8, the 2,000-row age table), "Variable selection" (Table 2.10, information value 0.6502 and its rules of thumb; filters are univariate; 10 to 15 variables in a typical fraud model); Ch. 4, "Logistic regression" (odds, logit, odds ratio, doubling amount), "Building a logistic regression scorecard" (score = offset + factor × ln(odds); factor 20/ln 2 = 28.85 and offset −12.87 for 100 points at 50:1 and 120 at 100:1; points per attribute; Fig. 4.7), "Variable selection for linear and logistic regression" (sign restrictions, operational and legal constraints).
+2. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 3.2–3.3 (the transaction simulator and its fifteen baseline inputs; the training/delay/test split with known compromised cards removed from the test days), Ch. 4.3 (card precision at k). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+3. Fraud Detection Handbook, *simulated-data-transformed* (the simulator's daily files with the fifteen baseline inputs already computed). The simulator card of this lesson, its bins, fit and test-week scores, and the regression on the card's seven inputs were computed for this lesson from these files, training week 25–31 July and test week 8–14 August 2018. https://github.com/Fraud-Detection-Handbook/simulated-data-transformed
+</References>

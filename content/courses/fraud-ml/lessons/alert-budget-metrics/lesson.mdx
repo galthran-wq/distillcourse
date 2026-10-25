@@ -1,14 +1,5 @@
 A model has scored the day's 8,300 payments and the investigators can open 100 of them. Accuracy says nothing useful when 99% of payments are genuine, and the usual summary of a ranking, the area under the ROC curve, averages over thresholds the team will never use. What number should you compute from the ranked list so that a better number means more fraud caught within the hundred?
 
-The day in that question is a real one from the transaction simulator of
-<Ref lesson="canonical-datasets" id="the-transaction-simulator-a-world-whose-rules-are-known">the
-canonical datasets</Ref>, the generator whose fraud scenarios are known.
-A depth-2 decision tree, the one that lesson read against its answer key,
-is trained on the week of 25 to 31 July 2018 and scores the week of 8 to
-14 August, days 129 to 135 of the simulation. That test week holds 58,264
-payments, about 8,300 a day, and 385 frauds on cards the bank had not
-already caught: about 55 a day, two thirds of one percent.
-
 <Ref lesson="economics-of-detection" id="why-hit-rate-is-not-a-target">The
 economics of detection</Ref> showed that the team works the top $k$ of a
 ranking, and that the share of those $k$ that turn out to be fraud, the
@@ -18,6 +9,64 @@ that the score predicts that hit rate. Classical machine learning offers
 threshold metrics (accuracy, precision, recall, F1) and the ROC curve with
 its area; each answers some question about the scored list, and none asks
 the team's.
+
+## Five models scored on a test week
+
+A metric is judged by what it says about models: whether the one it calls
+better is the one that puts more fraud in the hundred. Testing that needs
+ranked lists whose frauds are known, from several models that differ, and
+the ranking has to be of payments the model did not learn from, the way
+tomorrow's payments will be.
+
+The lists used throughout this lesson come from the transaction simulator
+of <Ref lesson="canonical-datasets"
+id="the-transaction-simulator-a-world-whose-rules-are-known">the
+canonical datasets</Ref>, whose fraud scenarios are known, cut into three
+consecutive weeks of 2018:
+
+- **Training week**, 25 to 31 July: 67,240 payments, 598 of them fraud.
+  Every model is fitted on these.
+- **Delay week**, 1 to 7 August: left unused. When a model is retrained
+  in practice, the labels of the most recent days have not arrived yet;
+  how long a gap that forces is derived in <Ref
+  lesson="delayed-labels-prequential">the next lesson</Ref>.
+- **Test week**, 8 to 14 August, days 129 to 135 of the simulation:
+  58,264 payments, about 8,300 a day, scored by each fitted model. After
+  the payments of cards the bank already knew to be compromised are
+  dropped, it holds 385 frauds, about 55 a day, two thirds of one percent.
+  The day in the opening question is one of these.
+
+Each model sees the same fifteen numbers per payment: the amount, whether
+it fell on a weekend or at night, and, over the previous 1, 7 and 30 days,
+the card's number of payments and their average amount and the
+terminal's number of payments and its fraud rate, counted from labels the
+bank already held. How such inputs are computed without reading the
+future is a problem for a later module. The five models are fitted with
+their library's default settings, nothing tuned:
+
+- **logistic regression**, a linear score on the fifteen inputs;
+- **a depth-2 decision tree**, the one <Ref lesson="canonical-datasets"
+  id="three-scripted-frauds">read against the simulator's answer
+  key</Ref>, which was trained on this same week; a payment's score is
+  the fraud share of its leaf among the training payments;
+- **a full-depth tree**, split until every leaf holds training payments
+  of one class only, so its only scores are 0 and 1;
+- **a random forest**, 100 full-depth trees, each grown on a resample of
+  the training week, whose scores are averaged;
+- **XGBoost**, 100 boosted trees of depth up to 6, each fitted to the
+  errors the earlier ones left.
+
+Every test-week number below, ROC-AUC, average precision and the
+top-hundred counts alike, is computed from these scores and the test
+week's labels. The same five models were also fitted the same way on the
+same three weeks of a real stream, the Belgian e-commerce payments of
+<Ref lesson="fraud-detection-system"
+id="a-hundred-cases-a-day-the-models-output-is-a-ranking">the layered
+system</Ref>: 2,858,663 training payments with 6,605 frauds, and a test
+week with a fraud share of about 0.2%, one in 500, after the same removal
+of known cards.
+Those payments are confidential, so their results can be quoted but not
+re-run.
 
 ## A threshold metric judges a cut nobody chose
 
@@ -53,8 +102,8 @@ The toy has four genuine payments per fraud; a simulator day has about
 8,250 genuine payments for 55 frauds, 150 per fraud. There the do-nothing
 rule makes 55 errors in 8,305 payments: accuracy
 $8{,}250/8{,}305 \approx 0.993$. A detector that alerts on a hundred
-payments and catches 29 of the 55 frauds, about what the tree used below
-achieves, makes 71 false alerts and 26 misses, 97 errors: accuracy
+payments and catches 29 of the 55 frauds, about what the depth-2 tree
+achieves on the test week, makes 71 false alerts and 26 misses, 97 errors: accuracy
 $0.988$. By accuracy, catching half the day's fraud is worse than
 catching none.
 
@@ -151,13 +200,13 @@ and which one does the AUC prefer?
 </Task>
 
 The two curves are drawn for illustration, but crossing curves are
-common. On the simulator's test week the depth-2 tree has AUC 0.763 and
-a tree grown to full depth on the same training week 0.788; whether the
+common. On the test week the depth-2 tree has AUC 0.763 and the
+full-depth tree 0.788; whether the
 deeper tree is also better in the strip a hundred alerts reach, the area
 cannot say.
 
-The full-depth tree's leaves are pure on the training data, so it outputs
-only two scores, 0 and 1. Payments with the same score are tied and no
+The full-depth tree outputs only two scores, 0 and 1. Payments with the
+same score are tied and no
 threshold can separate them, so there is one cut between the two scores:
 the curve is a single corner joined to $(0, 0)$ and $(1, 1)$ by straight
 lines, and most of its area comes from the straight segment on the right
@@ -452,23 +501,21 @@ list, so that fraud is reached at exactly the base rate. The depth-2
 tree's four blocks reach more of its frauds near the top.
 
 Because the floor is the base rate, AP, like precision, belongs to the
-stream it was measured on. On real Belgian e-commerce payments, about one
-fraud in 400, five standard models, each trained on one week and scored
-on a later one (logistic regression, the depth-2 and the full-depth
-decision tree, a random forest, and boosted trees, XGBoost), reach APs
-from 0.003 to 0.035 against a floor of 0.002.
+stream it was measured on. On the real stream's test week, one fraud in
+500, the five models reach APs from 0.003 to 0.035 against a floor of
+0.002.
 
 <Figure
   src="./figures/worldline-pr-floor.png"
   alt="Precision–recall plot, recall 0 to 1 across, precision 0 to 1 up. Five model curves and a dashed random line all lie in the bottom tenth of the plot: after a spike at recall near 0, logistic regression peaks near 0.2 and every curve is below 0.1 from recall about 0.15 on, sinking to near 0 by recall 1. Legend: AP random 0.002, logistic regression 0.035, depth-2 decision tree 0.024, unlimited-depth decision tree 0.003, random forest 0.015, XGBoost 0.035"
-  caption="Five standard models, each trained on one week of real Belgian e-commerce payments, about one fraud in 400. Every curve hugs the floor: the best APs are 0.035 against 0.002 for random ordering, and precision stays under 0.1 for nearly all of the recall range."
+  caption="The five models on the real stream's test week, one fraud in 500. Every curve hugs the floor: the best APs are 0.035 against 0.002 for random ordering, and precision stays under 0.1 for nearly all of the recall range."
   float="right"
   width="m"
 />
 
 <KeyFact>
 AP has a floor equal to the base rate, not 0.5 as AUC does. Read an AP as a
-multiple of the fraud share of its test set: 0.035 at one fraud in 400 is
+multiple of the fraud share of its test set: 0.035 at one fraud in 500 is
 seventeen times the floor, a strong model; 0.035 at one in 150 is five
 times it, a weak one beside the simulator trees' 47 and 75.
 </KeyFact>
@@ -646,11 +693,11 @@ compromised card, sits at card rank 4 and is found only with $k = 4$.
 
 On the Belgian stream about 300 cards are compromised every day and the
 team calls a hundred, so even a perfect ranking reaches at most a third of them. A random hundred cards hold about
-a quarter of one compromised card, $CP@100 \approx 0.0025$; the logistic
-regression of <Ref lesson="fraud-detection-system"
-id="ranking-then-cutting-at-the-capacity">the layered system</Ref>,
-whose top hundred holds about 15 compromised cards, has $CP@100 \approx
-0.15$, and a depth-2 tree about 0.10.
+a quarter of one compromised card, $CP@100 \approx 0.0025$. On the real
+test week the logistic regression's top hundred holds about 15
+compromised cards, the count <Ref lesson="fraud-detection-system"
+id="ranking-then-cutting-at-the-capacity">the layered system</Ref>
+quoted, so $CP@100 \approx 0.15$; the depth-2 tree's holds about ten.
 
 <Figure
   src="./figures/worldline-cards-vs-k.png"
@@ -701,9 +748,9 @@ compromised, and the daily card precision falls with it: 0.32 instead of
 had already been blocked. Written without qualification, $CP@k$ means
 the version with removal.
 
-The test days had already been through one such cleaning: the week's 385
-frauds exclude the payments of cards the bank knew to be compromised from
-the training period; the raw week held 74 to 91 frauds a day. Which cards
+Dropping the cards the bank already knew, before the test week was
+scored, was the same cleaning applied once, with the cards found during
+the training period; without it the week held 74 to 91 frauds a day. Which cards
 count as known at a given test day depends on when their labels arrived,
 a question about the label delay that <Ref
 lesson="delayed-labels-prequential">the next lesson</Ref> answers.
@@ -749,9 +796,8 @@ undefined.
 ## Three numbers for three questions
 
 With ROC-AUC, average precision and card precision at $k$ in hand, it is
-tempting to let $CP@k$ replace the other two. The five standard models,
-trained on the simulator's week of 25 to 31 July and scored on its test
-week, show why that is premature.
+tempting to let $CP@k$ replace the other two. The five models on the
+simulator's test week show why that is premature.
 
 <Figure
   src="./figures/three-rankings.svg"

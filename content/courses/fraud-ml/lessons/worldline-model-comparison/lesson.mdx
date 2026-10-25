@@ -1,0 +1,854 @@
+Eight model families are trained and tuned on the same weeks of real card payments and scored by three metrics. XGBoost, the attention-LSTM and the feed-forward network each top one of the three leaderboards. What in the validation design, the metrics and the compute spent produces three different winners from one experiment?
+
+Five of the eight rows are already familiar. The tuned decision tree,
+logistic regression, random forest and XGBoost are <Ref
+lesson="gbm-model-selection" id="the-four-searches-on-the-real-stream">the
+four searches on the real stream</Ref>, and the feed-forward network is the
+one <Ref lesson="neural-tabular-detectors"
+id="a-tie-on-the-simulator-a-loss-below-the-top-on-real-data">the network
+lesson</Ref> brought level with them at the budget. Those lessons compared
+two or three of them at a time. The three new rows are networks that read
+the card's earlier payments as well as the current one.
+
+Put all eight in one table and the obvious move is to ship the winner of the
+team's own number, card precision at 100: the feed-forward network, at
+0.236. Its lead over XGBoost is 0.001, a tenth of a compromised card a day,
+and the families that top the other two columns are different again. Before
+any top place can be read as a property of a model family it has to survive
+three questions. Does the gap exceed what four weeks of real fraud move by
+themselves? Which part of each day's ranking does the metric read? And how
+much search did each family get?
+
+## One stream, one referee, eight grids
+
+A leaderboard means something only if every row went through the same
+procedure. Compare models from different studies and the data, the split and
+the metric all change at once; nothing in the gap can then be attributed to
+the model. This experiment holds everything fixed except the family.
+
+### What is held fixed
+
+**The stream.** The Belgian e-commerce payments of 2018 that <Ref
+lesson="fraud-detection-system"
+id="a-hundred-cases-a-day-the-models-output-is-a-ranking">the layered
+system</Ref> introduced: about 400,000 payments a day, about 1,000 of them
+fraud, on a little over 300 compromised cards. The data is confidential, so
+every number below can be quoted but not re-run.
+
+**The inputs.** The same fifteen numbers per payment as <Ref
+lesson="alert-budget-metrics" id="five-models-scored-on-a-test-week">the five
+baseline models</Ref>: the amount, the weekend and night flags, the card's
+counts and mean amounts over 1, 7 and 30 days, and the terminal's counts and
+delayed fraud rates over the same windows.
+
+**The referee.** Each candidate setting is validated on four prequential
+folds, each a training week, a delay week and a validation week (<Ref
+lesson="delayed-labels-prequential"
+id="prequential-folds-a-spread-across-weeks">prequential folds</Ref>). For
+each metric the candidate with the best mean is picked, refitted on the
+training block that ends a delay before each of four forward test weeks, and
+scored there. Every number in the table is the mean over those four test
+weeks, and every ± is the standard deviation across them.
+
+### Three rows that read the card's past
+
+The feed-forward network sees the fifteen numbers of the payment it scores.
+The three new models see the same fifteen numbers for each of the card's
+last few payments, the current one included, in time order (five payments in
+the simulator version of the same models). They differ in how they read that
+short sequence:
+
+- a **one-dimensional convolutional network (CNN)** slides one small set of
+  weights along the sequence, over each pair of neighbouring payments, so a
+  pattern learned at one position is recognised at any other;
+- an **LSTM** (long short-term memory network) reads the payments one at a
+  time, oldest first, and updates a vector of state after each, which carries
+  what it has read so far; the final state feeds a hidden layer and a sigmoid
+  output;
+- an **LSTM with attention** keeps the state after every payment and lets a
+  learned score weight them, so the classifier can lean on any earlier
+  payment instead of only on the final state.
+
+The last exercise of the network lesson arrived at the need for the first two:
+<Ref lesson="neural-tabular-detectors" id="exercises">concatenating the last
+five payments</Ref> gives every position its own weights and cannot
+recognise a burst wherever it starts. How these models work, and when the
+order of a card's payments carries signal at all, is the problem of <Ref
+lesson="sequence-models-for-transactions">sequence models over an entity's
+transactions</Ref>. Here they are three rows of a table.
+
+### The grids each family got
+
+| family | settings searched | candidates |
+|---|---|---|
+| decision tree | maximum depth 2–10, 20, 50 | 11 |
+| logistic regression | regularisation 0.1, 1, 10, 100 | 4 |
+| random forest | 25, 50, 100 trees × depth 5, 10, 20, 50 | 12 |
+| XGBoost | 25, 50, 100 trees × rate 0.1, 0.3 × depth 3, 6, 9 | 18 |
+| feed-forward network | rate 0.001, 0.0001 × batch 64, 128, 256 × 5, 10, 20 epochs × dropout 0, 0.2 | 36 |
+| CNN, LSTM, LSTM with attention | the same four settings, same values | 36 each |
+
+The eight searches produced this table.
+
+| real stream, four test weeks | ROC-AUC | average precision | $CP@100$ |
+|---|---|---|---|
+| decision tree | 0.869 ± 0.03 | 0.068 ± 0.01 | 0.232 ± 0.04 |
+| logistic regression | 0.816 ± 0.02 | 0.054 ± 0.01 | 0.211 ± 0.03 |
+| random forest | 0.912 ± 0.02 | 0.080 ± 0.03 | 0.227 ± 0.05 |
+| XGBoost | **0.928** ± 0.01 | 0.095 ± 0.03 | 0.235 ± 0.07 |
+| feed-forward network | 0.894 ± 0.01 | 0.084 ± 0.02 | **0.236** ± 0.04 |
+| CNN | 0.882 ± 0.01 | 0.093 ± 0.02 | 0.221 ± 0.03 |
+| LSTM | 0.892 ± 0.00 | 0.104 ± 0.03 | 0.220 ± 0.03 |
+| LSTM with attention | 0.898 ± 0.01 | **0.105** ± 0.02 | 0.232 ± 0.03 |
+
+## Three leaderboards from one table
+
+Sorting each column on its own gives three orders, and the rows move a long
+way between them.
+
+<Figure
+  src="./figures/leaderboards.svg"
+  alt="Bump chart with three columns, ROC-AUC, average precision and CP@100, each listing the eight families sorted from best to worst with their values. ROC-AUC: XGBoost 0.928, random forest 0.912, LSTM with attention 0.898, feed-forward net 0.894, LSTM 0.892, CNN 0.882, decision tree 0.869, logistic regression 0.816. Average precision: LSTM with attention 0.105, LSTM 0.104, XGBoost 0.095, CNN 0.093, feed-forward net 0.084, random forest 0.080, decision tree 0.068, logistic regression 0.054. CP@100: feed-forward net 0.236, XGBoost 0.235, decision tree 0.232, LSTM with attention 0.232, random forest 0.227, CNN 0.221, LSTM 0.220, logistic regression 0.211. Lines join each family's three positions; the two tree ensembles are blue, the three sequence networks amber, the rest grey. Only logistic regression stays in one place, last"
+  caption="The tree ensembles lead ROC-AUC, the sequence networks lead average precision, and card precision at 100 is topped by the feed-forward network by 0.001."
+/>
+
+<Task>
+Before reading on, take each column's leader and mark every family whose gap
+to it is smaller than the larger of the two standard deviations in the
+table. Count how many families share each top place.
+</Task>
+
+The rule is the one <Ref lesson="delayed-labels-prequential"
+id="prequential-folds-a-spread-across-weeks">the delayed-labels lesson</Ref>
+set for prequential folds: two candidates whose means differ by less than
+about one standard deviation are not separated, because a different set of
+weeks could reverse them. Here the standard deviations are taken across the
+four test weeks, and the gap is compared with the larger of the pair's. That
+is the stricter of the two possible tests: a family whose weeks happen to be
+quiet cannot be called ahead of a rival whose weeks swing widely on the
+strength of its own small spread.
+
+### ROC-AUC: the tree ensembles, below the top hundred
+
+XGBoost's 0.928 is ahead of every network by at least 0.030, against
+standard deviations of at most 0.01, and ahead of the tree and the
+regression by more. The forest, at 0.912 ± 0.02, is not separated from
+XGBoost; it is also not separated from the best two networks (0.898, 0.894).
+So the first place is shared by the two tree ensembles, and only XGBoost is
+clear of the networks.
+
+It is the only column whose leader is clear of a whole class of rivals,
+and the lead sits where the team never works. <Ref lesson="gbm-model-selection"
+id="where-the-classes-differ-and-where-they-do-not">The tree-ensemble
+lesson</Ref> located it: the strip of false-positive rates a hundred alerts
+can reach holds at most 0.001 of the ROC area, so a 0.03 lead is earned
+almost entirely below the hundredth card. Why the ensembles separate the
+lower part of the list better than any of the networks is not something this
+experiment measures.
+
+### Average precision: five families inside one band
+
+The attention-LSTM's 0.105 ± 0.02 is not separated from the LSTM (0.104),
+XGBoost (0.095 ± 0.03), the CNN (0.093) or, because its standard deviation is
+0.03, the forest (0.080). It is separated, by 0.001 beyond the deviation,
+from the feed-forward network (0.084 ± 0.02), and clearly from the tree and
+the regression. The top place is a band of five families.
+
+### Card precision at 100: one band for all eight
+
+The largest gap in the column, 0.236 against the regression's 0.211, is 2.5
+compromised cards a day, against weekly standard deviations of 3 to 7
+cards. No family is separated from any other.
+
+<KeyFact>
+Card precision at 100 is the column the deployment rule says should decide
+(<Ref lesson="alert-budget-metrics"
+id="three-numbers-for-three-questions">three numbers for three
+questions</Ref>), because it counts what the team's hundred calls a day find.
+It is also the one column in which this experiment cannot decide anything.
+The two columns that do separate families both read far past the hundredth
+card, into the part of the ranking a hundred calls a day never reach.
+</KeyFact>
+
+## How much four weeks move by themselves
+
+Every verdict above rests on the standard deviations, and the ones in the
+team's column are large: 0.03 to 0.07, three to seven cards a day. Where
+they come from decides what would shrink them. If they are the luck of which
+cards happened to land in 700 places a week, more test days from the same
+weeks would sharpen the comparison. If the weeks themselves differ, only
+more weeks, or comparing models on the same weeks, can.
+
+### The sampling floor
+
+<Example title="the sampling floor of a week's card precision">
+A test week's $CP@100$ is the mean of seven daily values, each the number of
+compromised cards among that day's top hundred divided by 100. Over the week
+that is $X/700$, where $X$ counts the compromised cards among 700 card
+places.
+
+Suppose every place holds a compromised card independently with the same
+probability $p$, the assumption under which one week differs from another
+only by chance. Then $X$ is
+binomial with $n = 700$ and
+
+$$
+\mathrm{sd}\!\left(\frac{X}{700}\right) = \sqrt{\frac{p(1-p)}{700}} .
+$$
+
+At the table's level, $p = 0.23$:
+$\sqrt{0.23 \times 0.77 / 700} = \sqrt{0.000253} = 0.016$, about 1.6 cards
+a day.
+
+The measured spreads are 0.03 to 0.07, two to four times that floor. A
+standard deviation computed from four values is itself rough, but even its
+smallest values here sit at twice the floor. Most of the week-to-week
+movement is therefore not sampling: the four weeks differ in what they
+contain.
+</Example>
+
+<Figure
+  src="./figures/noise.svg"
+  alt="Horizontal dot plot of CP@100 for the eight families, from 0.15 to 0.30. Each dot carries a thin whisker of plus or minus one weekly standard deviation and a short green bar of plus or minus 0.016. Feed-forward net 0.236 with whiskers 0.196 to 0.276; XGBoost 0.235, whiskers 0.165 to 0.305; decision tree 0.232; LSTM with attention 0.232; random forest 0.227, whiskers 0.177 to 0.277; CNN 0.221; LSTM 0.220; logistic regression 0.211. Every whisker overlaps every other, and each whisker is two to four times as wide as the green bar"
+  caption="Every family's weekly spread overlaps every other's, and each is two to four times what 700 independent card places a week would produce."
+/>
+
+### What makes one week unlike another
+
+What they differ in is visible in the stream itself. On the real test days
+the number of compromised cards not yet found ranges from about 200 to 370
+(<Ref lesson="alert-budget-metrics" id="on-real-card-data">the real-data
+counts</Ref>), and the easy cases that fill the top of every model's list,
+compromised terminals and bursts on one card, vary in number from week to
+week. A week rich in easy cards lifts every model at once. That shared lift
+has been seen directly on a longer record: ten months of European online
+card payments, from August 2014 to May 2015, scored every day by three
+random-forest detectors (one trained once and never updated, one retrained
+daily, one retrained daily with the investigators' latest findings). The
+daily card precision of all three peaked together in February 2015, the
+month with the most compromised cards, and sank together in October 2014,
+the month with the fewest.
+
+That is also why the comparison between two models is sharper than their
+spreads suggest. Two models scored on the same four weeks share each week's
+supply of easy cards, and their weekly differences cancel it. The tree-ensemble lesson's
+exercises sized such a paired comparison (<Ref lesson="gbm-model-selection"
+id="exercises">a paired difference across weeks</Ref>): at a paired
+standard deviation of 0.02, a gap of 0.003 needs about 180 weeks to show,
+a gap of 0.02 about four.
+
+<Exercise>
+On the simulator, the tuned models of the earlier lessons scored $CP@100$
+near 0.30 (XGBoost 0.303, the network 0.303, the forest 0.299), with
+standard deviations across the four test weeks of 0.01 to 0.02. Compute the
+sampling floor at $p = 0.30$ and compare. What does the comparison say about
+how the simulator's weeks differ from one another, and why?
+
+<Solution>
+$\sqrt{0.30 \times 0.70 / 700} = \sqrt{0.0003} = 0.017$. The measured
+spreads, 0.01 to 0.02, sit at the floor, not above it: the simulator's weeks
+differ from one another about as much as 700 random draws would. That fits
+how the simulator makes fraud. Its generator runs the same scripts every
+week, two terminals and three customers compromised per day for fixed
+durations (<Ref lesson="canonical-datasets"
+id="three-scripted-frauds">the three scripted frauds</Ref>), so after the
+first month each week holds about the same mix of the same kinds of fraud.
+The real stream's spreads at two to four times the floor measure exactly
+what the generator leaves out: weeks that are not alike.
+</Solution>
+</Exercise>
+
+## What the card's history adds, and where it shows
+
+The average-precision column is the one place where the three new rows lead,
+and the table contains a comparison that isolates why. The feed-forward
+network and the LSTM receive the same fifteen numbers for the payment they
+score; the LSTM also receives the fifteen numbers of the card's previous
+payments. Up to the difference in their layers, whatever separates them is
+what the history adds.
+
+### One comparison that changes one thing
+
+On the real stream the history moves average precision from 0.084 (the
+feed-forward network) to 0.104 (LSTM) and 0.105 (attention), with the CNN in
+between at 0.093. By the rule the LSTM's gap of 0.020 is inside its
+standard deviation of 0.03 and does not separate; the attention-LSTM's 0.021
+clears the larger deviation of its pair, 0.02, by 0.001. Only one of the two
+separates, and barely, but all three sequence models fall on the same side.
+ROC-AUC barely moves (0.894 against 0.882 to 0.898), and card precision at
+100 does not move at all (0.236 against 0.220 to 0.232).
+
+From the simulator one would have expected no gain. The same four networks,
+tuned on the simulator's folds and scored on its four test weeks as in <Ref
+lesson="neural-tabular-detectors" id="three-numbers-for-the-network">the
+network lesson's benchmark</Ref>, gave average precision 0.675
+for the feed-forward network, 0.665 for the LSTM, 0.667 with attention and
+0.599 for the CNN: the history added nothing and the CNN lost. The
+simulator's frauds are scripts whose whole signature is already in the
+aggregates, a terminal's recent fraud rate or an amount far above the card's
+own mean (<Ref lesson="ulb-handbook-benchmark"
+id="the-simulator-half-the-fraud-in-two-leaves">two leaves of a shallow tree
+hold half of them</Ref>), and a sequence of the same fifteen numbers has
+nothing left to add. On real payments something in the order of a card's
+payments survives the 1-, 7- and 30-day windows. Which property of real
+fraud that is, and on which kinds of payment it matters, is what <Ref
+lesson="sequence-models-for-transactions">sequence models over an entity's
+transactions</Ref> takes up.
+
+<Figure
+  src="./figures/ap-cp.svg"
+  alt="Scatter of average precision (vertical, 0.04 to 0.12) against CP@100 (horizontal, 0.15 to 0.30) for the eight families, with one-standard-deviation whiskers in both directions. The three sequence networks, amber, sit highest: LSTM with attention at 0.232, 0.105; LSTM at 0.220, 0.104; CNN at 0.221, 0.093. XGBoost, blue, at 0.235, 0.095; random forest, blue, at 0.227, 0.080; feed-forward net at 0.236, 0.084; decision tree at 0.232, 0.068; logistic regression at 0.211, 0.054. The points spread over a factor of two vertically and lie within 0.025 horizontally; the horizontal whiskers overlap completely"
+  caption="Average precision spreads the families over a factor of two; card precision at 100 packs them inside 2.5 cards a day."
+/>
+
+### Average precision up, card precision flat: two readings
+
+How can a model raise average precision by a quarter and put no more
+compromised cards into the day's hundred? Two different changes in the
+ranking would both do it, and the table cannot tell them apart.
+
+Average precision counts payments: every fraudulent payment adds the
+precision at its rank. Card precision counts each card once, at its
+highest-scored payment. A compromised card on this stream carries about
+three fraudulent payments a day, so one card can fill several payment places
+near the top (<Ref lesson="alert-budget-metrics" id="on-real-card-data">the
+alert-budget lesson</Ref> noted that real cards fill up to three of the
+hundred).
+
+<FigureSequence
+  name="readings"
+  alt="Three frames of a toy day of twelve payments in score order, each box showing the card letter, a blue dot under fraudulent payments, the three cards the team calls shaded amber. Frame 1: cards A, B, C, D, A, E, F, G, H, C, J, G with frauds at ranks 1, 3, 5, 8, 10, 12; the called cards are A, B, C; average precision 0.63, card precision at 3 cards 0.67. Frame 2: A's and C's second frauds move up, order A, A, B, C, C, D, E, F, G, H, J, G; frauds at 1, 2, 4, 5, 9, 12; called cards still A, B, C; average precision 0.77, card precision 0.67. Frame 3, again from frame 1: card G's two frauds move up to ranks 4 and 5, order A, B, C, G, G, A, D, E, F, H, C, J; called cards still A, B, C; average precision 0.77, card precision 0.67"
+  caption="Two different improvements to the same day raise average precision from 0.63 to 0.77 and leave the three called cards unchanged."
+/>
+
+<Task>
+Step through the frames. In each, find the fourth card in the ranking and
+say whether it is compromised. Which frame would gain if the team could call
+four cards?
+</Task>
+
+**Reading 1: later payments of cards already near the top rise.** In frame 2
+the second frauds of cards A and C climb. Average precision rises from 0.63
+to 0.77, because two fraudulent payments are now reached at higher
+precision. The called cards are the same three. A model that reads the
+card's previous payments is placed to do exactly this: when it scores a
+card's second or third payment of a burst, the first payments are in its
+input.
+
+**Reading 2: a card just below the cut rises.** In frame 3 card G's frauds
+climb to ranks 4 and 5. Average precision rises to the same 0.77, and the
+called cards are again the same, because G is the fourth card and the
+budget is three. With a budget of four, frame 3 would find a third
+compromised card and frame 2 would not.
+
+On the real stream the two readings make different promises. Under the
+first, the sequence models spend top places on cards the team would call
+anyway; under the second, they hold cards in reserve just below the
+hundredth place, worth something the day the team grows. Which reading
+holds is a measurement on the scored test weeks, designed in <Ref
+lesson="worldline-model-comparison" id="exercises">the exercises</Ref>.
+
+<KeyFact>
+Payment-level average precision cannot tell the two readings apart: frames 2
+and 3 both score 0.77. Only a quantity that counts each card once, such as
+average precision over the day's card ranking or card precision at a larger
+budget, can.
+</KeyFact>
+
+## What the search found, and what it missed
+
+The table reports, for each family, the test score of the candidate the
+folds picked. That number depends on two things besides the family: whether
+the folds told the candidates apart correctly, and whether the grid
+contained a good candidate at all.
+
+### The leaderboard the bank sees on deployment day
+
+On the morning a model is chosen, the bank has only the validation folds.
+Their card precision for each family's pick tells a different story from the
+test weeks.
+
+<Figure
+  src="./figures/val-test.svg"
+  alt="Slope chart of CP@100 for the eight families across three columns. Left, validation folds: XGBoost 0.261, random forest 0.258, LSTM with attention 0.243, LSTM 0.238, CNN 0.227, feed-forward net 0.218, decision tree 0.214, logistic regression 0.171. Middle, test weeks for the folds' pick: all between 0.211 and 0.236. Right, test weeks for the best candidate in each grid in hindsight: XGBoost 0.249, LSTM with attention 0.247, CNN 0.245, LSTM 0.240, feed-forward net 0.236, decision tree 0.232, random forest 0.227, logistic regression 0.212. Lines from the left column converge sharply into the middle and fan out slightly again to the right"
+  caption="On the folds the ensembles lead by four to five cards a day; on the test weeks the eight families sit inside 2.5 cards; in hindsight the order changes again."
+/>
+
+On the folds, XGBoost (0.261) and the forest (0.258) lead the feed-forward
+network (0.218) by about four cards a day, and the regression trails at
+0.171. XGBoost's lead of 0.043 over the network is just larger than the
+larger of their fold standard deviations (0.04), so by the rule the folds
+call it ahead. On the test weeks that
+separation is gone: the ensembles fell by 0.03, the network, the tree and
+the regression rose by 0.02 to 0.04, and nine cards of spread became 2.5.
+<Ref lesson="gbm-model-selection"
+id="the-fifty-trees-the-folds-did-not-find">The tree-ensemble lesson</Ref>
+saw this for XGBoost against the tree; the table shows it across all eight.
+The folds validate on four weeks that end a delay before the first test
+week, and those weeks differ from the test weeks in the same way the test
+weeks differ among themselves. The fold spread is a floor on the
+uncertainty, not a measure of it, which is <Ref
+lesson="delayed-labels-prequential"
+id="prequential-folds-a-spread-across-weeks">the delayed-labels lesson's
+conclusion</Ref> seen at the scale of eight families.
+
+### Hindsight: the cost of selecting is as large as the field
+
+The right-hand column of the figure is each grid's best test value, the
+optimal row of <Ref lesson="gbm-model-selection"
+id="three-test-numbers-for-one-model-class">the triplet</Ref>. Its order is
+a third one: XGBoost 0.249, attention 0.247, CNN 0.245, LSTM 0.240. The cost
+of selecting, optimal minus best-estimated, is 0.024 for the CNN, 0.020 for
+the LSTM, 0.015 for attention and 0.014 for XGBoost, and near zero for the
+other four, whose picks were already their grid's best.
+
+| $CP@100$ | folds' pick (test) | best in grid (test) | cost of selecting |
+|---|---|---|---|
+| decision tree | 0.232 | 0.232 | 0.000 |
+| logistic regression | 0.211 | 0.212 | 0.001 |
+| random forest | 0.227 | 0.227 | 0.000 |
+| XGBoost | 0.235 | 0.249 | 0.014 |
+| feed-forward network | 0.236 | 0.236 | 0.000 |
+| CNN | 0.221 | 0.245 | 0.024 |
+| LSTM | 0.220 | 0.240 | 0.020 |
+| LSTM with attention | 0.232 | 0.247 | 0.015 |
+
+The optimal values are maxima of 18 or 36 noisy test numbers, so they are
+optimistic, and none of the gaps in the column is separated by the rule. The
+point is their size.
+
+<KeyFact>
+Which candidate the folds happened to pick inside one family moves card
+precision at 100 by up to 2.4 cards a day; the whole field of eight families
+spans 2.5. A ranking of families at the budget is, at this resolution, a
+ranking of lucky picks.
+</KeyFact>
+
+### A grid that brackets its optimum, and one that stops at its edge
+
+A selection can only find what its grid contains. The decision tree's grid
+shows what a grid that contains its optimum looks like. Trees of depth 2 to
+10, 20 and 50 were fitted at library defaults on the single training week of
+the five baseline models' real half and scored on its single test week (<Ref
+lesson="alert-budget-metrics" id="five-models-scored-on-a-test-week">the
+baseline setup</Ref>).
+
+<Figure
+  src="./figures/overfit-real.svg"
+  alt="Two line charts against maximum depth 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 50 on the real stream. Left, average precision: the test-week curve in amber rises from 0.024 at depth 2 to a peak of 0.049 at depth 6, then falls to 0.020 at depth 8 and 0.003 at depth 50; the dashed training-week curve rises steadily from 0.063 at depth 2 to 0.282 at depth 9. Right, CP@100: test rises from 0.077 to a peak of 0.196 at depth 6 and falls to 0.049 at depth 9 and 0.017 at depth 50; training rises from 0.147 to 0.500 at depth 9"
+  caption="On real payments a single tree's test scores peak at depth 6 and collapse beyond it, while its training scores keep rising."
+/>
+
+Test average precision and card precision both peak at depth 6 and fall
+steeply after it, to 0.003 and 0.017 at depth 50, the unpruned tree of <Ref
+lesson="ulb-handbook-benchmark" id="the-unpruned-tree-falls-to-chance">the
+benchmark lesson</Ref>; test ROC-AUC peaks later, at 0.838 at depth 8. The
+peak lies well inside the grid, with candidates on both sides, and the
+prequential search picked depth 6 for average precision and card precision
+and 7 for ROC-AUC. Whatever the folds' noise, the grid gave them the right
+candidates to choose among.
+
+The LSTM's grid did not. All three of the folds' picks, one per metric, use
+the fewest epochs the grid offered, 5. To see which way the other settings
+lean, the LSTM's scores on the folds and on the test weeks were traced
+against the number of epochs at the grid's two extreme pairs of learning
+rate and batch size: the fast pair (rate 0.001, batch 64) and the slow pair
+(rate 0.0001, batch 256). The slow pair scored higher, and its highest
+scores came at 5 epochs: the slow corner of the grid. Each of the three edges is a way of training
+less, fewer and smaller updates, which <Ref
+lesson="neural-tabular-detectors"
+id="batch-size-and-epochs-count-the-same-thing">the network lesson</Ref>
+showed are one dimension, the amount of training. A pick on the edge of
+that dimension says the optimum may lie beyond it, at even less training,
+where no candidate was tried; the attention-LSTM's picks lean the same way.
+The sequence rows are therefore lower bounds for their families under a
+36-candidate grid, while the tree's row is close to what a tree can do.
+
+### What the compute bought
+
+The compute each family consumed is only partly on record. On the real
+stream the four classic searches took 695 seconds (regression), 1,617 (tree),
+3,616 (forest) and 8,789 (XGBoost) on a 40-core server, as <Ref
+lesson="gbm-model-selection" id="what-the-compute-buys">the tree-ensemble
+lesson</Ref> priced them. The networks' real-stream grids, 36 candidates
+each, have no recorded times.
+
+The simulator, where every grid was timed, gives the scale. With ten fits
+running at once, the feed-forward network's 162 candidates took about two
+hours; the LSTM's 162 took 4.1 hours, the attention-LSTM's 162 took 4.6, and
+the CNN's 216 took 7.5. Per candidate, a sequence network cost two to three
+times a feed-forward network, and XGBoost's eighteen candidates took 21
+minutes on one core. On the real stream the networks' grids were cut to 36
+candidates, and the LSTM's picks show the cut landed short of the family's
+optimum. The compute did not buy a single card a day at the budget. What it
+bought was the sequence networks' place at the top of the average-precision
+band, and that place was measured whichever of the two readings above
+holds. What the readings decide is its worth: under reading 1 it buys
+nothing the team can call, under reading 2 it buys cards in reserve that
+pay only if the budget grows.
+
+## Models that tie do not catch the same frauds
+
+A tie in card precision says that two models find about the same number of
+compromised cards a day. It does not say they find the same cards, and if
+they find different ones, the useful answer to "which family?" may be two.
+
+### Measuring the overlap
+
+The eight-model experiment did not record which cards each family found.
+Another card stream did. On three months of a European processor's 2015
+payments, with e-commerce and face-to-face payments modelled separately, a
+random forest and an LSTM were trained on March and April and tested on
+May, each cut at the score where it had caught a fifth of the test frauds,
+so that both caught the same number. The overlap of their caught frauds was
+measured by the Jaccard index, the number caught by both divided by the
+number caught by either.
+
+For two sets of the same size $n$ sharing $s$ elements, the union holds
+$2n - s$, so
+
+$$
+J = \frac{s}{2n - s} \quad\Longleftrightarrow\quad \frac{s}{n} = \frac{2J}{1 + J} .
+$$
+
+On e-commerce the forest and the LSTM had $J = 0.35$: each model shared
+$0.70/1.35 = 52\%$ of its catches with the other, and the other 48% were its
+own. On face-to-face payments $J = 0.25$, a 40% share. Even two forests
+built on different input sets shared only 64% ($J = 0.475$), and two LSTMs
+67% ($J = 0.508$).
+
+<Figure
+  src="./figures/overlap.svg"
+  alt="Two equal circles, blue for the forest and amber for the LSTM, overlapping so that the shared region holds 52% of each circle. Labels: forest only 48%, both 52%, LSTM only 48%. Note beneath: each circle is one model's caught frauds, the same count; Jaccard index 0.35 equals both divided by either"
+  caption="At the same recall on e-commerce payments, a forest and an LSTM share about half of the frauds each catches."
+/>
+
+### What the overlap means for the eight families
+
+Half of each model's catches are its own. Two such models tied in card
+precision are not interchangeable. A list of 100 cards drawn from their two
+top-100 lists can find at most the union of what the two find; an average of
+their rankings is not limited to the two lists, and can promote a card that
+both models rank just below the cut, or demote one that only one of them
+ranked high. Whether it gains or loses is not settled by the overlap. The
+backtest
+that decides whether it does was designed in <Ref
+lesson="neural-tabular-detectors" id="exercises">the network lesson's
+exercises</Ref>: measure the overlap of each day's detected cards first,
+average ranks, choose the weight on the folds, compare week by week. On the
+eight-model table the natural pair is the family with the firm ROC-AUC lead
+and a family from the average-precision band that reads the history,
+XGBoost and an LSTM. Whether they disagree on this stream as much as on the
+2015 one was not measured.
+
+## Where this experiment departs from the bank
+
+The table is a backtest under one set of simplifications, and each bears on
+how far its three leaderboards carry to a deployed detector.
+
+| the experiment | the bank | what it bears on |
+|---|---|---|
+| every training payment carries its label as finally known; the delay enters only as the gap in the split | labels arrive over weeks, and the fast ones are the cards the model itself chose to alert (<Ref lesson="fraud-detection-system" id="the-fast-labels-are-a-sample-the-model-chose">the system lesson</Ref>) | how well each family learns from labels its own alerts selected: <Ref lesson="alert-feedback-selection-bias">alert feedback and selection bias</Ref> |
+| four forward test weeks of one summer | months of drift, weeks unlike the folds | whether any order holds beyond a season: <Ref lesson="drift-strategies-on-worldline">drift strategies on Worldline data</Ref> |
+| e-commerce payments only | card-present payments too | where the history pays: <Ref lesson="sequence-models-for-transactions">sequence models</Ref> |
+| fifteen hand-built numbers, no merchant category or country | dozens of categorical fields | embeddings had nothing to embed (<Ref lesson="neural-tabular-detectors" id="what-the-terminal-and-the-weekday-added-on-the-simulator-nothing">the null result</Ref>) |
+| grids of 4 to 36 candidates, the LSTM's pick on the edge, network times unrecorded | a search budget chosen in advance | how much of each row is the family and how much the grid |
+| one refit per test week | a nightly retrain | how often the compute bill is paid |
+
+None of these invalidates the table. They mark what it measured: eight
+families, on one season of one channel, each searched once, with labels a
+deployed system never has.
+
+<Conclusion>
+You can now read a multi-model leaderboard as a measurement and say what
+produced each top place. ROC-AUC's lead belongs to the tree ensembles and is
+earned below the hundredth card. Average precision's top is a band of five
+families, in which the networks that read the card's earlier payments sit
+highest, consistent with the history carrying signal on real payments that
+it did not carry on the simulator, and the gain is either more payments of
+cards already called or more cards just below the cut. Card precision at
+100, the team's own number, ties all eight inside 2.5 cards a day against
+weekly spreads of three to seven, two to four times the sampling floor
+because the weeks themselves differ, and the folds' choice of candidate
+inside a family moves it as much as the choice of family. Models that tie
+can still catch different frauds, so the reply to the table is to combine
+and measure, not to crown.
+
+What none of the eight rows can show is what the choice between two
+detectors is worth in money, the measure a deployment decision is finally
+argued in. <Ref lesson="scorecard-vs-gbm-lab">The scorecard and
+boosted-tree lab</Ref> builds a scorecard and a boosted tree under the same
+referee and argues that choice in savings.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+Suppose the investigators could call 1,000 cards a day instead of 100. (a)
+On days with 200 to 370 compromised cards not yet found, what is the ceiling
+of $CP@1000$, and what does it now depend on? (b) Which of the table's
+columns would you expect $CP@1000$ to resemble more, and why might the
+eight-way tie break? (c) Push $k$ to every card that pays that day, about
+120,000. What does every model score?
+
+<Solution>
+**(a)** The ceiling is $\min(1, \gamma_t/k)$ with $\gamma_t$ the day's
+compromised cards not yet found (<Ref lesson="alert-budget-metrics"
+id="reading-a-day-against-its-ceiling">reading a day against its
+ceiling</Ref>). At $k = 1{,}000$ it is $\gamma_t/1{,}000$, between 0.20 and
+0.37: for the first time on this stream the ceiling binds, and it moves with
+each day's supply of fraud. Comparisons across weeks would then need the
+normalised version, $CP@k$ divided by its ceiling, or a paired comparison on
+the same weeks.
+
+**(b)** $CP@1000$ reads the cards ranked 101 to 1,000, the region where the
+table's average-precision differences can live and the top of the region
+ROC-AUC reads. It should look more like the average-precision column: if the
+sequence networks' gain is reading 2 (cards just below the hundredth), it
+shows up here. The tie can also break for a statistical reason: 7,000 card
+places a week give a sampling floor of about
+$\sqrt{0.1 \times 0.9 / 7{,}000} \approx 0.004$ at a precision near 0.1, a
+quarter of the 100-card floor. The week-to-week waves remain, which is why
+the comparison should be paired.
+
+**(c)** With every card called, the top $k$ cards are all cards, and
+$CP@k$ is the share of compromised cards among them, about
+$300 / 120{,}000 \approx 0.0025$ (taking the course's working assumption of
+about 120,000 cards a day), the same for every model. The metric has
+stopped reading the ranking at all: at the two extremes of $k$, a budget of
+one card and a budget of every card, it says least about the model, and
+between them it reads a different part of the list for each $k$.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague writes: "The attention-LSTM is the best model for this bank: it
+tops average precision, which summarises the whole top of the list, and it
+is the most sophisticated model we tried." Refute the claim, naming the step
+that fails.
+
+<Solution>
+**What is true.** The attention-LSTM has the highest average precision,
+0.105.
+
+**First failure: the top place is not separated.** Its gap to the LSTM
+(0.104), XGBoost (0.095 ± 0.03), the CNN (0.093) and the forest
+(0.080 ± 0.03) is smaller than the larger standard deviation of each pair.
+On another four weeks the order inside that band could reverse.
+
+**Second failure, the decisive one: average precision is not the bank's
+metric.** The team calls a hundred cards a day, and on card precision at 100
+the attention-LSTM scores 0.232, inside a band where all eight families
+tie. The step "tops AP, therefore best for this bank" fails because average
+precision counts payments and reads beyond the hundredth card. Its gain may
+be later payments of cards the team calls anyway (reading 1), which is worth
+nothing to a team that calls cards, or cards just below the cut (reading 2),
+worth something only if the budget grows.
+
+**Third: the row is a lower bound with an unknown price.** Its grid's picks
+lean toward the slow edge, so the family might do better with a longer
+search, and its real-stream search time was not recorded; on the simulator a
+sequence grid ran four to seven and a half hours against XGBoost's 21
+minutes on one core. "Most sophisticated" is a cost, not a credential.
+
+The defensible statement is narrower: among the eight, the sequence networks
+sit at the top of an average-precision band, which matters if the bank
+needs the ranking below the hundredth card and is worth testing in
+combination with a tree ensemble.
+</Solution>
+</Exercise>
+
+<Exercise>
+Design the measurement that tells reading 1 from reading 2 for the
+attention-LSTM against the feed-forward network, using only the scored test
+weeks. (a) Name two quantities, computed from each model's scores and the
+test labels, that move under one reading and not the other. (b) Compute both
+on the three frames of the toy day. (c) Say what result on the four real
+test weeks would count as evidence for reading 2.
+
+<Solution>
+**(a)** Two quantities that ignore repeated payments of a card:
+
+- **Card-level average precision.** Collapse each day to cards as card
+  precision does, each card scored by its highest payment and labelled
+  compromised if any payment is fraud, then compute average precision over
+  the ranked cards. Reading 1 reorders payments of cards that already lead,
+  so the card order, and this number, stay put; reading 2 moves a
+  compromised card up the card order and raises it.
+- **$CP@k$ for $k$ above 100**, say 150, 200 and 300 cards a day. Reading 2
+  puts compromised cards just below the hundredth place, so these rise;
+  reading 1 leaves them where they were.
+
+**(b)** Frame 1: the card order is A, B, C, D, E, F, G, H, J, with
+compromised cards at card ranks 1, 3 and 7, so card-level AP is
+$\tfrac13(1 + \tfrac23 + \tfrac37) = 0.698$, and $CP@4 = 2/4 = 0.50$
+(A, B, C, D). Frame 2: the card order is unchanged (A, B, C, D, E, F, G, H,
+J): card-level AP 0.698, $CP@4 = 0.50$. Frame 3: the order is A, B, C, G,
+D, …, compromised at ranks 1, 3 and 4: card-level AP
+$\tfrac13(1 + \tfrac23 + \tfrac34) = 0.806$, $CP@4 = 3/4 = 0.75$. Payment AP
+was 0.77 in both frames 2 and 3; the card-level quantities separate them.
+
+**(c)** Compute both quantities for both models on each of the four test
+weeks and take the weekly differences, LSTM minus network. Evidence for
+reading 2 is a mean difference in card-level AP and in $CP@200$ above two
+standard errors of those weekly differences, with the same sign every week.
+Evidence for reading 1 is a payment-level AP gain with card-level AP and
+$CP@200$ flat; then the history is ranking more of each burst, which helps
+a system that blocks per payment and not a team that calls per card.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two models each call 100 cards a day and find 23 compromised cards. Their
+sets of found cards have Jaccard index $J$. (a) Show that the number of
+distinct compromised cards found by either is $46/(1+J)$, and evaluate it at
+$J = 0$, $0.35$ and $1$. (b) If the team calls the union of the two lists,
+how many cards is that, and between which values does the union's precision
+lie at $J = 0.35$? (c) The budget stays at 100. What is the most a combined
+list can find, and why is that only a bound?
+
+<Solution>
+**(a)** With $n = 23$ found by each and $s$ by both, $J = s/(46 - s)$, so
+$s = 46J/(1+J)$ and the union holds $46 - s = 46/(1+J)$ compromised cards.
+At $J = 0$: 46, the lists find disjoint fraud. At $J = 0.35$: $46/1.35 =
+34.1$. At $J = 1$: 23, the second model adds nothing.
+
+**(b)** At $J = 0.35$ the two lists share $s = 11.9$ compromised cards, and
+may share up to all 77 genuine cards of the smaller list as well. The lists
+therefore share between 11.9 and $11.9 + 77 = 88.9$ cards, and their union
+holds between $200 - 88.9 = 111$ and $200 - 11.9 = 188$ cards. Its
+precision is between $34.1/188 = 0.18$ and $34.1/111 = 0.31$, against 0.23
+for either list alone: calling both lists raises precision only if the
+models also agree on most of their false alarms.
+
+**(c)** A list built from the cards on the two existing lists finds at most
+$\min(100, 34.1) = 34$ compromised cards, 11 more than either model, and only
+if it kept every compromised card on either list and filled the rest with
+genuine ones. Nothing tells the combination which cards those are, which is
+why 34 is a bound and not a forecast.
+
+An average of the two rankings is not such a list, so 34 does not bind it.
+It can move off the bound in both directions. Up: a compromised card that
+both models place at 101 to 150 is on neither list but can rank inside the
+top 100 on the average, which can take the count above 34. Down: a card that
+one model ranks first and the other ranks 300th averages to a middling rank
+and can drop out, while a genuine card that both rank moderately high climbs
+in, which can take the count below 23. The Jaccard index bounds only a
+choice among the cards the two lists already hold; what averaging finds is
+the backtest's question.
+</Solution>
+</Exercise>
+
+<Exercise>
+A compliance officer asks to ship the points scorecard of <Ref
+lesson="scorecards-woe">the scorecard lesson</Ref> instead of any of the
+eight families, because a reviewer can read it line by line. (a) Which row
+of the table stands in for the scorecard, and what supports that? (b) What
+does the bank give up at a budget of 100 cards, in cards a day and, if the
+gap were real, in euros at €360 saved per compromised card found? (c) What
+does it give up below the top hundred? (d) Which part of your answer can the
+data not support?
+
+<Solution>
+**(a)** Logistic regression: the scorecard is a logistic regression on
+weight-of-evidence columns, and on the simulator's test week it tied the
+plain regression on card precision at 100 (0.290 against 0.291) while
+losing average precision, 0.52 against 0.61, where the one-direction rule
+merged the terminal's 30-day fraud rate. No scorecard was fitted on the real
+stream, so the regression row is the closest measured stand-in, and an upper
+bound on the card's average precision if the same merge applies.
+
+**(b)** The regression's $CP@100$ is 0.211 against the best 0.236: 2.5 cards a
+day. At €360 a card that would be €900 a day, about €330,000 a year. But
+2.5 cards is inside weekly standard deviations of 3 to 7 cards (0.03 for
+the regression, 0.04 for the network), and the regression is not separated
+from any family by the rule.
+
+**(c)** Below the top it loses clearly: ROC-AUC 0.816 against 0.928,
+average precision 0.054 against 0.105 or 0.095, half of the best. Those gaps
+exceed the standard deviations. The bank pays for the scorecard if it
+needs the ranking below the hundredth card: a growing team, or a queue
+ordered by expected loss across all amounts (<Ref
+lesson="example-dependent-cost">example-dependent cost</Ref>).
+
+**(d)** The euro figure: the 2.5-card gap is not separated from zero on
+four weeks, so €330,000 a year is the value of a difference the experiment
+cannot confirm. A paired comparison over many more weeks, or the savings
+measure of the lab that follows, is what would turn it into a number.
+</Solution>
+</Exercise>
+
+<Exercise>
+The bank can afford one more grid search on the real stream, about 36
+candidates. Which family's grid would you extend, in which direction, and
+why not the decision tree's? How would you spend the 36 candidates?
+
+<Solution>
+**Which family.** The LSTM: its picks all use the
+fewest epochs (5), and its best scores came at the smaller learning rate
+(0.0001) and the largest batch (256), all three edges on the side of less
+training. A pick on the boundary says the grid may not contain the family's
+optimum, so its row is a lower bound. The tree's grid has candidates on
+both sides of its peak at depth 6, with test scores falling steeply on each
+side, so extending it can only add candidates the folds would reject.
+
+**Which direction.** The three edges are one dimension, the number and size
+of updates: fewer epochs and larger batches mean fewer steps, a smaller rate
+smaller ones. Extend along that dimension: 2 and 3 epochs, batches of 512,
+rates of 0.00005 and 0.00002. Keep dropout at its two values, 0 and 0.2. With
+only two levels both are edges, so the edge argument says nothing about it;
+it is left alone because it is not part of the training-amount dimension the
+other three edges point along, and because the folds did not favour one
+value: the LSTM's picks used 0.2 for ROC-AUC and average precision and 0
+for card precision at 100.
+
+**How to spend the candidates.** Draw them at random over the extended
+ranges instead of crossing a few values of each, because random draws try
+more distinct values along whichever setting matters (<Ref
+lesson="gbm-model-selection"
+id="why-random-search-beats-a-grid-when-settings-are-ranges">why random
+search beats a grid</Ref>). Validate on the same four folds and judge by
+the same rule: a new pick counts as an improvement only if its fold mean
+beats the old pick's by more than a fold standard deviation; the extended
+search may also confirm that the corner was already the optimum.
+</Solution>
+</Exercise>
+
+<Exercise>
+The sequence networks here saw only e-commerce payments. Card-present
+payments, at a shop's terminal, are a different stream. Predict on which of
+the two a model that reads the order of a card's payments should gain more
+over the 1-, 7- and 30-day aggregates, and argue from what constrains a
+card's sequence of payments in each channel.
+
+<Solution>
+**Card-present.** A card paying at terminals has to be physically there:
+consecutive payments are tied to places and to the time it takes to move
+between them, and a cardholder's shop payments follow routines of places
+and hours. A counterfeit or stolen card breaks that order in ways that live
+in consecutive payments: a terminal in another city twenty minutes after the
+last one, a run of terminals the card has never used. A count or a mean over
+a window loses which payment followed which; a sequence model keeps it.
+
+**E-commerce.** Moving between merchants online costs nothing, so a
+genuine card's consecutive payments are already irregular, and the order
+carries less that a window misses. The aggregates, how many payments and
+how much money recently, catch most of what a burst of online fraud looks
+like.
+
+The prediction is a larger gain on card-present payments and a small or
+null one on e-commerce, which makes this lesson's average-precision gain on
+an e-commerce stream the harder case. Whether the prediction holds, and
+whether hand-built features that encode the order close the gap, is what
+<Ref lesson="sequence-models-for-transactions">sequence models over an
+entity's transactions</Ref> measures.
+</Solution>
+</Exercise>
+
+<References>
+1. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 7, section "Real-world data" (the grids of the feed-forward network, CNN, LSTM and LSTM with attention on Worldline e-commerce transactions; their best-estimated and optimal parameters and validation and test scores; the LSTM's best performance at the lowest learning rate, largest batch and fewest epochs; the global table of eight model classes); Ch. 7, section "Sequential models and representation learning" (building each card's sequence of previous transactions; the 1D-CNN, the LSTM and attention over the LSTM's hidden states; prequential grid searches on simulated data with ten parallel jobs, 26,905 s, 14,751 s and 16,736 s; the simulated-data benchmark of eight classes); Ch. 5, section "Real-world data" (training against test performance of decision trees by depth; prequential selection for decision trees, logistic regression, random forests and XGBoost; execution times on a 40-core server); Ch. 3, section "Real-world data" (Belgian e-commerce transactions of 2018: about 400,000 a day, about 1,000 fraudulent, about 300 compromised cards). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+2. J. Jurgovsky, M. Granitzer, K. Ziegler, S. Calabretto, P.-E. Portier, L. He-Guelton, O. Caelen, "Sequence Classification for Credit-Card Fraud Detection," *Expert Systems with Applications* 100, 2018, pp. 234–245 — Sec. 3.3 and Table 1 (e-commerce and face-to-face transactions of 2015, training March–April, test May); Sec. 4.4 (the Jaccard index of true positives at recall 0.2); Sec. 5.2 (random forest against LSTM: inter-model agreement 25.2% face-to-face and 35.0% e-commerce, intra-model 47.5–50.8%). https://doi.org/10.1016/j.eswa.2018.01.037
+3. A. Dal Pozzolo, G. Boracchi, O. Caelen, C. Alippi, G. Bontempi, "Credit Card Fraud Detection: A Realistic Modeling and a Novel Learning Strategy," *IEEE Transactions on Neural Networks and Learning Systems* 29(8), 2018, pp. 3784–3797 — Sec. VI-C–D, Table III and Fig. 5 (the daily card precision of every classifier rising and falling with the number of fraudulent cards over ten months; the high standard deviations of $P_k$ and $CP_k$ against those of AUC). https://doi.org/10.1109/TNNLS.2017.2736643
+4. S. Hochreiter, J. Schmidhuber, "Long Short-Term Memory," *Neural Computation* 9(8), 1997, pp. 1735–1780 — the recurrent cell whose state carries information across a sequence. https://doi.org/10.1162/neco.1997.9.8.1735
+5. D. Bahdanau, K. Cho, Y. Bengio, "Neural Machine Translation by Jointly Learning to Align and Translate," *International Conference on Learning Representations*, 2015 — Sec. 3.1 (attention: a learned, softmax-normalised weighting of all hidden states). https://arxiv.org/abs/1409.0473
+</References>
