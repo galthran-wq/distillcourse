@@ -1,0 +1,73 @@
+# gbm-model-selection — ledger
+
+**Problem.** How to choose the settings of a tree ensemble on prequential
+folds (labels a delay old), what the search costs, and what it buys over a
+tuned single tree. Answer: score every search by three test numbers (default,
+best-estimated, optimal); gain = best-est − default, cost of selecting =
+optimal − best-est, measured only in a backtest and floored by fold noise; a
+search pays only where the default is bad (single tree), ensembles' defaults
+sit on plateaus; grids cost fits × folds and multiply per setting; the folds
+often cannot separate the candidates (XGBoost CP@100: 18 of 18 inside one
+std), so random search suffices, and n draws hit a band of fraction q with
+probability 1 − (1−q)^n; on real card data a tuned depth-6 tree ties tuned
+XGBoost on CP@100 (0.232 vs 0.235) for 1/5.4 of the wall-clock time (tree on
+1 core, XGB on 40) and ~1/18 of the processor time on equal hardware
+(simulator, single core); XGBoost leads AUC/AP, which read the ranking below
+the hundredth card; LR (scorecard stand-in) trails XGB on CP@100 by 0.6
+(simulator) / 2.4 (real, inside noise) cards a day.
+
+## Explained
+- Setup shared by every search (simulator): candidate settings per class, four prequential folds (Ref delayed-labels-prequential), best mean = winner (deployable on day 129); backtest = EVERY candidate also fitted on the four training blocks ending a delay before each of the four forward test weeks from day 129 and scored on its week (what T(θ) and the optimal row need); same fifteen inputs (Ref alert-budget-metrics five-models) — §What a search buys / ### Three test numbers for one model class
+- Definition: default score T(θ0), best-estimated T(θ̂) with θ̂ = argmax_m V(θm), optimal T(θ*) = max_m T(θm); selection gain, cost of selecting ≥ 0; best-estimated = choosable on day 129, optimal = hindsight, optimistic (max of M noisy numbers); no search beats its grid's optimal row — same ###
+- Worked example (FigureSequence procedure-1..3, Example): presented as the delayed-labels depth table renamed (Ref what-prequential-selection-picks: test at pick = best-est, test at optimum = optimal); new: default = depth 50 (library grows until pure) 0.334; AP gain 0.245, cost 0.022; AUC gain 0 (pick = default), cost 0.016; CP gain 0.026, cost 0; cost 0.022 < fold stds 0.027/0.038 named as the folds' noise floor — same §
+- In-body exercise: LR regularisation C ∈ {0.1, 1, 10, 100}, default C = 1, 4-decimal table (val/test AUC, AP, CP); picks C = 100 (AUC, AP), 0.1 (CP); gains ≤ 0.0002, cost ≤ 0.0004 (0.04 cards/day); CP means span 0.0014 vs fold std 0.017 → four ties, default on a plateau, opposite-end picks mean nothing — same §
+- KeyFact: cost of selecting measurable only in a backtest, floored by noise; finer grid raises the optimal row, moves best-est only where folds separate — same §
+- Random forest: depth stops mattering once averaged (single tree AP 0.600 → 0.334 from depth 5 to 50; forest of 100: 0.627, 0.665, 0.678, 0.672 at 5/10/20/50; averaging cancels what each deep tree memorised alone, cannot add detail too coarse trees lack); trees 25/50/100 at depth 20: AP 0.660/0.673/0.678, fit 3.2/6.0/11.5 s per fold (linear cost, diminishing gain); 12 candidates 587 s on one core; picks 100/20 on all metrics → 0.870/0.678/0.299 vs default (100, unlimited) 0.870/0.672/0.299; optimal 100/10 for AUC (0.875) and CP (0.303) — §Two ensembles… / ### Random forest (figure rf-depth.svg)
+- XGBoost: learning rate η = shrinkage on each new tree's output (not a weight step size); trees × η ≈ distance from the base rate; grid depth 3/6/9 × trees 25/50/100 × η 0.1/0.3 = 18, written trees/rate/depth; 1,251 s; default 100/0.3/6 0.859/0.659/0.285; picks 100/0.3/3, 50/0.3/3, 25/0.3/3 → 0.869/0.687/0.303; optimal 0.872 (50/0.3/3), 0.694 (100/0.1/3), 0.304 (100/0.1/3); all picks depth 3; why depth 6 loses inside boosting: at η 0.3 depth-6 test AP falls with more trees (0.682/0.674/0.659 at 25/50/100), depth 9 likewise, depth 3 flat 0.679–0.687; after the describable patterns are fitted, later rounds fit unexplained rows, and a 64-leaf tree can isolate small groups of them where an 8-leaf tree cannot; deep trees × many large steps = memorising — ### XGBoost
+- Four-class triplet figure (key image triplet.svg); LR bars = the first section's exercise (plateau); gains: tree 0.245 AP, XGB 0.028, RF 0.006, LR 0; costs ≤ 0.022 (tree), ≤ 0.007 ensembles; between classes: AUC LR/RF/XGB within 0.002, tree 0.07 behind; AP XGB ≈ RF > LR > tree; CP XGB 0.303, RF 0.299, LR 0.297 tie, tree 0.284 1.9 cards/day behind (just under two-card line); imbalance lesson's XGBoost row (0.872/0.687/0.302) is a separate run — ### Four classes side by side
+- KeyFact: tuning moves an ensemble's CP by ≤ 2 cards/day; the metric decides which class wins (AP separates ensembles, CP@100 three-way tie) — same §
+- Grid cost = Σ candidates fit time × folds; XGB fit 1.8 s (25/0.3/3) to 18.6 s (100/0.1/9), ~140 s for one fit of each, ×4 folds = 560 s = validation pass (the only one a bank runs); backtest's test-week fits of every candidate = second ~560 s pass; two passes + scoring = 1,251 s (RF 587 s likewise both passes); each new setting multiplies (e.g. scale_pos_weight × 4) — §Paying less for the search / ### What a grid costs
+- What the folds can tell apart (figure xgb-band.svg): validation CP of 18 XGB candidates 0.278–0.289 vs fold std ~0.015 → 18 ties (test 0.285–0.304); validation AP 14 of 18 within one std of best, outside = 25 trees at η 0.1 at all depths (trees × η 2.5, grid's smallest) + 50/0.1/3 (product 5, 8-leaf trees correct least; 50/0.1/6 and /9 are inside), under-trained corner — ### What the folds can tell apart
+- Random search defined (draw n combinations, validate only those; RandomizedSearchCV on the same prequential splits); 10 of 18: same AP/CP picks, AUC pick 50/0.3/3 (= grid optimum 0.872); 690 s vs 1,251; time ratio 0.55 = candidate ratio 0.56, scores same because the surface is flat (any 10 contain ≥ 6 of the 14 AP-band candidates) — ### Random search on the same grid
+- Why random beats grid on ranges: grid of n points over k settings tries n^{1/k} values each, random n; grid repeats each important value n^{1−1/k} times (figure grid-vs-random.svg); P(hit band of fraction q) = 1 − (1−q)^n, q = 5% → 59 draws for 95%, independent of k; in-body exercise (q 10% → 29; 99% at 5% → 90; q ≈ 0.78 → 2 draws) — ### Why random search beats a grid when settings are ranges
+- KeyFact: a search only has to land in the band the folds cannot separate from the best; random draws' hit probability independent of k, grid needs a level inside the band along every setting — same §
+- Real stream (Belgian e-commerce; same geometry: four prequential folds of 1-week train/delay/validation, four forward test weeks; the imbalance lesson's unrebalanced tree/RF/XGB rows ARE these best-estimated models): table — tree picks 7/6/6, 0.869 ± 0.03 / 0.068 ± 0.01 / 0.232 ± 0.04, optimal CP 0.232, 1,617 s; LR C 0.1, 0.816/0.054/0.211 ± 0.03, 695 s; RF 25/10, 100/10, 100/10, 0.912/0.080/0.227 ± 0.05, 3,616 s; XGB 100/0.1/6 ×3, 0.928 ± 0.01 / 0.095 ± 0.03 / 0.235 ± 0.07, optimal CP 0.249 at 50/0.1/6, 8,789 s; real tree picks 6–7, optimal depths 6 (AP, CP) and 8 (AUC) vs simulator optima 4–5 — §On real card data / ### The four searches on the real stream
+- Where classes differ: AUC +0.06 (beyond stds), AP 0.095 vs 0.068 (+40%, ~1 weekly std), CP 0.3 cards/day vs weekly stds of 4–7 cards → tie (RF too); compatible because CP@100 reads only the top hundred cards of ~200–350 unfound compromised cards/day, AUC's reachable strip holds ≤ 0.001 (Ref ulb-handbook-benchmark) so the AUC lead is below the hundredth card, AP can also rise there; top of list = terminal + burst cards (explanation consistent, not checkable) — ### Where the classes differ
+- The 50-tree XGB optimum (0.249 vs 0.235) is inside test noise and is a max of 18; validation class gap XGB 0.261 vs tree 0.214 (4.7 cards/day) vanished on test; class choice obeys the same noise rule (real fold stds 0.02–0.04 CP) — ### The fifty trees the folds did not find
+- Compute (figure real-compute.svg): wall-clock on a 40-core server, RF/XGB fits parallel, tree's on one core → 8,789/1,617 = 5.4× wall-clock; processor ratio = 5.4 × mean busy cores, unrecorded: 5.4 to ≈ 220; simulator single-core: one fit of each tree depth (11) 7.9 s (0.4–1.4 s each) vs XGB's 18 candidates 140 s → ≈ 18× on equal hardware (real ratio unmeasured, range contains 18); paid again at each nightly retrain / re-search (Ref fraud-detection-system) — ### What the compute buys
+- KeyFact: on real data tuned depth-6 tree ≈ tuned XGBoost on CP@100 (0.232 vs 0.235) for 1/5 of the wall-clock time (1 core vs 40) and ~1/18 of the single-core processor time (simulator); XGBoost's lead in AUC/AP below the hundredth card.
+- Scorecard question answered (Ref scorecards-woe the-card-and-the-regression-on-one-test-week: card ties plain LR on CP@100, so LR rows stand in): XGB vs LR CP@100 0.303 vs 0.297 (sim, 0.6 cards/day), 0.235 vs 0.211 (real, 2.4 cards/day, inside weekly stds 0.03/0.07) → no measurable gain at k = 100; ensemble buys the ranking below the top (real AUC 0.928 vs 0.816, AP 0.095 vs 0.054) — same § Ship rule: fixed k = 100 → tree (≤ 64 readable leaves, not additive like a scorecard); ranking below the top needed (growing team, expected-loss queue, Ref example-dependent-cost) → ensemble — same §
+- ★ Boosting on labels that may be wrong: silence-as-genuine mislabels (Ref fraud-detection-system); boosting keeps a large error on a mislabelled fraud scored high and pushes down similar real frauds; forest dilutes; trees and η limit the chase; no experiment, a caution — §★ Boosting on labels that may be wrong
+
+## Notation
+- θ_m candidate setting, M number of candidates, θ0 library default, A metric
+- V(θ) mean over validation folds, T(θ) mean over the four test weeks
+- θ̂ = argmax V (best-estimated), θ* = argmax T (optimal)
+- η learning rate (shrinkage); settings written trees/rate/depth (XGBoost), trees/depth (forest)
+- n number of random draws, k number of settings, q fraction of the space covered by the band, m levels per setting (exercise)
+
+## Running cases
+- Simulator searches (Ch. 5 re-run outputs; full per-candidate tables cached in research/texts/reproducible-Chapter_5_ModelSelection-full-outputs.txt): tree depths 2…10, 20, 50 (validation AP: d3 0.573 ± 0.027, d4 0.554 ± 0.038, d5 0.546 ± 0.042, d6 0.537 ± 0.037, d10 0.494 ± 0.048, d50 0.342 ± 0.026; test AP 0.579, 0.601, 0.600, 0.585, 0.505, 0.334); RF and XGBoost grids as above; LR C ∈ {0.1, 1, 10, 100} (val AUC 0.8651/0.8669/0.8671/0.8671, test 0.8670/0.8676/0.8677/0.8677; val AP 0.6083/0.6123/0.6125/0.6125, test 0.6202/0.6231/0.6232/0.6233; val CP 0.2789/0.2782/0.2775/0.2775, test 0.2971/0.2971/0.2975/0.2975; fold stds ≈ 0.009/0.023/0.017); XGB η 0.3 test AP by depth × trees 25/50/100: d3 0.679/0.687/0.685, d6 0.682/0.674/0.659, d9 0.676/0.661/0.659; tree single-core fit 0.38–1.40 s per depth (7.9 s for all 11)
+- Four-class simulator triplets AUC / AP / CP@100 (default; best-est; optimal): tree 0.797/0.334/0.258; 0.797/0.579/0.284; 0.813/0.601/0.284. LR 0.868/0.623/0.297; same; 0.868/0.623/0.298. RF 0.870/0.672/0.299; 0.870/0.678/0.299; 0.875/0.678/0.303. XGB 0.859/0.659/0.285; 0.869/0.687/0.303; 0.872/0.694/0.304
+- XGBoost simulator best-estimated 0.869 / 0.687 / 0.303 = the bar handed to neural-tabular-detectors
+- Real-stream table as above
+- Exercises: XGB depth 3, η 0.3, trees 25/50/100 slice (val AUC 0.877/0.883/0.887, test 0.871/0.872/0.869; val AP 0.698/0.708/0.706, test 0.679/0.687/0.685; val CP 0.289/0.288/0.286, test 0.303/0.302/0.299) → picks 100/50/25, gains ≤ 0.004; η → 0 gives F0 + Mη h1 (ranking of one tree, probabilities ≈ base rate), η = 1 memorises; refutation of the 50-tree "mistake"; grid needs (1/q)^k points (8,000 at q 0.05, k 3) vs 59 draws, 27³ = 19,683; paired-difference design (σ_d 0.02 assumed: 0.003 needs ~178 weeks, 0.02 needs 4); scale_pos_weight × 4 → 72 candidates ≈ 35,000 s, 18 random draws miss four targets with p ≈ 0.31; trees invariant to strictly increasing transforms (scaling, log1p), LR's penalty is not, forward to networks
+
+## Assumed
+- delayed-labels-prequential: prequential folds and four forward test weeks (what-prequential-selection-picks, prequential-folds-a-spread-across-weeks), the depth search and its picks 50/3/5, optimum 4/4/5, test-week tuning optimistic (neither-the-training-week-nor-the-test-week-can-choose), the two-score fully grown tree (what-auc-sees-in-the-fully-grown-tree), one-fold-std rule
+- imbalance-techniques-revisited: random forest/bagging (balanced-ensembles-the-gain-is-not-the-balance), boosting's errors = label − prediction (boosting-without-rebalancing-near-best-not-the-pick), six-ensemble table, real-stream rows (the-real-stream), scale_pos_weight and ratio-as-hyperparameter (exercise), sampler inside folds (exercise)
+- alert-budget-metrics: fifteen inputs, CP@100, two-card noise line (what-each-disagreement-means), real-data compromised cards per day (on-real-card-data), three-metric rule (three-numbers-for-three-questions)
+- ulb-handbook-benchmark: simulator two leaves (the-simulator-half-the-fraud-in-two-leaves), AUC lead outside the reachable strip (xgboost-a-lead-where-the-team-never-works), real depth-2 tree (a-compromised-terminal-and-a-burst)
+- scorecards-woe: the open question (does a boosted tree buy enough CP to give up readability), card ties raw LR on CP@100 (the-card-and-the-regression-on-one-test-week)
+- fraud-detection-system: nightly retraining, silence read as genuine
+- example-dependent-cost: expected-loss queue (ship rule)
+- undersampling-calibration: β = IR/r correction (exercise)
+- classical-ml: decision trees, random forests, gradient boosting/XGBoost, regularised logistic regression, GridSearchCV/RandomizedSearchCV
+
+## Left open
+- Feed-forward networks against the tuned XGBoost bar, scaling, embeddings → neural-tabular-detectors (conclusion + forward exercise)
+- Eight-model real-data leaderboard incl. sequence models, real-data overfitting curve → worldline-model-comparison
+- Random-search checkpoint, scorecard vs boosted tree in money (savings) on the same folds → scorecard-vs-gbm-lab
+- Metric-dependent selection under drift / retraining cadence → drift-strategies-on-worldline, model-risk-monitoring
+- Label noise and boosting not measured (★ caution only) → alert-feedback-selection-bias, label-maturation
+- Not taught: permutation importance, class-balanced bootstraps per tree (APATE-style), Bayesian/successive-halving search, early stopping for boosting (early stopping on validation comes in neural-tabular-detectors)

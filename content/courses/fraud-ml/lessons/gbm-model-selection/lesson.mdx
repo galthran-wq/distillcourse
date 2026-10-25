@@ -1,0 +1,862 @@
+A boosted tree ensemble with the right depth, learning rate and number of trees beats a single tree, but the right values depend on the data and the metric, and every candidate costs minutes to hours of compute. How do you choose the settings for next week's data when the only labels you have are a week old, and how much does the choice buy over a well-tuned single tree?
+
+You already have a procedure for one setting. <Ref
+lesson="delayed-labels-prequential" id="what-prequential-selection-picks">The
+delayed-labels lesson</Ref> chose a decision tree's depth: eleven candidate
+depths, each validated on four prequential folds that copy the deployment's
+training, delay and validation blocks, the depth with the best mean card
+precision at 100 kept, and a tree of that depth refitted on the latest
+labelled week. A tree
+fits in under a second, so the eleven candidates cost nothing worth counting.
+
+The ensembles that topped <Ref lesson="imbalance-techniques-revisited"
+id="six-ensembles-two-streams">the imbalance lesson's tables</Ref> were each
+reported "at the setting its prequential folds picked", with no word on what
+that search tried or what it cost. A random forest has two settings that
+matter and XGBoost three. A few values of each makes a dozen to twenty
+candidates, each fitted on four folds, each fit up to forty times slower than
+a single tree's. Three things make the choice hard. The folds validate on
+weeks that are already a delay old, so their best candidate need not be next
+week's. Candidates often differ by less than the folds' own spread, so the
+search may be choosing among ties. And at the end stands the question <Ref
+lesson="scorecards-woe">the scorecard lesson</Ref> left open: whether the
+ensemble finds enough extra fraud to justify giving up a model a reviewer can
+read.
+
+## What a search buys: default, best-estimated and optimal settings
+
+A search is a procedure, and a procedure is judged like a model: by what it
+delivers on weeks it has not seen. That needs a way to score the search
+itself, separately from the model it returns.
+
+### Three test numbers for one model class
+
+Every experiment below has the same shape. A model class (decision tree,
+logistic regression, random forest, XGBoost) comes with a list of candidate
+settings. Each candidate is validated on the four prequential folds, and the
+one with the best mean is the winner: the setting a bank would deploy on the
+morning of day 129.
+
+The check comes from the four forward test weeks of the delayed-labels
+lesson, starting on day 129, which exist only because the simulator's file
+runs past that day. For this backtest every candidate, not only the winner,
+is fitted a second time on the four training blocks that end a delay before
+each test week, and each fit is scored on its own week. The winner's mean
+over the four weeks says what the search delivered; the other candidates'
+means say what it could have delivered had it chosen differently.
+
+<Definition title="default, best-estimated and optimal settings">
+Let $\theta_1, \dots, \theta_M$ be the candidate settings of a model class
+and $A$ a metric. Write $V(\theta_m)$ for candidate $m$'s mean over the
+validation folds and $T(\theta_m)$ for its mean over the test weeks. Three
+numbers describe the class:
+
+- the **default** score $T(\theta_0)$, where $\theta_0$ is the library's
+  setting, used without any search;
+- the **best-estimated** score $T(\hat\theta)$, where
+  $\hat\theta = \arg\max_m V(\theta_m)$ is the candidate the folds pick;
+- the **optimal** score $T(\theta^\star) = \max_m T(\theta_m)$, the best test
+  score any candidate reached, known only in hindsight.
+
+The *selection gain* is $T(\hat\theta) - T(\theta_0)$. The *cost of
+selecting* is $T(\theta^\star) - T(\hat\theta) \ge 0$.
+</Definition>
+
+The names are easy to swap. "Best-estimated" is the candidate anyone could
+have chosen on the morning of day 129. "Optimal" is not a choice at all: it is
+found by looking at weeks that had not happened, and it flatters the grid,
+since the largest of $M$ noisy test numbers is optimistic by construction, as
+<Ref lesson="delayed-labels-prequential"
+id="neither-the-training-week-nor-the-test-week-can-choose">the delayed-labels
+lesson</Ref> warned for picking a depth on the test week. A better search can
+only close the gap between the two; no search can beat the optimal row of its
+own grid.
+
+<FigureSequence
+  name="procedure"
+  alt="Three frames of one table for the decision tree on the simulator, rows for maximum depth 3, 4, 5, 6, 10 and 50 (the default). Frame 1 shows the validation average precision over four prequential folds, mean plus or minus standard deviation: 0.573 ± 0.027, 0.554 ± 0.038, 0.546 ± 0.042, 0.537 ± 0.037, 0.494 ± 0.048, 0.342 ± 0.026; the depth-3 row is highlighted in amber as the pick. Frame 2 adds the test average precision over the four weeks after day 129: 0.579, 0.601, 0.600, 0.585, 0.505, 0.334, with depth 4 highlighted in blue as the best. Frame 3 adds a vertical scale with three dots: default 0.334 in grey, best-estimated 0.579 in amber, optimal 0.601 in blue, an amber bar labelled gain +0.245 between the first two and a blue bar labelled cost 0.022 between the last two"
+  caption="The tree's search in three numbers: the folds pick depth 3, the test weeks would have picked 4, and the default was the fully grown tree."
+/>
+
+<Task>
+Step to the third frame and, before reading the labels, measure the two bars
+against the validation spreads in the first frame. Is the cost of selecting
+larger or smaller than one fold standard deviation of the pick?
+</Task>
+
+<Example title="the decision tree's search, read as three numbers">
+The figure is <Ref lesson="delayed-labels-prequential"
+id="what-prequential-selection-picks">the delayed-labels lesson's depth
+table</Ref> with its columns renamed. Its "test value at the pick" is the
+best-estimated score, its "test value at the optimum" the optimal score. On
+average precision those are 0.579 (depth 3) and 0.601 (depth 4).
+
+The one number the table lacked is the default. A tree's library setting
+grows it until every leaf is pure, which the grid represents by depth 50, so
+the default score is the fully grown tree's 0.334. Now each difference has a
+name: the search *gained* $0.579 - 0.334 = 0.245$ over not searching, and
+*cost* $0.601 - 0.579 = 0.022$ against hindsight.
+
+The same renaming applies to the table's other two rows. On ROC-AUC the
+folds' pick was depth 50, which is the default itself: gain 0, cost
+$0.813 - 0.797 = 0.016$, a search that returns the model you would have had
+without searching. On $CP@100$ the pick was the optimum: gain
+$0.284 - 0.258 = 0.026$, cost 0.
+
+What the names add is a way to read the cost. The table showed that the
+folds put depth 3 and depth 4 closer together than either's fold spread
+(0.027 and 0.038). So 0.022 is not a mistake a better search on those folds
+could have avoided: it is the noise floor of those folds.
+</Example>
+
+<Exercise>
+Logistic regression has one setting that matters, the regularisation
+strength $C$ (smaller means a stronger penalty on the coefficients); the
+library default is $C = 1$. Its search on the simulator, with the same
+inputs, folds and test weeks as the tree's, gave these means (four decimals, because the candidates are
+so close):
+
+| $C$ | validation AUC | test AUC | validation AP | test AP | validation $CP@100$ | test $CP@100$ |
+|---|---|---|---|---|---|---|
+| 0.1 | 0.8651 | 0.8670 | 0.6083 | 0.6202 | 0.2789 | 0.2971 |
+| 1 | 0.8669 | 0.8676 | 0.6123 | 0.6231 | 0.2782 | 0.2971 |
+| 10 | 0.8671 | 0.8677 | 0.6125 | 0.6232 | 0.2775 | 0.2975 |
+| 100 | 0.8671 | 0.8677 | 0.6125 | 0.6233 | 0.2775 | 0.2975 |
+
+The fold standard deviations are about 0.009 for AUC, 0.023 for AP and 0.017
+for $CP@100$. (a) For each metric write the three numbers, the gain and the
+cost. (b) The AUC and AP searches pick $C = 100$, the card-precision search
+$C = 0.1$, opposite ends of the range. Does that disagreement tell you
+anything about the model?
+
+<Solution>
+**(a)** The search ranks the unrounded means; where two candidates tie at
+four decimals, the larger $C$ was ahead.
+
+| metric | default ($C = 1$) | best-estimated | optimal | gain | cost |
+|---|---|---|---|---|---|
+| ROC-AUC | 0.8676 | 0.8677 ($C = 100$) | 0.8677 | 0.0001 | 0 |
+| AP | 0.6231 | 0.6233 ($C = 100$) | 0.6233 | 0.0002 | 0 |
+| $CP@100$ | 0.2971 | 0.2971 ($C = 0.1$) | 0.2975 | 0 | 0.0004 |
+
+Every gain and every cost is under a hundredth of a fold standard deviation;
+the card-precision cost is 0.04 compromised cards a day.
+
+**(b)** No. The card-precision means of the four candidates span
+$0.2789 - 0.2775 = 0.0014$ against a fold spread of 0.017, so the folds rank
+four ties, and the AUC and AP means do the same. A pick among candidates the
+folds cannot separate says nothing about which setting is better; here it
+says that the default already sat on a plateau, and the search had nothing to
+find.
+</Solution>
+</Exercise>
+
+<KeyFact>
+The cost of selecting can only be measured in a backtest, and it has a floor
+set by noise: once it is below about one fold standard deviation, the search
+has done everything a search on those folds can do. A finer grid can only
+raise the optimal row; it moves the best-estimated one only where the folds
+can separate the new candidates from the old pick.
+</KeyFact>
+
+## Two ensembles, more settings: what the search finds on the simulator
+
+The tree's search paid because its default is the worst candidate in its own
+grid. Whether a search pays for the ensembles depends on where their defaults
+sit, and they have more settings to search. All runs below use the same
+fifteen inputs as the tree (<Ref lesson="alert-budget-metrics"
+id="five-models-scored-on-a-test-week">the five baseline models'
+inputs</Ref>), the same folds and the same four test weeks.
+
+### Random forest: depth stops mattering once trees are averaged
+
+A random forest averages many trees, each grown on a bootstrap sample of the
+training rows and choosing each split among a random subset of the inputs
+(<Ref lesson="imbalance-techniques-revisited"
+id="balanced-ensembles-the-gain-is-not-the-balance">recalled in the imbalance
+lesson</Ref>). Its two main settings are the maximum depth of each tree and the
+number of trees. The grid tried depths 5, 10, 20 and 50 with 25, 50 and 100
+trees: twelve candidates. The library default is 100 trees grown until pure.
+
+<Figure
+  src="./figures/rf-depth.svg"
+  alt="Line chart of test average precision against maximum depth 5, 10, 20 and 50 on the simulator. A black line for a single decision tree falls from 0.600 at depth 5 to 0.505, 0.439 and 0.334 at depth 50. An amber line for a forest of 100 trees rises from 0.627 at depth 5 to 0.665 and 0.678 at depth 20, then 0.672 at depth 50"
+  caption="Depth that ruins a single tree costs a forest almost nothing: averaging removes most of what each deep tree memorised."
+/>
+
+A single tree loses almost half its average precision between depth 5 and
+depth 50. A forest of 100 trees at depth 50 loses 0.006 from its best. A
+fully grown tree fits its own training rows exactly, including the payments
+that are fraud or genuine for reasons the inputs do not capture, and those
+idiosyncrasies are different in each bootstrap sample. Averaging a hundred
+such trees keeps what most of them agree on and cancels what each one
+memorised alone. The forest at depth 5 is the weakest of the four: averaging
+cannot add detail that every one of its trees is too coarse to hold.
+
+The number of trees behaves differently. At depth 20, going from 25 to 50 to
+100 trees raises test average precision from 0.660 to 0.673 to 0.678, while
+the time to fit one forest on one fold grows from 3.2 to 6.0 to 11.5 seconds:
+each doubling costs twice as much and buys less than the one before. The
+twelve candidates took 587 seconds on one processor core, validation and
+backtest fits together.
+
+The folds pick 100 trees at depth 20 by all three metrics. On the test weeks
+that scores ROC-AUC 0.870, average precision 0.678 and $CP@100$ 0.299; the
+default scores 0.870, 0.672 and 0.299. The search gained 0.006 of average
+precision and nothing else, and the optimal candidates (depth 10 for ROC-AUC
+and card precision) sit 0.004 to 0.005 above it, a third of the test weeks'
+standard deviation of about 0.013. The library default was already on the
+plateau.
+
+### XGBoost: three settings, and the one that only shrinks
+
+XGBoost fits trees in sequence, each one to the errors the sum of the previous
+trees still makes; <Ref lesson="imbalance-techniques-revisited"
+id="boosting-without-rebalancing-near-best-not-the-pick">the imbalance
+lesson</Ref> read those errors as each payment's label minus its predicted
+probability. Its *learning rate* η multiplies every new tree's output before
+it is added to the sum. It is not a step size on weights, as in gradient
+descent for a network: it shrinks each correction, so that a smaller η needs
+more trees to travel the same distance, and the number of trees times η is a
+rough measure of how far the model has moved from the base rate.
+
+The grid crossed depths 3, 6 and 9, 25, 50 and 100 trees, and η of 0.1 and
+0.3: eighteen candidates, written trees/rate/depth below. The library default
+is 100/0.3/6. The search and its backtest took 1,251 seconds on one core.
+
+| XGBoost on the simulator | ROC-AUC | average precision | $CP@100$ |
+|---|---|---|---|
+| default 100/0.3/6 | 0.859 | 0.659 | 0.285 |
+| folds' pick | 100/0.3/3 | 50/0.3/3 | 25/0.3/3 |
+| best-estimated | 0.869 | 0.687 | 0.303 |
+| optimal (and where) | 0.872 (50/0.3/3) | 0.694 (100/0.1/3) | 0.304 (100/0.1/3) |
+
+The search gained 0.010 of ROC-AUC, 0.028 of average precision and 0.018 of
+card precision, almost two compromised cards a day, and its cost is 0.001 to
+0.007.
+
+Every pick has depth 3, shallower than the default's 6, and the grid shows
+when depth hurts. At η = 0.3, depth-6 ensembles lose test average precision
+as trees are added, 0.682 at 25 trees, 0.674 at 50, 0.659 at 100, and depth 9
+behaves the same way; depth-3 ensembles stay between 0.679 and 0.687. The
+first rounds fit the patterns the inputs can describe. Once those are fitted,
+each further round fits what is left: training payments whose label the
+inputs do not explain. A depth-6 tree has up to 64 leaves and can cut out a
+small group of such payments and correct it; a depth-3 tree has eight, too
+few to isolate groups that small, so its extra rounds do little harm. The
+default, deep trees and many large steps at once, is the combination that
+memorises. The picks disagree on the number of trees, 100, 50 and 25, and the
+card-precision pick is the smallest ensemble in the grid.
+
+### Four classes side by side
+
+<Figure
+  src="./figures/triplet.svg"
+  alt="Three bar-chart panels, ROC-AUC, average precision and CP@100, each with four groups for decision tree, logistic regression, random forest and XGBoost on the simulator. Each group has three bars: default in grey, best-estimated in amber, optimal in blue, with one-standard-deviation whiskers. Decision tree: AUC 0.797, 0.797, 0.813; AP 0.334, 0.579, 0.601; CP@100 0.258, 0.284, 0.284. Logistic regression: AUC 0.868 for all three; AP 0.623 for all three; CP@100 0.297, 0.297, 0.298. Random forest: AUC 0.870, 0.870, 0.875; AP 0.672, 0.678, 0.678; CP@100 0.299, 0.299, 0.303. XGBoost: AUC 0.859, 0.869, 0.872; AP 0.659, 0.687, 0.694; CP@100 0.285, 0.303, 0.304"
+  caption="A search pays where the default is bad, which on the simulator means the single tree and, a little, XGBoost; for every class the folds' pick lands within noise of the optimal."
+/>
+
+Logistic regression's bars are the first section's exercise: a default on a
+plateau, with nothing for the search to find. Read the figure in two
+directions.
+
+**Within a class**, the gain is large only where the default is a memoriser:
+the single tree gains 0.245 of average precision, XGBoost 0.028, the forest
+0.006, logistic regression nothing. The cost of selecting is at most 0.022,
+the tree's, and for the ensembles at most 0.007, under the test weeks'
+standard deviations of 0.01 to 0.013.
+
+**Between classes**, the verdict depends on the metric. By ROC-AUC, logistic
+regression, the forest and XGBoost lie within 0.002 of each other, and the
+tree 0.07 behind. By average precision XGBoost (0.687) and the forest (0.678)
+are not separated, and both lead logistic regression (0.623) and the tree
+(0.579) by several standard deviations. By card precision XGBoost (0.303), the
+forest (0.299) and logistic regression (0.297) lie within 0.6 cards a day of
+each other, and the tuned tree (0.284) trails the best by 1.9 cards a day,
+just under the two-card line below which, as <Ref lesson="alert-budget-metrics"
+id="what-each-disagreement-means">the alert-budget lesson</Ref> found, a
+different week could reverse the order. (The imbalance lesson's XGBoost row,
+0.872, 0.687 and 0.302, comes from a separate run of the same search and
+differs in the third decimal.)
+
+<KeyFact>
+On the simulator, tuning moves an ensemble's card precision by at most two
+cards a day, while the choice of metric changes which class wins: average
+precision separates the ensembles from the rest, card precision at 100 puts
+three of the four classes in a tie.
+</KeyFact>
+
+## Paying less for the search
+
+The ensembles' searches gained little, yet they took ten to twenty minutes
+each on three months of simulated payments, and a real stream has many times more. A
+search worth running has to cost less.
+
+### What a grid costs
+
+The bill of a search is the sum, over candidates, of the time to fit one
+model, times the number of folds. XGBoost's eighteen candidates take from
+1.8 seconds per fit (25 trees, η = 0.3, depth 3) to 18.6 seconds (100 trees,
+η = 0.1, depth 9), about 140 seconds for one fit of each; four folds make 560
+seconds. That is the validation pass, the only one a bank deploying the
+procedure runs. The backtest of the first section adds a second pass of the
+same size: every candidate fitted again on the four training blocks that end
+a delay before each test week, another 560 seconds or so. The two passes and
+the scoring of every fit on its week make the 1,251 seconds. The second pass
+is how this lesson checks the search, not part of the search.
+
+The grid's size is the product of its levels per setting. Adding a fourth
+setting with four values, say the fraud weight `scale_pos_weight` that the
+imbalance lesson tuned, multiplies the bill by four. Every new setting
+multiplies; that is why grids stop at two or three settings with two or three
+values each.
+
+### What the folds can tell apart
+
+Before cutting the bill, look at what the eighteen fits bought: how far apart
+the folds put the candidates they had to choose between.
+
+<Figure
+  src="./figures/xgb-band.svg"
+  alt="Two dot plots, one row per XGBoost candidate from 25/0.1/3 to 100/0.3/9 (trees/rate/depth), validation mean with one-standard-deviation whiskers over four prequential folds. A shaded amber band runs from the best candidate's mean down by its standard deviation. Left, validation average precision: 14 of 18 dots fall inside the band, around 0.69 to 0.71; four fall outside to the left, 25/0.1/3 at 0.618, 50/0.1/3 at 0.651, 25/0.1/6 at 0.640 and 25/0.1/9 at 0.657. Right, validation CP@100: all 18 dots fall inside the band, between 0.278 and 0.289, each whisker about 0.015 wide"
+  caption="On card precision the folds cannot separate any of XGBoost's eighteen candidates; on average precision they rule out only the four that have taken the fewest steps."
+/>
+
+On card precision the eighteen validation means span 0.278 to 0.289, a range
+of 0.011, while each candidate's fold standard deviation is about 0.015. By
+<Ref lesson="delayed-labels-prequential"
+id="prequential-folds-a-spread-across-weeks">the delayed-labels rule</Ref>,
+candidates closer than about one fold standard deviation are not separated: on
+this metric the search is choosing among eighteen ties, and on the test weeks
+their card precision spans 0.285 to 0.304, with no way to have known which
+would land where.
+
+On average precision the folds do separate something. Fourteen candidates sit
+within one standard deviation of the best. The four outside are the three
+with 25 trees at η = 0.1, whose trees times η, 2.5, is the smallest in the
+grid, and 50 trees at η = 0.1 with depth 3, where the product is 5 and each
+tree, with eight leaves, corrects the least; with depth 6 or 9 the same 50
+trees are inside the band. They have not moved far enough from the base
+rate. The search's real work was to stay out of that corner, not to find a
+peak inside the band.
+
+### Random search on the same grid
+
+The obvious saving is to fit fewer candidates. *Random search* draws $n$
+combinations of settings at random and validates only those; scikit-learn's
+`RandomizedSearchCV` accepts the same prequential splits as the grid search.
+Drawing 10 of the 18 XGBoost candidates gave the same picks for average
+precision and card precision, 50/0.3/3 and 25/0.3/3, and for ROC-AUC picked
+50/0.3/3, which scores 0.872 on the test weeks, the grid's optimum. It took
+690 seconds against 1,251.
+
+Read the two numbers before crediting the method. The time ratio,
+$690/1{,}251 = 0.55$, is the candidate ratio, $10/18 = 0.56$: the whole saving
+is that fewer candidates were fitted. And the scores could hardly have come
+out differently. With only four of the eighteen candidates outside the
+average-precision band, any ten of them contain at least six inside it, and
+on card precision every draw is inside. On this grid, random search saved
+time because the folds could not tell the candidates apart anyway.
+
+### Why random search beats a grid when settings are ranges
+
+The case for random search lies elsewhere. Above, it drew from the grid's own
+points, so it tried the same three depths as the grid. When a setting is a
+range instead of a list (η anywhere between 0.01 and 0.3, depth from 2 to 10,
+trees from 25 to 500), the two designs spend their fits differently.
+
+A grid of $n$ points over $k$ settings tries $n^{1/k}$ distinct values of
+each: 27 points over three settings give three values of each. $n$ random
+draws from continuous ranges try $n$ distinct values of each setting. When
+one setting matters and the others barely do, as the average-precision band
+showed (what mattered there was how far the model had moved, trees times η,
+far more than depth), the grid repeats each value of the important setting
+$n^{1-1/k}$ times with different values of the unimportant ones, and learns
+nothing new from the repeats.
+
+<Figure
+  src="./figures/grid-vs-random.svg"
+  alt="Two square panels of nine trials each over an important parameter on the horizontal axis and an unimportant one on the vertical axis. Above each square an amber curve shows the score against the important parameter, with a narrow peak at about 0.62 of its range; a flat blue line beside each square marks the unimportant parameter. Left, grid: a 3 by 3 lattice whose ticks on the important axis fall at three values, none on the peak. Right, random: nine scattered points whose ticks fall at nine different values, one of them on the peak"
+  caption="Nine grid trials try the important parameter three times over; nine random trials try it nine times."
+/>
+
+How many draws are enough follows from what a search has to achieve: land
+inside the band of candidates the folds cannot separate from the best. Suppose
+that band covers a fraction $q$ of the space being searched. Each independent
+draw misses it with probability $1-q$, so
+
+$$
+P(\text{at least one of } n \text{ draws lands in the band}) = 1 - (1 - q)^n .
+$$
+
+For a band covering 5% of the space, $n = 59$ draws give $1 - 0.95^{59}
+\approx 0.95$, whatever the number of settings. A grid lands in the band only
+if its levels straddle the band in every setting at once, and the narrower
+the band along the important setting, the more levels that takes.
+
+<Exercise>
+(a) How many random draws give a 95% chance of landing in a band that covers
+10% of the space? (b) How many give a 99% chance for a band of 5%? (c) The
+XGBoost grid's average-precision band held 14 of 18 candidates. If the
+continuous space behaved the same way, about what $q$ would that be, and how
+many draws would a 95% guarantee take?
+
+<Solution>
+Solve $1 - (1-q)^n \ge P$ for $n$: $n \ge \ln(1-P)/\ln(1-q)$.
+
+**(a)** $\ln 0.05 / \ln 0.9 = -2.996 / -0.105 = 28.4$, so 29 draws.
+
+**(b)** $\ln 0.01 / \ln 0.95 = -4.605 / -0.0513 = 89.8$, so 90 draws.
+
+**(c)** $q \approx 14/18 = 0.78$. Then $n \ge \ln 0.05/\ln 0.22 = -2.996 /
+-1.514 = 1.98$: two draws. A band that wide is the flat surface of the
+previous subsection: almost any setting outside the under-trained corner is as
+good as the folds can tell, and the search barely needs to search.
+</Solution>
+</Exercise>
+
+<KeyFact>
+A search only has to land inside the band of candidates its folds cannot
+separate from the best. $n$ random draws reach a band covering a fraction $q$
+of the space with probability $1-(1-q)^n$, independent of how many settings
+there are; a grid reaches it only if it has a level inside the band along
+every setting.
+</KeyFact>
+
+## On real card data: the tuned tree against the ensembles
+
+The simulator's frauds are nearly separable (<Ref
+lesson="ulb-handbook-benchmark"
+id="the-simulator-half-the-fraud-in-two-leaves">two leaves of a shallow tree
+hold half of them</Ref>), and on it the ensembles' lead
+over the tree was clearest in average precision. The Belgian e-commerce
+stream, real payments with real fraud, is where the trade between compute and
+card precision has to be settled.
+
+### The four searches on the real stream
+
+The same four grids ran on that stream with the same geometry: four
+prequential folds of one training week, one delay week and one validation
+week, and four forward test weeks, as in <Ref
+lesson="imbalance-techniques-revisited" id="the-real-stream">the imbalance
+lesson's real-stream rows</Ref>, whose unrebalanced tree, forest and XGBoost
+are the best-estimated models of these searches.
+
+| real stream | folds' pick (AUC / AP / CP) | ROC-AUC | average precision | $CP@100$ | optimal $CP@100$ | grid time |
+|---|---|---|---|---|---|---|
+| decision tree | depth 7 / 6 / 6 | 0.869 ± 0.03 | 0.068 ± 0.01 | 0.232 ± 0.04 | 0.232 | 1,617 s |
+| logistic regression | regularisation 0.1 for all three | 0.816 ± 0.02 | 0.054 ± 0.01 | 0.211 ± 0.03 | 0.212 | 695 s |
+| random forest | 25/10 / 100/10 / 100/10 | 0.912 ± 0.02 | 0.080 ± 0.03 | 0.227 ± 0.05 | 0.227 | 3,616 s |
+| XGBoost | 100/0.1/6 for all three | 0.928 ± 0.01 | 0.095 ± 0.03 | 0.235 ± 0.07 | 0.249 (50/0.1/6) | 8,789 s |
+
+The folds pick depths 6 and 7 for the tree, and the best test depths are 6
+for average precision and card precision and 8 for ROC-AUC, against 4 and 5
+on the simulator: on real payments a tree can take more splits before it
+starts to memorise. The
+costs of selecting are again small. The one visible gap is XGBoost's card
+precision: 50 trees would have scored 0.249 instead of 0.235.
+
+### Where the classes differ, and where they do not
+
+By ROC-AUC, XGBoost leads the tree by 0.06, beyond both standard deviations.
+By average precision it leads 0.095 to 0.068, 40% more, a gap of about one
+weekly standard deviation of XGBoost's own score. By card precision at 100
+the tree finds 23.2 compromised cards a day and XGBoost 23.5: a difference
+of 0.3 cards a day, against weekly standard deviations of 0.04 and 0.07, four
+to seven cards a day. The forest, at 0.227, is in the same tie.
+
+The two verdicts are compatible because the metrics read different parts of
+the ranking. A day on this stream has about 200 to 350 compromised cards not
+yet found (<Ref lesson="alert-budget-metrics" id="on-real-card-data">the
+alert-budget lesson's real-data numbers</Ref>), and card precision at 100
+depends only on which cards fill each day's top hundred places. ROC-AUC counts
+every fraud–genuine pair, and the strip of false-positive rates a hundred
+alerts can reach holds at most 0.001 of its area (<Ref
+lesson="ulb-handbook-benchmark"
+id="xgboost-a-lead-where-the-team-never-works">located in the benchmark
+lesson</Ref>), so XGBoost's 0.06 lead lies almost entirely below the hundredth
+card. Average precision counts every fraud at the precision where it is
+reached, so it too can rise through frauds ranked far below the hundred. At
+the very top, the cards a depth-6 tree already isolates, compromised
+terminals and sudden bursts of payments on one card like those of <Ref
+lesson="ulb-handbook-benchmark" id="a-compromised-terminal-and-a-burst">the
+benchmark's real depth-2 tree</Ref>, are the cards any of these models put
+first. That last step is an explanation consistent with the numbers; nobody
+outside the processor can check it on the confidential data.
+
+### The fifty trees the folds did not find
+
+The 50-tree XGBoost scores 0.249 on card precision, 1.4 cards a day above the
+100-tree model the folds chose. It looks like a cost of selecting, but the
+two test numbers carry standard deviations of 0.04 and 0.07, and 0.249 is the
+best of eighteen noisy test numbers. The gap is inside the noise on the test
+weeks themselves.
+
+The folds' own class comparison makes the same point from the other side. On
+validation, XGBoost's card precision was 0.261 against the tree's 0.214, 4.7
+cards a day; on the test weeks the two tie. Choosing between classes is a
+selection like choosing a depth, and it obeys the same rule: a gap under one
+fold standard deviation separates nothing, and the real stream's folds have
+standard deviations of 0.02 to 0.04 in card precision.
+
+### What the compute buys
+
+<Figure
+  src="./figures/real-compute.svg"
+  alt="Scatter of test CP@100 against the search's wall-clock time in seconds on the Belgian e-commerce stream, with one-standard-deviation whiskers. Logistic regression at 695 s, 0.211; decision tree at 1,617 s, 0.232, in amber; random forest at 3,616 s, 0.227; XGBoost at 8,789 s, 0.235, in blue, with a hollow blue circle above it at 0.249 for the 50-tree setting. The whiskers of all four overlap widely"
+  caption="The tuned tree finds as many compromised cards a day as tuned XGBoost; XGBoost's search took five times the wall-clock time, with its fits spread over forty cores."
+/>
+
+The grid times are wall-clock seconds on a 40-core server, where the
+forest's and XGBoost's fits ran in parallel across the cores and the tree's
+ran on one. In wall-clock time XGBoost's search took $8{,}789/1{,}617 = 5.4$
+times the tree's. Its processor time is that ratio times the number of cores
+its fits kept busy on average, which the record does not give: 5.4 times the
+tree's if the parallel run bought nothing, up to $5.4 \times 40 \approx 220$
+times if all forty cores were busy throughout.
+
+The simulator gives the ratio on equal hardware, because there every fit
+ran on a single core. One fit of each of the tree's eleven candidate depths took 7.9 seconds
+in all, 0.4 to 1.4 seconds per depth; one fit of each of XGBoost's eighteen
+candidates took 140 seconds. On one core each, XGBoost's search costs about
+18 times the tree's, an order of magnitude. The real stream's own ratio was
+not measured; its range, 5.4 to 220, contains the simulator's 18.
+
+The search is also not a one-off. The bank retrains on a nightly cadence (<Ref
+lesson="fraud-detection-system" id="how-often-the-model-changes-a-nightly-retrain-beside-hand-edited-rules">the system
+lesson</Ref>), refitting the chosen setting every time and re-running the
+search whenever the stream has moved, so the gap in compute is paid again and
+again.
+
+<KeyFact>
+On real card data, a tuned decision tree of depth 6 finds as many
+compromised cards in the daily top hundred as tuned XGBoost, 0.232 against
+0.235 inside weekly spreads of 0.04 to 0.07, for a fraction of the compute:
+a fifth of XGBoost's wall-clock time with one core against forty, and an
+eighteenth of its processor time when both run on one core, as measured on
+the simulator. XGBoost's lead is in ROC-AUC and average precision, which read
+the ranking below the hundredth card.
+</KeyFact>
+
+The logistic-regression rows answer the question <Ref lesson="scorecards-woe"
+id="the-card-and-the-regression-on-one-test-week">the scorecard lesson</Ref>
+left open: does a boosted tree find enough extra fraud to justify giving up a
+card a reviewer can read? The card tied the plain regression on card
+precision at 100, so the regression's rows stand in for it. On the simulator
+tuned XGBoost finds 0.303 against the regression's 0.297, 0.6 cards a day; on
+the real stream 0.235 against 0.211, 2.4 cards a day, inside weekly standard
+deviations of 0.03 and 0.07, three and seven cards. At a budget of a hundred
+cards, neither stream shows the ensemble buying a measurable number of
+cards. What it does buy on the real stream is the ranking below the top
+hundred: ROC-AUC 0.928 against 0.816, average precision 0.095 against
+0.054.
+
+Which to ship is the question the three metrics were built to separate
+(<Ref lesson="alert-budget-metrics"
+id="three-numbers-for-three-questions">three numbers for three
+questions</Ref>). If the team
+works a fixed hundred cards a day, the tree does that job at a fraction of the
+cost, and its at most 64 leaves can be read rule by rule, though not added up line by
+line like the scorecard's points. If the bank needs the ranking below the top
+hundred, because the team is growing, or because a queue ordered by expected
+loss (<Ref lesson="example-dependent-cost">example-dependent cost</Ref>) has
+to rank payments by probability times amount across the whole range, the
+ensemble's lead in average precision is what it pays for.
+
+## ★ Boosting on labels that may be wrong
+
+Every comparison above trusted the labels. On a card stream a fraud nobody
+reported within the delay is labelled genuine, a choice <Ref
+lesson="fraud-detection-system"
+id="silence-read-as-genuine-is-a-decision-not-a-fact">the system lesson</Ref>
+made explicit, so some training rows say "genuine" about payments that were
+fraud.
+
+The two ensembles treat such a row differently. Boosting fits each new tree to
+the current errors, label minus predicted probability. A mislabelled fraud that the model scores high keeps a large error round
+after round, and each round pushes its score down, and with it the scores of
+the real frauds that resemble it.
+A forest's trees never look at each other's errors: the mislabelled row pulls
+on each tree that draws it, and the average dilutes the pull. The number of
+trees and the learning rate set how far boosting goes in chasing rows it
+cannot fit, which is one more reason to choose them on folds instead of
+taking the defaults. No experiment here measures the effect; it is a reason
+to watch for it, not a result.
+
+<Conclusion>
+You can now run a model selection for a class with several settings and
+account for it in three test numbers: what the default scores, what the
+folds' pick scores, and what the best candidate would have scored in
+hindsight; you can read the gain and the cost of selecting against the folds'
+spread, price a search as fits times folds, cut it with random search and
+size the number of draws from the width of the band the folds cannot
+separate. On the simulator, tuning matters most for the single tree, little
+for the ensembles, and the metric decides which class wins. On real card
+data a tuned depth-6 tree ties tuned XGBoost on card precision at 100 for a
+fraction of the compute, a fifth of the wall-clock time on one core against
+forty and an eighteenth of the single-core time the simulator measured, while
+XGBoost leads in ROC-AUC and average precision. Even logistic regression, the
+scorecard's model, trails XGBoost at the hundred-card budget by less than the
+weekly noise.
+
+The tuned XGBoost on the simulator, 0.869, 0.687 and 0.303, is the bar the
+next family has to clear. <Ref lesson="neural-tabular-detectors">Feed-forward
+networks on transaction features</Ref> asks what it takes to train a network
+on the same fifteen inputs to that level, and what it gives that trees do not.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+Fix XGBoost's depth at 3 and its learning rate at 0.3 and vary only the
+number of trees, whose library default is 100. On the simulator:
+
+| trees | validation AUC | test AUC | validation AP | test AP | validation $CP@100$ | test $CP@100$ |
+|---|---|---|---|---|---|---|
+| 25 | 0.877 | 0.871 | 0.698 | 0.679 | 0.289 | 0.303 |
+| 50 | 0.883 | 0.872 | 0.708 | 0.687 | 0.288 | 0.302 |
+| 100 | 0.887 | 0.869 | 0.706 | 0.685 | 0.286 | 0.299 |
+
+For each metric, write the default, best-estimated and optimal scores, the
+gain and the cost, and judge them against fold and test standard deviations
+of about 0.01 to 0.02.
+
+<Solution>
+**ROC-AUC.** The folds pick 100 trees (0.887), the default. Default 0.869,
+best-estimated 0.869, optimal 0.872 at 50 trees. Gain 0, cost 0.003.
+
+**Average precision.** The folds pick 50 trees (0.708). Default 0.685,
+best-estimated 0.687, optimal 0.687 at 50 trees. Gain 0.002, cost 0.
+
+**$CP@100$.** The folds pick 25 trees (0.289). Default 0.299, best-estimated
+0.303, optimal 0.303 at 25 trees. Gain 0.004, cost 0.
+
+The three metrics pick three different numbers of trees, and none of it
+matters: every gain and cost is a fraction of one standard deviation. On
+average precision and card precision the three validation means lie closer
+together than one fold spread; on ROC-AUC the folds rank 100 trees above 25
+by 0.010, about one spread, and the test weeks put them in the opposite
+order. The transferable move: before reading a pick as a finding, check
+whether the candidates it was picked from are separated at all; here the
+search confirmed that the number of trees, in this range, is not worth
+searching.
+</Solution>
+</Exercise>
+
+<Exercise>
+Take XGBoost with a fixed number of trees $M$ and push the learning rate to
+its edges. (a) As $\eta \to 0$, show that the ranking the model produces
+approaches that of a single tree of the same depth, and say what happens to
+the probabilities. (b) At $\eta = 1$ with 100 trees, what does each round do
+to the training frauds, and why does that hurt the test weeks? (c) Which of
+the two would you expect at the 25-tree, η = 0.1 corner that the folds ruled
+out on average precision?
+
+<Solution>
+**(a)** The model starts from the base rate $F_0$ and adds $\eta h_m(x)$ at
+each round, where $h_m$ is fitted to the errors of the current sum. When η is
+tiny, each addition barely changes the sum, so the errors the second tree sees
+are almost those the first saw, and $h_2 \approx h_1$; by induction every tree
+is close to $h_1$, and the model is close to $F_0 + M\eta\, h_1(x)$. Adding a
+constant and multiplying by a positive number keeps the order, so the ranking
+is $h_1$'s: one tree of the chosen depth, fitted to label minus base rate. The
+probabilities stay close to the base rate for every payment, since
+$M\eta h_1$ is small, which ranking metrics cannot see and any rule reading
+the probability's value would get badly wrong.
+
+**(b)** At $\eta = 1$ each tree is added in full, so each round corrects the
+current errors of the training rows in its leaves completely, as far as its
+depth allows. After a few rounds the frauds the inputs can describe are fitted;
+the remaining rounds keep correcting what is left, the training rows whose
+label the inputs cannot explain, including frauds labelled genuine. The model
+memorises those rows, and memorised regions rarely hold fraud again on later
+weeks: the overfitting of the fully grown single tree, reached by a different
+route.
+
+**(c)** The underfitting side, the direction of case (a). Trees times η,
+$25 \times 0.1 = 2.5$, is the smallest in the grid, so this model has moved
+the least from the base rate: its later trees have had the fewest rounds to
+correct what the earlier ones missed, and its average precision falls short
+of the rest of the grid's, which is where the folds found it. A useful boosted model needs
+trees times η large enough to leave case (a) and η small enough to stay out of
+case (b); the grid's η of 0.1 and 0.3 with 50 to 100 trees lies between the
+two edges.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague writes: "On the real stream the folds chose 100 trees for
+XGBoost on all three metrics, but 50 trees score 0.249 on card precision
+against 0.235. The search made a mistake that costs 1.4 compromised cards a
+day, and a finer grid over the number of trees would have found it." Refute
+both sentences, naming the step that fails in each.
+
+<Solution>
+**First sentence.** Calling the gap a cost treats both test numbers as exact.
+They are means over four test weeks with standard deviations of 0.07 (100
+trees) and 0.04 (50 trees), and 0.249 is the largest of eighteen such numbers,
+optimistic for the same reason a depth picked on the test week is. A gap of
+0.014 is a fifth of the larger standard deviation; the two settings are not
+separated even on the weeks they are scored on. The failing step is reading
+optimal minus best-estimated as a loss when it is below the spread.
+
+**Second sentence.** A finer grid adds candidates. Each one adds a noisy test
+number, so the optimal row, the maximum of more noisy numbers, can only rise,
+whether or not any new setting is better. The best-estimated row moves only if
+the folds can separate the new candidate from the old pick, and on card
+precision the folds could not separate any of the simulator's eighteen. The
+failing step is assuming the search was limited by its candidates; it was
+limited by its folds. Four validation weeks with standard deviations of 0.02
+to 0.04 cannot locate a difference of 0.014 however fine the grid.
+</Solution>
+</Exercise>
+
+<Exercise>
+(a) A grid has $m$ equally spaced levels per setting over $k$ settings, each
+scaled to $[0,1]$. Only the first setting matters, and the band of
+acceptable candidates is an interval of width $q$ along it, anywhere in the
+range. Show that the grid is guaranteed to hit the band only if $m \ge 1/q$,
+so that it needs $(1/q)^k$ points. (b) Compare, for $q = 0.05$ and $k = 3$,
+with the number of random draws that give a 95% chance. (c) How many grid
+points would give the important setting 27 distinct values with three
+settings, and how many random draws?
+
+<Solution>
+**(a)** Levels spaced $1/m$ apart leave gaps of width $1/m$ between
+neighbours; an interval of width $q$ placed in a gap misses every level when
+$q < 1/m$. A level is guaranteed inside the interval wherever it lies only if
+$1/m \le q$, i.e. $m \ge 1/q$. The grid takes $m$ levels in every setting,
+because it does not know which one matters, so it has $m^k \ge (1/q)^k$
+points.
+
+**(b)** $(1/0.05)^3 = 20^3 = 8{,}000$ grid points for a guarantee, against
+59 random draws for a 95% chance. The grid's cost grows with $k$; the random
+search's does not.
+
+**(c)** 27 levels per setting over three settings: $27^3 = 19{,}683$ points.
+27 random draws give 27 distinct values of every setting.
+</Solution>
+</Exercise>
+
+<Exercise>
+Design the backtest that would decide whether the tuned tree and tuned XGBoost
+really differ on card precision at 100 on the real stream. Assume the
+difference between the two models' weekly card precisions, computed week by
+week on the same test week, has a standard deviation of 0.02. (a) Why compare
+paired weekly differences rather than the two four-week means? (b) How many
+test weeks would show a true difference of 0.003 at two standard errors?
+(c) And a difference of 0.02? (d) What makes the answer to (b) impractical
+beyond the arithmetic?
+
+<Solution>
+**(a)** Most of each model's week-to-week movement comes from the week: how
+many compromised cards it held and how easy they were. Both models face the
+same week, so that movement cancels in their difference, and the difference's
+spread (assumed 0.02) is smaller than either model's own (0.04 and 0.07).
+
+**(b)** With $n$ weeks the mean difference has standard error $0.02/\sqrt n$.
+Two standard errors equal 0.003 when $\sqrt n = 2 \times 0.02 / 0.003 =
+13.3$, so $n \approx 178$ weeks, more than three years.
+
+**(c)** $\sqrt n = 2 \times 0.02/0.02 = 2$, so $n = 4$ weeks.
+
+**(d)** Over three years the stream drifts and the fraud adapts, so the weeks
+are not draws from one distribution, and both models would be retrained many
+times along the way: the question "which model is better" stops having a
+single answer before the experiment ends. The practical conclusion is that
+the two are tied for any decision the bank can make, and the choice rests on
+cost, readability and what the ranking below the top hundred is used for.
+</Solution>
+</Exercise>
+
+<Exercise>
+The real-stream XGBoost grid of eighteen candidates took 8,789 seconds, both
+passes. The imbalance lesson found that a mild fraud weight,
+`scale_pos_weight` $= 5$, gave card precision 0.249 against 0.235 without it.
+(a) Add the weight with values 1, 5, 10 and 100 to the grid: how many
+candidates, and roughly how long for both passes? (b) Why must the weight be
+searched on the folds instead of set to $1/\mathrm{IR}$, about 400 on this
+stream? (c) What does a random search of 18 draws over the enlarged grid cost,
+and what is the chance that it contains at least one of the four candidates
+with depth 6, η = 0.1 and 50 or 100 trees? (d) If the search instead
+undersampled genuine payments, what two steps would it need that the weight
+does not?
+
+<Solution>
+**(a)** $18 \times 4 = 72$ candidates; at the same cost per candidate, about
+$4 \times 8{,}789 \approx 35{,}000$ seconds, close to ten hours, half of it
+for the pass a bank would actually run.
+
+**(b)** The imbalance lesson showed that the best weight changes with the
+metric, the model and the stream, and that the heuristic $1/\mathrm{IR}$
+pushes genuine payments over the line once boosting has fitted the frauds; on
+this stream the folds picked 5, and 10 to 100 did no better. A weight is a
+setting like depth: a grid that includes 1, prequential folds, and a pick by
+card precision.
+
+**(c)** 18 draws cost about what the original grid did, 8,789 seconds. The
+four target candidates are $4$ of $72$. The probability that 18 draws without
+replacement miss all four is $\binom{68}{18}/\binom{72}{18} =
+\frac{54 \cdot 53 \cdot 52 \cdot 51}{72 \cdot 71 \cdot 70 \cdot 69} \approx
+0.31$, so the chance of including at least one is about 0.69. Whether that
+matters depends on the band: if, as on the simulator, the folds cannot
+separate most candidates on card precision, missing these four costs nothing
+measurable.
+
+**(d)** The sampler has to run inside each fold, on the training block only,
+so that validation weeks keep the stream's own base rate; and any decision
+that reads the probability's value has to correct the outputs with
+$\beta = \mathrm{IR}/r$, the keep rate of <Ref
+lesson="undersampling-calibration">undersampling and calibration</Ref>. A
+weight changes the loss and needs neither the resampling step nor, for the
+ranking, a correction.
+</Solution>
+</Exercise>
+
+<Exercise>
+The pipeline behind every search in this lesson standardises each input (it
+subtracts the training mean and divides by the standard deviation) before the
+model sees it. (a) Show that for the decision tree, the forest and XGBoost
+this changes nothing in the fitted model, and that replacing the amount by
+$\log(1 + \text{amount})$ changes nothing either. (b) Why can the same step
+change logistic regression's fit at a given regularisation strength? (c) What
+would you expect for a model whose first step is a weighted sum of all inputs,
+fitted by gradient steps?
+
+<Solution>
+**(a)** A tree splits an input at a threshold: payments with a value at or
+below it go one way, the rest the other. A strictly increasing transform of an
+input keeps the order of the values, so every split available before the
+transform is available after it, with the threshold transformed, and it sends
+exactly the same payments each way. The impurity of every candidate split is
+therefore unchanged, the same splits are chosen, the leaves hold the same rows
+and give the same scores. Standardising and $\log(1+x)$ are both strictly
+increasing, so the tree, every tree of the forest and every boosting round are
+unchanged.
+
+**(b)** Logistic regression's penalty adds the squared coefficients to the
+loss. The coefficient that an input needs depends on its scale: amounts in
+euros need a small coefficient, a 0/1 flag a large one, so without
+standardising the penalty falls unevenly on the inputs. Standardising puts
+them on one scale, which changes what the penalty does and so the fitted
+coefficients and the order they give.
+
+**(c)** A weighted sum is not invariant to scale: an input in the thousands
+dominates the sum and its gradient, and a heavy-tailed one like the amount
+puts a few huge values into every step. Such a model needs the inputs scaled,
+and the heavy tails compressed, before it can be trained at all, while the
+trees above were indifferent. That is the first of the steps that <Ref
+lesson="neural-tabular-detectors">feed-forward networks on transaction
+features</Ref> takes, and the reason a network is harder to bring to the
+XGBoost bar on the same inputs.
+</Solution>
+</Exercise>
+
+<References>
+1. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 5, section "Model selection" (the four-step procedure and the argmax of validation performance; default, best-estimated and optimal parameters; prequential grid searches for decision trees, logistic regression, random forests and XGBoost on simulated data, with fit times; the four-class comparison; random search with `RandomizedSearchCV`, 10 of 18 combinations), Ch. 5, section "Real-world data" (the same searches on Worldline e-commerce transactions: best-estimated and optimal parameters per class, the 50-tree XGBoost optimum for CP@100, execution times on a 40-core server), Ch. 5, section "Validation strategies" (prequential folds and their spread). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+2. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015 — Ch. 4, p. 144 (decision trees depend strongly on their sample, motivating ensembles), pp. 164–168 (bagging and the instability it needs, boosting and its risk of overfitting hard and noisy cases in fraud data, random forests and the diversity of their trees).
+3. J. Bergstra, Y. Bengio, "Random Search for Hyper-Parameter Optimization," *Journal of Machine Learning Research* 13, 2012, pp. 281–305 — grid versus random trials when only some hyperparameters matter; the low effective dimensionality of hyperparameter response surfaces. https://jmlr.org/papers/v13/bergstra12a.html
+4. L. Breiman, "Random Forests," *Machine Learning* 45(1), 2001, pp. 5–32 — bootstrap samples, random input subsets at each split, and why averaging de-correlated trees reduces error. https://doi.org/10.1023/A:1010933404324
+5. J. H. Friedman, "Greedy Function Approximation: A Gradient Boosting Machine," *Annals of Statistics* 29(5), 2001, pp. 1189–1232 — boosting as fitting each tree to the current gradients; shrinkage (the learning rate) and its trade against the number of trees. https://doi.org/10.1214/aos/1013203451
+6. T. Chen, C. Guestrin, "XGBoost: A Scalable Tree Boosting System," *Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining*, 2016, pp. 785–794 — Sec. 2.3 (shrinkage and column subsampling). https://doi.org/10.1145/2939672.2939785
+</References>

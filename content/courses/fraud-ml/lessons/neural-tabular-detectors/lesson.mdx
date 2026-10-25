@@ -1,0 +1,1108 @@
+On a table of engineered features, boosted trees usually win and are cheaper to train. Yet banks train neural networks on the same tables. What has to be done to make a feed-forward network competitive on transaction features — scaling, optimiser, stopping, regularisation, categorical inputs — and what does the network buy that the trees cannot?
+
+The bar is already set. <Ref lesson="gbm-model-selection"
+id="four-classes-side-by-side">The tree-ensemble lesson</Ref> tuned XGBoost on
+the simulator's fifteen inputs with four prequential folds and scored the
+folds' pick on four forward test weeks: ROC-AUC 0.869, average precision
+0.687, card precision at 100 of 0.303. Its search took about twenty minutes
+on one processor core, and on the real Belgian stream a tuned depth-6 tree
+matched tuned XGBoost's card precision for a fraction of its compute.
+
+A network brings none of the trees' indifference to how the inputs are
+written. A tree asks one question of one input at a time, "is the amount
+above 218.67?", so it does not care whether the amount is in euros or cents,
+and it has two or three settings worth searching. A network multiplies every
+input by a weight and adds them up, is trained by thousands of small
+gradient steps whose size someone has to choose, keeps training as long as it
+is told to, and has a dozen settings that interact. Each of those differences
+is a place where the obvious choice, the one a tutorial makes, gives a
+network that is slow, fragile or quietly fitted to the test week. And a
+network brought level with the trees still has to justify the trouble.
+
+## A network that outputs a fraud probability
+
+The detector has to produce, for each payment, a number that ranks it among
+the day's payments and that a decision priced in euros can read as a
+probability. The
+first design question is what the network's last layer computes, and with
+which loss it is trained.
+
+### One output unit, read as P(fraud)
+
+The inputs are the fifteen numbers of each payment (<Ref
+lesson="alert-budget-metrics" id="five-models-scored-on-a-test-week">the five
+baseline models' inputs</Ref>: the amount, the weekend and night flags, the
+card's counts and mean amounts over 1, 7 and 30 days, the terminal's counts
+and fraud rates over the same windows). A hidden layer of $h$ units computes,
+for unit $j$,
+
+$$
+a_j = \max\Big(0,\; \sum_{i=1}^{15} w_{ij} x_i + b_j\Big),
+$$
+
+the ReLU of a weighted sum. One output unit then takes a weighted sum of the
+$a_j$ and passes it through the sigmoid $\sigma(z) = 1/(1+e^{-z})$, which
+lands in $(0,1)$ and is read as $P(\text{fraud} \mid x)$.
+
+With no hidden layer, the same construction is logistic regression: one
+weighted sum of the inputs, one sigmoid. That is the model under <Ref
+lesson="scorecards-woe" id="fitting-the-card-one-sign-to-check-per-line">the
+scorecard</Ref>, which adds one term per variable and can therefore never
+express that an input's effect depends on another's. The scorecard lesson's
+last exercise found exactly such a dependence: an amount far above the
+card's 30-day mean multiplies the fraud odds by about 265 among ordinary
+amounts and by only about 23 among amounts above €201.82. Each hidden unit is a hinge, zero on one
+side of a direction in input space and rising on the other, and a sum of
+hinges can bend the log-odds surface where a sum of per-variable terms
+cannot.
+
+### Cross-entropy: the loss whose best answer is the fraud share
+
+The network is fitted by minimising the binary cross-entropy over the
+training rows,
+
+$$
+\mathrm{BCE}(y, p) = -\big(y \ln p + (1-y)\ln(1-p)\big),
+$$
+
+with $y \in \{0, 1\}$ the label and $p$ the network's output. The cost rule
+of <Ref lesson="example-dependent-cost">example-dependent cost</Ref>, flag a
+payment when $C_a \le \mathrm{Amt}\cdot p$, needs $p$ to be a probability, not
+only a score in the right order. Cross-entropy is the loss that delivers one.
+
+<Example title="the constant that minimises cross-entropy on one group of payments">
+Take the scorecard lesson's top amount bin: 200 training payments above
+€201.82, of which 132 were fraud, a share of $q = 0.66$. Suppose a model must
+give all 200 the same output $p$. The mean loss over the group is
+
+$$
+\overline{\mathrm{BCE}}(p) = -\big(0.66 \ln p + 0.34 \ln(1-p)\big).
+$$
+
+At $p = 0.5$ it is $0.693$; at $p = 0.9$, $0.66 \times 0.105 + 0.34 \times
+2.303 = 0.852$; at $p = 0.66$, $0.66 \times 0.416 + 0.34 \times 1.079 =
+0.641$, the smallest of the three. In general, setting the derivative to
+zero,
+
+$$
+-\frac{q}{p} + \frac{1-q}{1-p} = 0 \quad\Longrightarrow\quad p = q ,
+$$
+
+so the loss is minimised by outputting the group's fraud share. A flexible
+model trained by cross-entropy therefore aims, for every region of input
+space, at the fraud share of the training rows there: an estimate of
+$P(\text{fraud} \mid x)$ on the training distribution.
+</Example>
+
+The last three words matter. If the training rows were rebalanced, the
+target is the rebalanced share, and <Ref
+lesson="undersampling-calibration">the undersampling lesson's</Ref>
+correction has to be applied before the cost rule reads the output.
+
+### The first network on the fifteen inputs
+
+Take the obvious first network: the fifteen inputs, each standardised
+(training mean subtracted, divided by the training standard deviation), a hidden layer of 1,000 ReLU units, a
+sigmoid output, plain stochastic gradient descent (SGD) at learning rate
+0.07 on batches of 64 payments, 150 passes over the training rows. It is
+trained on the same training week as <Ref lesson="alert-budget-metrics"
+id="five-models-scored-on-a-test-week">the five baseline models</Ref>,
+25–31 July 2018 (67,240 payments, 598 frauds), and scored on the same test
+week, 8–14 August, after the delay week and with cards already known to be
+compromised removed.
+
+| one test week, no tuning | ROC-AUC | average precision | $CP@100$ |
+|---|---|---|---|
+| logistic regression | 0.871 | 0.606 | 0.291 |
+| random forest | 0.867 | 0.658 | 0.287 |
+| XGBoost | 0.862 | 0.639 | 0.273 |
+| first network | 0.864 | 0.653 | 0.286 |
+
+On one week, untuned, the network sits among the default models. The
+problems are elsewhere. The 150 passes took 851 seconds on a graphics
+processor, against seven seconds for the default XGBoost (<Ref
+lesson="ulb-handbook-benchmark" id="so-which-model-should-the-bank-ship">the
+benchmark's training times</Ref>). And the
+number 150 was a guess.
+
+## Fourteen minutes of training, ten epochs of learning
+
+The run's own record shows where the fourteen minutes went. After each
+*epoch*, one pass over the training rows (here 1,051 batches of 64), it
+recorded the mean cross-entropy on the training week and on the test week.
+The record that survives covers epochs 1–20 and 110–129 of the 150; the
+epochs between, and the last 21, were trained but not logged.
+
+<Figure
+  src="./figures/loss-curves.svg"
+  alt="Line chart of mean cross-entropy per epoch for the first network. A black training-week curve falls from 0.035 at epoch 1 to about 0.020 at epoch 20 and 0.014 at epochs 110 to 129. An amber test-week curve starts at 0.022, reaches about 0.0197 at epoch 10 with a spike to 0.0286 at epoch 8, and stays between 0.019 and 0.021 through epoch 128, ending at 0.0194. Epochs 21 to 109 are not logged and the axis is broken there"
+  caption="Over the logged epochs, 1–20 and 110–129 of the 150, the training loss keeps falling; the test-week loss reached its level by epoch 10 and never left it."
+/>
+
+### What the two curves say
+
+The training loss falls from 0.035 to 0.014 and is still falling at the last
+logged epoch. The test-week loss is 0.0197 at epoch 10 and 0.0194 at epoch
+128: 118 more epochs, about eleven of the fourteen minutes at 5.7 seconds
+an epoch, bought nothing on payments the network had not seen, while the
+training loss halved.
+
+That second fall is the network fitting rows it can memorise. A layer of
+1,000 units has $15 \times 1{,}000 + 1{,}000$ weights and biases into the
+hidden layer and $1{,}001$ out of it, 17,001 parameters, about 28 for every
+training fraud. The [universal approximation
+theorem](https://en.wikipedia.org/wiki/Universal_approximation_theorem) says a single hidden
+layer with enough units can approximate any continuous function on a bounded
+region; a network of this width can learn the 598 frauds of one week one by
+one, the way <Ref lesson="delayed-labels-prequential"
+id="what-auc-sees-in-the-fully-grown-tree">the fully grown tree</Ref> did. The overfitting is the same; what
+differs is that a network does it gradually, epoch by epoch, so the number of
+epochs is itself a setting that controls it.
+
+A remark on the levels: the test-week loss lies below the training loss for
+most of the first twenty epochs. Cross-entropy grows with the share of frauds, and
+the test week, with known cards removed, holds fewer frauds per payment than
+the training week (0.66% against 0.89%). Loss curves on different weeks are
+compared by their shape, never by their level.
+
+### A week to watch that is not the test week
+
+The figure is informative only because it is read afterwards. Stopping
+training where the test-week curve flattens would be choosing a setting on
+the test week, which <Ref lesson="delayed-labels-prequential"
+id="neither-the-training-week-nor-the-test-week-can-choose">the delayed-labels
+lesson</Ref> ruled out: the test number would then be the best of many noisy
+looks, optimistic by construction. The loss has to be watched on a week that
+plays the test week's role without being it. That is the hold-out geometry of
+<Ref lesson="delayed-labels-prequential"
+id="a-validation-week-that-stands-where-the-test-week-stands">a validation
+week that stands where the test week stands</Ref>: train on 11–17 July,
+leave 18–24 July as the delay, watch the loss on 25–31 July.
+
+### Stopping when the validation loss stops improving
+
+The validation loss is noisy from epoch to epoch (in the figure, the
+test-week loss jumps from 0.0199 to 0.0286 at epoch 8 and comes straight
+back), so "stop at the first epoch that does not improve" would stop on a
+fluctuation. The rule tolerates a few bad epochs.
+
+<Definition title="early stopping with patience">
+After each epoch $e$, compute the validation loss $V_e$ and keep the best
+epoch so far, $b = \arg\min_{e' \le e} V_{e'}$, together with a copy of the
+weights at epoch $b$. A counter holds $e - b$, the number of epochs since the
+best. With patience $P$, training stops at the first epoch where the counter
+reaches $P + 1$, and the weights of epoch $b$ are restored.
+</Definition>
+
+Two parts of the definition are easy to drop. The counter counts epochs
+since the best, not consecutive increases, so a slow drift upward with
+occasional small dips below the previous epoch still stops. And the restore
+matters because the weights at the stopping epoch are $P + 1$ epochs past the
+best: a common implementation of the rule tracks the best loss but
+never saves the weights, and returns the model of the last epoch instead.
+
+Why watch the loss rather than card precision at 100, the metric that will
+choose the model? The loss uses every validation row and moves smoothly;
+card precision on one validation week moves in steps of one card in a hundred
+and depends only on the top of each day's list, so a rule watching it would
+react to which three or four cards happened to cross the hundredth place.
+
+## Which optimiser: 251 epochs or 13
+
+With the stopping rule in place the run can be left to decide its own
+length. How long it takes depends on how each step is computed.
+
+### Plain SGD at a small rate
+
+The first trial: the same 1,000-unit network, SGD with learning rate 0.0005,
+batches of 64, early stopping with patience 2 on the validation week. The
+validation loss falls quickly for ten epochs, then more and more slowly,
+by the end a few hundred-thousandths per epoch, but almost every epoch is a
+new best, so the counter never fills. The run stops after
+251 epochs, its best at epoch 248 with a validation loss of about 0.0218.
+
+The reason lies in the size of the gradient. For the output unit, the
+derivative of the cross-entropy with respect to its weighted sum is $p - y$.
+On a training week where 99.1% of payments are genuine and most of them are
+scored near zero after the first epochs, $p - y$ is a few thousandths for
+almost every row; only the frauds, about 600 in a week, and the few genuine
+payments that look like them produce gradients of order one. A batch of 64 payments holds on
+average half a fraud, so the batch-mean gradient is small, and SGD's step is
+the learning rate times that gradient. At 0.0005 the steps are tiny.
+
+SGD is not slow in itself. The first run used SGD at 0.07, 140 times the
+rate, and its held-out loss was at its level within ten epochs. What SGD
+needs is a learning rate matched to the scale of the gradients, and that
+scale depends on the base rate, the inputs and the stage of training.
+
+### What Adam changes
+
+[Adam](https://pytorch.org/docs/stable/generated/torch.optim.Adam.html), the optimiser from the course prerequisites, keeps for each weight a
+running mean $m_t$ of its gradients and a running mean $v_t$ of their
+squares, corrects both for their start at zero ($\hat m_t$, $\hat v_t$), and
+steps by
+
+$$
+w_{t+1} = w_t - \eta\, \frac{\hat m_t}{\sqrt{\hat v_t} + \epsilon} .
+$$
+
+The ratio $\hat m_t / \sqrt{\hat v_t}$ is about $\pm 1$ when a weight's
+gradient keeps the same sign, whatever its magnitude, and near 0 when the
+sign flips from batch to batch. Each weight therefore moves by roughly $\eta$
+per step in a consistent direction, whether its gradients are of order one or
+of order a thousandth. On the fraud table that is the difference that
+matters: the steps no longer shrink with $p - y$.
+
+<Figure
+  src="./figures/sgd-adam.svg"
+  alt="Two panels of validation loss against epoch for the 1,000-unit network at learning rate 0.0005. Left, epochs 0 to 260: a blue SGD curve falls from 0.094 at epoch 1 to 0.034 at epoch 14, then, through logged stretches around epochs 74 to 87, 147 to 159 and 220 to 232 joined by dashed lines, to about 0.0218 at its best epoch 248; it stops at 251. An amber Adam curve occupies only the first 13 epochs near 0.02. Right, epochs 1 to 15 enlarged: Adam's validation loss goes 0.0229, 0.0211, 0.0203, 0.0207, 0.0192, 0.0188, 0.0201, 0.0189, 0.0181, 0.0180, 0.0188, 0.0191, 0.0182, with its best of 0.0180 at epoch 10 and a stop at 13, while SGD is still at 0.034 after 14 epochs"
+  caption="At the same learning rate, Adam reaches a lower validation loss in 10 epochs than SGD reaches in 248."
+/>
+
+The same network with Adam at the same rate, 0.0005, stops after 13 epochs
+with its best validation loss, 0.0180, at epoch 10. It is both faster and
+lower: SGD's 0.0218 after 248 epochs is still above where Adam was after its
+second epoch (0.0211). A larger SGD rate or a longer patience would close part of the
+gap, but that rate has to track the gradient scale, as above. Adam's
+rate still has to be chosen, but because its steps do not scale with the
+gradients, the useful values sit in a fixed range, 0.0001 to 0.001, and a
+short list of them is enough; the grid later in the chapter searches exactly
+that list. The rest of the chapter uses Adam.
+
+### The stopping rule on the Adam run
+
+<FigureSequence
+  name="early-stop"
+  alt="Three frames of Adam's validation loss over epochs 1 to 13, with two rows beneath: the counter of epochs since the best, and the best epoch so far. Frame 1 shows epochs 1 to 6: losses 0.0229, 0.0211, 0.0203, 0.0207, 0.0192, 0.0188; counter 0, 0, 0, 1, 0, 0. Frame 2 adds epochs 7 to 10: 0.0201, 0.0189, 0.0181, 0.0180; counter 1, 2, 0, 0; best epoch 10. Frame 3 adds epochs 11 to 13: 0.0188, 0.0191, 0.0182; counter 1, 2, 3; a dashed line marks the stop at epoch 13 and a green circle marks the restored epoch 10 at 0.01805"
+  caption="Every new best resets the counter; the third epoch in a row without one stops the run and brings back the weights of epoch 10."
+/>
+
+<Task>
+Step through the three frames and, before reading the last one, say from the
+second frame alone how many more epochs the run can last at most if no new
+best appears, and which weights it would return.
+</Task>
+
+Epoch 13 scores 0.01815, almost as good as epoch 10's 0.01805, but "almost"
+is not an improvement, and the counter reaches three. The run returns the
+weights of epoch 10. Had the implementation forgotten to save them, it would
+return epoch 13's; here the difference is 0.0001 in validation loss, but with
+a patience of 10 on a run that has started to overfit, the returned model
+would be ten epochs further down the slope.
+
+<Exercise>
+Apply the rule to the same thirteen validation losses with patience 0 and
+with patience 1. At which epoch does each run stop, which epoch's weights
+does it return, and at what validation loss? What does the comparison with
+patience 2 say about choosing the patience?
+
+<Solution>
+The losses are 0.02292, 0.02114, 0.02032, 0.02067, 0.01915, 0.01883,
+0.02007, 0.01889, 0.01810, 0.01805, 0.01875, 0.01909, 0.01815.
+
+**Patience 0** stops when the counter reaches 1, the first epoch that fails
+to improve: epoch 4 (0.02067 is above 0.02032). It returns epoch 3, at
+0.0203.
+
+**Patience 1** stops when the counter reaches 2. Epoch 4 sets it to 1, epoch
+5 is a new best (0.01915) and resets it, epoch 6 is another (0.01883), epoch
+7 sets 1, epoch 8 sets 2 (0.01889 is above 0.01883): stop at epoch 8, return
+epoch 6, at 0.0188.
+
+**Patience 2** stops at epoch 13 and returns epoch 10, at 0.0180.
+
+Each extra unit of patience let the run cross one more bad stretch and reach
+a lower loss, at the price of a few epochs. Patience is a setting traded
+against training time: too small and a single noisy epoch ends training
+early, too large and the run spends epochs past the best (which the restore
+step makes harmless to the model, though not to the bill).
+</Solution>
+</Exercise>
+
+## Scaling the inputs: trees compare, networks multiply
+
+Every run so far fed the network standardised inputs. Trees did not need
+that: a strictly increasing transformation of an input leaves every split
+available and sends the same payments each way, as <Ref
+lesson="gbm-model-selection" id="exercises">the tree-ensemble lesson's last
+exercise</Ref> showed. The question is what a network does with the inputs
+as they come.
+
+<Figure
+  src="./figures/input-scales.svg"
+  alt="Horizontal bar chart on a logarithmic axis from 0.01 to 100 of the standard deviation of each of the fifteen inputs on one simulated week. Amount, in amber, 40.5; card mean amounts over 1, 7 and 30 days 33.9, 29.3, 28.1; card count over 30 days 29.5; terminal count over 30 days 8.57; card count over 7 days 7.9; terminal count over 7 days 3.07; card count over 1 day 1.84; terminal count over 1 day 1.03; weekend flag 0.453; night flag 0.379; and in blue the three terminal fraud rates, 0.0674, 0.0633 and 0.0515. A green vertical line at 1 marks where every bar ends after standardising"
+  caption="The inputs differ in spread by a factor of about 800, and the three that carry the terminal signal are the narrowest."
+/>
+
+### A step proportional to the input
+
+For a first-layer weight $w_{ij}$, the chain rule gives
+
+$$
+\frac{\partial L}{\partial w_{ij}} = \delta_j \, x_i ,
+$$
+
+where $\delta_j$ is the derivative of the loss with respect to unit $j$'s
+weighted sum, the same for every input of that unit. The gradient on each
+weight is the shared factor $\delta_j$ times the value of the input it
+multiplies.
+
+<Example title="one payment, two scales">
+A payment on a card with 80 payments in the last 30 days, at a terminal
+whose 7-day fraud rate is 0.6. For any hidden unit $j$, the gradient on the
+weight from the 30-day count is $80\,\delta_j$, the gradient on the weight
+from the terminal rate $0.6\,\delta_j$. The count's gradient is 133 times
+larger, and a plain gradient step moves its weight 133 times further.
+
+After standardising, with the simulated week's means and standard deviations
+(count 77.0 and 29.5, terminal rate 0.007 and 0.067), the two inputs become
+$(80 - 77.0)/29.5 = 0.10$ and $(0.6 - 0.007)/0.067 = 8.9$. Now the terminal
+rate's gradient is 88 times the count's. The payment is
+ordinary in its card count and extreme in its terminal rate, and after
+standardising the step says so; before, the step reflected only that counts
+are written in larger numbers than rates.
+</Example>
+
+The trouble is that one learning rate serves every weight, and the right
+size of step along a weight depends on how sharply the loss curves along it.
+Take a single logistic unit, $p = \sigma(\sum_i w_i x_i + b)$, trained by
+mean cross-entropy over $n$ rows. Its gradient along $w_i$ is the mean of
+$(p - y)\,x_i$; differentiating once more, with $\partial p / \partial w_i
+= p(1-p)\,x_i$,
+
+$$
+\frac{\partial^2 \overline{\mathrm{BCE}}}{\partial w_i^2} = \frac{1}{n}\sum_{\text{rows}} p(1-p)\, x_i^2 .
+$$
+
+The factor $p(1-p)$ is the same for every input of a row, so the curvature
+along each weight is, up to that shared weighting, the mean square of its
+input: about 6,800 for
+the 30-day card count on the simulated week and 0.003 for the 30-day
+terminal fraud rate, a ratio of more than a million. Near its minimum
+$w^*$, the loss along a direction of curvature $c$ is close to the quadratic
+$\tfrac{c}{2}(w - w^*)^2$, whose gradient is $c\,(w - w^*)$. A step of rate
+$\eta$ therefore moves $w$ to $w - \eta c\,(w - w^*)$, which multiplies the
+distance to the minimum by $(1 - \eta c)$. Once $\eta c > 1$ that factor is
+negative and the step lands past the minimum; once $|1 - \eta c| > 1$, that
+is once $\eta > 2/c$, the step lands further from the minimum than it
+started, and every step after it further still. A rate below $2/6{,}800$, safe along the count's weight, moves
+the terminal-rate weight about a millionth of the way to its minimum per
+step; a rate large enough to move the terminal-rate weight sends the
+count's weight back and forth across its minimum, further each time. That is
+divergence.
+
+### What happened without scaling
+
+The experiment was run on the validation week with Adam and dropout (the
+next section's regulariser), once with standardised inputs at learning rate
+0.0005 and once with the raw inputs. With raw inputs the rate had to be cut
+to 0.0001 to keep training from diverging, and even then the training and
+validation losses were noisier and settled at worse levels than with
+standardised inputs.
+
+Adam gives every weight a step of about $\eta$, so the curvature argument
+above, which is about plain gradient steps, does not apply to it directly.
+What it equalises is the step in weight space. What a hidden unit computes
+is its weighted sum, and a step of $\eta$ on weight $w_{ij}$ moves that sum
+by $\eta\,x_i$: about $80\eta$ for a 30-day count of 80, $0.007\eta$ for a
+typical terminal fraud rate. When every weight takes its step at once, a
+unit's sum on a raw payment moves by up to $\eta$ times the sum of the
+inputs' sizes, a few hundred, against about a dozen once the fifteen inputs
+are standardised; the rate had to come down to keep those jumps in check.
+
+The raw scales also set where training starts. The first-layer weights
+begin as small random numbers, a few tenths at most, so each unit's initial
+sum on a raw payment is fixed by the counts and amounts, tens each, while
+the terminal rates add thousandths. Counts and amounts are all positive,
+so a unit whose random weights make the counts-and-amounts part of its sum
+negative is off for almost every payment; it passes back no gradient, and
+Adam has nothing to normalise. The units that are on start out reading counts and amounts and
+nearly blind to the inputs that carry the terminal signal. Standardising
+removes both problems before the first step.
+
+### Standardise on the training block; compress a long tail first
+
+Standardising is a fitted step: its mean and standard deviation are
+computed on the training block and then applied unchanged to the validation
+and test weeks, exactly as a model's weights are. Computing them on the
+whole table would let the test weeks' values shape the inputs the model was
+trained on, the whole-table pitfall of <Ref lesson="transaction-aggregates"
+id="three-ordinary-table-operations-that-break-the-rule">the aggregates
+lesson</Ref>; on prequential folds the scaler is refitted on each fold's
+training block.
+
+Standardising fixes the spread, not the shape. An input with a long right
+tail, like the amount on a real card stream, where most payments are tens of
+euros and a few are thousands, has its standard deviation set by the few
+largest values; after dividing by it, the typical payments are squeezed into
+a narrow band near zero and the network sees mostly the tail. The usual
+repair is to replace the amount by $\log(1 + \text{amount})$ before
+standardising.
+
+<FigureSequence
+  name="amount"
+  alt="Two histograms of the same 58,957 payment amounts from one simulated week. Frame 1, raw amounts in bins of 15 euros: about 9,800 payments under 15 euros, a peak of about 10,700 between 15 and 30, falling to under 100 above 195, with 21 payments above 300 and a maximum of 916; skewness plus 1.7. Frame 2, log of one plus the amount in bins of 0.35: the bulk sits between 3 and 4.5 with a peak near 4, and a tail of a few hundred payments stretches down toward 0; skewness minus 0.8"
+  caption="On the simulator the log over-corrects: a right tail of skewness +1.7 becomes a left tail of −0.8."
+/>
+
+On the simulator, the transform has little to repair. Each simulated
+customer draws amounts from a normal distribution around their own mean, so
+the week's amounts have a moderate right tail (skewness +1.7), and the log
+turns it into a left tail of about the same size (−0.8), because it stretches
+the many payments of a few euros. On real amounts, which span from cents to
+thousands, the log is often what makes the input usable. Which form to feed
+is decided the way everything else is: on the folds.
+
+## Dropout: an ensemble inside one network
+
+Early stopping limits how long the network fits the training week. It does
+nothing about what the 1,000 units fit while they train, and a unit can
+come to depend on a handful of others to recognise a single training fraud.
+The second brake changes the network that is trained at each step.
+
+### Each batch trains a different sub-network
+
+*Dropout* with rate $p$ sets each hidden unit's output to zero with
+probability $p$, independently for each unit and each batch, and multiplies
+the surviving outputs by $1/(1-p)$ so that their sum keeps its expected
+size. Each batch therefore trains a different random sub-network, about
+$(1-p)$ of the units, and no unit can rely on any particular other being
+present. At prediction time no unit is dropped, and the full network acts
+approximately as the average of the sub-networks trained along the way. It
+is the forest's move, many models fitted on perturbed versions of the
+problem and averaged so that what each memorised alone cancels (<Ref
+lesson="gbm-model-selection"
+id="random-forest-depth-stops-mattering-once-trees-are-averaged">the forest
+in the tree-ensemble lesson</Ref>), carried out inside one set of weights.
+
+### Training mode and evaluation mode
+
+The averaging only happens if the network knows which mode it is in.
+Frameworks switch dropout on and off with a training flag (in PyTorch,
+`model.train()` and `model.eval()`); a validation loss computed with the
+flag left in training mode scores a different random sub-network on every
+batch, and comes out both noisier and worse than the network really is.
+
+### How much dropout: a setting searched with the epochs
+
+The rate trades two things. A larger $p$ averages more different
+sub-networks and leaves each unit less room to memorise, but each unit is
+also present in only a fraction $1-p$ of the batches: at $p = 0.4$ it
+receives 60% of the updates a unit of the plain network would. A rate that
+regularises well over a long run can therefore leave a short run
+undertrained, and the best rate depends on how long the network trains. So
+the rate is chosen together with the number of epochs, on validation data
+like any other setting, and its candidates include 0, the plain network.
+
+## Categorical inputs: embeddings
+
+The fifteen inputs are all numbers. A payment also carries categories: the
+terminal it was made at, the day of the week, and on real data the
+merchant's category, the country, the entry mode. A network has to turn a
+category into numbers before its first layer can multiply them, and for
+trees <Ref lesson="transaction-aggregates"
+id="the-identifier-as-a-lookup-table">the aggregates lesson</Ref> already
+showed what the raw identifier becomes: a lookup table of which terminals
+were compromised in the training week.
+
+### One column per value
+
+The obvious encoding is one-hot: a column per value, 1 in the payment's
+column and 0 elsewhere. For the weekday that is 7 columns. For the
+simulator's 10,000 terminals it is 10,000 columns, and a first layer of 500
+units would need five million weights for this one input, each trained only
+by the payments made at its terminal. A training week of 67,240 payments
+spread over 10,000 terminals gives each terminal about seven: 500 weights
+fitted from seven payments, almost all of them genuine.
+
+### An embedding is a linear layer on the one-hot input
+
+<Figure
+  src="./figures/embedding.svg"
+  alt="A one-hot row for the weekday, seven cells Mon to Sun with a 1 under Sat, multiplied by a seven-by-three table E whose Saturday row reads minus 0.41, plus 0.35, plus 0.26, equals a one-by-three vector minus 0.41, plus 0.35, plus 0.26, which joins the fifteen inputs of the first layer. Values are illustrative; k equals the ceiling of log base 2 of 7, which is 3"
+  caption="Multiplying a one-hot row by the table picks out one row of it."
+/>
+
+<Definition title="embedding">
+For a categorical input with value set $C$, an *embedding of dimension $k$*
+is a table $E$ of $|C|$ rows and $k$ columns. A payment with value $c$ is
+represented by row $c$ of $E$, written $e_c$, which is placed beside the
+numerical inputs of the first layer. The rows of $E$ are parameters of the
+network, trained by the same gradient steps as every other weight.
+</Definition>
+
+If $o_c$ is the one-hot row of value $c$ (length $|C|$, a single 1 in
+position $c$), then
+
+$$
+o_c\, E = e_c ,
+$$
+
+because the product adds up the rows of $E$ weighted by the entries of
+$o_c$, and only row $c$ has weight 1. An embedding of dimension $k$ is
+therefore exactly a linear layer without bias that takes the one-hot input
+and has $k$ outputs. Nothing is computed differently; the lookup only skips
+multiplying by $|C| - 1$ zeros, and its gradient touches only the rows of the
+values present in the batch.
+
+What the embedding changes is the width. With $k$ columns, the terminal input
+costs $10{,}000 \times k$ parameters plus $k \times 500$ into the hidden
+layer, instead of $10{,}000 \times 500$, and every value is placed in the
+same $k$-dimensional space, where values that the training data treats alike
+end up with similar rows. A common convention sets $k = \lceil \log_2 |C|
+\rceil$, which gives 3 for the weekday and 14 for 10,000 terminals, and
+starts each row with small random values, for instance drawn uniformly from
+$[-0.05, 0.05]$.
+
+<Exercise>
+Use the table in the figure. (a) What vector does a Thursday payment
+contribute? (b) For the 10,000 terminals with $k = 14$ and a hidden layer of
+500 units, count the parameters of the embedding route and of the one-hot
+route into the hidden layer. (c) A terminal first seen in the test week has
+no row learned from data. What does the network do with it, and what does
+that imply for a fraud wave at newly compromised terminals?
+
+<Solution>
+**(a)** $o_{\text{Thu}} E$ is the Thursday row: $(+0.27, -0.10, +0.04)$.
+
+**(b)** Embedding route: $10{,}000 \times 14 = 140{,}000$ table entries plus
+$14 \times 500 = 7{,}000$ first-layer weights, 147,000 in all. One-hot
+route: $10{,}000 \times 500 = 5{,}000{,}000$ weights, about 34 times as many.
+
+**(c)** Encoders reserve an "unknown" row for values not seen in training;
+since no training payment had that value, the row keeps its random starting
+values, so every new terminal gets the same uninformative vector. A wave at
+newly compromised terminals is invisible to the embedding, exactly as it was
+to the identifier lookup table; only features recomputed from the terminal's
+recent labelled history, like the delayed terminal fraud rate, can see it.
+</Solution>
+</Exercise>
+
+### What the terminal and the weekday added on the simulator: nothing
+
+Adding the terminal identifier and the weekday as two embedded inputs,
+dimension 10 each, beside the fifteen numerical inputs, and training with
+Adam and dropout 0.2 on the same training and validation weeks, gave a
+validation loss no better than without them. It is a null
+result, and it has two plain causes. The terminal's fraud history is already
+among the inputs: the delayed terminal fraud rate is <Ref
+lesson="point-in-time-features" id="every-statistic-of-labels-target-encoding">the
+point-in-time target encoding of the terminal identifier</Ref>, so a learned
+terminal vector can only add a memory of which terminals were bad in the
+training week, the lookup table again. The weekday carries nothing because
+the simulator's frauds ignore the calendar: no scenario depends on the day,
+which is also why the weekend flag earned an information value of 0.002 in
+<Ref lesson="scorecards-woe" id="the-simulators-fifteen-inputs">the
+scorecard lesson</Ref>.
+
+Embeddings earn their place where the categories carry signal that no
+aggregate has summarised: on real data with many categorical fields, and in
+the sequence models of a later module, where each past payment of a card
+enters with its own merchant category and country.
+
+## What the tuning costs: 162 networks on four folds
+
+A network has more settings than any tree ensemble, and none of them has a
+library default that comes from fraud data: the 1,000 units, the rate 0.0005,
+the dropout of 0.2 were all choices. They have to be chosen the way <Ref
+lesson="gbm-model-selection"
+id="three-test-numbers-for-one-model-class">the tree-ensemble lesson</Ref>
+chose an ensemble's: candidates validated on four prequential folds, the
+best mean deployed, and every candidate also scored on the four forward test
+weeks to see what the choice cost.
+
+### The grid
+
+The search crossed learning rates 0.0001, 0.0002 and 0.001; batch sizes 64,
+128 and 256; 10, 20 or 40 epochs; dropout 0, 0.2 or 0.4; and one or two
+hidden layers of 500 units: $3 \times 3 \times 3 \times 3 \times 2 = 162$
+candidates, each trained on four folds and again on the four test-week
+training blocks, with Adam. Inside the grid the number of epochs was a
+setting instead of being decided by early stopping, because early stopping
+would need a separate validation week inside each fold's training block.
+The search took 7,350 seconds with ten fits running in parallel, against
+1,251 seconds on a single core for XGBoost's eighteen candidates: six times
+the wall-clock time while using ten times the processors.
+
+<Aside>
+**What the "two hidden layers" setting tested.** In the code behind this
+grid, the second hidden layer was kept in a plain Python list inside the
+PyTorch module. A module registers only layers assigned as modules (or held
+in a `torch.nn.ModuleList`), so the extra layer's weights were never handed
+to the optimiser: they stayed at their random starting values. The
+"two-layer" candidates were one trained layer followed by a fixed random
+layer of 500 ReLU units. Nothing in the scores flags such a bug; counting
+the parameters the optimiser actually holds, `sum(p.numel() for p in
+model.parameters())`, against the architecture on paper does.
+</Aside>
+
+### Batch size and epochs count the same thing
+
+The grid's slices show the settings interacting. At 20 epochs, smaller
+batches gave better average precision and card precision; at 40 epochs, the
+best batch size was larger. The interaction is arithmetic. A training block
+holds about 67,000 payments, so an epoch is about 1,051 updates at batch
+size 64 and 263 at batch size 256. What the network learns depends mostly on
+the number of updates and their size, and an epoch count means four times as
+many updates at batch 64 as at batch 256.
+
+<Exercise>
+(a) How many weight updates do 40 epochs at batch size 256 make on a
+training block of 67,240 payments, and how many epochs at batch size 64 make
+about the same number? (b) The folds' pick for ROC-AUC was learning rate
+0.001, batch 256, 40 epochs, dropout 0.4. Which other candidates in the grid
+make a similar number of updates at the same rate and dropout?
+
+<Solution>
+**(a)** $67{,}240/256 = 262.7$, so 263 batches per epoch and $40 \times 263
+= 10{,}520$ updates. At batch 64, $67{,}240/64 = 1{,}050.6$, so 1,051 batches
+per epoch; $10{,}520 / 1{,}051 \approx 10$ epochs.
+
+**(b)** Batch 64 with 10 epochs (10,510 updates) and batch 128 with 20
+epochs ($526 \times 20 = 10{,}520$). The three are not identical models,
+since a larger batch averages its gradient over more payments and each of
+its steps is less noisy, but the grid's "batch size" and "epochs" are two
+axes along one dimension, the amount of training, which is why their best
+values move together.
+</Solution>
+</Exercise>
+
+### Dropout and epochs move together
+
+The same slices show the trade the dropout section predicted. At learning
+rate 0.001, batches of 64 and 20 epochs, a dropout rate of 0.2 gave better
+validation and test scores than no dropout, and 0.4 gave worse ones. Yet
+the folds' picks for ROC-AUC and average precision, in the table below,
+both use 0.4, with 40 epochs: twice the training let units present in 60%
+of the batches catch up, and the stronger averaging then paid. Read alone,
+the 20-epoch slice would have ruled out the rate the search ended up
+choosing.
+
+### Three numbers for the network
+
+| network on the simulator | ROC-AUC | average precision | $CP@100$ |
+|---|---|---|---|
+| folds' pick (rate/batch/epochs/dropout) | 0.001/256/40/0.4 | 0.001/64/40/0.4 | 0.0002/64/40/0.2 |
+| validation mean | 0.881 | 0.701 | 0.288 |
+| best-estimated (test weeks) | 0.876 ± 0.01 | 0.675 ± 0.01 | 0.303 ± 0.02 |
+| optimal (test weeks) | 0.878 | 0.683 | 0.304 |
+
+The costs of selecting are 0.002, 0.008 and 0.001, each within a test-week
+standard deviation, as they were for the ensembles. There is no default
+row: a network has no setting that would have been used without a search,
+so there is no gain to measure either. The three metrics again pick three different candidates,
+and random search, <Ref lesson="gbm-model-selection"
+id="random-search-on-the-same-grid">which cut XGBoost's bill</Ref> to the
+fraction of candidates drawn, applies here with more to save.
+
+## The verdict, and what a network buys
+
+After the five decisions, the network can be put beside the trees on equal
+terms: the same inputs, the same folds, the same test weeks.
+
+### A tie on the simulator, a loss below the top on real data
+
+<Figure
+  src="./figures/benchmark.svg"
+  alt="Dot plots with one-standard-deviation whiskers for five tuned models, each scored by ROC-AUC, average precision and CP@100 over four test weeks. Simulator row: decision tree 0.797, 0.579, 0.284; logistic regression 0.868, 0.623, 0.297; random forest 0.870, 0.678, 0.299; XGBoost in blue 0.869, 0.687, 0.303; network in amber 0.876, 0.675, 0.303. Real card stream row: decision tree 0.869, 0.068, 0.232; logistic regression 0.816, 0.054, 0.211; random forest 0.912, 0.080, 0.227; XGBoost 0.928, 0.095, 0.235; network 0.894, 0.084, 0.236. The network's and XGBoost's whiskers overlap in every panel except real-stream ROC-AUC"
+  caption="At the budget of a hundred cards the network ties the ensembles on both streams; below the top, on real data, it trails XGBoost."
+/>
+
+On the simulator the network's ROC-AUC (0.876) is 0.007 above XGBoost's,
+inside both standard deviations; its average precision (0.675) is 0.012
+below, about one standard deviation; its card precision equals XGBoost's,
+0.303. On the real Belgian stream, searched over a smaller grid with the
+same geometry as <Ref lesson="gbm-model-selection"
+id="the-four-searches-on-the-real-stream">the four searches on the real
+stream</Ref> (hidden layers of 500 units, dropout 0 or 0.2, rate 0.001 or
+0.0001, 5, 10 or 20 epochs, batches of 64, 128 or 256: 36 candidates), the
+network finds 23.6 compromised cards a day in its top hundred against
+XGBoost's 23.5 and the depth-6 tree's 23.2, all inside weekly standard
+deviations of four to seven cards. Below the top it loses: ROC-AUC 0.894
+against 0.928, average precision 0.084 against 0.095, level with the random
+forest (0.912 and 0.080).
+
+<KeyFact>
+Tuning brings the network level with the best tree ensemble exactly where
+the bank works, the hundred cards a day, and nowhere better; below the top
+on real payments it trails, and its search costs several times the compute.
+Accuracy on a static table is therefore no reason to choose it.
+</KeyFact>
+
+A familiar expectation is that a neural network, being the more flexible
+model, should beat trees once it is tuned. On these tables it does not, and
+the reason is in the tables themselves. The fifteen inputs are already the
+summaries that make fraud visible: the terminal's recent fraud rate, the
+card's recent counts and amounts. What remains is to cut and combine a
+handful of strong, unevenly scaled inputs, which a tree does with one
+threshold per question, and a network has to approximate by summing smooth
+hinges fitted with gradient steps. Flexibility that the data does not
+demand buys nothing, and on real data, where the signal is weaker and the
+noise larger, the ensemble's lead in the ranking below the top is the
+measurable difference.
+
+### Four things that come naturally to a network
+
+If not accuracy, then what? Each of the four answers below is something a
+tree ensemble can approach only by a costlier or more roundabout route,
+while for a network it follows from being a fixed set of weights trained by
+gradient steps.
+
+**Updating the same model.** Both kinds of model can learn from the newest
+labelled day without the nightly rebuild of <Ref lesson="fraud-detection-system"
+id="how-often-the-model-changes-a-nightly-retrain-beside-hand-edited-rules">the
+system lesson</Ref>. A boosted ensemble does it by appending trees fitted to
+the current ensemble's errors on that day; the trees already there keep the
+splits they chose on older data, and the ensemble grows with every update.
+A network continues its gradient steps on the same weights, which carry
+everything it learned before and can all move; the model stays the same
+size. Either route spares the bank from rereading months of raw payments,
+which data-protection law limits how long it may store. <Ref
+lesson="stream-learning-and-adaptation">Stream learning and adaptation</Ref>
+takes up what such updating does to a model when the stream drifts.
+
+**Learning its own inputs.** The fifteen inputs were built by hand: someone
+chose the windows, the entities and the statistics. A network can take the
+card's last payments as raw input, learn its own summary of them and train
+that summary and the classifier by one loss, end to end, because the
+gradient passes back through every layer to the raw fields. A tree's split
+is a hard threshold with no gradient to pass back, so in front of a tree
+ensemble the summary has to be built separately. <Ref
+lesson="sequence-models-for-transactions">Sequence models over an entity's
+transactions</Ref> tries it, against the hand-built aggregates.
+
+<Figure
+  src="./figures/four-reasons.svg"
+  alt="Four panels. 1, update the same model: days t minus 2, t minus 1 and t, with day t feeding a few steps into the weights; a network continues gradient steps on the same weights and stays the same size, while a boosted ensemble appends new trees and leaves the old splits as they were. 2, learn from raw sequences: five raw payments p1 to p5 feed a learned summary trained together with the classifier, in place of hand-built 1, 7 and 30-day windows; a tree's split passes no gradient back. 3, average weights across banks: banks A, B and C send weights to a mean of weights; same architecture, local data, only the weights travel, while federated trees exchange split statistics as each tree is built. 4, a partner unlike the trees: XGBoost and a network feed an average of scores; a different kind of model, partly different frauds"
+  caption="What a network makes cheap or direct beside a tree ensemble; none of the four is accuracy on a static table."
+/>
+
+**Averaging across institutions.** Banks cannot pool their payment logs. If
+each starts from one shared network, trains it on its own data and sends
+back only the weights, the weights can be averaged into a model none of them
+could have trained alone (the scheme is called federated averaging). A
+weighted average of networks with the same architecture is again a network
+of that architecture; an average of two trees' split thresholds is not a
+tree that either bank's data chose. Boosted trees can be trained across
+banks too, but the banks then have to take part in building each tree,
+exchanging statistics of the candidate splits as it is grown, where the
+network's banks exchange finished weights once per round.
+
+**A partner unlike the trees.** Two models with the same card precision need
+not find the same cards, and an average of two scores beats both only when
+their mistakes differ. Two tree ensembles fitted to the same fifteen inputs
+tend to cut on the same strong inputs and flag the same cards; a network
+fits a smooth surface by gradient steps, a different route to the same
+target, so it is a likelier source of different mistakes. None of the four
+is measured here; they are the reasons the bank pays for the search, not
+results.
+
+## ★ Imbalance levers inside the loss
+
+Every network above was trained on the stream's own class mix. The levers
+of <Ref lesson="imbalance-techniques-revisited"
+id="why-every-remedy-moves-the-boundary-the-same-way">the imbalance
+lesson</Ref> have direct network forms. A *weighted cross-entropy* multiplies
+the fraud rows' loss by a weight $\omega$: the class weight, with the same
+effect of moving the boundary into the genuine payments. A *balanced
+sampler* builds each batch with equal numbers of frauds and genuine
+payments, which is undersampling done batch by batch; the outputs then
+estimate the fraud share of the balanced batches and need the keep-rate
+correction before any rule reads them as probabilities. *Focal loss*
+multiplies each row's cross-entropy by $(1 - p_t)^\gamma$, where $p_t$ is the
+probability given to the row's true class, so that rows already classified
+confidently, almost all of them genuine, contribute little. None of these
+was run on the simulator here, and the imbalance lesson's finding, that the
+best setting for average precision and card precision is no or the mildest
+rebalancing, gives no reason to expect more from them than from the trees'
+versions.
+
+One more implementation detail: wrappers that make a PyTorch network behave
+like a scikit-learn classifier, such as [skorch](https://skorch.readthedocs.io/),
+expect two outputs with a softmax, one probability per class. A softmax over
+two outputs $z_1, z_0$ gives $P(\text{fraud}) = \sigma(z_1 - z_0)$, so the
+two-output network is the one-output network with a redundant parameter, and
+its cross-entropy is the same loss.
+
+<Conclusion>
+You can now train a feed-forward network on transaction features and say
+why each of its parts is there: a sigmoid output with
+cross-entropy because the cost rule needs a probability and cross-entropy's
+minimiser is the fraud share; early stopping with patience on a validation
+week, with the best weights restored, because training loss keeps falling
+long after held-out loss has stopped; Adam because its steps do not shrink
+with the tiny gradients of a table that is 99% confidently genuine;
+standardised inputs, fitted on the training block, because a first-layer
+gradient is proportional to the input it multiplies; dropout and the number
+of epochs searched together, and embeddings for categories that no
+aggregate has summarised. Tuned on the same folds, the network ties tuned
+XGBoost at the hundred-card budget on the simulator and on real data and
+trails it below the top on real payments, at several times the compute. The
+reasons to train it are what it makes cheap beside the trees: continuing to
+train the same weights, learned representations, weight averaging across
+banks and a different kind of mistake to average with.
+
+The comparison so far has been five model classes, one at a time. <Ref
+lesson="worldline-model-comparison">Eight models on Worldline data</Ref> puts
+eight families, sequence networks included, through one experiment on real
+card payments, where three metrics crown three different winners, and asks
+what in the validation design and the compute produces that.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+A bank scores each payment within its authorisation deadline. Compare the
+cost of one prediction for (a) a network with 15 inputs, one hidden layer of
+500 units and one output; (b) the same network with a second hidden layer of
+500 units; (c) a depth-6 decision tree; (d) XGBoost with 100 trees of depth
+3. Count parameters for (a) and (b) and multiply-adds or comparisons for
+all four. Where, then, does the network's extra cost lie?
+
+<Solution>
+**(a)** Into the hidden layer, $15 \times 500 = 7{,}500$ weights and 500
+biases; out of it, 500 weights and 1 bias: 8,501 parameters. A prediction
+takes $7{,}500 + 500 = 8{,}000$ multiply-adds, 500 ReLUs and one sigmoid.
+
+**(b)** A second layer adds $500 \times 500 + 500 = 250{,}500$ parameters,
+259,001 in all, and $250{,}000$ more multiply-adds: about 258,000 per
+prediction.
+
+**(c)** A depth-6 tree compares at most 6 values per prediction.
+
+**(d)** 100 trees of depth 3: at most 300 comparisons and 100 additions.
+
+Even (b) is a quarter of a million operations, well under a millisecond on
+one core, so the deadline is not where the network costs more. The cost is
+in training: hundreds of gradient steps per epoch, epochs searched or
+stopped by a rule, and a grid of 162 candidates on four folds, against
+trees whose fits take seconds and whose defaults sit on a plateau.
+</Solution>
+</Exercise>
+
+<Exercise>
+Push dropout to its edges on the 500-unit network trained for 20 epochs at
+learning rate 0.001. (a) At $p = 0.9$, about how many units does each batch
+train, how often is a given unit updated, and what do you predict for the
+training and validation losses after 20 epochs? (b) At $p = 0$, what do you
+predict if the network is instead trained for 200 epochs without early
+stopping? (c) Which hypothesis of the "ensemble inside one network" picture
+fails at each edge?
+
+<Solution>
+**(a)** Each batch keeps about $0.1 \times 500 = 50$ units, and a given unit
+is present in about one batch in ten, so in 20 epochs it receives the
+updates of about 2 epochs. The surviving outputs are multiplied by
+$1/(1-0.9) = 10$, so each batch's sub-network is a small, very noisy one.
+Prediction: both losses stay high and fall slowly; the network underfits.
+Training loss stays close to validation loss, because there is too little
+fitting for either to separate them.
+
+**(b)** With every unit present at every step, nothing stops units from
+specialising on single training frauds. Prediction: training loss keeps
+falling for the 200 epochs, as in the first run's curve, while validation
+loss reaches its level within the first tens of epochs and then drifts
+upward; the model at epoch 200 is worse on held-out weeks than the one at
+the best epoch.
+
+**(c)** The picture needs sub-networks that are each good enough to be worth
+averaging, and enough of them to average. At $p = 0.9$ the first hypothesis
+fails: fifty-unit networks trained on a tenth of the steps are each too weak,
+and averaging weak models cannot add the detail every one of them lacks, the
+forest of depth-5 trees again. At $p = 0$ the second fails: there is one
+network, not many, so nothing averages out what it memorises. This is why
+the grid includes 0 and why a rate of 0.4 was only competitive with 40
+epochs.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague writes: "Standardising the inputs cannot matter for a network.
+The first layer computes $\sum_i w_{ij} x_i + b_j$, and if $x_i$ is
+replaced by $(x_i - \mu_i)/s_i$, the weights $w_{ij} s_i$ and a shifted
+bias give exactly the same function. Whatever the network can learn from
+standardised inputs, it can learn from raw ones." Say which part is true,
+and name the step that fails.
+
+<Solution>
+The first part is true: for every network on standardised inputs there is a
+network on raw inputs computing the same function, with weights
+$w_{ij}/s_i$ and bias $b_j - \sum_i w_{ij}\mu_i/s_i$. The set of functions
+the network can represent is unchanged.
+
+The failing step is "it can learn", which is a claim about the training
+procedure, not about the set of functions. Training moves each weight by
+the learning rate times its gradient, and the gradient on $w_{ij}$ is
+$\delta_j x_i$, proportional to the raw input. On the simulator the inputs'
+standard deviations differ by a factor of about 800 and their mean squares
+by more than a million, so the loss is steep along the weights of large
+inputs and nearly flat along those of the terminal fraud rates. One
+learning rate cannot suit both: large enough to move the fraud-rate weights,
+it makes the count and amount weights overshoot and diverge; small enough
+for those, it leaves the fraud-rate weights almost where they started. The
+measured consequence: without scaling the rate had to be cut from 0.0005 to
+0.0001, and the losses still settled at worse levels. The equivalent raw-input
+network exists; gradient descent at a usable rate does not find it in the
+same number of steps.
+</Solution>
+</Exercise>
+
+<Exercise>
+An embedding of dimension $k$ for a categorical input with values $C$ is
+followed by the first layer, whose weights from the embedding form a $k
+\times h$ matrix $W$. (a) Show that, for this input, the composition
+computes $o_c M$ for one $|C| \times h$ matrix $M$ of rank at most $k$, and
+that every such matrix arises this way. (b) What does the rank constraint
+buy, and what does it cost, for the terminal input with $|C| = 10{,}000$,
+$k = 14$ and $h = 500$?
+
+<Solution>
+**(a)** The embedding gives $e_c = o_c E$ with $E$ of size $|C| \times k$,
+and the first layer adds $e_c W = o_c (E W)$ to its weighted sums. So the
+input contributes $o_c M$ with $M = EW$, a $|C| \times h$ matrix. Since
+$\operatorname{rank}(EW) \le \min(\operatorname{rank} E, \operatorname{rank}
+W) \le k$, the rank of $M$ is at most $k$. Conversely, any $|C| \times h$
+matrix $M$ of rank at most $k$ factors as $M = EW$ with $E$ of size
+$|C| \times k$ and $W$ of size $k \times h$ (take $E$ as $k$ columns spanning
+the column space of $M$, padded with zero columns if the rank is below $k$,
+and $W$ as the coefficients expressing $M$'s columns in them). So the
+embedding route computes exactly the one-hot first layers whose weight
+matrix has rank at most $k$.
+
+**(b)** It buys parameters and sharing. A full one-hot layer has
+$10{,}000 \times 500 = 5$ million weights; the factored one has
+$140{,}000 + 7{,}000 = 147{,}000$. And because every terminal's 500 weights
+must be combinations of the same 14 rows of $W$, a terminal with few payments
+borrows structure from terminals the data treats alike, where in a full
+one-hot layer its 500 weights would be fitted from its own seven or so
+payments of the week. The cost is expressiveness: if the terminals' effects on the 500
+hidden units truly needed more than 14 independent directions, the embedding
+could not represent them. With $k = \lceil\log_2 10{,}000\rceil = 14$ the
+convention bets that they do not.
+</Solution>
+</Exercise>
+
+<Exercise>
+The fourth reason to train a network was diversity: tuned XGBoost and the
+tuned network tie on card precision on the simulator (0.303 each), and might
+still catch different cards. Design the backtest that would decide whether
+averaging the two beats both, using only the simulator's four prequential
+folds and four forward test weeks. Say (a) what to measure first, before any
+averaging; (b) how to combine the two scores, given that the network's
+outputs and XGBoost's may not be calibrated alike; (c) how the combination's
+weight is chosen without touching the test weeks; (d) what result would count
+as a gain.
+
+<Solution>
+**(a)** Overlap. For each test day, take the two models' top-100 cards and
+count the cards in both, and among each day's detected compromised cards,
+how many each model found alone. If the two lists share nearly all their
+detected cards, averaging cannot find more; if each finds several cards a
+day the other misses, there is something to combine.
+
+**(b)** Average ranks instead of probabilities: replace each model's score
+by its rank among the day's payments (or the fraction of payments it beats)
+and take $\lambda\,r_{\text{XGB}} + (1-\lambda)\,r_{\text{NN}}$. Ranks are
+insensitive to calibration; an average of probabilities would let the model
+with the more spread-out scores dominate. Card precision depends only on the
+order, so nothing is lost.
+
+**(c)** Treat $\lambda$ as a setting, with candidates such as 0, 0.25, 0.5,
+0.75 and 1 (the two endpoints are the single models). Fit both models on
+each fold's training block, combine their validation-week scores, and pick
+the $\lambda$ with the best mean card precision over the four folds, exactly
+as any other setting. Then refit on the test-week training blocks and score
+the chosen $\lambda$ on the four test weeks.
+
+**(d)** Compare the combination with the better single model week by week,
+on the same weeks, so that the variation each week brings cancels in the
+difference. A gain counts if the mean paired difference exceeds both <Ref lesson="alert-budget-metrics"
+id="what-each-disagreement-means">the two-cards-a-day noise line</Ref> and about two standard errors of the
+weekly differences; with four weeks and a paired standard deviation near
+0.02, that means a difference of roughly 0.02, two cards a day. Smaller
+improvements may be real but cannot be told from week-to-week noise with
+four weeks.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague trains the 500-unit network with a balanced sampler: every
+batch holds as many frauds as genuine payments, drawn from the simulator's
+training week of 67,240 payments with 598 frauds. (a) What keep rate
+$\beta$ does this correspond to? (b) Turn outputs of 0.5 and 0.95 into
+probabilities on the stream. (c) With an alert costing €5, which of the two
+payments does the cost rule flag if each is a €200 payment, before and after
+the correction? (d) Does the correction change the network's card precision
+at 100?
+
+<Solution>
+**(a)** A balanced batch has training odds of fraud 1:1. The keep rate is
+the stream's odds divided by the training odds: $598 / 66{,}642 = 0.00897$,
+so $\beta \approx 0.009$.
+
+**(b)** With $p' = \beta p_s / (\beta p_s - p_s + 1)$:
+for $p_s = 0.5$, $p' = 0.0045 / (0.0045 + 0.5) = 0.0089$;
+for $p_s = 0.95$, $p' = 0.00855 / (0.00855 + 0.05) = 0.146$.
+
+**(c)** The rule flags when $C_a \le \mathrm{Amt}\cdot p$, here when
+$p \ge 5/200 = 0.025$. Read raw, both outputs (0.5 and 0.95) clear the cut
+and both payments are flagged. Corrected, the first is 0.0089 and is not
+flagged; the second is 0.146 and is. The raw reading overstates every
+probability by the factor that <Ref lesson="undersampling-calibration"
+id="two-tasks-with-the-same-β">the undersampling lesson</Ref> located below
+the bias peak, close to $1/\beta$ for small $p$.
+
+**(d)** No. The correction is strictly increasing, so the order of the
+day's payments, the top hundred cards and the card precision are unchanged.
+What changes is every decision that reads the probability's value.
+</Solution>
+</Exercise>
+
+<Exercise>
+Drop the fifteen engineered inputs. For each payment, build an input vector
+by concatenating the raw fields of the card's last five payments before it
+(amount, time since the previous payment, terminal fraud rate as of that
+payment) with the current payment's own, 18 numbers, and train the same
+500-unit network. (a) How many first-layer weights does the network spend on
+"the amount of the payment three steps back"? (b) A card's burst can start
+at any position in its last five payments. What does the network have to
+learn to recognise a burst wherever it starts? (c) A card with only two
+earlier payments: what goes in the empty slots, and what does the network
+learn from that? (d) What kind of model removes these three problems?
+
+<Solution>
+**(a)** 500 weights, one per hidden unit, for that one slot; and another
+500 for the amount two steps back, and so on. The network treats "amount
+three steps back" and "amount two steps back" as unrelated inputs.
+
+**(b)** A burst, several payments minutes apart, shows up as short
+time gaps in positions 1–2, or 2–3, or 3–4. With separate weights per
+position, the network must learn the pattern separately at each position
+it can occur in, from the frauds that happen to show it there; nothing
+carries what was learned at position 2 over to position 4.
+
+**(c)** Padding values, typically zeros, which the network cannot tell from
+real zero-amount payments unless a separate indicator says the slot is
+empty; and the number of filled slots becomes a feature the network can
+learn from (new cards look different), whether or not that is wanted.
+
+**(d)** A model that applies the same weights to every position and reads
+the payments in order, so that a pattern learned at one position is
+recognised at any other and a sequence of any length can be read: a
+convolution over the sequence or a recurrent network. That is the problem
+<Ref lesson="sequence-models-for-transactions">sequence models over an
+entity's transactions</Ref> takes up, together with the question of whether
+the raw sequence finds anything the hand-built aggregates do not.
+</Solution>
+</Exercise>
+
+<References>
+1. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 7, section "Introduction" (incremental learning, representation learning and end-to-end training, federated learning, an additional model for stacking); Ch. 7, section "Feed-forward neural network" (the sigmoid-output network and binary cross-entropy, the 150-epoch SGD run and its 851 s, the first-shot test-week scores, early stopping with patience and the unsaved best checkpoint, SGD against Adam at learning rate 0.0005, dropout, the scaling experiment and log1p, embeddings as a linear layer on the one-hot input and the terminal/weekday result, ensembles, the 162-candidate prequential grid search with skorch in 7,350 s and its interactions, the benchmark summary against Chapter 5's models, weighted BCE, focal loss and balanced samplers); Ch. 7, section "Real-world data" (the feed-forward network's grid and scores on Worldline transactions). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+2. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015 — Ch. 4, section "Neural Networks", pp. 144–149 (logistic regression as a one-neuron network; one hidden layer as a universal approximator; standardising inputs; choosing the number of hidden neurons on a validation set, typically 6 to 12 in fraud; a validation set to stop training; weight regularisation).
+3. J. Jurgovsky, M. Granitzer, K. Ziegler, S. Calabretto, P.-E. Portier, L. He-Guelton, O. Caelen, "Sequence Classification for Credit-Card Fraud Detection," *Expert Systems with Applications* 100, 2018, pp. 234–245 — Sec. 4.2 (embeddings of categorical variables, dimension ⌈log₂|C|⌉, initialisation from U[−0.05, 0.05]); Sec. 6.1 (dropout for predictions that stay valid over the following days, ℓ2 against ℓ1 penalties, Adam against plain SGD, gradient methods for online updating). https://doi.org/10.1016/j.eswa.2018.01.037
+4. D. P. Kingma, J. Ba, "Adam: A Method for Stochastic Optimization," *International Conference on Learning Representations*, 2015 — Algorithm 1 (moment estimates, bias correction and the per-parameter step). https://arxiv.org/abs/1412.6980
+5. N. Srivastava, G. Hinton, A. Krizhevsky, I. Sutskever, R. Salakhutdinov, "Dropout: A Simple Way to Prevent Neural Networks from Overfitting," *Journal of Machine Learning Research* 15, 2014, pp. 1929–1958 — Secs. 1–4 (dropping units at random, sub-networks sharing weights, scaling at test time as approximate model averaging). https://jmlr.org/papers/v15/srivastava14a.html
+6. K. Hornik, M. Stinchcombe, H. White, "Multilayer Feedforward Networks Are Universal Approximators," *Neural Networks* 2(5), 1989, pp. 359–366. https://doi.org/10.1016/0893-6080(89)90020-8
+7. C. Guo, F. Berkhahn, "Entity Embeddings of Categorical Variables," arXiv:1604.06737, 2016 — Sec. 3 (an embedding as a fully connected layer on the one-hot input). https://arxiv.org/abs/1604.06737
+8. H. B. McMahan, E. Moore, D. Ramage, S. Hampson, B. Agüera y Arcas, "Communication-Efficient Learning of Deep Networks from Decentralized Data," *Proceedings of AISTATS*, PMLR 54, 2017, pp. 1273–1282 — the federated averaging algorithm. https://proceedings.mlr.press/v54/mcmahan17a.html
+</References>
