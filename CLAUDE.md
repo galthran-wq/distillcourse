@@ -174,6 +174,20 @@ Rules that override defaults:
   — React runs a transition only for a commit that holds one, so this is what
   makes the turn happen at all — and `::view-transition-*` rules keyed on the
   type a `<Link transitionTypes>` sets.
+- Readers' problem reports reach us through the tutor, not GitHub: when it
+  concludes the material itself is at fault it calls
+  `report_content_incident`, which writes a row to `incidents` in the
+  production database (locator `lesson:<course>/<slug>#<anchor>`, kind
+  `error|unclear|other`, a one-paragraph summary). Nothing in the app reads
+  that table; it is triaged by hand. When asked about "an issue from the
+  agent" or reader feedback, read the open ones on the deploy host:
+  `docker compose exec -T db psql -U postgres -d distillcourse -x -c
+  "SELECT id, locator, kind, summary, created_at FROM incidents WHERE
+  status = 'open' ORDER BY created_at"`. Fix the lesson on its course
+  branch; a report that shows a class of defect becomes a constitution
+  rule and a QA item (`docs/pedagogy.md`, `course-qa/rubric.md`), not only
+  a one-off edit. Once the fix is deployed, `UPDATE incidents SET status =
+  'resolved' WHERE id = '<id>'`.
 - Code style is binding for ALL code in this repo:
   `.claude/skills/impl-review/style.md` — simplicity above all, WHY-comments
   only, grep before writing (no duplicated functionality), domain-separated

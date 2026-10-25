@@ -91,6 +91,17 @@ only by someone who already knows the material.
   delete every sentence whose deletion loses no idea, number or step. A
   lesson that can lose a fifth of its words that way was too long; length
   is earned by content, never by restatement.
+  (g) **Every quoted result has a setup the reader has seen.** A number
+  from a fitted model or an experiment — a test-week AP, a tree's AUC, a
+  benchmark table — is quoted only once the reader knows what was fitted,
+  on what data, split how, and scored how. Either this lesson sets it up
+  where the number first appears (one or two sentences: the models, the
+  training and test periods, what was measured), or an earlier lesson did
+  and a `<Ref>` points there. A result whose experiment a *later* lesson
+  sets up is not borrowed ahead of it: set up the part this lesson needs,
+  or leave the number out. "The depth-2 tree scores 0.496" with no tree
+  ever fitted in front of the reader is a required fix, however correct
+  the number.
 - **L1 — One objective.** Exactly one `goal` per lesson, starting with a Bloom
   verb ("Compute…", "Explain…", "Construct…"). If a draft teaches two things,
   split it.

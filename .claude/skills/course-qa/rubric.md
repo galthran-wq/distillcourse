@@ -52,6 +52,12 @@ how easily they would master what it presents.
   every preview of what a later section will show. Name the sections that
   could lose a fifth of their words without losing an idea. The closing
   must be a `<Conclusion>` before `## Exercises`, and the only summary.
+- **U9 (required)**: every quoted result has a setup the reader has
+  seen (L0g). For each number from a fitted model or an experiment, find
+  where the reader learned what was fitted, on what data and split, and
+  how it was scored — in this lesson before the number, or in an earlier
+  lesson the text `<Ref>`s. Quote every result with no such setup, and
+  every one whose setup only a later lesson gives.
 - **U5 (advisory)**: length is judged by need, not by the clock: an hour
   to an hour and a half is fine when every part is needed; name any
   section the newcomer would not miss, and flag a lesson carrying two

@@ -17,6 +17,11 @@ Report PASS/FAIL for each, with a quoted line as evidence where sensible.
    tightening pass done; the closing is a `<Conclusion>` before
    `## Exercises` and the only summary?
 
+0d. Every quoted result (a model's AUC, AP, a benchmark row) comes after
+   the reader has been told what was fitted, on what data and split, and
+   how it was scored — here or in an earlier lesson that a `<Ref>` names;
+   nothing borrowed from an experiment a later lesson sets up (L0g)?
+
 ## Structure (validator also checks the mechanical parts)
 1. Opens with the opening statement verbatim, and it is the PROBLEM in
    plain words — not the lesson's conclusion compressed; nothing after it
