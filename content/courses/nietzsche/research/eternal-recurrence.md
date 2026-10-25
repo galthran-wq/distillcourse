@@ -1,0 +1,108 @@
+# Research brief: eternal-recurrence (Eternal recurrence as a test)
+
+status: planned
+module: affirmation (7 of 9), lesson 34 of 45
+type: core
+goal: Analyze eternal recurrence as a test of affirmation and evaluate rival accounts of what passing it requires
+
+## ARC (L10)
+- **Spine step (11, "Saying yes"):** "The reply to nihilism is affirmation: loving what is necessary, tested by the demon's offer to live this life again forever, a test whose force does not depend on the physics; a self that can pass it is achieved, not given, by giving style to one's drives, and Ecce Homo is Nietzsche putting his own life to the test"
+- **Inherits:** from amor-fati, the love of the necessary with its unstated holism and the forward exercise asking for a measure; from nihilism, the "In vain!" the Lenzer Heide note sets the thought against; from nietzsche-life-and-books, books before notebooks (the notes say what the books only ask).
+- **Contributes:** GS 341 as a conditional measuring one's disposition to one's whole life; why no indifferent answer; why recurrence rather than one replay; Zarathustra's crisis as illustration of the cost (the small man recurs); the fork among readings; the atrocity and emptiness objections with his replies and the plain sentence where the first keeps its force. Introduces eternal-recurrence.
+- **Hands off:** to recurrence-as-cosmology (extra): whether he believed it literally and tried to prove it. To becoming-who-you-are (next core): a self that could answer "you are a god" is made, not given. To overman-and-last-man (module 8): the type who bears the recurrence of the small man (Z III 13; EH III Z 6).
+
+## STANCE (binding)
+- **Favorable:** a doctrine of another life had made this one bearable; Nietzsche built the one device that does the same work with no other life in it, an eternity made of this life repeated, so every flight to elsewhere is closed and the only question left is whether one can want this. The lesson shows the force of the construction from inside (GS 285's lake; GS 341) before any physics.
+- **Hard passages this lesson must quote whole:** Z III 13 §2 (pp.330-333, zarathustra-full.txt lines 7995-8066): "At tragedies, bullfights, and crucifixions he has so far felt best on earth; and when he invented hell for himself, behold, that was his heaven on earth"; "man is the cruelest animal"; "Eternally recurs the man of whom you are weary, the small man"; "the eternal recurrence even of the smallest — that was my disgust with all existence". GM I 12 (pp.43-44, genealogy--text.txt): "We are weary of man." Notebook 5[71] sec. 13-15 (Bittner pp.120-121, unpublished, Lenzer Heide 10 June 1887): the thought "a curse" for the unhealthy; "the strongest are the most moderate".
+- **What the words meant:** "the small man" (Z III 13): the last man of the Prologue, comfortable, levelled, unable to despise himself; named with contempt, and the contempt is part of the doctrine (affirmation must include what one despises). "Weight" (das grösste Schwergewicht; Kaufmann "greatest weight", the Portable "greatest stress"): what gives acts gravity against the weightlessness of nihilism. "Nihilism" (5[71]): the thought "in its most terrible form", existence "without meaning or goal, but inevitably recurring"; first a deepening of nihilism, turned over only by a strength that can bear it.
+- **Objection answered from his side:** the atrocity objection: to say yes to the demon is to will the return of every horror in history. Reply, texts first: GS 341 asks about "this life as you now live it and have lived it", one's own life and its conditions, not a vote on each event; the affirmation is of the whole as necessary ("Errors" 8; EH III BT 2), not approval of each part; Z III 13 makes the affirmation precisely of what nauseates, so the objection names what the thought is built to cost. Gap sentence: holism makes the horrors part of what is willed, and the texts give no account on which willing their return is other than willing them; the objection retains force there.
+- **Humanizing reading to test:** (a) the thought as a quasi-Kantian imperative for particular acts; Kaufmann rejects it and the text agrees (a disposition toward a life; the question "lies upon your actions as the greatest weight" as weight, not rule). (b) The thought as a psychological test and nothing more; the text is less tidy: BGE 56 calls the man who wants it "da capo" an ideal, "circulus vitiosus deus"; TI "Ancients" 5 signs "the teacher of the eternal recurrence"; EH III Z 1 calls it an "idea" and "the highest formula of affirmation that is at all attainable"; EH III BT 3 says Heraclitus may have taught it. The lesson keeps the test's force independent of the physics (spine) and says Nietzsche did not keep the two apart.
+- **Facts against the popular image:** none in this lesson's texts.
+
+## Primary passages (exact)
+- GS 341 (pp.273-274) — gayscience-s2-bk4-bk5-appendix.txt lines 2192-2215 — "The greatest weight. — What, if some day or night a demon were to steal after you into your loneliest loneliness and say to you: 'This life as you now live it and have lived it, you will have to live once more and innumerable times more; and there will be nothing new in it, but every pain and every joy and every thought and sigh ... in the same succession and sequence — even this spider and this moonlight between the trees, and even this moment and I myself. The eternal hourglass of existence is turned upside down again and again, and you with it, speck of dust!' Would you not throw yourself down and gnash your teeth and curse the demon who spoke thus? Or have you once experienced a tremendous moment when you would have answered him: 'You are a god and never have I heard anything more divine.' If this thought gained possession of you, it would change you as you are or perhaps crush you. The question in each and every thing, 'Do you desire this once more and innumerable times more?' would lie upon your actions as the greatest weight. Or how well disposed would you have to become to yourself and to life to crave nothing more fervently than this ultimate eternal confirmation and seal?" — read from text; Kaufmann n.71. The Portable (portable-early.txt lines 3894-3916) has "The greatest stress"; quote the Vintage.
+- GS 285 (pp.229-230) — same file lines 345-360 — first appearance: "you will the eternal recurrence of war and peace" (Kaufmann n.13: "This is how Nietzsche first introduces his concept"); the lake that "ceased to permit itself to flow off" and rises "as soon as he ceases to flow out into a god" — read from text.
+- GS 342 (pp.274-275, "Incipit tragoedia", Zarathustra begins) — same file — read from text.
+- GS 109 (pp.167-169, line 6831, the "musical box" that "repeats eternally its tune"; "there are only necessities"; Kaufmann n.2) and GS 233 (pp.212-213, line 8667, "What I do or do not do now is as important for everything that is yet to come as is the greatest event of the past"; n.60) — gayscience-s1-intro-books1-3.txt — read from text.
+- Kaufmann, GS Introduction 4-5 (pp.13-19) — same file — recurrence alluded to in 109, 233, 285 before 341; "the doctrine is not proclaimed even here"; Heine's formulation (p.16); the four-point reading (pp.15-19); the notebook line "I do not want life again. How did I endure it? Creating" (p.19, Musarion XIV 121) — secondary within the edition.
+- Z II 20 (pp.249-253) — zarathustra-full.txt lines 5142-5213 — "The will cannot will backwards"; revenge "the will's ill will against time and its 'it was'"; "Who could teach him also to will backwards?" — illustration. Z II 22 (pp.257-259), the stillest hour — illustration.
+- Z III 2 §1-2 (pp.267-272) — same file lines 5825-5900 — the gateway Moment; "are not all things knotted together so firmly that this moment draws after it all that is to come?"; the shepherd who bites off the snake's head and rises "no longer shepherd, no longer human — one changed, radiant, laughing"; §1 "Was that life? Well then! Once more!" — illustration; read from text. Not identified as the small man in III 2.
+- Z III 13 §1-2 (pp.327-333) — same file lines 7995-8066 — "that monster crawled down my throat and suffocated me. But I bit off its head and spewed it out" (the identification); the animals' wheel of being, "a hurdy-gurdy song" (pp.330, 332); "Eternally recurs the man of whom you are weary, the small man"; "I come back eternally to this same, selfsame life" (the animals' words for him) — illustration; read from text.
+- Z III 15 §2-3, III 16 (pp.338-343, "But all joy wants eternity"; "the ring of recurrence ... I love you, O eternity") and IV 19 §1, 9-12 (pp.429-436, lines 11653-11849, "Was that life? For Zarathustra's sake! Well then! Once more!"; "Have you ever said Yes to a single joy? O my friends, then you said Yes too to all woe. All things are entangled, ensnared, enamored; if ever you wanted one thing twice ... then you wanted all back") — same file — illustration; read from text.
+- EH III Z 1 (pp.295-296) — eccehomo-full.txt line 3545 — "the idea of the eternal recurrence, this highest formula of affirmation that is at all attainable, belongs in August 1881"; "6000 feet beyond man and time"; the pyramidal rock near Surlei (Kaufmann n.1 p.295 corrects the rock usually pictured); GS 341 named as "the basic idea of Zarathustra" (p.296) — read from text. EH III Z 6 (p.306, the "most abysmal idea" is "one reason more for being himself the eternal Yes"); III BT 3 (pp.273-274, Heraclitus, the Stoa); II 10 (p.258) — read from text.
+- BGE 56 — bge-zimmern.txt lines 1715-1732; bge-german.txt lines 1974-1982 — the "world-affirming man" who wants it "as it was and is, to all eternity, insatiably calling da capo"; "circulus vitiosus deus"; the only BGE passage; "Wiederkunft" does not occur. German "so wie es war und ist, wieder haben will, in alle Ewigkeit hinaus, unersättlich da capo rufend" — verify against eKGWB JGB-56.
+- HL (UM II) 1 — early-hl-se.txt lines 182-183 — "whoever asks his friends whether they would live the last ten or twenty years over again, will easily see which of them is born for the 'super-historical standpoint'" (Collins; 1874, the proto-test with the opposite valuation) — read from text.
+- TI "What I Owe to the Ancients" 5 (p.563) — portable-late.txt line 4595 — "I, the last disciple of the philosopher Dionysus — I, the teacher of the eternal recurrence" — read from text.
+- Notebook 5[71] sec. 6-8, 13-15 (pp.118-121) — latenotebooks-full.txt lines 6231-6468 — "Let us think this thought in its most terrible form: existence as it is, without meaning or goal, but inevitably recurring, without any finale into nothingness: eternal recurrence. That is the most extreme form of nihilism"; "the most scientific of all possible hypotheses"; "a curse"; "What would such a man think of eternal recurrence?" — unpublished, Lenzer Heide 10 June 1887, Bittner pp.116-121.
+- Notebooks 7[38] (pp.135-136), 10[3] (p.173), 7[54] (p.138, "To imprint upon becoming the character of being — that is the highest will to power"), 14[89] (p.250) — same file — unpublished, Bittner pages as given.
+
+## Secondary (References only)
+- Nehamas, Nietzsche: Life as Literature, Ch. 5 pp.141-169 ("not a theory of the world but a view of the self"; conditionals (C), (C'); no indifference; redemption by recontextualizing; Proust); nietzschelif-full.txt.
+- Reginster, The Affirmation of Life, Ch. 5 pp.201-227 (surveyed readings; permanence against recurrence; revaluation as precondition, citing WP 1059); theaffirmati-full.txt.
+- Kaufmann, Nietzsche, Ch. 11 II pp.316-333 (antecedents; UM II; not a test of particular acts; nihilism; being and becoming); nietzschephi-s3; GS Introduction 4-5.
+- Tanner, Nietzsche: A Very Short Introduction, Ch. 6 pp.62-65 (Kundera's "Einmal ist keinmal"; the Auschwitz thought experiment; Yeats; recurrence as parody of other-world doctrines); nietzschea-full.txt lines 6082-6260.
+- Leiter, SEP s.2 (the "except my first marriage" case; the Holocaust objection); nietzsches-.txt. Janaway, in Janaway & Robertson Ch. 8 s.1 (a measure of degree, conditional not imperative).
+
+## The reconstruction
+- **Claim and where.** GS 341: if the thought took hold it would crush you or change you; the question is the weight on every act; the measure is how well disposed to life one must be to crave it. EH III Z 1: "the highest formula of affirmation that is at all attainable".
+- **Argument in plain steps.** (1) Suppose your life repeats identically, without end. (2) Nothing can be picked out: a life that recurred differently would not be yours, and the parts draw one another after them (Z III 2; IV 19). (3) So your reaction measures your attitude to the whole life. (4) Indifference is unavailable: endless repetition magnifies every joy and pain past a shrug. (5) To curse the demon is the old verdict on life (nihilism; revenge against time, Z II 20). (6) To call him a god is to want the life without remainder: amor fati with its measure. (7) Recurrence, not one replay: a second life is a second chance and keeps the bridge to something better, the ascetic structure; repetition "with nothing new in it" closes every elsewhere (GS 285's lake). (8) Recurrence, not permanence: to want a moment to recur is to want it as something that passes, so the test fits a life of becoming.
+- **Unstated premise.** That one's response to infinite repetition measures one's valuation of the life itself (infinity may change the question); and holism, stated only in Zarathustra's voice and in a notebook.
+- **Strongest objection and Nietzsche's reply.** (i) Atrocity: as in STANCE, with the gap sentence. (ii) Emptiness: a monster could pass. Reply: the thought measures affirmation, not goodness, and is selective by design (5[71] sec. 14; GS 341's "how well disposed would you have to become"); the content of a good life is the next lessons' business. (iii) Futility: if all repeats, choice is pointless. Reply: the repeated life includes the choosing; the thought weights choices (GS 233, 341). (iv) The imperative reading: rejected on the wording.
+- **Connections.** amor-fati; recurrence-as-cosmology; becoming-who-you-are; overman-and-last-man (Z III 13; EH III Z 6); ecce-homo; nihilism (5[71]); will-to-power-as-psychology (7[54], unpublished).
+
+## Where the claim forks (named by content)
+(a) A formal no-regrets test: would one choose one's whole life again. (c) A view of the self: every feature of a life essential to it, so to affirm any moment is to affirm all; the life as a narrative that justifies itself. (d) A substantive test presupposing a revaluation: to wish a moment to recur rather than last is to value becoming over permanence. Two fail on the text: (b) the imperative reading (GS 341 asks for a disposition; Kaufmann's notes agree); (e) the futility reading (GS 233, 341 weight action). The lesson presents (a), (c), (d) by content, notes that (c) supplies the holism premise and (d) explains step (8), and leaves the choice open with each reading's anchor (GS 341; Z IV 19 §10; Z III 15-16).
+
+## Set pieces and gems
+- The demon read whole as the opening scene (GS 341): "even this spider and this moonlight between the trees"; "speck of dust"; "You are a god and never have I heard anything more divine".
+- The lake that stops flowing off into a god (GS 285, p.230).
+- August 1881, Silvaplana, the rock near Surlei, "6000 feet beyond man and time" (EH III Z 1, p.295).
+- The gateway Moment, the shepherd and the snake (Z III 2); "Eternally recurs the man of whom you are weary, the small man" (Z III 13 §2, p.331); "Was that life? Well then! Once more!" (Z III 2 §1; IV 19 §1) — illustrations.
+- "Let us think this thought in its most terrible form" (5[71] sec. 6, unpublished, Lenzer Heide 10 June 1887, Bittner p.118).
+- Kundera's "Einmal ist keinmal" and Yeats's "I am content to live it all again" (Tanner pp.62-65; References).
+
+## Pitfalls
+- GS 341 is a conditional; the demon is a speaker; no physics in 285 or 341. One sentence points to the extra lesson.
+- Quote the Vintage wording ("live once more and innumerable times more", "greatest weight"), not the Portable's "greatest stress" and not paraphrase.
+- Z passages carry their speaker: the animals' wheel of being is not Zarathustra's statement; the snake is identified with the small man in III 13, not III 2.
+- The Lenzer Heide note introduces the thought as nihilism's extreme form, not a joyous test; always "unpublished, 10 June 1887, Bittner pp.116-121". WP 55 (= 5[71]), WP 617 (= 7[54] p.138), WP 1059 are compilation numbers.
+- EH says "idea" and "highest formula of affirmation"; the test framing is GS 341's.
+- Refute the imperative and futility readings once each (L13); no other "some believe".
+
+## FIGURE PLAN
+1. `draw:` single `<Figure>`: **the hourglass turned**: one life as a strip of moments repeating in identical order, the speck of dust inside (GS 341).
+2. `draw:` single `<Figure>`: **two reactions, no third**: curse / "you are a god", the indifferent middle crossed out, with "it would change you as you are or perhaps crush you".
+3. `draw:` single `<Figure>`: **knotted together**: a chain of events in which removing one painful event unravels the goods that followed (Z III 2 §2; IV 19 §10).
+4. `draw:` single `<Figure>`: **the lake that stops flowing off** (GS 285): the outflow "into a god" dammed, the level rising; why recurrence and not a second chance.
+5. `draw:` single `<Figure>`: **permanence against recurrence**: a moment wished never to end (flat line) against a moment wished to come again (cycle), with the good each fits (step 8).
+6. `draw:` single `<Figure>`: **readings of the test**: formal / self / substantive with anchors and weaknesses; imperative and futility marked as failing on the text.
+7. `source:` hunt: **photograph of the pyramidal rock near Surlei, Lake Silvaplana** (Wikimedia Commons, check CC licence); the caption must say which rock is shown and on what authority (Kaufmann n.1 says the usual one is wrong). Optional.
+
+## EXERCISE PLAN
+Floor check: claim to refute (2), boundary probe (4), derivation (5), research-shaped (3).
+1. Retrieval (E3 from amor-fati): state EH II 10's formula, the two rejected alternatives and the third counterfeit (the ass's yes); say which the demon's curse corresponds to.
+2. Claim to refute: "Eternal recurrence is Nietzsche's categorical imperative: act only as you could will to act forever." Break it from GS 341's wording and from the fact that the question is put to a life already lived.
+3. Research-shaped (corroboration): order GS 285, GS 341, Z III 2, Z III 13 and EH III Z 1 by composition and say, from the wording, what changes from 1882 to 1888: what is asked, who speaks, whether a claim about the world is made.
+4. Boundary probe: a person who would relive their life except for one event. Pass, fail, or ill-formed? Use holism, then say what the reading gives up if holism is denied.
+5. Derivation: from "would lie upon your actions as the greatest weight" derive how the thought changes choice without prescribing any; show why a single replay would not have the same effect (step 7).
+6. FORWARD (E7, reaches becoming-who-you-are): describe what a person must be like to answer "you are a god", with three features from the texts (freedom from ressentiment, EH I 6; a life whose parts hang together; a disposition acquired, "how well disposed would you have to become"). Solution: the second and third are what the next lesson calls giving style and becoming who one is, <Ref lesson="becoming-who-you-are" />.
+
+## Corrections applied
+- APPLIED — EH III Z 1 quoted as "6000 feet beyond man and time" with the Surlei rock and Kaufmann n.1; EH's "idea"/"highest formula of affirmation" distinguished from GS 341's test framing (ecce-homo reader).
+- APPLIED — GS 109 and 233 added as precursors with pages; Kaufmann's four-point reading (pp.15-19) and Heine (p.16) in Secondary (gay-science-1 reader).
+- APPLIED — Kaufmann's "live once more and innumerable times more" restored; GS 285 added as first appearance (gay-science-2 reader).
+- APPLIED — the Z III 2 vision not identified as the small man in III 2; identification in III 13 §1-2; the animals' speech not treated as Zarathustra's own (zarathustra reader).
+- APPLIED — 5[71] cited as introducing recurrence as "the most extreme form of nihilism" and "a curse", the strong man's reaction left open; affirmative wording from 10[3] and 7[38] (late-notebooks reader).
+- APPLIED — BGE 56 as the only BGE passage, an ideal, no "Wiederkunft" (bge reader).
+- APPLIED — TI "Ancients" 5 added from the Portable; the Portable's "greatest stress" noted, Vintage wording preferred (portable-late reader).
+- APPLIED — WP 55, 617, 1059 treated as compilation numbers, mapped where Bittner has the note; 1059 listed for concordance (architect's known-gaps list).
+8 applied, 0 declined.
+
+## Verification debts
+- German of GS 341 ("Das grösste Schwergewicht"; "noch einmal und noch unzählige Male") against eKGWB FW-341; BGE 56's "unersättlich da capo rufend" against JGB-56.
+- WP 1059: notebook[fragment] and Bittner page.
+- Kaufmann's p.19 notebook line (Musarion XIV 121): KSA locator before quoting.
+- The Surlei rock photograph: identify against Kaufmann n.1 before captioning.
+
+## Revision
+Carried over: the ARC, the fork, the eight-step reconstruction, the objections, the exercise skeleton. Replaced: "not staged; verify" pointers with pages and files; Z citations re-sorted with the III 13 identification; the Lenzer Heide note correctly characterized. Added: GS 285, 109, 233, HL 1, BGE 56, TI Ancients 5, EH III Z 6, the STANCE block and hard passages.
