@@ -62,13 +62,19 @@ class Settings(BaseSettings):
     # those models would only sell dead options in the picker.
     CHAT_MODELS: list[ChatModel] = [
         ChatModel(
+            openrouter_id="moonshotai/kimi-k3.1-pro",
+            display_name="Kimi K3.1 Pro",
+            context_window=1_048_576,
+            reasoning=True,
+        ),
+        ChatModel(
             openrouter_id="moonshotai/kimi-k3",
             display_name="Kimi K3",
             context_window=1_048_576,
             reasoning=True,
         ),
     ]
-    DEFAULT_CHAT_MODEL: str = "moonshotai/kimi-k3"
+    DEFAULT_CHAT_MODEL: str = "moonshotai/kimi-k3.1-pro"
 
     # The tutor's only route out to the open web. Unset, web_search reports
     # itself unavailable and the agent answers from the corpus.
