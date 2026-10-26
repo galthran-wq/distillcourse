@@ -220,9 +220,20 @@ $n$.
 
 ## The anomaly score: 0.5 for a typical path
 
-A path ratio $E[h(x)]/c(n)$ runs from 0 upward, with 1 for a typical point.
-Raising 2 to minus that ratio turns it into a number between 0 and 1 that
-falls as the path grows.
+The path ratio $E[h(x)]/c(n)$ puts the typical point at 1 for every $n$,
+but it reads the wrong way for an alert list. It grows as a point gets
+more normal, so the anomalies sit at the bottom, and it has no upper bound,
+so nothing says how far down a list the strange end lies. A score should
+put anomalies high, live on a fixed range, and keep the typical point at
+one fixed value whatever $n$ the trees were built on.
+
+Any decreasing function of the ratio turns it the right way up, and none
+changes the order: within one forest, a point with a shorter mean path
+gets a higher score under every such function. The choice of function is
+therefore a convention about the numbers printed, not about the ranking.
+The usual one is $2^{-\text{ratio}}$: a ratio of 0 gives 1, a ratio of 1,
+the typical path, gives exactly $\tfrac12$, and a long path gives a value
+near 0.
 
 <Definition title="isolation anomaly score">
 For a forest whose trees are each built on $n$ points, the anomaly score
@@ -274,9 +285,7 @@ gives a lower score: on bunched data the typical point sits a little below
 <KeyFact>
 Within one forest the score ranks points exactly as the mean path length
 does, so it adds nothing to the ranking an investigator works. It matters
-when scores from forests built on different sample sizes are compared, and
-its reading, near 1 for an anomaly and about 0.5 for a typical point, is
-approximate on bunched data.
+when scores from forests built on different sample sizes are compared.
 </KeyFact>
 
 ## Fewer points per tree: swamping and masking
@@ -421,10 +430,13 @@ The ROC-AUC is 0.95 in every row. The ranges overlap, so the file names no
 best size. What it shows is that the default gains nothing here: 256 has
 the lowest mean and by far the widest spread, with one forest at 0.10 and
 another at 0.27 on the same data. The default $\psi = 256$ serves a wide
-range of data because it is small enough to thin most crowds; where there
-is no crowd it is a setting like a tree's depth, chosen on <Ref
-lesson="delayed-labels-prequential"
-id="prequential-folds-a-spread-across-weeks">prequential folds</Ref>.
+range of data because it is small enough to thin most crowds. Where there
+is no crowd, $\psi$ is a setting like a tree's depth, and it can be chosen
+on <Ref lesson="delayed-labels-prequential"
+id="prequential-folds-a-spread-across-weeks">prequential folds</Ref> only
+where delayed labels do arrive, since each fold is scored against them.
+On a stream with no labels at all, keep the default, or set $\psi$ by the
+$N/g$ rule from the size of burst the team expects.
 
 ## A partial tree is enough: the height limit
 
@@ -514,17 +526,20 @@ brackets. A cut now lands on a
 noise column 500 times in 528, and a noise cut splits frauds and genuine
 rows alike, so every path is mostly noise.
 
+The repair in the table's last row chooses the columns per tree before
+cutting. *Kurtosis* measures how heavy a column's tails are relative to its
+spread; a few extreme values raise it sharply, and uniform noise, which has
+no values far from the rest, has thinner tails than a Gaussian. A column
+where some payments sit far out scores high, a noise column low. Each
+tree ranks the columns by kurtosis on its own sample and keeps the top 28.
+
 | columns given to the forest | ROC-AUC | average precision |
 |---|---|---|
 | V1 to V28 | 0.95 | 0.20 (0.16 to 0.26) |
 | V1 to V28 and 500 noise columns | 0.76 (0.71 to 0.79) | 0.015 (0.005 to 0.027) |
 | the same 528, each tree keeping the 28 of highest kurtosis in its sample | 0.95 | 0.16 (0.13 to 0.19) |
 
-The repair chooses the columns per tree before cutting. *Kurtosis*
-measures how heavy a column's tails are relative to its spread; a few
-extreme values raise it sharply, and uniform noise has thinner tails than
-a Gaussian. Ranking the columns by kurtosis on each tree's own sample and
-keeping the top 28 picks exactly the 28 V columns in every one of the 100
+The selection picks exactly the 28 V columns in every one of the 100
 trees, and the ranking comes back: average precision 0.16 against 0.20,
 inside the spread between forests, against a base rate of 0.0016. A
 distance-based score suffers the same way, since 500 noise columns add to
@@ -722,7 +737,7 @@ fails.
 <Solution>
 **The cuts.** Consider a cut on the second column just above B's value
 $-1.5$. On B's side lie only the payments with a second value below $-1.5$,
-about 5% of them, and because of the correlation nearly all of these also
+about 7% of them, and because of the correlation nearly all of these also
 have a low first value, mostly below 0. A cut on the first column anywhere
 between those payments and B's 1.5 then leaves B alone. Two cuts suffice,
 each of a kind that random cuts produce often, so B's mean path is short.

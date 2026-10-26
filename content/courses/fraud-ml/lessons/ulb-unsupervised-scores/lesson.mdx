@@ -21,10 +21,7 @@ PaySim, whose frauds follow scripts.
 
 What none of those runs did is the test a deployed scorer faces: built on
 one day, judged on the next, read at the investigators' budget of a hundred
-calls, and set beside a model trained on the same day's labels. <Ref
-lesson="one-class-and-reconstruction">The last lesson</Ref> ended by asking
-what isolation, reconstruction and a cluster rule deliver on this file at
-the investigators' budget, and that test is how the question gets answered.
+calls, and set beside a model trained on the same day's labels.
 
 The same file is where most people first try unsupervised fraud detection,
 because it is a standard coursework exercise: cluster the payments with
@@ -33,10 +30,6 @@ its F1 score. One submitted run of the clustering exercise produced the 71%
 cluster. Read at face value it is a detector that never saw a label and
 finds fraud at about 400 times the base rate, and the conclusion it invites
 is that clustering finds fraud on real data.
-
-Before believing that, two things need explaining: what in the pipeline
-produced the 71%, and what produced the flood. Then the module's scorers
-can be put through the forward test.
 
 ## The coursework pipeline, run as written
 
@@ -329,8 +322,8 @@ chose</Ref>.
   standardised inputs, with no model. Below, "distance" always means this
   length, in day-1 standard deviations; its square, the sum of the squared
   inputs, ranks the payments in the same order;
-- **isolation forest**: 100 trees on samples of $\psi = 256$ (five forests)
-  and of $\psi = 4{,}096$ (three forests);
+- **isolation forest**: 100 trees on samples of $\psi = 256$ (five seeds)
+  and of $\psi = 4{,}096$ (three seeds);
 - **autoencoder**: 29-100-20-100-29 with ReLU units, trained <Ref
   lesson="one-class-and-reconstruction"
   id="training-it-the-supervised-pipeline-with-the-label-replaced-by-the-input">exactly
@@ -341,7 +334,8 @@ chose</Ref>.
   seeds, read two ways from <Ref lesson="density-and-distance-scores"
   id="clustering-comparing-with-a-few-centroids-instead-of-every-neighbour">the
   clustering assumptions</Ref>: distance to the nearest centre, and
-  smallest cluster first, with ties inside a cluster broken by distance.
+  smallest cluster first, and inside a cluster the payment farther from its
+  centre first.
   $K = 8$ is the setting <Ref lesson="density-and-distance-scores"
   id="does-the-small-cluster-score-find-organised-fraud">the small-cluster
   score was run with on PaySim</Ref>, fixed before day 2 was looked at;
@@ -349,6 +343,9 @@ chose</Ref>.
   bend;
 - **supervised**: a logistic regression at library defaults and a random
   forest of 100 trees (three seeds), trained on day 1's labels.
+
+Where a scorer was run with several seeds, each seed's run is scored
+separately and the table gives the mean of their metrics.
 
 ### The table
 
@@ -420,16 +417,9 @@ PaySim, here finding a group of frauds that repeat one pattern.
 
 ### A window of K that no label-free criterion finds
 
-The same score at other numbers of clusters:
-
-<Figure
-  src="./figures/ksweep.svg"
-  alt="Line chart of precision in day 2's top 100 against the number of k-means clusters K from 2 to 40, fitted on day 1 without labels, three seeds per K drawn as faint dots and their mean as a line. Amber, smallest cluster first: erratic between 0 and 0.71 for K 2 to 4, about 0.62 to 0.70 for K 5 to 18 in a shaded band labelled far cluster smallest, a dip and spike at 19 and 20, then 0.13, 0.15, 0.03 and 0.07 at K 24, 28, 32 and 40. Blue, distance to nearest centre: 0.25 to 0.33 for K 2 to 4, then about 0.08 to 0.10 for every larger K. Dashed guides: random forest with labels 0.93, logistic regression with labels 0.81, isolation forest psi 4,096 0.38."
-  caption="The small-cluster score works for K from 5 to 18 and fails beyond 24; the distance-to-centre score fails from K = 5 on."
-/>
-
-From $K = 5$ to $K = 18$ the fraud group is the smallest cluster and the
-score puts 62 to 70 frauds in the top 100. From $K = 24$ on, some honest
+Refitted at every $K$ from 2 to 40, three seeds each, the small-cluster
+score works only inside a window. From $K = 5$ to $K = 18$ the fraud
+group is the smallest cluster and the score puts 62 to 70 frauds in the top 100. From $K = 24$ on, some honest
 group of a few dozen or a few hundred payments gets its own cluster, smaller
 still, and is ranked first: the top 100 holds 3 to 15 frauds on average.
 Below $K = 5$ the outcome depends on the random start. The value 8,
@@ -438,6 +428,12 @@ this file short of labels would have warned against 32, since the elbow
 curve without resampling has no elbow. Choosing $K$ needs labelled days,
 and it becomes a setting chosen on labelled folds, like the forest's
 sample size.
+
+<Figure
+  src="./figures/ksweep.svg"
+  alt="Line chart of precision in day 2's top 100 against the number of k-means clusters K from 2 to 40, fitted on day 1 without labels, three seeds per K drawn as faint dots and their mean as a line. Amber, smallest cluster first: erratic between 0 and 0.71 for K 2 to 4, about 0.62 to 0.70 for K 5 to 18 in a shaded band labelled far cluster smallest, a dip and spike at 19 and 20, then 0.13, 0.15, 0.03 and 0.07 at K 24, 28, 32 and 40. Blue, distance to nearest centre: 0.25 to 0.33 for K 2 to 4, then about 0.08 to 0.10 for every larger K. Dashed guides: random forest with labels 0.93, logistic regression with labels 0.81, isolation forest psi 4,096 0.38."
+  caption="The small-cluster score works for K from 5 to 18 and fails beyond 24; the distance-to-centre score fails from K = 5 on."
+/>
 
 ### Same centres, opposite verdicts
 
@@ -545,7 +541,7 @@ no drift, and no retraining cadence to test.
 can be built from knowledge of payments.
 
 **Final, undated labels.** No label clock and no feedback from alerts. What
-the file tests is a score; the course's systems are tested on the
+the file tests is a score; a detection system is tested on the
 simulator and the Belgian stream.
 
 <Conclusion>

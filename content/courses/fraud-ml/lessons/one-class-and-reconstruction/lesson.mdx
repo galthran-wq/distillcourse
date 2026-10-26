@@ -186,20 +186,20 @@ $$
 which is a hyperplane condition with $w$ along $a$. On a sphere, the inside
 of a smaller sphere is a cap, and a cap is what a hyperplane cuts off. For
 the Gaussian kernel, and any kernel with constant $k(x, x)$, the two
-methods fit the same family of regions; for other kernels they differ, and
-the last exercise works out how.
+methods fit the same family of regions; for other kernels they differ.
 
 <KeyFact>
 The origin can stand in for the missing class only because the kernel puts
 every payment at the same distance from it ($k(x, x)$ constant) and on the
-same side of it ($k > 0$); the Gaussian does both. Then $\nu$ fixes how
-many training payments are left outside, and nothing else: which ones, and
-the shape of the region, are set by $\gamma$ and by the training sample.
+same side of it ($k > 0$); the Gaussian does both. Then $\nu$ bounds how
+many training payments are left outside: at most a share $\nu$ of them.
+Which payments fall outside, and the shape of the region, depend on
+$\gamma$ and on the training sample as well as on $\nu$.
 </KeyFact>
 
 ## What a boundary cannot see: its width and its training sample
 
-If $\nu$ sets only the count, what decides which payments end up outside?
+$\nu$ bounds the count; what else decides which payments end up outside?
 Two settings nobody can check without anomalies: the kernel width and the
 payments the region is fitted to.
 
@@ -284,10 +284,10 @@ support vector.
 ## A network that reproduces its input
 
 The second way to say "unlike normal" is a model that has learned to
-reproduce normal payments and fails on the others. The obvious model is a
-network with fifteen inputs and fifteen outputs, trained so that the
-output equals the input. Its best solution is to copy, with zero error on
-every payment, and the error ranks nothing.
+reproduce normal payments and fails on the others. Closing the copying
+shortcut of the introduction is not enough on its own: a network that
+cannot copy must also fail on the right payments, and what decides which
+payments it reproduces well turns out not to be its width.
 
 ### What stops the copying
 
@@ -355,8 +355,7 @@ copy only inside the region where enough of their hinges are on their
 rising side, and training places and tilts the hinges so that this region
 covers the training payments. Where there were none, nothing corrected the
 pieces, and a payment that falls there comes back wrong. The training data,
-not the code, decides where the network is accurate; the first exercise
-works this out with one hinge.
+not the code, decides where the network is accurate.
 
 ### Training it: the supervised pipeline with the label replaced by the input
 
@@ -368,14 +367,11 @@ learning rate 0.0001 on batches of 64, and <Ref
 lesson="neural-tabular-detectors"
 id="stopping-when-the-validation-loss-stops-improving">early stopping</Ref>
 with patience 2. The loss it watches needs no labels: the reconstruction
-error of a held-out tenth of the training payments. One step of the rule is left out: the weights kept are the last epoch's, not
-the best's. That is how the run on the 2018 file further down was trained, and
-keeping the same rule makes the two runs differ only in their data. The
-price is the one the restore exists to avoid: with patience 2 the run stops
-three epochs after its best, and the scores below come from weights that
-are three epochs past it, no better on the held-out tenth and possibly
-worse. The two regimes of the
-boundary apply unchanged: train on every payment of the week, or on its
+error of a held-out tenth of the training payments. The weights kept are
+the last epoch's, not the best's: with patience 2 the run stops three
+epochs after its best, so the scores below come from weights three epochs
+past it, no better on the held-out tenth and possibly worse. The two
+regimes of the boundary apply unchanged: train on every payment of the week, or on its
 genuine payments only.
 
 On training days 42 to 48, the network trained on every payment ran 49
@@ -505,7 +501,9 @@ lesson="neural-tabular-detectors"
 id="a-week-to-watch-that-is-not-the-test-week">the supervised network
 watched its loss on</Ref>. Its early stopping watched the reconstruction
 loss of 25 to 31 July, which uses that week's payments but none of its
-labels. Beside it, an isolation forest of only 10 trees, on samples of 256
+labels, and kept the last epoch's weights. The two autoencoder runs
+therefore stop on different signals: the lab run on a held-out tenth of its
+own training payments, this one on the week it is then scored on. Beside it, an isolation forest of only 10 trees, on samples of 256
 (the library default), is built on the fifteen inputs of the same 11 to 17
 July payments without labels and scores the same week.
 
@@ -528,11 +526,14 @@ a quarter of it.
 
 ## The code as a picture
 
-A code of 20 numbers cannot be drawn. A code of 2 can, at a price: a
-15-100-2-100-15 network trained the same way stopped at a mean error of
-0.36, five thousand times the 20-unit network's, because two numbers cannot
-hold a payment. What it keeps is the direction in which a payment departs
-from the mass of the week.
+The reconstruction error is one number per payment: it says how unusual a
+payment is, not in which way. The code is what the network kept of the
+payment, and drawing it answers a question the error cannot: do frauds of
+different kinds leave the mass of the week in different directions, so that
+payments could be grouped by kind without a label? A code of 20 numbers
+cannot be drawn. A code of 2 can, at a price: a 15-100-2-100-15 network
+trained the same way stopped at a mean error of 0.36, five thousand times
+the 20-unit network's, because two numbers cannot hold a payment.
 
 <Figure
   src="./figures/code2d.svg"
@@ -544,11 +545,24 @@ Ten k-means clusters fitted to the training week's codes put five centres
 inside the dense corner and five out on the rays. Three of the five far
 clusters are mostly fraud, 35 of 36, 68 of 124 and 92 of 176 test payments,
 and the other two hold 25 of 139 and 17 of 160: all five run at 11% fraud
-or more, against a base rate of 0.73%. The rays are
-the label-built terminal rates and the inflated amounts again, now as
-directions. Grouping payments by such a code, and alerting a whole cluster,
-is the rule <Ref lesson="ulb-unsupervised-scores">the next lesson</Ref>
-tests on real card data, and the cluster exercise at the end prices it on this week.
+or more, against a base rate of 0.73%.
+
+What lies on each ray is read off the payments of its clusters. The 36
+payments on the steep ray hold 35 leaked-card frauds, the scenario whose
+amounts the simulator multiplies by five; their mean standardised amount is
+10.7 and their card's one-day average amount 8.8, while every terminal input
+stays within half a unit of zero. The four clusters on the shallow rays
+hold 202 frauds, every one of them at a compromised terminal, and in each
+of the four the largest of the terminal's three delayed fraud rates, over
+one, seven or thirty days, sits on average between 3 and 14 standard
+deviations above the training week's mean, while the amount and the card's
+inputs stay within half a unit of zero. Their genuine
+payments carry the same high rates: they are honest payments at the same
+terminals, which is why two of the four clusters are mostly genuine. The
+26 frauds of the amount-over-220 scenario reach no ray. So the code does
+separate kinds of fraud, along the inputs that set them apart: the inflated
+amount for the leaked cards, and for the compromised terminals the rates
+built from labels.
 
 ## Does an unlike-normal score help a model trained on labels?
 
@@ -588,10 +602,25 @@ network from 0.859, 0.646 and 0.28 to 0.861, 0.651 and 0.276. That
 comparison changed two things at once, though: the network with the extra
 input had 100 hidden units, the one without it 1,000.
 
-On the forest's simulator run, with everything else held fixed (the
-supervised network above, the error of the first autoencoder seed, the
-error's logarithm standardised as the sixteenth input) and five training
-seeds per arrangement:
+On the forest's simulator run each arrangement was trained with five
+seeds, 0 to 4, on training days 42 to 48 and scored on the test week. On
+the simulator every training payment carries a label, so every row trains
+the supervised part of each arrangement. The error used is that of one
+autoencoder, the 15-100-20-100-15 network of seed 0 trained on every
+payment.
+
+- **Network trained on labels**: the 500-unit network of the comparison
+  table, dropout 0.2, Adam at 0.001, batches of 64, a fixed 20 epochs.
+- **Average of the two ranks**: each seed's supervised network, its ranks
+  averaged with the ranks of that one autoencoder's error.
+- **Error as a sixteenth input**: the same network and training with a
+  sixteenth input, the logarithm of the error (the error spans several
+  powers of ten) standardised on the training week.
+- **One code, two heads**: the autoencoder's encoder (15 to 100 to a code
+  of 20) and decoder (20 to 100 to 15), plus a fraud head, one sigmoid unit
+  reading the code. The loss is the mean squared reconstruction error plus
+  the cross-entropy, added with equal weight on every batch; Adam at 0.001,
+  batches of 64, a fixed 20 epochs, no early stopping.
 
 | arrangement | ROC-AUC | AP | CP@100 |
 |---|---|---|---|
@@ -618,8 +647,9 @@ On the simulator, the labels already cover every scripted kind of fraud.
 An unlike-normal score adds most where the supervised model is blind: fraud
 of a kind its labels do not hold, or far more unlabelled payments than
 labelled ones to fit the reconstruction on. A simulator whose three fraud
-scripts all appear in the labelled week has neither, and there the score
-moved the ROC-AUC and nothing an investigator sees.
+scripts all appear in the labelled week, and whose every training payment
+carries a label, has neither, and there the score moved the ROC-AUC and
+nothing an investigator sees.
 </KeyFact>
 
 <Conclusion>

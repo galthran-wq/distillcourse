@@ -35,7 +35,8 @@ amounts of the stream and flag them.
 
 On one 63-day run of <Ref lesson="canonical-datasets"
 id="three-scripted-frauds">the transaction simulator</Ref>, the run the
-evaluation lab uses, take days 30 to 62: 324,045 payments, 2,769 of them
+evaluation lab uses, take days 30 to 62, skipping the first 30 so that
+every card's 30-day windows have filled: 324,045 payments, 2,769 of them
 fraud. Flag every payment above the 99.9th percentile of amount, which is
 €298. The rule flags 325 payments, every one of them fraud, and still
 catches only one fraud in eight.
@@ -173,7 +174,7 @@ relations, which a table of independent rows does not.
 <Figure
   src="./figures/ecg-collective-anomaly.png"
   alt="A real electrocardiogram trace of about 3,000 samples: ten regular heartbeats, each a tall spike up to about -4.4 and a sharp dip down to about -7, with small bumps between them around -5.8. Between samples 1050 and 1380, where the fifth beat should be, the trace instead stays flat at about -5.75, drawn in a lighter grey. Every value in that stretch is within the range the normal beats pass through."
-  caption="A human heartbeat with one beat missing. No single sample in the grey stretch is out of range, since the trace passes through -5.75 on every beat. What is abnormal is that it stays there for 330 samples. That is an atrial premature contraction, and it can only be seen in the sequence, not in any one reading."
+  caption="A human heartbeat with one beat missing. No single sample in the grey stretch is out of range, since the trace passes through -5.75 on every beat. What is abnormal is that it stays there for 330 samples, which can only be seen in the sequence, not in any one reading."
   float="right"
   width={380}
 />
@@ -289,8 +290,10 @@ fitted to the shop's previous month has never seen a night like this and
 flags it.
 
 <KeyFact>
-Unsupervised detection is not free of assumptions: it assumes that normal
-data dominates whatever sample it is fitted to.
+Rarity is a property of the sample a model is fitted to, not of the bank.
+Fraud that is rare bank-wide can be the majority of one merchant's night,
+so the narrower the context a model is fitted to, the more easily the rarity
+premise fails.
 </KeyFact>
 
 ## Whose normal: by owner or by operation
@@ -353,7 +356,7 @@ ball.
 
 <FigureSequence
   name="balls"
-  alt="Four frames on axes spend in the week from 0 to 2,000 euros and share of the week's payments made online from 0 to 1. Frame 1: one cardholder's normal weeks, blue dots around 300 euros and 0.2, inside a dashed blue boundary. Frame 2: adds a black ring at 620 euros and 0.08 labelled holiday abroad, outside: alarm. Frame 3: adds amber squares around 1,450 euros and 0.75 labelled fraud weeks of other cards and an amber discriminating line between them and the normal weeks; the holiday week is now labelled normal side: no alarm. Frame 4: adds a green dot at 280 euros and 0.93 labelled a new scheme: outside the boundary, on the normal side of the line"
+  alt="Four frames on axes spend in the week from 0 to 2,000 euros and share of the week's payments made online from 0 to 1. Frame 1: one cardholder's normal weeks, blue dots around 300 euros and 0.2, inside a dashed blue boundary. Frame 2: adds a black ring at 620 euros and 0.08 labelled holiday abroad, outside: alarm. Frame 3: adds amber squares around 1,450 euros and 0.75 labelled fraud weeks of other cards and an amber discriminating line between them and the normal weeks; the holiday week is now labelled normal side: no alarm. Frame 4: adds a green dot at 280 euros and 0.93 labelled a new scheme, a takeover in small online payments: outside the boundary, on the normal side of the line"
   caption="One ball flags everything outside it; two balls flag only what lies toward known fraud."
 />
 
@@ -381,20 +384,26 @@ wherever they apply.
 The two-ball rule rests on two assumptions: that future fraud on this
 card will look like past fraud, and that it will look like the fraud on
 other cards, whose weeks fill the second ball. The fourth frame breaks
-both. A card being tested pays tiny amounts online: its week sits outside
-the normal ball, where the one-ball rule flags it, and on the normal side
-of the line, where the two-ball rule does not.
+both. A thief takes over this card and spends through it in many small
+online payments, a pattern no labelled fraud week shows: the week's spend
+stays ordinary while nearly all of it goes online. It sits outside the
+normal ball, where the one-ball rule flags it, and on the normal side of
+the line, where the two-ball rule does not.
 
-The trade is measurable in this course already. <Ref
+The trade can be measured. <Ref
 lesson="behavioural-profiles" id="exercises">The peer-group detector</Ref>,
 built with no labels, put about 11 compromised cards in each daily
 hundred alerts (card precision at 100 of 0.11), against 0.02 for a random
 draw. The depth-2 tree trained with labels reached a mean <Ref
 lesson="alert-budget-metrics"
 id="card-precision-at-k-the-team-calls-cards">card precision at 100</Ref>
-of about 0.29 over the simulator's test week. The comparison is rough,
-since the peer detector ran on a different seeded run of the simulator,
-but the supervised model finds between two and three times as many. A
+of about 0.29 (0.286) over the simulator's test week, scored day by day
+without removing cards already found on earlier days, the setting the
+peer detector used too. The 0.24 quoted beside the peer detector is the
+tree's figure with that removal, which is why the ratio there was about
+two. The comparison is rough, since the peer detector ran on a different
+seeded run of the simulator, but like for like the supervised model finds
+between two and three times as many. A
 label-free score ranks well above chance and well below a supervised
 model at the top of the list, because its top holds every honest surprise
 as well as the fraud.
@@ -407,8 +416,7 @@ queue: it complements the supervised score, it does not replace it.
 
 ## Every detector family assumes one thing about normal data
 
-A boundary around normal can be drawn in many ways, and the next lessons
-build several. The obvious way to choose among them is a benchmark: run
+A boundary around normal can be drawn in many ways. The obvious way to choose among them is a benchmark: run
 each on a labelled dataset and keep the best. The trouble is that the
 benchmark's geometry picks the winner, and the next stream has a different
 geometry.
@@ -483,8 +491,8 @@ sees it.
 The panels are not exotic. Panel (c) is the card-testing night, the
 organised fraud of the box above. Panel (b) is any stream whose normal behaviour has several
 modes, such as cards used for groceries, for travel and for business,
-around a region no honest card occupies. And there is a case below every
-row of the table. As the three-scenario example showed, the compromised
+around a region no honest card occupies. And one case is covered by no row
+of the table. As the three-scenario example showed, the compromised
 terminals' frauds leave no trace in the label-free columns at all, so no
 family finds them: every assumption in the table is about where payments
 lie, and these lie exactly where the genuine payments they replaced
@@ -501,7 +509,7 @@ internal settings until the number of "anomalous" payments roughly matches
 that budget. A score that ranks payments from most to least anomalous is
 cut at $k$ directly, scored with average precision and card precision at
 $k$ like any other ranking, and can still be turned into a verdict by a
-threshold. Every detector of this module is therefore built as a score.
+threshold. An anomaly detector is therefore built as a score.
 
 An anomaly at the top of that ranking is a reason to look, not a finding.
 The investigator's call decides whether it was fraud, noise or a novelty,
