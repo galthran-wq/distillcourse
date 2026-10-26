@@ -1,0 +1,941 @@
+If no labels exist, a model can still be fitted to the normal payments alone: a boundary that encloses them, or a network trained to reproduce them. A payment outside the boundary, or one the network reproduces badly, is suspect. How are the boundary and the reconstruction trained, how good are their scores on transactions with no labels at all, and does adding such a score to a supervised model help?
+
+<Ref lesson="isolation-forest">The isolation forest</Ref> scored a payment
+by how few random cuts separate it from the rest, and on the simulator
+<Ref lesson="isolation-forest" id="which-frauds-reach-the-top">its
+label-free version reached an average precision of 0.03</Ref>, against 0.63
+for a logistic regression trained with labels. A boundary and a
+reconstruction are two other ways of saying "unlike normal", and each comes
+with an obvious first attempt that does not work.
+
+A boundary is what a classifier learns, and a classifier learns it between
+two classes. Here there is one: the payments believed normal, and a support
+vector machine given only genuine payments has nothing to put on the other
+side of its hyperplane. A network trained to reproduce its input has an
+easy way out: copy it. A network that copies reproduces every payment
+perfectly, the fraud included, and its error ranks nothing.
+
+Both repairs exist, and both train without a single label. Their numbers
+in this chapter come from <Ref lesson="isolation-forest" id="the-setup">the
+stream the forest was measured on</Ref>: a simulator run whose training
+days 42 to 48 hold 68,898 payments, used without their labels, and whose
+test days 56 to 62, after known-card removal, hold 60,212 payments of which
+440 are fraud, a base rate of 0.73%. Two input sets are compared there too:
+the fifteen inputs, and the twelve label-free ones that leave out the
+terminals' three delayed fraud rates, which are built from labels. A number
+from any other file says so.
+
+## A boundary with only one class: the origin stands in for the missing class
+
+The support vector machine of classical-ml, recalled in one sentence: it
+finds the hyperplane that separates two classes with the widest margin,
+lets a few training points fall on the wrong side at a price (the slack
+variables), and works in a feature space $\varphi(x)$ that it never builds,
+because the optimisation needs only inner products
+$k(x, x') = \varphi(x)\cdot\varphi(x')$, the kernel. To use it with one
+class, something must play the second class.
+
+### Every payment lands on one patch of a sphere
+
+Take the Gaussian kernel on standardised inputs,
+$$
+k(x, x') = e^{-\gamma\,\lVert x - x' \rVert^2},
+$$
+with a width parameter $\gamma > 0$. Two of its properties fix where the
+payments sit in feature space.
+
+First, $k(x, x) = e^0 = 1$, so $\lVert \varphi(x) \rVert = 1$: every
+payment is mapped onto the unit sphere. Second, $k(x, x') > 0$ for every
+pair, so the angle between any two images is below 90°. Take $\gamma = 1/15$,
+one over the number of the simulator's fifteen inputs, because on
+standardised inputs the squared difference of two random payments averages
+2 in each coordinate (the difference of two independent values of variance
+1 has variance $1 + 1 = 2$), a squared distance of about $2p$ over $p$
+inputs, and
+$\gamma = 1/p$ then puts a typical pair at $k \approx e^{-2} = 0.14$: far
+from 1, where every payment would look the same, and far from 0, where each
+would be alone. It is also the library default. Two payments at
+standardised distance 1 have $k = e^{-1/15} = 0.94$, an angle of 21°; two
+payments at distance 5, five standard deviations apart on one input, have $k = e^{-25/15} = 0.19$, an angle of 79°. No pair reaches 90°.
+
+Angles below 90° between every pair are enough to put a hyperplane between
+all the payments and the origin. Take the mean image
+$m = \frac1n\sum_j \varphi(x_j)$ of $n$ training payments. Its inner
+product with any one of them is
+$$
+m\cdot\varphi(x_i) = \frac1n\sum_{j=1}^{n} k(x_i, x_j) > 0 ,
+$$
+a mean of positive numbers, so every image lies strictly on the positive
+side of the hyperplane through the origin normal to $m$. Shift that
+hyperplane a little towards the payments, by less than the smallest of
+these inner products, and it separates every image from the origin. The
+origin can therefore play the second class: one point that a hyperplane can
+always split off from all the payments. A hyperplane that cuts the sphere
+close to the payments, as far from the origin as possible while leaving
+them on its far side, encloses them; a payment on the origin's side of it
+lies outside.
+
+<Figure
+  src="./figures/origin.svg"
+  alt="Two panels, each showing a quarter of the unit sphere around the origin with payment images along the arc: most are blue dots in the middle of the arc, four amber squares near its two ends. Left: an amber line, labelled w·φ(x) = ρ, cuts the arc so that the blue dots lie beyond it and the amber squares on the origin's side; an arrow from the origin to the line is labelled distance ρ over the norm of w, made as large as possible. Right: an amber circle with centre a and radius R encloses exactly the same blue dots and leaves the same amber squares outside."
+  caption="In feature space every payment sits on the unit sphere; a plane far from the origin and a small sphere around the data cut off the same cap."
+/>
+
+<Definition title="one-class SVM">
+Given $n$ training payments $x_1, \dots, x_n$, a kernel $k$ with feature
+map $\varphi$, and $\nu \in (0, 1]$, the *one-class SVM* solves
+$$
+\min_{w,\,\rho,\,\xi}\ \ \tfrac12\lVert w\rVert^2 \;-\; \rho \;+\; \frac{1}{\nu n}\sum_{i=1}^{n}\xi_i
+\qquad\text{subject to}\quad w\cdot\varphi(x_i) \ge \rho - \xi_i,\ \ \xi_i \ge 0 .
+$$
+A payment $x$ is inside the fitted region when $w\cdot\varphi(x) - \rho \ge 0$
+and outside otherwise.
+</Definition>
+
+Each term has one job. The hyperplane $w\cdot\varphi = \rho$ lies at
+distance $\rho/\lVert w\rVert$ from the origin, and the first two terms
+together push that distance up. The slack $\xi_i$ lets payment $i$ fall on
+the origin's side, and the last term charges $1/(\nu n)$ per unit of slack:
+a small $\nu$ makes slack expensive and keeps almost everything inside, a
+large $\nu$ lets more payments out in exchange for a hyperplane further from
+the origin, a tighter region.
+
+### What ν controls
+
+The same problem in its dual form, which is what a solver works on, has one
+weight $\alpha_i$ per training payment, the price of payment $i$'s
+constraint. Setting the derivative of the Lagrangian with respect to $w$ to
+zero gives $w = \sum_i \alpha_i\,\varphi(x_i)$, the two-class expansion
+without the labels $y_i$, because every constraint here has the same sign:
+each payment must lie on the far side of the hyperplane. Then
+$w\cdot\varphi(x) = \sum_i \alpha_i\,k(x_i, x)$, and the feature map
+never has to be built. Setting the derivative with respect to $\rho$
+to zero gives $\sum_i \alpha_i = 1$, because $\rho$ appears once in the
+objective, with coefficient $-1$, and once in each constraint, weighted by
+$\alpha_i$; and the price
+$1/(\nu n)$ of a unit of slack becomes a cap on each weight, as $C$ did in
+the two-class dual. The weights are therefore constrained by
+$$
+0 \le \alpha_i \le \frac{1}{\nu n}, \qquad \sum_{i=1}^{n}\alpha_i = 1,
+$$
+and the fitted rule is
+$$
+f(x) = \sum_{i=1}^{n}\alpha_i\,k(x_i, x) \;-\; \rho ,
+$$
+inside when $f(x) \ge 0$. The payments with $\alpha_i > 0$ are the support
+vectors. The optimality conditions of classical-ml's SVM dual carry over:
+a payment strictly outside ($\xi_i > 0$) has its weight at the cap,
+$\alpha_i = 1/(\nu n)$; a payment strictly inside has $\alpha_i = 0$.
+
+<Theorem title="ν counts the payments left outside">
+At the solution, the fraction of training payments outside the region is at
+most $\nu$, and the fraction of training payments that are support vectors
+is at least $\nu$.
+<Proof>
+**Outside.** Let $m$ payments lie strictly outside. Each has
+$\alpha_i = 1/(\nu n)$, and all weights are non-negative and sum to 1, so
+$m/(\nu n) \le 1$, that is $m/n \le \nu$.
+
+**Support vectors.** The weights sum to 1 and none exceeds $1/(\nu n)$, so
+at least $\nu n$ of them must be non-zero: at least a fraction $\nu$ of the
+payments are support vectors.
+</Proof>
+</Theorem>
+
+The theorem turns $\nu$ into a number a practitioner can set: the share of
+the training payments the region is allowed to leave out. Fitted on 10,000
+random payments of training days 42 to 48, with $\gamma = 1/15$:
+
+| $\nu$ | training payments outside | support vectors |
+|---|---|---|
+| 0.01 | 1.3% | 2.1% |
+| 0.05 | 5.0% | 5.3% |
+| 0.20 | 20.0% | 20.1% |
+
+At $\nu = 0.01$ the count of outside payments slightly exceeds the bound.
+Support vectors on the boundary itself have $f(x) = 0$ only up to the
+solver's tolerance, and a few of them land a hair on the outside.
+
+### A sum of bumps around the support vectors
+
+The rule $f$ reads more simply than the hyperplane that produced it. With
+the Gaussian kernel, each support vector contributes a bump
+$\alpha_i e^{-\gamma\lVert x - x_i\rVert^2}$ centred on itself, and a
+payment is inside where the bumps add up to at least $\rho$. In input space
+the region is a level set of a smoothed sum over a few hundred training
+payments: at $\nu = 0.05$, 527 of the 10,000.
+
+The verdict "outside" is too coarse for a team that calls a hundred cards a
+day. On the test week's 60,212 payments the $\nu = 0.05$ region left 4.7%
+outside: 68% of the week's frauds and 4.3% of its genuine payments, about
+400 payments a day. The usable output is the ranking by $-f(x)$, how far a
+payment falls short of the level $\rho$.
+
+### The smallest sphere describes the same region
+
+A second construction asks directly for the smallest sphere in feature space
+that holds the payments, again with slack for a few left out: centre $a$,
+radius $R$, payment $x$ inside when
+$\lVert\varphi(x) - a\rVert^2 \le R^2$. It is called support vector data
+description, SVDD. Expanding the square with $\lVert\varphi(x)\rVert = 1$,
+$$
+\lVert\varphi(x) - a\rVert^2 \le R^2
+\iff 1 - 2\,a\cdot\varphi(x) + \lVert a\rVert^2 \le R^2
+\iff a\cdot\varphi(x) \ge \tfrac12\bigl(1 + \lVert a\rVert^2 - R^2\bigr),
+$$
+which is a hyperplane condition with $w$ along $a$. On a sphere, the inside
+of a smaller sphere is a cap, and a cap is what a hyperplane cuts off. For
+the Gaussian kernel, and any kernel with constant $k(x, x)$, the two
+methods fit the same family of regions; for other kernels they differ, and
+the last exercise works out how.
+
+<KeyFact>
+The origin can stand in for the missing class only because the kernel puts
+every payment at the same distance from it ($k(x, x)$ constant) and on the
+same side of it ($k > 0$); the Gaussian does both. Then $\nu$ fixes how
+many training payments are left outside, and nothing else: which ones, and
+the shape of the region, are set by $\gamma$ and by the training sample.
+</KeyFact>
+
+## What a boundary cannot see: its width and its training sample
+
+If $\nu$ sets only the count, what decides which payments end up outside?
+Two settings nobody can check without anomalies: the kernel width and the
+payments the region is fitted to.
+
+### The width decides between a ring and islands
+
+<Ref lesson="anomaly-detection-framing" id="three-planar-experiments">The
+framing lesson's panel (b)</Ref> put eight tight clouds of normal points on
+a circle and a few anomalies at its centre, and a one-class boundary drawn
+around the whole ring called the centre normal. Whether the boundary is
+drawn around the whole ring is a setting. A wide kernel, small $\gamma$,
+makes each bump broad, the bumps merge, and the region is one disc. A
+narrow kernel, large $\gamma$, keeps each bump local, and the region breaks
+into islands.
+
+<Figure
+  src="./figures/ring-width.svg"
+  alt="Two panels with the same eight tight clouds of black points on a circle and three amber squares at the centre. Left, wide kernel gamma 0.05: one dashed blue disc covers the whole ring, centre included; caption one region: the centre is inside. Right, narrow kernel gamma 2: eight small dashed blue islands, one around each cloud, and the centre outside all of them; caption eight islands: the centre is outside. Footnote: the same 320 normal points, nu 0.05."
+  caption="The same 320 normal points and the same ν = 0.05: the kernel width alone decides whether the anomalies at the centre are inside."
+/>
+
+Both fits leave about 5% of the training points outside, 4.7% and 5.3%,
+because $\nu$ is the same. Nothing in the normal points says which width
+is right: both regions describe them equally well, and only an anomaly can
+show that one of them is wrong. Without labels the width is a guess about
+the anomalies you expect.
+
+On payments the narrow extreme is easy to reach. With $\gamma = 1$ on the
+fifteen standardised inputs, 64% of the 10,000 training payments became
+support vectors and 65% of the test week's genuine payments fell outside:
+each training payment had become an island of its own. The verdict is then
+worthless. The ranking by $-f(x)$ survives better, an average precision of
+0.27 against 0.32 at $\gamma = 1/15$, because how far a payment falls short
+of $\rho$ still grows with its distance from the training payments.
+
+### Fraud inside the training sample is enclosed
+
+The region is fitted to whatever it is given. In <Ref
+lesson="anomaly-detection-framing"
+id="where-normal-comes-from-three-label-regimes">the label regimes</Ref>,
+fitting it to every payment of the training week is the unsupervised
+regime, and fitting it to the week's genuine payments only, which needs the
+training week's labels, is the semi-supervised one. The training week holds
+about 0.8% fraud, a share small enough that $\nu = 0.05$ could leave all of
+it outside. It does not.
+
+Scored on the test week, by average precision against a base rate of 0.007:
+
+| one-class SVM, $\nu = 0.05$ | fitted to all payments | fitted to genuine payments |
+|---|---|---|
+| fifteen inputs | 0.32 | 0.53 |
+| twelve label-free inputs | 0.13 | 0.14 |
+
+With the fifteen inputs, dropping the training week's frauds raises the
+average precision by two thirds. Most of those frauds are payments at
+compromised terminals, and they share one trait: a high value of <Ref
+lesson="point-in-time-features"
+id="the-delayed-terminal-risk-a-window-that-ends-δ-days-ago">the
+terminal's delayed fraud rate</Ref>. Dozens of payments in the same corner
+of the input space are a dense group, and a dense group earns support
+vectors and bumps of its own, so the region grows to cover the corner. Fit
+without them, the corner is outside. This is panel (c) of the framing
+lesson met by a boundary: an anomaly that comes in a crowd is normal to any
+model fitted to the crowd.
+
+With the twelve label-free inputs the frauds form no such corner, and
+cleaning the sample changes almost nothing. The gain on the fifteen inputs
+also used labels twice: once to clean the sample, and once inside the
+terminal rates, which are built from labels.
+
+### What the boundary costs
+
+Fitting the dual takes time quadratic in the number of training payments,
+since every pair enters through $k(x_i, x_j)$. On one core, 10,000 payments
+took 0.47 seconds and 20,000 took 1.9, four times as long for twice the
+data. A full week of 68,898 payments would take about 20 seconds, and a
+month of a real issuer's twelve million payments is out of reach without
+sub-sampling, the same wall <Ref lesson="density-and-distance-scores"
+id="what-the-score-costs-every-payment-against-every-other">the neighbour
+scores</Ref> hit. Scoring a new payment costs one kernel evaluation per
+support vector.
+
+## A network that reproduces its input
+
+The second way to say "unlike normal" is a model that has learned to
+reproduce normal payments and fails on the others. The obvious model is a
+network with fifteen inputs and fifteen outputs, trained so that the
+output equals the input. Its best solution is to copy, with zero error on
+every payment, and the error ranks nothing.
+
+### What stops the copying
+
+The classical repair forces the payment through a narrow layer. A
+*replicator network*, also called an *autoencoder*, has three parts: an
+*encoder* that maps the $p$ inputs to a short vector, the *code*; a
+*decoder* that maps the code back to $p$ outputs $o$; and training that
+makes $o$ close to $x$ on the training payments. If the code holds fewer
+numbers than the payment, the network cannot copy and must keep what
+describes the training payments best, so a payment unlike them comes back
+distorted.
+
+<Definition title="reconstruction error">
+For a payment $x$ with $p$ standardised inputs and its reconstruction $o$,
+the *reconstruction error* is
+$$
+\varepsilon(x) = \frac{1}{p}\sum_{j=1}^{p}\,(x_j - o_j)^2 ,
+$$
+and it is used as the anomaly score: the larger, the more suspect.
+</Definition>
+
+The error is a mean of squared differences across inputs, so the inputs
+must share a scale. Unscaled, a €5 difference in the amount would outweigh
+any difference in a fraud rate between 0 and 1, the problem <Ref
+lesson="density-and-distance-scores"
+id="the-columns-have-to-share-a-scale">the neighbour distances</Ref> had.
+Every input is standardised with the training week's mean and standard
+deviation, as <Ref lesson="neural-tabular-detectors"
+id="standardise-on-the-training-block-compress-a-long-tail-first">for the
+supervised network</Ref>.
+
+### The network used on the simulator
+
+The network used on the simulator's fifteen inputs has the layer widths
+15, 100, 20, 100, 15: a hidden layer of 100 ReLU units, a code of 20 ReLU
+units, another hidden layer of 100, and a linear output of 15.
+
+<Figure
+  src="./figures/funnel.svg"
+  alt="Left, a column of fifteen boxes holding one standardised payment, labelled amount, weekend, night, card count and average over 1, 7 and 30 days, terminal count and rate over 1, 7 and 30 days; the night value is 2.1808. Arrows lead through a tall box of 100 hidden units, a smaller amber box of 20 code units labelled more units than the 15 inputs, and another 100-unit box, to a column of fifteen reconstructed values. A last column holds the squared differences in units of ten to the minus five, shaded by size, the largest 24.0 for the card's one-day count and 15.9 for the terminal's one-day count. Below: mean of the 15: 4.7 times ten to the minus five, the payment's score."
+  caption="One training payment through the trained network: every input comes back within a few thousandths, and the mean squared difference is the payment's score."
+/>
+
+<Example title="the error of one payment">
+The figure's payment is a training payment, one made at night (its
+standardised night flag is 2.18), after training. The largest difference is
+on the card's one-day count, $-0.3003$ in and $-0.3158$ out:
+$(0.0155)^2 = 24.0\times10^{-5}$. The next is the terminal's one-day
+count, $-0.9810$ against $-0.9684$: $15.9\times10^{-5}$. The fifteen
+squared differences sum to $70.9\times10^{-5}$, and their mean is
+$$
+\varepsilon(x) = \frac{70.9\times10^{-5}}{15} = 4.7\times10^{-5}.
+$$
+</Example>
+
+The code has 20 units, more than the 15 inputs, so the bottleneck argument
+above does not apply, and on the figure's payment
+the network nearly copies. It still cannot copy everywhere, because a ReLU
+unit outputs zero for every negative input to it. Each code unit is a
+hinge, flat on one side of a direction in input space and rising on the
+other, and on the flat side it passes on nothing. Copying a signed input
+everywhere takes two hinges, $x = \max(0, x) - \max(0, -x)$, so copying
+all fifteen inputs everywhere would take about 30 code units. Twenty units
+copy only inside the region where enough of their hinges are on their
+rising side, and training places and tilts the hinges so that this region
+covers the training payments. Where there were none, nothing corrected the
+pieces, and a payment that falls there comes back wrong. The training data,
+not the code, decides where the network is accurate; the first exercise
+works this out with one hinge.
+
+### Training it: the supervised pipeline with the label replaced by the input
+
+Everything else is <Ref lesson="neural-tabular-detectors">the supervised
+network's</Ref> pipeline with the target changed from the label to the
+payment itself: mean squared error instead of cross-entropy, <Ref
+lesson="neural-tabular-detectors" id="what-adam-changes">Adam</Ref> at
+learning rate 0.0001 on batches of 64, and <Ref
+lesson="neural-tabular-detectors"
+id="stopping-when-the-validation-loss-stops-improving">early stopping</Ref>
+with patience 2. The loss it watches needs no labels: the reconstruction
+error of a held-out tenth of the training payments. One step of the rule is left out: the weights kept are the last epoch's, not
+the best's. That is how the run on the 2018 file further down was trained, and
+keeping the same rule makes the two runs differ only in their data. The
+price is the one the restore exists to avoid: with patience 2 the run stops
+three epochs after its best, and the scores below come from weights that
+are three epochs past it, no better on the held-out tenth and possibly
+worse. The two regimes of the
+boundary apply unchanged: train on every payment of the week, or on its
+genuine payments only.
+
+On training days 42 to 48, the network trained on every payment ran 49
+epochs in 45 seconds on one processor. Its mean error on the test week fell from
+0.96 with random weights to 0.00007.
+
+<FigureSequence
+  name="recon"
+  alt="Three frames of overlaid histograms on a log x axis from ten to the minus 7 to above 100, blue for genuine test payments and amber for fraudulent ones, each normalised to its class. Frame 1, untrained network: genuine payments peak just below 1, median 0.71; frauds have a second hump between 10 and 50, median 7.5. Frame 2, after training: genuine payments peak near ten to the minus 5, median 1.3 times ten to the minus 5; frauds are spread from ten to the minus 5 to ten to the minus 2 with a hump near ten to the minus 2.5, median 6.4 times ten to the minus 4. Frame 3: the same as frame 2 with a green vertical line at the median daily top-100 cut, about 7 times ten to the minus 4, and the text above it: 215 frauds and 485 genuine payments."
+  caption="The test week's reconstruction errors before and after training, and what a daily top-100 cut keeps."
+/>
+
+<Task>
+Compare frames 1 and 2 before reading on: are the frauds already separated
+from the genuine payments before the network has learned anything, and by
+roughly how much do the medians differ in each frame?
+</Task>
+
+Training separates the two classes by a factor of 50 between medians,
+$6.4\times10^{-4}$ against $1.3\times10^{-5}$. The first frame shows that a
+factor of 10 was there before any training. An untrained network's outputs
+are small next to its standardised inputs, so its error is close to the
+mean square of those inputs: the squared distance of the payment from the training
+week's mean. Frauds, with large amounts and high terminal fraud rates, are
+far from that mean.
+
+That makes the untrained network a fair baseline, and an uncomfortable
+one. Ranking the test week by the mean square of the standardised inputs,
+with no network at all, gives an average precision of 0.31. The trained
+network, over three training seeds, gives 0.21 to 0.29.
+
+<KeyFact>
+On the simulator's fifteen inputs, the trained autoencoder ranks no better
+than the payment's squared distance from the training mean, which needs no
+model. Training taught the network to reproduce what the training week
+held, and the training week held fraud.
+</KeyFact>
+
+The network trained on genuine payments only, the semi-supervised regime,
+is the other half of that sentence: its average precision is 0.52. Like the
+boundary, it is accurate wherever its training payments were, and once the
+frauds are taken out of them, the network was never trained where they lie.
+
+## What the scores are worth on a week of payments
+
+Both scores now have a training procedure and two regimes. How do they
+compare with the forest, with the no-model distance, and with a network
+trained on labels, on the same test week?
+
+### The models compared
+
+- **autoencoder**: 15-100-20-100-15, or 12-100-20-100-12, trained as above;
+  means over three seeds;
+- **one-class SVM**: Gaussian kernel with $\gamma = 1/p$ for $p$ inputs,
+  $\nu = 0.05$, fitted on 10,000 random training payments;
+- **isolation forest**: 100 trees on samples of 256, means over three
+  forests, the forest lesson's numbers;
+- **distance to the mean**: the mean square of the standardised inputs, no
+  training;
+- **network trained on labels**: the fifteen inputs, 500 ReLU units,
+  dropout 0.2, Adam at 0.001, batches of 64, 20 epochs, the settings <Ref
+  lesson="neural-tabular-detectors" id="dropout-and-epochs-move-together">the
+  supervised grid</Ref> favoured; means over five seeds.
+
+The columns are ROC-AUC, average precision, and card precision at 100
+(<Ref lesson="alert-budget-metrics"
+id="card-precision-at-k-the-team-calls-cards">CP@100</Ref>).
+
+| score | inputs | training payments | ROC-AUC | AP | CP@100 |
+|---|---|---|---|---|---|
+| isolation forest | 12 | all | 0.60 | 0.03 | 0.05 |
+| autoencoder | 12 | all | 0.61 | 0.05 | 0.06 |
+| one-class SVM | 12 | all | 0.64 | 0.13 | 0.07 |
+| distance to the mean | 12 | none | 0.61 | 0.13 | 0.07 |
+| autoencoder | 12 | genuine | 0.64 | 0.15 | 0.07 |
+| one-class SVM | 12 | genuine | 0.64 | 0.14 | 0.07 |
+| isolation forest | 15 | all | 0.84 | 0.26 | 0.27 |
+| autoencoder | 15 | all | 0.86 | 0.26 | 0.28 |
+| one-class SVM | 15 | all | 0.87 | 0.32 | 0.30 |
+| distance to the mean | 15 | none | 0.85 | 0.31 | 0.31 |
+| autoencoder | 15 | genuine | 0.88 | 0.52 | 0.31 |
+| one-class SVM | 15 | genuine | 0.87 | 0.53 | 0.31 |
+| network trained on labels | 15 | labelled | 0.89 | 0.70 | 0.34 |
+
+<Figure
+  src="./figures/scores.svg"
+  alt="Horizontal bar chart of average precision on the test week, base rate 0.007, two bars per score: amber for the 12 label-free inputs and blue for the 15 inputs, three of them built from labels. Isolation forest 0.03 and 0.26; autoencoder on all rows 0.05 and 0.26; one-class SVM on all rows 0.13 and 0.32; distance to the mean 0.13 and 0.31; autoencoder on genuine rows 0.15 and 0.52; one-class SVM on genuine rows 0.14 and 0.53; network trained on labels, blue only, 0.70."
+  caption="Average precision on the test week: with no labels anywhere the scores run from 0.03 to 0.13, and every larger number leans on labels somewhere."
+/>
+
+### Three readings of the table
+
+**With no labels anywhere**, in the twelve-input rows fitted to all
+payments, the best score finds about 7 compromised cards in each day's
+hundred calls, against 34 for the network trained on labels. The boundary
+and the no-model distance tie at the top of that group, at an average
+precision of 0.13; the forest and the autoencoder trail at 0.03 and 0.05.
+
+**The fifteen-input rows read labels.** Of the 215 frauds that reach the
+autoencoder's daily top 100 payments over the week, 195 are payments at
+compromised terminals, found through the terminals' delayed fraud rates;
+and 91% of the genuine payments in those lists were made at a terminal with
+a non-zero delayed fraud rate, against 10% of the stream. The score is
+ranking a column built from labels, exactly as <Ref lesson="isolation-forest"
+id="which-frauds-reach-the-top">the forest did</Ref>.
+
+**Cleaning the training sample is the largest effect in the table**, 0.26
+to 0.52 for the autoencoder and 0.32 to 0.53 for the boundary on the
+fifteen inputs, and it too needs the training week's labels. Where the
+labels exist, a network trained on them still does better: 0.70.
+
+The ROC-AUC column tells a different story from the others, as it did <Ref
+lesson="isolation-forest" id="a-decent-ranking-a-poor-top">for the
+forest</Ref>: 0.86 for the autoencoder against 0.89 with labels, while its
+average precision is little more than a third of the supervised one. The
+unlike-normal scores order the bulk of the week well and fill its top with
+payments that are merely unusual.
+
+### The same comparison on the 2018 simulator file
+
+The weeks of <Ref lesson="alert-budget-metrics"
+id="five-models-scored-on-a-test-week">the five baseline models</Ref> give
+a second run of the same comparison. The autoencoder, the same 15-100-20-100-15
+network, is trained on every payment of 11 to 17 July 2018 and scored on 25
+to 31 July after known-card removal, the hold-out geometry <Ref
+lesson="neural-tabular-detectors"
+id="a-week-to-watch-that-is-not-the-test-week">the supervised network
+watched its loss on</Ref>. Its early stopping watched the reconstruction
+loss of 25 to 31 July, which uses that week's payments but none of its
+labels. Beside it, an isolation forest of only 10 trees, on samples of 256
+(the library default), is built on the fifteen inputs of the same 11 to 17
+July payments without labels and scores the same week.
+
+Its mean error on the scored week fell from 0.93 with random weights to
+0.00008 after training, and the frauds' mean error was 27 times the genuine
+payments', $1.8\times10^{-3}$ against $6.9\times10^{-5}$.
+
+| scored on 25–31 July 2018 | ROC-AUC | AP | CP@100 |
+|---|---|---|---|
+| autoencoder, all payments | 0.836 | 0.18 | 0.217 |
+| isolation forest, 10 trees | 0.808 | 0.164 | 0.19 |
+| network trained on labels | 0.859 | 0.646 | 0.28 |
+
+The labelled network here has 1,000 ReLU units and dropout 0.2, and it was
+stopped on the cross-entropy of 25 to 31 July with that week's labels, so
+its row is slightly optimistic: the week it is scored on also chose its
+length. The picture repeats: the reconstruction and the forest are close,
+their AUC is near the supervised one, and their average precision is about
+a quarter of it.
+
+## The code as a picture
+
+A code of 20 numbers cannot be drawn. A code of 2 can, at a price: a
+15-100-2-100-15 network trained the same way stopped at a mean error of
+0.36, five thousand times the 20-unit network's, because two numbers cannot
+hold a payment. What it keeps is the direction in which a payment departs
+from the mass of the week.
+
+<Figure
+  src="./figures/code2d.svg"
+  alt="Scatter plot of the two code coordinates, both from 0 to beyond 30. Blue dots, 4,000 sampled genuine test payments, are packed in a dense wedge near the origin, below coordinate 1 of about 5. Amber squares, all 440 frauds, run outward along three rays: one steeply up to coordinate 2 of 30 and beyond, drawn at the edge, and two shallower rays to coordinate 1 of about 48. Ten black circles mark k-means centres: five inside the dense wedge, and labelled ones away from it reading 35 of 36, 92 of 176, 68 of 124, 25 of 139 and 17 of 160."
+  caption="The test week through a two-number code: genuine payments in one corner, frauds along rays leaving it; every k-means cluster on the rays runs at 11% fraud or more, three of them mostly fraud."
+/>
+
+Ten k-means clusters fitted to the training week's codes put five centres
+inside the dense corner and five out on the rays. Three of the five far
+clusters are mostly fraud, 35 of 36, 68 of 124 and 92 of 176 test payments,
+and the other two hold 25 of 139 and 17 of 160: all five run at 11% fraud
+or more, against a base rate of 0.73%. The rays are
+the label-built terminal rates and the inflated amounts again, now as
+directions. Grouping payments by such a code, and alerting a whole cluster,
+is the rule <Ref lesson="ulb-unsupervised-scores">the next lesson</Ref>
+tests on real card data, and the cluster exercise at the end prices it on this week.
+
+## Does an unlike-normal score help a model trained on labels?
+
+Where labels exist, the reconstruction error does not have to compete with
+the supervised network; it can be handed to it. The supervised network
+learns only the fraud its labels show, and the error might carry what they
+miss.
+
+### "Semi-supervised", a second meaning
+
+In anomaly detection, <Ref lesson="anomaly-detection-framing"
+id="where-normal-comes-from-three-label-regimes">semi-supervised</Ref>
+means training on normal payments only. Combining an unsupervised score
+with a supervised model, using unlabelled payments and labelled ones
+together, is also called semi-supervised, and that is the meaning in this
+section. There are three ways to wire it.
+
+<Figure
+  src="./figures/fusion.svg"
+  alt="Three wiring diagrams. 1, average the two scores: the 15 inputs feed a blue labelled net giving P(fraud) and an amber autoencoder giving an error; both feed a box mean of ranks; note two models joined at the output. 2, the error as a 16th input: the 15 inputs feed the autoencoder, whose error joins the 15 inputs into the labelled net, which outputs P(fraud); note two models joined at the input. 3, one code, two heads: the 15 inputs feed an encoder to a code, which feeds a decoder trained by squared error and a fraud head trained by cross-entropy; every row trains the decoder, labelled rows also the head; both losses shape the code."
+  caption="Three ways to combine a reconstruction error with labels."
+/>
+
+1. **Average the scores**: rank the week by the supervised probability and
+   by the error separately, and order payments by the mean of their two
+   ranks.
+2. **The error as an input**: compute each payment's error with the trained
+   autoencoder and give it to the supervised network as a sixteenth input.
+3. **One code, two heads**: one encoder feeds both a decoder, trained to
+   reconstruct every payment, and a fraud output, trained on the labelled
+   ones; the sum of the two losses shapes the shared code.
+
+### What the sixteenth input added
+
+On the 2018 file, the error added as a sixteenth input moved the labelled
+network from 0.859, 0.646 and 0.28 to 0.861, 0.651 and 0.276. That
+comparison changed two things at once, though: the network with the extra
+input had 100 hidden units, the one without it 1,000.
+
+On the forest's simulator run, with everything else held fixed (the
+supervised network above, the error of the first autoencoder seed, the
+error's logarithm standardised as the sixteenth input) and five training
+seeds per arrangement:
+
+| arrangement | ROC-AUC | AP | CP@100 |
+|---|---|---|---|
+| network trained on labels | 0.894 ± 0.004 | 0.699 ± 0.014 | 0.343 ± 0.006 |
+| average of the two ranks | 0.891 ± 0.001 | 0.548 ± 0.019 | 0.312 ± 0.005 |
+| error as a sixteenth input | 0.901 ± 0.003 | 0.704 ± 0.007 | 0.343 ± 0.003 |
+| one code, two heads | 0.895 ± 0.005 | 0.689 ± 0.015 | 0.339 ± 0.006 |
+
+The ± is the standard deviation over the five seeds. Averaging the ranks
+costs 0.15 of average precision and three cards a day: half the weight
+goes to a score whose top is full of honest surprises. The sixteenth input
+raised the ROC-AUC in every seed, by 0.004 to 0.009, and left average
+precision and card precision where the seeds already scatter them. The
+shared code changed nothing measurable.
+
+The gain shows where it is least useful, in the bulk of the ranking. The
+reason it is small is that the error adds no information about a payment:
+it is a function of the same fifteen inputs the supervised network already
+reads, computed by another network. It can help only by handing over a
+summary the supervised network would not find by itself from its labels.
+On the simulator, the labels already cover every scripted kind of fraud.
+
+<KeyFact>
+An unlike-normal score adds most where the supervised model is blind: fraud
+of a kind its labels do not hold, or far more unlabelled payments than
+labelled ones to fit the reconstruction on. A simulator whose three fraud
+scripts all appear in the labelled week has neither, and there the score
+moved the ROC-AUC and nothing an investigator sees.
+</KeyFact>
+
+<Conclusion>
+You can now fit a boundary to one class: map the payments onto one patch of
+the unit sphere with a Gaussian kernel, cut it with a hyperplane as far from
+the origin as possible, and read $\nu$ as a bound on the share of training
+payments left outside and on the share of support vectors. You can show
+that the smallest enclosing sphere gives the same region for that kernel,
+explain why the kernel width decides whether a ring of normal groups
+encloses its centre, and why fraud inside the training sample gets enclosed.
+You can build an autoencoder, score a payment by its mean squared
+reconstruction error, and say why a 20-unit ReLU code on 15 inputs copies
+only where the training payments were. And you can read the scores honestly: with no labels anywhere they
+find a handful of compromised cards a day, about as many as the squared
+distance from the mean; their larger numbers lean on labels in the inputs
+or in the cleaning of the training sample; and added to a supervised
+network they moved only its AUC.
+
+<Ref lesson="ulb-unsupervised-scores">The next lesson</Ref> runs isolation,
+reconstruction and a cluster rule on real card data, the ULB set, where no
+input is built from labels and the frauds are not scripted, and asks what
+they deliver at the investigators' budget.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+A one-input network computes $o(x) = \max(0,\ x + 2) - 2$: one ReLU hinge,
+trained on payments whose standardised value lies between $-1.5$ and $2$.
+(a) Compute the reconstruction error of $x = 1$, $x = -1.5$ and $x = -5$.
+(b) Which of the three is flagged, and what property of the training
+payments decided where the hinge sits? (c) The same network is retrained on
+data that includes payments down to $-6$; where must the hinge move for the
+error to stay zero on all of them, and what happens to the error of $-5$?
+
+<Solution>
+**(a)** For $x \ge -2$ the hinge is active and $o(x) = x + 2 - 2 = x$: the
+error is 0 at $x = 1$ and at $x = -1.5$. For $x = -5$ the ReLU outputs 0,
+so $o = -2$ and the error is $(-5 - (-2))^2 = 9$ (with $p = 1$, the mean is
+the single square).
+
+**(b)** Only $x = -5$. The hinge sits at $-2$, below every training value,
+so the network is the identity wherever training payments were and constant
+below $-2$, where none were. Training put the bend just outside the data
+because nothing in the data asked for the identity further down.
+
+**(c)** The bend must move to $-6$ or lower, $o(x) = \max(0, x + 6) - 6$, and
+the error of $-5$ drops to 0. This is the lesson's point in one dimension:
+a value is reconstructed badly only if no training payment was near it, so
+a fraud pattern present in the training data stops being flagged.
+</Solution>
+</Exercise>
+
+<Exercise>
+Push $\nu$ to its edges in the dual constraints
+$0 \le \alpha_i \le 1/(\nu n)$, $\sum_i \alpha_i = 1$. (a) For $\nu = 1$,
+what are the weights, what is $f(x)$, and what kind of score is it? (b) As
+$\nu \to 0$, which constraint stops binding, and what does the region do on
+a training sample that contains frauds? (c) On a training week with 0.8%
+fraud that you want left outside, which of the two edges is the wrong
+choice, and why does setting $\nu$ exactly at 0.008 still not guarantee
+that the frauds end up outside?
+
+<Solution>
+**(a)** With $\nu = 1$ the cap is $1/n$, and $n$ weights of at most $1/n$
+summing to 1 must all equal $1/n$. Then
+$f(x) = \frac1n\sum_i e^{-\gamma\lVert x - x_i\rVert^2} - \rho$: the mean of
+Gaussian bumps on every training payment, which is a kernel density
+estimate, minus a level. Every payment is a support vector, and the
+theorem allows up to all of them outside: the level sits so that a large
+share of the training payments fall below it.
+
+**(b)** As $\nu \to 0$ the cap $1/(\nu n)$ grows past 1 and stops binding:
+slack becomes infinitely expensive and the region must hold every training
+payment, frauds included. It becomes the smallest region around all of
+them, which on a polluted sample means one drawn around the fraud as well.
+
+**(c)** $\nu \to 0$ is wrong: it encloses the 0.8% by construction. Setting
+$\nu = 0.008$ allows that share outside but does not choose which payments
+are left out. The solver leaves out the payments whose exclusion moves the
+plane furthest from the origin, those in sparse places. Frauds that form a
+dense group, like the compromised-terminal payments with high terminal
+fraud rates, are cheaper to enclose than to leave out, and stay inside; the
+budget is then spent on rare genuine payments.
+</Solution>
+</Exercise>
+
+<Exercise>
+"An autoencoder trained on all payments, 0.8% of them fraud, learns to
+reconstruct the fraud as well as the genuine payments, so its error cannot
+separate them." Refute the claim with the lesson's numbers, name the
+assumption that makes it fail, and say what kind of fraud would make it
+true.
+
+<Solution>
+**The numbers.** Trained on all payments of training days 42 to 48, the
+network's median error on the test week's frauds was $6.4\times10^{-4}$
+against $1.3\times10^{-5}$ for genuine payments, a factor of 50, with an
+average precision of 0.26 against a base rate of 0.007. On the 2018 file
+the frauds' mean error was 27 times the genuine one.
+
+**The assumption.** Training minimises the mean error over all payments, so
+each region of the input space is fitted in proportion to how many training
+payments it holds. A kind of fraud that is a few payments in a sparse
+region contributes almost nothing to the loss and is reconstructed badly.
+That is <Ref lesson="anomaly-detection-framing"
+id="the-rarity-assumption-and-where-it-breaks">the rarity assumption</Ref>
+of the unsupervised regime: normal payments dominate whatever sample the
+model is fitted to.
+
+**When the claim is true.** For fraud that is dense in the training sample:
+a bulk anomaly such as a card-testing night at one shop, or, on the
+simulator, the compromised-terminal payments that share high terminal fraud
+rates. The claim is partly true even here: dropping the training week's
+frauds raised the average precision from 0.26 to 0.52, so the network
+trained on all payments had learned to reconstruct part of the fraud.
+</Solution>
+</Exercise>
+
+<Exercise>
+A *linear* autoencoder has no ReLU: code $c = Ax$ with $A$ of size
+$q \times p$, output $o = Bc$, trained to minimise
+$\sum_i \lVert x_i - BAx_i \rVert^2$ on centred inputs. (a) Show that for
+any fixed $A$ and $B$ the outputs $o$ lie in a subspace of dimension at
+most $q$, and that the best $o$ for each $x$ in a given subspace $S$ is the
+orthogonal projection of $x$ onto $S$. (b) Conclude, using what classical-ml
+proved about principal components, that the optimal subspace is the span of
+the first $q$ principal components and the reconstruction error is the
+squared distance off that span. (c) Which score of <Ref
+lesson="density-and-distance-scores"
+id="where-the-rare-combinations-live-principal-coordinates">the principal
+coordinates section</Ref> is this, and what does a nonlinear autoencoder add
+to it?
+
+<Solution>
+**(a)** $o = BAx$ is $B$ applied to a vector of $q$ numbers, so it lies in
+the column space of $B$, of dimension at most $q$. For a subspace $S$, the
+point of $S$ closest to $x$ in Euclidean distance is its orthogonal
+projection $Px$; any output in $S$ has error at least
+$\lVert x - Px\rVert^2$, and a linear map achieves exactly $Px$ for every
+$x$ (take $B$ an orthonormal basis of $S$ and $A = B^\top$).
+
+**(b)** The training problem therefore reduces to choosing the
+$q$-dimensional subspace that minimises the total squared distance of the
+training points from it. Classical-ml showed that this subspace is spanned
+by the $q$ leading principal components, the eigenvectors of the covariance
+with the largest eigenvalues. The error of a payment is then
+$\lVert x - Px\rVert^2 = \sum_{i > q} y_i^2$ in principal coordinates
+$y_i$.
+
+**(c)** It is the minor-component score $\sum_{i > q} y_i^2/\lambda_i$
+without the division by the variances $\lambda_i$: distance off the leading
+subspace. On the simulator, <Ref lesson="isolation-forest"
+id="exercises">the forest lesson's PCA exercise</Ref> found that with $q =
+2$ it already matched the forest. A nonlinear autoencoder replaces the flat
+subspace by a curved surface that can follow normal payments more closely,
+and its pieces are fitted only where training payments lie, which is also
+why it reconstructs well whatever the training sample held, fraud included.
+</Solution>
+</Exercise>
+
+<Exercise>
+The 2018-file result quoted in the lesson reads: with the reconstruction
+error as a sixteenth input, the labelled network went from 0.859, 0.646 and
+0.28 to 0.861, 0.651 and 0.276; the network without the extra input had
+1,000 hidden units, the one with it 100. (a) What can and cannot be
+concluded from this comparison? (b) Design the experiment that would
+measure the effect of the input alone, say how many training seeds and
+weeks it needs, and what difference in average precision you would accept
+as a gain, using the seed spread in the lesson's own table. (c) The
+lesson's table shows a gain in ROC-AUC in every seed. Why does that not
+justify adding the input in deployment?
+
+<Solution>
+**(a)** Two settings changed at once, the input set and the hidden width.
+If one helped and the other hurt, the near-zero difference would hide both;
+the comparison cannot attribute anything to the input. It also rests on a
+single seed and a single week, while <Ref lesson="worldline-model-comparison"
+id="how-much-four-weeks-move-by-themselves">weeks differ by more than
+seeds</Ref>.
+
+**(b)** Hold the network fixed (same width, dropout, rate, epochs), train
+with and without the error input from the same seeds, and score both on the
+same weeks: prequential folds for choosing, several forward test weeks for
+judging, and compare the paired differences, week by week and seed by seed.
+The lesson's five seeds put the standard deviation of a single network's
+average precision at 0.007 to 0.014 on one week; a mean difference of 0.005
+over five seeds is inside it. A gain worth acting on should exceed about
+two standard errors of the paired differences across weeks, not across
+seeds alone.
+
+**(c)** The ROC-AUC weighs every false-positive rate equally, most of them
+far beyond a hundred calls a day; the deployment rule reads CP@100, where
+the five seeds showed no change. The AUC gain says the error reorders the
+bulk of the week, which the team never sees.
+</Solution>
+</Exercise>
+
+<Exercise>
+On the forest's simulator run, a 15-100-2-100-15 autoencoder trained on all
+payments of days 42 to 48 maps the test week (days 56 to 62) to two-number
+codes, and ten k-means clusters are fitted to the training week's codes.
+The five clusters away from the dense corner hold, on the test week:
+
+| cluster | test payments | frauds |
+|---|---|---|
+| A | 36 | 35 |
+| B | 124 | 68 |
+| C | 176 | 92 |
+| D | 139 | 25 |
+| E | 160 | 17 |
+
+The other five clusters hold 59,577 payments and 203 frauds. (a) If the
+team alerts every payment of cluster A, what are the precision, the number
+of alerts a day, and the share of the week's 440 frauds caught? (b) Add
+clusters B and C, then D and E: give the precision and alerts a day after
+each step. (c) The clusters were ranked by their test-week fraud share.
+Why is that optimistic, and what would a deployable version of the rule
+use instead? (d) Compare the payments-a-day of (b)'s last step with the
+budget, and say what a cluster rule cannot do that a score can.
+
+<Solution>
+**(a)** Precision $35/36 = 0.97$; $36/7 \approx 5$ alerts a day; $35/440 =
+8\%$ of the frauds.
+
+**(b)** A, B, C: $35 + 68 + 92 = 195$ frauds among $36 + 124 + 176 = 336$
+payments, precision 0.58, 48 a day, 44% of the frauds. Adding D and E: 237
+frauds among 635 payments, precision 0.37, about 91 a day, 54% of the
+frauds.
+
+**(c)** The fraud shares were read off the week being scored, so the
+ordering of clusters used its labels. A deployable rule ranks clusters by
+their fraud share in the training week, or in the latest labelled week,
+and applies that order to the next week; a cluster that was pure fraud in
+training can be diluted in the next week, and the order can change.
+
+**(d)** At 91 payments a day the five clusters fit the hundred calls, but
+the size of a cluster is not chosen: alerting a whole cluster gives a queue
+whose length is set by the clustering, not by the budget, and inside a
+cluster every payment is equal, so the queue cannot be cut at a hundred by
+suspicion. On real card data a cluster selected for its fraud share can be
+far larger than the budget: <Ref lesson="ulb-unsupervised-scores">the next
+lesson</Ref> meets a cluster that is 71% fraud and still floods the queue.
+</Solution>
+</Exercise>
+
+<Exercise>
+The autoencoder's error on the fifteen inputs, trained on genuine payments,
+reaches an average precision of 0.52. A product manager wants to show
+investigators "the probability of fraud" next to each payment and proposes
+the error itself, rescaled to lie between 0 and 1. (a) Why is the error not
+a probability, and why does rescaling not make it one? (b) Would <Ref
+lesson="undersampling-calibration">the undersampling correction</Ref>
+$p' = \beta p_s / (\beta p_s - p_s + 1)$ apply? (c) Describe a calibration
+that would turn the error into a probability, the data it needs, and what
+it does to the average precision and CP@100.
+
+<Solution>
+**(a)** The error is a squared distance between a payment and its
+reconstruction; nothing in its training involved the fraud label, so no
+value of it is tied to a fraud frequency. Rescaling to $[0, 1]$ is a
+monotone map chosen without labels: a payment at 0.9 is not fraud nine
+times in ten, and the value depends on the most extreme payment in the
+week.
+
+**(b)** No. That correction undoes a known change in the class mix of a
+model trained with cross-entropy on labelled data, mapping one probability
+to another. The autoencoder's output was never a probability on any class
+mix, so there is nothing to correct.
+
+**(c)** Fit a monotone map from the error to the fraud frequency on
+labelled payments that the autoencoder was not trained on: Platt scaling (a
+logistic regression on the error, or on its logarithm) or isotonic
+regression, fitted on a labelled validation week in the hold-out geometry.
+It needs labels, so the calibrated number exists only where labels arrive.
+Being monotone, the map leaves the order of payments unchanged, and the
+average precision and CP@100 stay exactly where they were; only the values
+shown to the investigators change.
+</Solution>
+</Exercise>
+
+<Exercise>
+For a kernel whose $k(x, x)$ varies with $x$, for instance the polynomial
+kernel $k(x, x') = (1 + x\cdot x')^2$, redo the expansion of the lesson's
+SVDD section. (a) Show that the sphere condition becomes
+$a\cdot\varphi(x) \ge \tfrac12\bigl(k(x, x) + \lVert a\rVert^2 - R^2\bigr)$.
+(b) Why is this not a hyperplane condition, and how does it change which
+payments fall outside compared with the one-class SVM? (c) What does this
+say about choosing the kernel when the two methods are expected to agree?
+
+<Solution>
+**(a)** $\lVert\varphi(x) - a\rVert^2 = \varphi(x)\cdot\varphi(x) - 2a\cdot\varphi(x) + \lVert a\rVert^2 = k(x, x) - 2a\cdot\varphi(x) + \lVert a\rVert^2$,
+and $\le R^2$ rearranges to the stated condition.
+
+**(b)** The right-hand side now depends on $x$ through $k(x, x)$, so the
+threshold moves with the payment: the condition compares $a\cdot\varphi(x)$
+with a quantity that grows with $\lVert\varphi(x)\rVert^2$. With the
+polynomial kernel, $k(x, x) = (1 + \lVert x\rVert^2)^2$ grows with the
+payment's size, so a payment far from the origin of input space must
+project further along $a$ to stay inside. SVDD then penalises large
+payments that the one-class SVM's hyperplane, which ignores
+$\lVert\varphi(x)\rVert$, would keep inside.
+
+**(c)** The two methods agree exactly when every image has the same norm,
+which holds for kernels of the form $k(x, x') = g(\lVert x - x'\rVert)$
+such as the Gaussian. With such a kernel the choice between them is a
+choice of software, not of model.
+</Solution>
+</Exercise>
+
+<References>
+1. B. Schölkopf, J. C. Platt, J. Shawe-Taylor, A. J. Smola, R. C. Williamson, "Estimating the Support of a High-Dimensional Distribution," *Neural Computation* 13(7), 2001, pp. 1443–1471 — the one-class SVM: separation from the origin, the primal with $\nu$ and slack, the dual with the box constraint $1/(\nu n)$ and the kernel expansion of the decision function, the $\nu$-property (bounds on outliers and support vectors). https://doi.org/10.1162/089976601750264965
+2. D. M. J. Tax, R. P. W. Duin, "Support Vector Data Description," *Machine Learning* 54(1), 2004, pp. 45–66 — the smallest enclosing sphere with slack, and its relation to the one-class SVM for kernels with constant $k(x, x)$.
+3. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015 — Ch. 3, section "One-class SVMs" (the hyperplane $w^\top\varphi(x) - \rho = 0$, the objective with $1/(\nu n)$, $\nu$ as an upper bound on the share of outliers, the kernelised decision function; Fig. 3.32).
+4. V. Chandola, A. Banerjee, V. Kumar, "Anomaly Detection: A Survey," *ACM Computing Surveys* 41(3), Article 15, 2009 — Sec. 4 (the classification-based assumption; one-class versus multi-class, Fig. 6), Sec. 4.1 (replicator neural networks and the reconstruction-error score), Sec. 4.3 (one-class SVMs; the smallest hypersphere), advantages and disadvantages of classification-based techniques (scores versus labels), Sec. 11 (Fig. 10(b): the ring of clusters whose centre a one-class boundary encloses). https://doi.org/10.1145/1541880.1541882
+5. S. Hawkins, H. He, G. J. Williams, R. A. Baxter, "Outlier Detection Using Replicator Neural Networks," *Proceedings of the 4th International Conference on Data Warehousing and Knowledge Discovery (DaWaK)*, Springer, 2002, pp. 170–180 — the replicator network with compressing hidden layers.
+6. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 7, section "Autoencoders and anomaly detection" (encoder, code and decoder; the 15-100-20-100-15 network; untrained error 0.93 and trained 0.00008; fraud 0.0018 against genuine 0.000069; AUC 0.836, AP 0.18, CP@100 0.217; the ten-tree isolation forest at 0.808, 0.164, 0.19; the two-unit code with k-means; the semi-supervised arrangements and the sixteenth-input result 0.859/0.646/0.28 to 0.861/0.651/0.276), section "Feed-forward neural network" (the training loop and early stopping reused here); Ch. 3 (the simulator). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+7. scikit-learn developers, `sklearn.svm.OneClassSVM` — the implementation used for every boundary in this chapter: `nu`, the Gaussian kernel with `gamma="scale"` ($1/(p\cdot\mathrm{Var}(X))$, which is $1/p$ on standardised inputs), `decision_function` returning $f(x)$. https://scikit-learn.org/stable/modules/generated/sklearn.svm.OneClassSVM.html — The simulator computations of this chapter (the boundary and autoencoder tables, the ring of clusters, the error histograms, the two-unit code and its clusters, the fusion table) were run for this course with numpy, scikit-learn and PyTorch on the evaluation lab's simulator run, seed 0, in the isolation-forest lesson's geometry.
+</References>

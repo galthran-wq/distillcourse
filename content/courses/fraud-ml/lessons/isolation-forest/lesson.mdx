@@ -1,0 +1,948 @@
+Scoring every point by its distance to every other costs time quadratic in the data, which a stream of hundreds of thousands of payments a day cannot pay. Anomalies are few and different: a random axis-aligned cut separates them from the rest in fewer tries than a normal point. Can 'how many random cuts does it take' be turned into a score, and why does a tiny random sub-sample of the data make it better?
+
+<Ref lesson="density-and-distance-scores">The neighbour scores</Ref> ended
+against two walls. With no labels and no period believed clean, every
+payment is scored against every other: <Ref
+lesson="density-and-distance-scores"
+id="what-the-score-costs-every-payment-against-every-other">one day of
+400,000 payments against itself takes about ten minutes of one processor
+core, a 30-day set about six days</Ref>. And <Ref
+lesson="density-and-distance-scores"
+id="a-crowd-of-anomalies-is-its-own-neighbourhood">a group of more than
+$k$ anomalies is its own neighbourhood</Ref>: forty card tests at one web
+shop have each other as nearest neighbours and score as normal. The last
+exercise of that lesson planted such a group of 40 rows among 32,000 rows
+of the ULB card set; the 10th-neighbour distance put them at a median rank
+of 31,323, among the most normal rows in the file. Scored against a random
+2,000 of those rows instead, all 40 reached the top 100: the smaller
+reference held about 2.5 of them, fewer than $k$, so the group could no
+longer fill its own neighbourhoods. A small sample lowered the first wall
+and removed the second. It still leaves every payment measured against
+2,000 others in all 28 columns, and the whole result resting on one draw
+of the reference.
+
+Both walls come from the same question, "how far is this payment from the
+others?", which needs the others. A different question needs much less:
+how easy is this payment to cut off from the rest? A point far to one side
+of a cloud can be fenced off with a line or two. A point in the middle of
+the crowd needs many lines before nothing else is left on its side.
+Answering it requires comparing one value with one threshold at a time,
+and no distance at all.
+
+## Cutting a point off from the rest: one random tree
+
+To turn "easy to cut off" into a number, the cuts have to be made by a rule
+that knows nothing about which point is unusual. The simplest such rule is
+a random one.
+
+### Random cuts, counted
+
+Take 135 payments described by two standardised columns: 134 drawn from a
+Gaussian cloud, and one, called $o$, placed at $(3.2, 2.6)$, off to the
+upper right. Call $m$ the point nearest the centre. Draw a box around all
+135 points and repeat one step:
+
+1. pick one of the two columns at random;
+2. pick a position uniformly between that column's smallest and largest
+   value among the points still in the box, and cut there;
+3. keep the side that holds the point you are following, and set the other
+   side aside.
+
+The step stops when the point is alone in its box. *Isolation* means
+exactly that: separating one point from all the others.
+
+<FigureSequence
+  name="cuts"
+  alt="Six frames of 135 points in a square plot. Frame 1: a Gaussian cloud of black points, an amber square o at the upper right edge, a blue dot m at the centre. Frames 2 to 5 each add one amber cut line and grey out the side set aside: cut 1 at y = minus 1.38 keeps 126 of 135, cut 2 at x = minus 2.29 keeps 125, cut 3 at x = 0.24 keeps 48, cut 4 at y = 2.27 leaves o alone, path length 4. Frame 6: the same tree followed to m, twelve blue cut lines closing a narrow box around m, text: m alone after 12 cuts, o after 4."
+  caption="One random tree: the outlier o is alone after 4 cuts, the central point m after 12."
+/>
+
+<Task>
+Step through frames 2 to 5 and note how many points each cut removes from
+$o$'s box. Before opening frame 6, guess how many cuts the same tree needs
+for $m$.
+</Task>
+
+The first two cuts barely help: they remove 9 points and then 1. A cut
+position drawn uniformly over a column's range lands in the sparse tails
+as often as their width allows, and the tails are as wide as the crowd.
+The third cut removes 77 of the remaining 125, and the fourth falls in the empty
+strip between $o$ and the crowd below it. The point $m$, in the same tree,
+needs 12 cuts: every cut that reaches its neighbourhood leaves dozens of
+neighbours on its side.
+
+Two properties of $o$ shorten its path. It is **different**: on the
+horizontal column it lies 0.74 beyond the largest value of any other
+point, so every cut on that column that lands in this gap isolates it.
+And it is **few**: nothing lies near it, so a cut that separates it from
+the crowd leaves it alone instead of in a group.
+
+### The cuts form a tree
+
+Follow every point instead of one and the cuts form a binary tree: the
+root is the first cut, its two children are the cuts made on each side,
+and each branch ends where a single point is left.
+
+<Definition title="isolation tree, path length">
+An *isolation tree* on a set of $n$ points is built recursively. A node
+holding more than one point stores a test "column $q$ < value $p$", with
+$q$ drawn at random among the columns and $p$ drawn uniformly between the
+smallest and largest value of $q$ among the node's points; the points
+with $q < p$ go to the left child, the others to the right. A node holding
+one point, or points that are all identical, is a leaf. The *path length*
+$h(x)$ of a point $x$ is the number of edges from the root to the leaf
+that holds it: the number of cuts it took to isolate $x$.
+</Definition>
+
+With $n$ distinct points the tree has $n$ leaves and $n - 1$ internal
+nodes. It is not a decision tree: no label enters, no split is chosen to
+separate anything, and the tree is not fitted to the data in any sense
+beyond keeping each cut inside the range of the points it divides.
+
+<KeyFact>
+Because each test reads one column against a threshold drawn between that
+column's own minimum and maximum, shifting a column or multiplying it by a
+positive factor changes no path's distribution: the forest needs none of
+<Ref lesson="density-and-distance-scores"
+id="the-columns-have-to-share-a-scale">the standardisation the neighbour
+scores did</Ref>. A nonlinear change does
+matter. Taking the logarithm of the amount moves where uniform cuts fall,
+and so changes the paths.
+</KeyFact>
+
+## One tree is a lottery: averaging over a forest
+
+The tree in the figure gave $o$ a path of 4 and $m$ a path of 12. Another
+random tree gives other numbers. Over 1,000 independent trees on the same
+135 points, $o$'s path ranged from 1 to 10 cuts and $m$'s from 4 to 22,
+with standard deviations of 1.7 and 2.9. These two points are rarely
+confused, $m$'s path was as short as $o$'s in fewer than 1% of trees, but
+the ranking at the top is crowded: the next two easiest points of the
+cloud need on average 4.9 cuts, about one more than $o$ and less than one
+tree's spread.
+
+The repair is to average. Build $t$ independent trees and score each point
+by its mean path length $E[h(x)]$ over them.
+
+<Figure
+  src="./figures/convergence.svg"
+  alt="Line chart, log-scale x axis from 1 to 1,000 trees, y axis mean path length 0 to 16. A blue line for m wanders between 9.5 and 11.6 over the first 30 trees and settles at 12.08. An amber line for o settles at 3.75. A dashed horizontal line at 8.97 is labelled c(135) = 8.97: expected path of a typical point."
+  caption="Running mean path length over the trees: after about a hundred trees both points have settled, o at 3.75 and m at 12.08."
+/>
+
+The standard deviation of a mean falls with the square root of the number
+of trees: for $o$, 1.7 for one tree, 0.53 for ten, 0.17 for a hundred. A
+hundred trees is the usual default, and the figure shows why little is
+gained beyond it.
+
+## How long is a typical path?
+
+A mean path of 12 cuts says little on its own. Among 135 points it is
+long; among 100,000 points, where the crowd is far deeper, it is very short.
+Comparing paths across data sets of different sizes, or forests built on
+samples of different sizes, needs a yardstick: the path length a typical
+point would get among $n$ points.
+
+### A cut at a random gap
+
+Start with points spread evenly along one column. A cut drawn uniformly
+over the range lands in each of the $n - 1$ gaps between neighbouring
+points with the same probability, so it leaves $j$ points on the left with
+probability $1/(n-1)$, for $j = 1, \dots, n - 1$. A typical point is a
+point picked at random; it is on the left with probability $j/n$. Write
+$c(n)$ for its expected path length.
+
+Small cases come straight from the rule. One point needs no cut:
+$c(1) = 0$. Two points need exactly one: $c(2) = 1$. Three points: the cut
+leaves one point on the left or two, each with probability 1/2. A random
+point is the lone one with probability 1/3 and finishes after that cut;
+otherwise it is in a pair and needs one more. So
+$c(3) = 1 + \tfrac13 \cdot 0 + \tfrac23 \cdot 1 = \tfrac53$.
+
+<Theorem title="expected path of a typical point">
+If every cut falls in each gap with equal probability, the expected path
+length of a point picked at random from $n$ points is
+$$
+c(n) = 2\,(H_n - 1) = 2H_{n-1} - \frac{2(n-1)}{n},
+$$
+where $H_n = 1 + \tfrac12 + \dots + \tfrac1n$ is the $n$-th harmonic number.
+<Proof>
+**Recursion.** The first cut costs one step. With probability $1/(n-1)$ it
+leaves $j$ points on the left and $n - j$ on the right, and a random point
+then continues in a set of $j$ points with probability $j/n$ and of $n - j$
+with probability $(n-j)/n$. So
+$$
+c(n) = 1 + \frac{1}{n-1}\sum_{j=1}^{n-1}\Bigl(\frac{j}{n}\,c(j) + \frac{n-j}{n}\,c(n-j)\Bigr)
+= 1 + \frac{2}{n(n-1)}\sum_{j=1}^{n-1} j\,c(j),
+$$
+since the two halves of the sum run over the same terms.
+
+**Difference of two consecutive cases.** Write $S_n = \sum_{j=1}^{n-1} j\,c(j)$,
+so $n(n-1)\bigl(c(n) - 1\bigr) = 2S_n$, and the same for $n + 1$:
+$(n+1)n\bigl(c(n+1) - 1\bigr) = 2S_n + 2n\,c(n)$. Subtracting the first from
+the second and dividing by $n(n+1)$ gives $c(n+1) = c(n) + 2/(n+1)$.
+
+**Sum.** From $c(1) = 0$, $c(n) = 2\bigl(\tfrac12 + \tfrac13 + \dots + \tfrac1n\bigr) = 2(H_n - 1)$.
+Since $H_n = H_{n-1} + 1/n$, this equals $2H_{n-1} - 2(n-1)/n$.
+</Proof>
+</Theorem>
+
+The formula reproduces the small cases: $c(2) = 2 \cdot \tfrac12 = 1$ and
+$c(3) = 2(\tfrac12 + \tfrac13) = \tfrac53$. For larger $n$ the harmonic
+number is close to $\ln n + 0.5772$, so $c(n)$ grows like $2\ln n$:
+$c(135) = 8.97$, $c(256) = 10.25$, $c(4{,}096) = 15.79$. The same number is
+the average cost of a search for an absent key in a binary search tree
+built from $n - 1$ keys inserted in random order, which is the form in
+which software libraries usually quote it.
+
+### What the yardstick assumes
+
+The theorem assumes each gap is equally likely to receive the cut, which
+holds for evenly spread points. Real cuts are uniform in value, not in
+gap. On the 135-point cloud the mean path over all points, measured with
+100 trees, is 10.44, not 8.97: a Gaussian bunches its points in the middle,
+so cuts land in the wide, sparse tails more often than their share of
+points and peel off a few points at a time. On 135 points drawn uniformly
+over a square the same measurement gives 8.83. The yardstick is the path
+of a typical point on evenly spread data, used as a fixed reference, not a
+prediction of the mean.
+
+### Why not divide by n, or by log n?
+
+Path lengths run from 1 up to $n - 1$ (a tree that peels off one point per
+cut), so dividing by $n - 1$ bounds the score. It also drives every typical
+point toward zero as $n$ grows: $8.97/134 = 0.067$ at 135 points, 0.0002 at
+100,000. Dividing by $\log_2 n$ tracks the growth, but not exactly: the
+typical point's ratio $c(n)/\log_2 n$ is 1.19 at 16 points, 1.28 at 256 and
+1.32 at 4,096, so the same ratio means different things at different
+sizes. Dividing by $c(n)$ puts the typical point at exactly 1 for every
+$n$.
+
+## The anomaly score: 0.5 for a typical path
+
+A path ratio $E[h(x)]/c(n)$ runs from 0 upward, with 1 for a typical point.
+Raising 2 to minus that ratio turns it into a number between 0 and 1 that
+falls as the path grows.
+
+<Definition title="isolation anomaly score">
+For a forest whose trees are each built on $n$ points, the anomaly score
+of a point $x$ with mean path length $E[h(x)]$ is
+$$
+s(x, n) = 2^{-E[h(x)]/c(n)}.
+$$
+</Definition>
+
+Three values fix how to read it. A typical path, $E[h(x)] = c(n)$, gives
+$s = 2^{-1} = 0.5$ for every $n$. A path near zero gives $s$ near 1. The
+longest paths give $s$ near 0. The $n$ in the score is the number of
+points each tree was built on, not the size of the data set being scored;
+using the data set's size is a common bug, and it shifts every score.
+
+<Example title="the scores of o and m">
+The trees were built on all $n = 135$ points, so
+$c(135) = 2(H_{135} - 1) = 2(5.486 - 1) = 8.97$.
+
+**Point o.** $E[h(o)] = 3.75$, the ratio is $3.75/8.97 = 0.418$, and
+$s = 2^{-0.418} = 0.75$.
+
+**Point m.** $E[h(m)] = 12.08$, the ratio is $12.08/8.97 = 1.347$, and
+$s = 2^{-1.347} = 0.39$.
+</Example>
+
+<Figure
+  src="./figures/score.svg"
+  alt="The curve s = 2 to the power minus E[h] over c(135), falling from 1 at E[h] = 0 through 0.5 at E[h] = 8.97, marked with dashed guides, to about 0.16 at 24. An amber square at E[h] = 3.75, s = 0.75 labelled o; a blue dot at E[h] = 12.08, s = 0.39 labelled m."
+  caption="The score curve for trees on 135 points: o sits high on it, m below the typical 0.5."
+/>
+
+<Exercise>
+The mean path over all 135 points of the cloud is 10.44. Compute the score
+of a point with that path, and explain from the previous section why the
+average point of this cloud scores below 0.5.
+
+<Solution>
+$s = 2^{-10.44/8.97} = 2^{-1.164} = 0.45$. The yardstick $c(135) = 8.97$ is
+the expected path when every gap is equally likely to receive a cut. In a
+Gaussian cloud the cuts, uniform in value, land in the sparse tails more
+often than the tails' share of points, so most cuts peel off only a few
+points and the average path, 10.44, is longer than 8.97. A longer path
+gives a lower score: on bunched data the typical point sits a little below
+0.5. The reading "0.5 means typical" is exact only for evenly spread data.
+</Solution>
+</Exercise>
+
+<KeyFact>
+Within one forest the score ranks points exactly as the mean path length
+does, so it adds nothing to the ranking an investigator works. It matters
+when scores from forests built on different sample sizes are compared, and
+its reading, near 1 for an anomaly and about 0.5 for a typical point, is
+approximate on bunched data.
+</KeyFact>
+
+## Fewer points per tree: swamping and masking
+
+The trees so far were built on all 135 points, which held one anomaly.
+The planted group of the opening is the harder case: forty anomalies that
+are each other's company. Does a crowd lengthen a path the way it shortened
+a neighbour distance, and does a smaller sample per tree clear it the way
+the 2,000-row reference did?
+
+### Two ways a crowd hides an anomaly
+
+A crowd acts on a path in two ways:
+
+- **Masking**: the anomalies are numerous and close together. A member of
+  the group is not alone after the cuts that separate the group from the
+  crowd; the cuts must then work through its companions one by one, and
+  its path grows toward a normal one. Forty card tests at one shop mask
+  each other this way.
+- **Swamping**: normal points sit pressed against the anomalies. First,
+  they lengthen an anomaly's path: a cut that would have fenced it off
+  leaves those neighbours on its side, and further cuts must strip them
+  away one by one. Second, those neighbours are themselves out in the
+  sparse fringe of the cloud, where the anomaly is, so the same few cuts
+  that fence off the fringe fence them off too: their paths are as short
+  as the anomaly's or shorter, and they rank beside it or above it. Normal
+  points ranked as anomalies are the false alarms swamping produces.
+
+<Figure
+  src="./figures/mulcross-subsample.png"
+  alt="Two square scatter plots of the same generated data set, circles for normal points and triangles for anomalies. Left, all 4,096 points: a dense cloud of blue circles with two tight red clusters of triangles at its upper-left and lower-right edges, circles pressed against both clusters, and scattered single triangles around the rim. Right, a random sub-sample of 128 points: a sparse cloud of circles, and at the same two places only a handful of triangles each, with no circles beside them."
+  caption="The Mulcross data set: all 4,096 points (left) and a random sub-sample of 128 (right). Circles are normal points and triangles anomalies, the scattered single triangles included."
+/>
+
+The figure shows both effects on a generated data set built to have them,
+from the Mulcross generator: 4,096 points, a large Gaussian cloud of
+normal points and two dense clusters of anomalies, 10% of the data, placed
+at the cloud's edge with normal points pressed against them. Each cluster
+masks its own members, and the normal points around it swamp it. A forest
+built on all 4,096 points ranks the anomalies with a ROC-AUC of 0.67.
+Built on random samples of 128 points each, it reaches 0.91. In a sample
+of 128 each cluster shrinks to a handful of points and the normal points
+that surrounded it are mostly gone: the crowd that hid the anomalies is no
+longer in the data the tree sees.
+
+### How small: about one member of the crowd per sample
+
+How much smaller should the sample be? Return to the planted group of the
+previous lesson's last exercise. Take 32,000 random rows of the ULB card
+set, columns V1 to V28, and add a tight group of $g$ rows: copies of one
+point placed at twice the mean of the fraud rows, each moved by Gaussian
+noise of standard deviation 0.05 per column. Build forests of 100 trees,
+each tree on a random sample of $\psi$ rows (the *sub-sample size*), score
+every row, and measure the ranking by the <Ref
+lesson="alert-budget-metrics" id="what-the-team-sees-at-each-fraud">average
+precision</Ref> of finding the planted rows.
+
+<Figure
+  src="./figures/psi-crowd.svg"
+  alt="Line chart of average precision for the planted group against the sub-sample size psi on a log scale from 16 to all rows. Green line, 1,000 planted rows: 0.94 at 16 and 64, falling to 0.83 at 256, 0.61 at 1,024 and 0.43 with all rows. Blue line, 200 planted rows: 0.54 at 16, 0.79 at 64, 0.80 at 256, then falling to 0.30 with all rows. Amber line, 40 planted rows: 0.13 at 16, rising to 0.49 at 1,024, falling to 0.16 with all rows. A dashed vertical line marks psi = 256. Triangles on the axis mark 32,000 divided by g: 32 for green, 160 for blue, 800 for amber."
+  caption="Each group size has its best sample size, and it sits near N/g, where a sample holds about one planted row."
+/>
+
+With every row in each tree, the forest finds the planted groups badly:
+average precision 0.16 for 40 rows, 0.30 for 200, 0.43 for 1,000. Each
+curve peaks at a smaller sample: around $\psi = 1{,}024$ for 40 rows
+(0.49), 64 to 256 for 200 rows (0.80), 16 to 64 for 1,000 rows (0.94). In
+every case the peak is where a sample holds about one or two planted rows
+on average, $\psi \approx N/g$ with $N = 32{,}000$: a single planted row
+in a sample sits alone in a sparse region and is cut off early, which is
+exactly what the forest rewards. Below the peak the samples are too small
+to describe the ordinary rows, and the planted rows compete with every
+sparse honest row.
+
+At $\psi = 256$ all 40 planted rows of the smallest group land in the top
+100 of 32,040, at a median rank of 53; with every row only 21% of them do,
+at a median rank of 119. The 10th-neighbour distance of the opening
+recovered the same way, and the two recoveries have one cause. A group
+stops hiding once the set each payment is compared against holds fewer of
+its members than the score needs to treat them as company: fewer than
+$k = 10$ for the neighbour distance, which the 2,000-row reference met,
+and about one for a tree, since every member past the first adds cuts of
+its own. The tree asks for the smaller sample.
+
+<KeyFact>
+Isolation needs the anomalies to be few in each tree's sample, not few in
+the data. A group of $g$ anomalies among $N$ rows stops masking itself once
+the sample size $\psi$ is near $N/g$.
+</KeyFact>
+
+Two things separate the forest from a neighbour score on a sample. Each
+tree draws its own sample, without replacement, so a member of the crowd
+that shares one tree's sample with two others is alone in another's, and
+the mean path combines a hundred draws where the neighbour score rested on
+one reference. And the sample is the whole model: a tree on 256 rows is a
+few hundred stored tests, and a payment is scored by walking each tree
+from the root, one comparison per cut, about ten for a typical path on 256
+rows ($c(256) = 10.25$), instead of being measured against 2,000 rows in 28
+columns.
+
+In the demo below each tree is grown around the point you follow, on a
+random sample of $\psi$ points. In **Single outlier**, before growing any
+tree, predict which of the marked points A, B and C is alone after the
+fewest cuts, then grow ten or more trees for each and compare their mean
+paths. Then switch to **Masked cluster**: 380 points, of which 50 are a
+planted cluster (amber) sitting among 30 normal points at the cloud's
+upper right. The second readout gives the mean path of the cluster and of
+the normal points over a forest of 100 trees. Lower $\psi$ one step at a
+time until the cluster's mean path drops below the normal points'.
+
+<Demo name="IsolationSplitter" caption="A random isolation tree grown around the point you follow, on a sample of ψ points. In the masked-cluster preset a forest readout compares the planted cluster's mean path with the normal points'." />
+
+<Task>
+At which $\psi$ does the cluster's mean path fall below the normal
+points'? Compare it with $N/g$ for this preset, and say which of the two
+effects, masking or swamping, the 30 normal points around the cluster add.
+</Task>
+
+### When the frauds come in small clumps, a small sample buys nothing
+
+The same rule says when sub-sampling has nothing to clear. On the whole
+ULB file, 284,807 rows and 492 real frauds, the frauds sit in small
+clumps: <Ref lesson="density-and-distance-scores"
+id="on-real-card-data-fraud-comes-in-clumps">a fraud's ten nearest rows are
+59% fraud</Ref>: a fraud and some six fraudulent neighbours, a clump of
+something like seven, not a crowd of hundreds. For $g \approx 7$, $N/g$ is about 40,000 rows. A
+sample of 256 then holds a member of a given clump in fewer than one tree
+in a hundred ($256 \times 7/284{,}807 = 0.006$): there is no crowd in it to
+thin, and the smaller sample only describes the genuine rows more coarsely.
+
+Five forests of 100 trees at each sample size, mean average precision and
+range across the five:
+
+| $\psi$ | average precision |
+|---|---|
+| 256 | 0.20 (0.10 to 0.27) |
+| 1,024 | 0.24 (0.20 to 0.30) |
+| 4,096 | 0.28 (0.23 to 0.31) |
+| all 284,807 rows | 0.25 (0.24 to 0.28) |
+
+The ROC-AUC is 0.95 in every row. The ranges overlap, so the file names no
+best size. What it shows is that the default gains nothing here: 256 has
+the lowest mean and by far the widest spread, with one forest at 0.10 and
+another at 0.27 on the same data. The default $\psi = 256$ serves a wide
+range of data because it is small enough to thin most crowds; where there
+is no crowd it is a setting like a tree's depth, chosen on <Ref
+lesson="delayed-labels-prequential"
+id="prequential-folds-a-spread-across-weeks">prequential folds</Ref>.
+
+## A partial tree is enough: the height limit
+
+Growing every tree until each point is alone spends most of its cuts deep
+in the crowd, on paths that are long whatever happens. The ranking an
+investigator reads is the top of the list, the short paths, and a tree can
+stop where paths stop being short.
+
+### Stopping at depth ⌈log₂ ψ⌉, and accounting for it
+
+The usual limit is $l = \lceil \log_2 \psi \rceil$: depth 8 for
+$\psi = 256$, below the typical path $c(256) = 10.25$. Every path shorter
+than 8 is computed exactly. A node at depth $l$ is not split further,
+whatever it holds, and becomes a leaf that records how many sample points
+reached it, its *Size*.
+
+A point that ends in such a leaf has been cut $l$ times and still shares
+its box with Size − 1 sample points. Reporting $h = l$ would treat it as
+isolated. The repair adds the cuts the unbuilt subtree would have needed
+on average: a point reaching a leaf at depth $e$ that holds Size points
+gets $h(x) = e + c(\text{Size})$.
+
+<Figure
+  src="./figures/height-limit.svg"
+  alt="A binary tree drawn over depths 0 to 3 for a sub-sample of 8 points, height limit 3 drawn as a dashed line below depth 3. Two leaves at depth 2 hold one point each, labelled h = 2. Four leaves at depth 3: three hold one point, one amber leaf holds 3 points. Below the line, an unbuilt subtree under the amber leaf is drawn dashed, with the note: not built: 3 points would need c(3) = 1.67 more cuts on average; h = 3 + c(3) = 4.67."
+  caption="A tree stopped at the height limit: the leaf that still holds 3 points is charged the 1.67 cuts its subtree would have taken."
+/>
+
+<Exercise>
+A forest uses $\psi = 256$ and $l = 8$. In one of its trees, payment A
+reaches a leaf at depth 8 holding 5 sample points, payment B a leaf at
+depth 3 holding one, payment C a leaf at depth 8 holding one. Compute the
+three path lengths and, as if this tree were the whole forest, the three
+scores. What would the ranking be without the adjustment?
+
+<Solution>
+**Paths.** $c(5) = 2(H_5 - 1) = 2(2.2833 - 1) = 2.57$, so
+$h(\mathrm{A}) = 8 + 2.57 = 10.57$; $h(\mathrm{B}) = 3$;
+$h(\mathrm{C}) = 8 + c(1) = 8$.
+
+**Scores**, with $c(256) = 10.25$: A, $2^{-10.57/10.25} = 2^{-1.031} = 0.49$;
+B, $2^{-3/10.25} = 2^{-0.293} = 0.82$; C, $2^{-8/10.25} = 2^{-0.781} = 0.58$.
+
+**Without the adjustment** A and C both get $h = 8$ and tie, although C was
+alone at depth 8 and A still had four sample points with it. The
+adjustment separates them and puts A near the typical score of 0.5, where
+a point still in a crowd belongs. B's path is untouched: the limit never
+changes a path shorter than $l$.
+</Solution>
+</Exercise>
+
+### What a forest costs
+
+A tree on $\psi$ points has at most $2\psi - 1$ nodes, 511 for
+$\psi = 256$, and the height limit caps it at $2^{l+1} - 1$, also 511.
+Building $t$ trees costs about $t\psi\log\psi$ steps and does not grow with
+the size of the data. Scoring one payment walks each tree from the root to
+a leaf, at most $l$ comparisons per tree, so scoring $N$ payments costs
+about $N t \log\psi$: linear in $N$.
+
+Measured on the whole ULB file on one processor core, with $t = 100$ and
+$\psi = 256$: building the forest takes 0.2 seconds and scoring all 284,807
+rows 0.9 seconds. The previous lesson estimated five minutes for the
+pairwise neighbour pass on the same file and measured 21 seconds against a
+20,000-row sample. A 30-day stream of 12 million payments would take about
+40 seconds to score, and one new payment costs 100 walks of at most 8
+comparisons.
+
+<KeyFact>
+A larger sample is cheap where it is used. Scoring grows with
+$\log_2 \psi$: $\psi = 4{,}096$, the best mean on the ULB file, means 12
+comparisons per tree instead of 8. Building grows with
+$\psi\log\psi$, about 24 times the work for sixteen times the sample, and
+is paid once per forest, not once per payment.
+</KeyFact>
+
+## Where isolation fails: columns that carry nothing
+
+Each cut picks its column at random, which assumes every column might
+separate an anomaly. A column that carries no information about any
+payment still receives its share of the cuts.
+
+Take a random 50,000 rows of the ULB file, 78 of them fraud, and add 500
+columns of uniform random noise to its 28 V columns. The table gives the
+mean over several forests of 100 trees with $\psi = 256$, and the range in
+brackets. A cut now lands on a
+noise column 500 times in 528, and a noise cut splits frauds and genuine
+rows alike, so every path is mostly noise.
+
+| columns given to the forest | ROC-AUC | average precision |
+|---|---|---|
+| V1 to V28 | 0.95 | 0.20 (0.16 to 0.26) |
+| V1 to V28 and 500 noise columns | 0.76 (0.71 to 0.79) | 0.015 (0.005 to 0.027) |
+| the same 528, each tree keeping the 28 of highest kurtosis in its sample | 0.95 | 0.16 (0.13 to 0.19) |
+
+The repair chooses the columns per tree before cutting. *Kurtosis*
+measures how heavy a column's tails are relative to its spread; a few
+extreme values raise it sharply, and uniform noise has thinner tails than
+a Gaussian. Ranking the columns by kurtosis on each tree's own sample and
+keeping the top 28 picks exactly the 28 V columns in every one of the 100
+trees, and the ranking comes back: average precision 0.16 against 0.20,
+inside the spread between forests, against a base rate of 0.0016. A
+distance-based score suffers the same way, since 500 noise columns add to
+every distance, and needs the same kind of selection.
+
+The forest's assumption, in the form of <Ref
+lesson="anomaly-detection-framing"
+id="every-detector-family-assumes-one-thing-about-normal-data">the framing
+lesson's table</Ref>, is that anomalies are few in each sample and differ
+from normal payments in the value of at least one of the columns the cuts
+use. Noise columns break the second half; a group as large as the sample
+can thin it breaks the first.
+
+## What an isolation score finds in payments
+
+The ULB file has labels and anonymous columns. The simulator shows which
+kinds of fraud an isolation score finds and why.
+
+### The setup
+
+The stream is <Ref lesson="cost-aware-evaluation-lab">the evaluation
+lab's</Ref> simulator run, with its deployment geometry: the forest, 100
+trees with $\psi = 256$, is built on the 68,898 payments of training days
+42 to 48 without their labels, and scores test days 56 to 62 after the
+known-card removal of <Ref lesson="delayed-labels-prequential"
+id="which-test-payments-would-really-be-scored-removing-known-cards">the
+delayed-labels lesson</Ref>: 60,212 payments, 440 frauds, a base rate of
+0.73%, about 8,600 payments a day. Two input sets are compared:
+
+- **12 label-free inputs**: the amount, the weekend and night flags, the
+  card's count and mean amount over 1, 7 and 30 days, and the terminal's
+  counts over the same windows;
+- **the 15 inputs**: the same 12 plus the terminal's three <Ref
+  lesson="point-in-time-features"
+  id="the-delayed-terminal-risk-a-window-that-ends-δ-days-ago">delayed fraud
+  rates</Ref>, which are computed from labels.
+
+For comparison, a logistic regression and a random forest of 100 trees,
+at library defaults, are trained with labels on the 15 inputs of the same
+training week and scored on the same test week. The isolation-forest rows
+are means over three forests. The last column is <Ref
+lesson="alert-budget-metrics"
+id="card-precision-at-k-the-team-calls-cards">card precision at 100</Ref>:
+of the 100 cards the team calls each day, the share that were compromised,
+averaged over the week.
+
+| detector | inputs | ROC-AUC | average precision | CP@100 |
+|---|---|---|---|---|
+| isolation forest | 12 label-free | 0.60 | 0.03 | 0.05 |
+| isolation forest | 15 | 0.84 | 0.26 | 0.27 |
+| logistic regression, labels | 15 | 0.89 | 0.63 | 0.33 |
+| random forest, labels | 15 | 0.89 | 0.69 | 0.35 |
+
+### Which frauds reach the top
+
+<Figure
+  src="./figures/sim-scenarios.svg"
+  alt="Grouped bar chart of the share of each scenario's test frauds that reach the daily top 100 payments. Amount over 220, 26 test frauds: forest on 12 label-free inputs 0.42, forest on 15 inputs 0.15, logistic regression 0.92. Compromised terminal, 295 test frauds: 0.01, 0.64, 0.66. Leaked card with five-fold amounts, 119 test frauds: 0.32, 0.23, 0.65."
+  caption="Without label-derived inputs the forest finds part of the amount and leaked-card frauds and none of the compromised terminals; the terminal fraud rates bring those in."
+/>
+
+On the label-free inputs the forest finds part of what departs from
+normal. Of the frauds above €220, 42% reach a day's top 100 payments; of
+the leaked-card payments with five-fold amounts, 32%. The
+compromised-terminal frauds, two-thirds of the test week, reach it 1% of
+the time: <Ref lesson="anomaly-detection-framing"
+id="context-turned-into-a-column">nothing in the label-free data departs
+from normal for them</Ref>, since the generator leaves the terminal's
+traffic and the cards that pay there unchanged.
+
+The top of the list fills with honest payments that are different along
+one column. 73% of the honest payments in the daily top 100 are night
+payments, against 17% of the stream: a 0/1 column whose ones are a
+minority hands every one of them a short path, because a single cut on that
+column separates the minority from the rest. Different is not the same as
+fraudulent.
+
+With the terminal fraud rates added, the forest finds 64% of the terminal
+frauds, as many as the logistic regression. A terminal rate of 0.5 is
+extreme on its column, and the forest isolates it like any extreme value.
+But that column was built from labels, so the forest is no longer
+detecting "unlike normal"; it is reading a supervised signal that the
+feature carries.
+
+<KeyFact>
+The row that measures the forest as a detector for a stream without labels
+is the label-free one: average precision 0.03. The 0.26 of the 15-input
+row exists only where labels already arrive, and there a model trained on
+those labels reaches 0.63.
+</KeyFact>
+
+### A decent ranking, a poor top
+
+Even with the terminal rates, the forest's ROC-AUC, 0.84, is close to the
+supervised models' 0.89, while its average precision is less than half of
+theirs. <Ref lesson="alert-budget-metrics"
+id="how-much-of-the-curve-a-hundred-alerts-can-reach">ROC-AUC weighs every
+false-positive rate equally</Ref>, most of them far beyond what a hundred
+alerts a day can reach; average precision reads the top, where the forest
+mixes frauds with honest night payments and big spenders. A score can
+order the bulk of the stream well, which AUC rewards, and still fill the
+hundred places the team reads with payments that are merely unusual, and
+those hundred places are all the team ever sees.
+
+<Conclusion>
+You can now build an isolation tree by hand, read a payment's path length
+as the number of random cuts that isolate it, and average it over a
+forest. You can derive the yardstick $c(n) = 2(H_n - 1)$ from the
+random-gap recursion, turn a mean path into the score
+$s = 2^{-E[h]/c(n)}$, and say why 0.5 marks a typical point only roughly.
+You can explain swamping and masking, choose the sample size near $N/g$
+for a crowd of $g$ anomalies among $N$ payments, and say why a small
+sample buys nothing when the frauds come in small clumps. You can account for a truncated leaf with
+$c(\text{Size})$, give the forest's linear cost, and recognise its two
+failures: columns that carry nothing, and inputs that smuggle labels in.
+
+The forest scores a payment by how easily it is cut off. <Ref
+lesson="one-class-and-reconstruction">The next lesson</Ref> scores it by
+whether it falls outside a boundary fitted around normal payments, or by
+how badly a network trained to reproduce normal payments reproduces it,
+and asks whether adding such a score to a supervised model helps.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+Compute $c(n) = 2H_{n-1} - 2(n-1)/n$ for $n = 16$, 256 and 4,096, using
+$H_i \approx \ln i + 0.5772$, and the score of a point whose mean path is
+5 in each case. Explain in one sentence why the same path length gives
+three different scores.
+
+<Solution>
+**c(n).** $c(16) = 2(\ln 15 + 0.5772) - 2 \cdot 15/16 = 2(3.2853) - 1.875 = 4.70$.
+$c(256) = 2(\ln 255 + 0.5772) - 2 \cdot 255/256 = 2(6.1185) - 1.992 = 10.25$.
+$c(4{,}096) = 2(\ln 4{,}095 + 0.5772) - 2 \cdot 4{,}095/4{,}096 = 2(8.8947) - 2.000 = 15.79$.
+
+**Scores for a path of 5.** $2^{-5/4.70} = 2^{-1.064} = 0.48$;
+$2^{-5/10.25} = 2^{-0.488} = 0.71$; $2^{-5/15.79} = 2^{-0.317} = 0.80$.
+
+**Why.** Five cuts are about the typical path among 16 points, so the
+score is near 0.5; among 4,096 points the typical path is about 16 cuts,
+and a point isolated in 5 is far quicker than its crowd. The exact
+harmonic numbers give $c(16) = 4.76$ instead of 4.70; the approximation is
+close from about ten points up.
+</Solution>
+</Exercise>
+
+<Exercise>
+Push the sub-sample size to its smallest values. (a) With $\psi = 2$: what
+is the height limit, what tree can be built, and what score does any
+payment get? (b) With $\psi = 3$: what paths are possible for a payment
+passed through one tree, and what scores do they give? (c) What do the two
+cases say about the bottom end of the planted-group figure?
+
+<Solution>
+**(a)** $l = \lceil \log_2 2 \rceil = 1$, and $c(2) = 1$. The tree is one
+cut between the two sampled points, with two leaves of one point each.
+Every payment, whatever its values, lands in one of the two leaves after
+one cut: $h = 1$ in every tree, $E[h] = 1$, and
+$s = 2^{-1/1} = 0.5$ for every payment. The forest ranks nothing.
+
+**(b)** $l = \lceil \log_2 3 \rceil = 2$ and $c(3) = 5/3$. The first cut
+separates one sampled point from the other two. A payment that falls on
+the single point's side has $h = 1$; one that falls on the pair's side is
+cut again and has $h = 2$. The scores are $2^{-1/(5/3)} = 2^{-0.6} = 0.66$
+and $2^{-2/(5/3)} = 2^{-1.2} = 0.44$. Over many trees a payment's score
+reflects how often it falls on the side of a lone sampled point: some
+information, but each tree knows only which side of one random cut a
+payment is on.
+
+**(c)** A tree on a handful of points cannot describe where ordinary
+payments are, so a planted row and an ordinary row in a sparse region
+look alike. That is why the curves whose $N/g$ lies well above 16 fall
+again at the smallest $\psi$: the 40-row group ($N/g = 800$) drops from 0.36
+at $\psi = 256$ to 0.13 at 16, the 200-row group ($N/g = 160$) from 0.79 at
+64 to 0.54. The 1,000-row group ($N/g = 32$) reads 0.94 at both 16 and 64:
+the smallest tested size is already near its best, so the fall would come
+below the tested range. The sample must be small enough to thin the
+crowd and large enough to describe the normal data; for a crowd of $g$
+among $N$, $\psi \approx N/g$ balances the two.
+</Solution>
+</Exercise>
+
+<Exercise>
+"A payment whose every column lies well inside the normal range cannot get
+a high isolation score, since every cut on every column has normal
+payments on both sides of it." Refute the claim with payment B of <Ref
+lesson="density-and-distance-scores"
+id="many-columns-at-once-the-mahalanobis-distance">the Mahalanobis
+section</Ref>: two standardised columns with correlation 0.8, B at
+$(1.5, -1.5)$, each value with about 13% of payments further out on its
+axis. Explain which cuts isolate it, and name the step of the claim that
+fails.
+
+<Solution>
+**The cuts.** Consider a cut on the second column just above B's value
+$-1.5$. On B's side lie only the payments with a second value below $-1.5$,
+about 5% of them, and because of the correlation nearly all of these also
+have a low first value, mostly below 0. A cut on the first column anywhere
+between those payments and B's 1.5 then leaves B alone. Two cuts suffice,
+each of a kind that random cuts produce often, so B's mean path is short.
+
+**Measured.** A forest of 1,000 trees on 254 points drawn with correlation
+0.8 plus A $= (2.5, 2.5)$ and B gives B a mean path of 6.6 cuts against a
+median of 12.5, a score of 0.64, rank 5 of 256. A, at the end of the
+cloud's long axis, scores 0.61, rank 8.
+
+**The failing step.** "Normal payments on both sides of every cut" is
+true of the first cut, not of the later ones. After one cut the box holds
+a subset of the payments, and the second cut divides only those. The
+claim treats each column on the whole data; the tree cuts each column
+inside a box already narrowed by the other column, which is how a
+combination of common values becomes a sparse corner.
+</Solution>
+</Exercise>
+
+<Exercise>
+A point $x$ lies beyond all other points on column $q$: their values span
+a range $R_q$, and $x$ exceeds their largest by a margin $m_q$. (a) Show
+that a cut on column $q$, drawn among the points of the box including $x$,
+isolates $x$ immediately with probability $m_q/(R_q + m_q)$. (b) With $d$
+columns chosen with equal probability, write the probability that the
+first cut isolates $x$, counting only columns on which $x$ is outside the
+others' range. (c) Apply it to $o$ of the lesson's cloud: on the first
+column the other 134 points span $-2.83$ to $2.46$ and $o$ is at 3.2; on
+the second, $o$ is inside the range. (d) Now let $x$ be one of a tight
+group of $g$ points beyond the range. What does the first cut in the gap
+achieve, and roughly how many more cuts does a member of the group need?
+
+<Solution>
+**(a)** With $x$ included, the box spans $[\min, \max + m_q]$ on column
+$q$, a length of $R_q + m_q$. The cut position is uniform on it. $x$ is
+alone on its side exactly when the cut lands strictly between the others'
+maximum and $x$, an interval of length $m_q$: probability
+$m_q/(R_q + m_q)$.
+
+**(b)** $P = \dfrac{1}{d}\sum_{q} \dfrac{m_q}{R_q + m_q}$, the sum running
+over the columns on which $x$ lies outside the others' range; a column on
+which $x$ lies inside cannot isolate it with one cut while others remain
+on both sides.
+
+**(c)** $R = 2.46 - (-2.83) = 5.29$ and $m = 3.2 - 2.46 = 0.74$; only the
+first column counts, so $P = \tfrac12 \times 0.74/6.03 = 0.061$. A single
+cut rarely isolates $o$. What shortens its path is that every cut that
+keeps $o$ shrinks the box while $o$'s margin stays: after the tree's third
+cut the 47 other points in the box spanned 0.28 to 2.46 on the first
+column, and a cut on that column isolated $o$ with probability
+$0.74/(3.2 - 0.28) = 0.25$.
+
+**(d)** A cut in the gap separates the whole group from the rest, not
+$x$. The group is then a box of $g$ nearly identical points, and isolating
+one of them takes about $c(g)$ more cuts: $c(40) = 2(H_{40} - 1) = 6.56$,
+$c(200) = 9.76$. A member of a group of 40 has the path of a lone outlier
+plus six or seven cuts, which is masking measured in cuts. In a sample of
+$\psi$ rows the group appears with about $\psi g/N$ members, and once that
+is near 1 the extra $c(\cdot)$ vanishes.
+</Solution>
+</Exercise>
+
+<Exercise>
+On the evaluation lab's simulator run, with the lesson's geometry
+(forest built on days 42 to 48 without labels, scored on days 56 to 62
+after known-card removal), sweep the sub-sample size $\psi$ over 16, 64,
+256, 1,024, 4,096 and all 68,898 training payments, for both input sets.
+Before running, predict from the $N/g$ rule whether the curve should rise
+or fall, and say what result would show masking on this stream. Then
+report the average precision at each $\psi$, averaged over three seeds.
+
+<Solution>
+**Prediction.** Masking needs a crowd: many anomalies close together in
+the columns the forest reads. The simulator's frauds are scattered: a
+compromised terminal's frauds are ordinary payments by different cards,
+a leaked card's inflated payments are spread over two weeks, and the
+amount-rule frauds are a few a day. With no large group, $N/g$ is large,
+so the average precision should rise with $\psi$ and level off. Masking
+would show as a peak at a small $\psi$ followed by a fall as $\psi$ grows.
+
+**Measured** (seeds 0 to 2): with the 12 label-free inputs, 0.011, 0.017,
+0.034, 0.074, 0.088 and 0.081; with the 15 inputs, 0.036, 0.14, 0.26, 0.31,
+0.31 and 0.32. Both rise and level off from about 1,024: no masking. A
+card-testing night, by contrast, would put dozens of near-identical rows
+at one merchant into the scored data, and the same sweep on that night
+would peak where a sample holds one or two of them.
+
+**Setup.** scikit-learn's `IsolationForest(n_estimators=100,
+max_samples=psi)`, fitted on the training rows and scored with
+`-score_samples` on the test rows; `average_precision_score` against the
+test labels.
+</Solution>
+</Exercise>
+
+<Exercise>
+On the same geometry, standardise the 15 inputs with the training week's
+means and standard deviations, fit a principal component analysis with 2
+components on the training week, and score each test payment by its
+squared reconstruction error: the squared distance between the payment
+and its projection back from the 2 components. Report the ROC-AUC and
+average precision, and compare them with the isolation forest's 0.84 and
+0.26. Which score of <Ref lesson="density-and-distance-scores"
+id="where-the-rare-combinations-live-principal-coordinates">the principal
+coordinates section</Ref> is this, up to the weighting of its terms?
+
+<Solution>
+**Measured.** ROC-AUC 0.86, average precision 0.27: level with the forest
+on both. With 4 components the average precision falls to 0.21; with only
+the 12 label-free inputs and 2 components it is 0.085, close to the best
+the label-free forest reached in the previous exercise's sweep.
+
+**Which score.** The reconstruction error is the squared distance off the
+plane of the two leading components, $\sum_{i > 2} y_i^2$: the
+minor-component score with its terms not divided by the variances
+$\lambda_i$. It flags payments whose columns depart from the main
+correlations.
+
+**The connection.** A projection onto a few directions and back is the
+simplest model trained to reproduce normal payments. <Ref
+lesson="one-class-and-reconstruction">The next lesson</Ref> replaces the
+two linear directions with a network that compresses and reproduces a
+payment, and scores by the same reconstruction error; on this stream the
+linear version already matches the forest.
+</Solution>
+</Exercise>
+
+<Exercise>
+The label-free forest of the scenario figure has a CP@100 of 0.05: about
+5 compromised cards a day, 35 over the test week. (a) From the figure's
+three shares and the week's 26 amount, 295 terminal and 119 leaked-card
+frauds, predict how many fraudulent payments enter the daily top 100
+payments over the week, and how many cards a day that would suggest. (b)
+The prediction is too high. Using <Ref lesson="alert-budget-metrics"
+id="collapsing-a-day-to-cards">how a day collapses to cards</Ref> and <Ref
+lesson="alert-budget-metrics"
+id="removing-cards-the-team-has-already-found">the removal of cards
+already found</Ref>, name each step between "fraudulent payments in the
+top 100" and "compromised cards found", say which way it moves the count
+and which scenario it mostly concerns. (c) One step moves the count up.
+Which, and through which scenario?
+
+<Solution>
+**(a)** $0.42 \times 26 + 0.01 \times 295 + 0.32 \times 119 \approx 11 + 3 +
+38 = 52$ fraudulent payments in the week's top-100 lists, about 7.4 a day.
+If each were a different card, the forest would find about 7 cards a day,
+not 5.
+
+**(b)** Two steps take cards out, both through the leaked cards. The 119
+leaked-card frauds belong to 31 cards, each with a third of its payments
+inflated fivefold for two weeks, so the forest keeps finding the same
+cards. *One card, one slot*: the day is collapsed to cards by their
+highest score, and on 8 occasions a leaked card had two inflated payments
+in the same day's top 100, so 52 payments are 44 card-days. *Found cards
+are removed*: a card called on one day is blocked and its later payments
+leave the list; 14 of the 44 card-days were cards found on an earlier
+day. That leaves 30.
+
+**(c)** *A card is compromised on a day if any of its payments is fraud.*
+A card can reach the top 100 through a genuine payment and still count as
+found. This happens to the compromised-terminal victims: 3 of their
+fraudulent payments reached the payment lists, but 8 of their cards were
+counted, 5 of them through a genuine payment the forest found unusual. So
+$30 + 5 = 35$ cards: 11 amount, 8 terminal and 16 leaked. The forest's
+recall over leaked-card payments, 32%, overstates its value to the team,
+because its finds come back to the same few cards; its 1% on terminal
+frauds understates it slightly, since a victim card that pays somewhere
+unusual on the day of its fraud is found without the fraud being
+noticed.
+</Solution>
+</Exercise>
+
+<Exercise>
+For each situation choose among the k-th neighbour distance, the local
+outlier factor, the Mahalanobis distance and an isolation forest, and name
+the property of the data that decides. (a) Tonight's 400,000 payments must
+be scored before morning with no clean reference period, and card-testing
+bursts of a few dozen identical payments are expected. (b) A merchant's
+month of payments in two columns, a dense lunchtime crowd of small
+amounts and a thin spread of large evening orders; you want the odd
+payment in either group. (c) Thirty strongly correlated columns, where the
+payments to flag are those whose columns disagree with each other, and a
+clean month exists to estimate from. (d) The same thirty columns plus
+three hundred columns of device and browser attributes, most of them
+irrelevant.
+
+<Solution>
+**(a)** Isolation forest, or a neighbour score built for the bursts. The
+deciding properties are the bursts and the missing clean reference: the
+scores are fitted to the data that holds the bursts, so a burst is its own
+neighbourhood for any neighbour score with $k$ below its size. Time does not
+decide: the pairwise pass on 400,000 payments takes about ten minutes, well
+before morning. Two neighbour scores also work: $k$ at least the largest
+expected burst, or scoring against a small random reference that holds
+fewer than $k$ members of a burst, as the opening's 2,000 rows did. The
+forest gets the same effect with $\psi$ near $N/g$, about
+400,000/40 = 10,000 for bursts of 40, and draws a fresh sample per tree
+instead of resting on one reference.
+
+**(b)** Local outlier factor, with $k$ below the size of the evening group.
+The two groups have very different densities; a global distance ranks
+every evening order above an odd lunchtime payment, and a forest's random
+cuts also isolate the sparse evening orders early, for the same reason.
+
+**(c)** Mahalanobis distance with all components, estimated on the clean
+month. The anomalies are departures from the correlations, the
+rare-combination case, and the covariance finds those directions exactly;
+a forest finds them only through sequences of axis cuts.
+
+**(d)** Isolation forest with per-tree column selection, or a reduction to
+the relevant columns before any score. Irrelevant columns dilute every
+distance and receive most random cuts; kurtosis selection on each tree's
+sample keeps the columns whose tails hold the anomalies.
+</Solution>
+</Exercise>
+
+<References>
+1. F. T. Liu, K. M. Ting, Z.-H. Zhou, "Isolation Forest," *Proceedings of the Eighth IEEE International Conference on Data Mining (ICDM)*, 2008, pp. 413–422 — Sec. 1 (anomalies as few and different; profiling versus isolation; two parameters), Sec. 2 (random partitioning of a 135-point Gaussian and the convergence of mean path lengths, Fig. 1; the isolation tree and path length definitions; the analogy with unsuccessful search in a binary search tree, Table 1; $c(n)$, Eq. 1; the anomaly score, Eq. 2, and its reading; Figs. 2–3), Sec. 3 (swamping and masking; sub-sampling without replacement; the Mulcross example with AUC 0.67 on 4,096 instances and 0.91 on sub-samples of 128, Fig. 4), Sec. 4 (Algorithms 1–3: the forest, the tree with height limit $\lceil\log_2\psi\rceil$, path length with the $c(\text{Size})$ adjustment; defaults $\psi = 256$, $t = 100$; complexity), Sec. 5.1 (nearest-neighbour methods missing anomaly clusters larger than $k$), Sec. 5.2 (AUC against sub-sample size), Sec. 5.3 (506 uniform noise attributes and kurtosis-based attribute selection, Fig. 7), Sec. 5.4 (training on normal instances only), Sec. 6 (the 511-node bound). https://doi.org/10.1109/ICDM.2008.17
+2. D. E. Knuth, *The Art of Computer Programming, Vol. 3: Sorting and Searching*, 2nd ed., Addison-Wesley, 1998 — Sec. 6.2.2 (binary tree searching: the average cost of an unsuccessful search in a tree built by random insertions, $2H_{N+1} - 2$ for $N$ keys).
+3. V. Chandola, A. Banerjee, V. Kumar, "Anomaly Detection: A Survey," *ACM Computing Surveys* 41(3), Article 15, 2009 — Sec. 5, advantages and disadvantages of nearest-neighbour techniques (anomalies with enough close neighbours are missed; the cost of computing every test instance's distances). https://doi.org/10.1145/1541880.1541882
+4. D. M. Rocke, D. L. Woodruff, "Identification of Outliers in Multivariate Data," *Journal of the American Statistical Association* 91(435), 1996, pp. 1047–1061 — the Mulcross generator of the swamping-and-masking figure. https://doi.org/10.1080/01621459.1996.10476975
+5. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 7, section "Autoencoders and anomaly detection", subsection "Comparison with another unsupervised baseline: Isolation Forest" (ten trees on the fifteen simulator inputs, trained on one week and scored on a later one: AUC 0.808, AP 0.164, CP@100 0.19); Ch. 3 (the simulator). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+6. A. Dal Pozzolo, O. Caelen, R. A. Johnson, G. Bontempi, "Calibrating Probability with Undersampling for Unbalanced Classification," *IEEE Symposium Series on Computational Intelligence (SSCI)*, 2015 — the release of the ULB credit-card dataset (284,807 payments, 492 frauds, V1–V28 principal components). https://doi.org/10.1109/SSCI.2015.33 The ULB computations of this chapter (sub-sample sweeps, planted groups, timings, noise columns and kurtosis selection) and the simulator computations (the evaluation lab's generator, seed 0) were run for this course with numpy and scikit-learn on the copy published as OpenML dataset 1597. https://www.openml.org/d/1597
+7. scikit-learn developers, `sklearn.ensemble.IsolationForest` — the implementation used for every forest in this chapter: `max_samples` as the sub-sample size (default `min(256, n)`), `n_estimators` as the number of trees, height limit $\lceil\log_2\psi\rceil$, `score_samples` returning $-s$. https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.IsolationForest.html
+</References>

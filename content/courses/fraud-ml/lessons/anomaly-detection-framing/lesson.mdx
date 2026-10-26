@@ -1,0 +1,788 @@
+A supervised detector finds the kinds of fraud it was shown. A new scheme produces payments unlike any labelled fraud, and the only thing known about them is that they are unlike the normal ones. What does 'unlike normal' mean for a payment, what has to be assumed about normal data to detect departures from it, and when does each assumption break?
+
+Every detector of the previous module learned from labelled history. The
+boosted tree and the network of
+<Ref lesson="worldline-model-comparison">the eight-family comparison</Ref>,
+like <Ref lesson="scorecards-woe">the points scorecard</Ref>, rank a
+payment high when it resembles payments that investigators and
+customers had already marked as fraud. On the simulator that is enough,
+because the same three scripts run every week. A real stream has no such
+guarantee: fraud is <Ref lesson="financial-crime-typology"
+id="rarity-is-one-difficulty-out-of-five">time-evolving</Ref>, and when one
+method gets blocked its users change it.
+
+Take one change. A fraud ring buys a batch of stolen card numbers and,
+before spending on them, checks which still work: each number pays €1 at a
+small web shop with weak checks, and the numbers that pass are spent on
+later. This is *card testing*, the €1 probe of
+<Ref lesson="economics-of-detection" id="one-card-five-chances-to-act">the
+stolen card that probes, then spends</Ref>, run over hundreds of cards at
+once. Suppose the bank's labelled history holds no case of it. A €1 payment
+looks like nothing the model learned to fear, so the model scores it low,
+and the investigators find the scheme weeks later, by hand, from the
+complaints about what followed.
+
+Could a detector have raised it on the night it began, with no label, on
+the grounds that it looked like nothing normal?
+
+## One unusual column does not find most fraud
+
+"Unlike normal" has an obvious first reading: a payment with an unusual
+value. Amount is the column everyone checks first, so take the largest
+amounts of the stream and flag them.
+
+### The obvious detector, measured
+
+On one 63-day run of <Ref lesson="canonical-datasets"
+id="three-scripted-frauds">the transaction simulator</Ref>, the run the
+evaluation lab uses, take days 30 to 62: 324,045 payments, 2,769 of them
+fraud. Flag every payment above the 99.9th percentile of amount, which is
+€298. The rule flags 325 payments, every one of them fraud, and still
+catches only one fraud in eight.
+
+The 325 are all leaked-card payments whose amount the script multiplied
+by five. The rule catches none of the 1,776 frauds at compromised terminals,
+two-thirds of all fraud, because those payments keep their ordinary
+amounts. It also catches none of the 179 frauds of the amount rule, which
+lie between €220 and €298: unusual for the simulator's script, not unusual
+enough for the 99.9th percentile.
+
+<KeyFact>
+Most fraud is not extreme in the column a global cut looks at.
+</KeyFact>
+
+The rule fails in the other direction too. In the weeks before Christmas
+many cardholders spend several times their usual amounts, so a global
+amount cut fills with honest shoppers in December. A payment can be
+extreme without being fraud, and fraud can sit in the middle of every
+column.
+
+### Anomaly, noise, novelty
+
+Both failures say the same thing: "unusual" needs a stated notion of
+normal behaviour, and a global distribution of one column is a poor one.
+An *anomaly* is a pattern that does not conform to a well-defined notion
+of normal behaviour; the older word *outlier* names an observation that
+deviates markedly from the other members of its sample. Neither word means
+fraud. An anomaly is a reason to look.
+
+Two neighbouring ideas are kept apart from it. *Noise* is an unusual record
+nobody cares about, a mistyped amount or a terminal clock reset, to be
+removed or made harmless before modelling. A *novelty* is a new pattern
+that, once seen, is folded into the model of normal: a cardholder who
+moves abroad, a new payment app. A fraud detector wants anomalies that are
+neither, and it cannot tell the three apart from the data alone; the
+investigator's call does that.
+
+## Point and contextual anomalies: the card is the context
+
+What notion of normal would have caught more than one fraud in eight? The
+answer depends on what the departure is a departure from, and there are
+three kinds.
+
+<Figure
+  src="./figures/anomaly-types.svg"
+  alt="Three panels. Left, titled point anomaly, unusual on its own: payments of all cards over 60 minutes on a log scale from 1 euro to above 10,000 euros, black dots spread between a few euros and a few hundred euros, one amber dot at 15,000 euros far above them all. Middle, titled contextual anomaly, unusual for this card, this season: one card's weekly spend over 52 weeks inside a blue usual-range band that rises steeply in the last weeks; an amber dot at 1,000 euros in July far above the band, and a black dot at 1,000 euros at Christmas inside it. Right, titled collective anomaly, unusual only as a run: payments at one web merchant over 60 minutes, scattered black dots between a few euros and 150 euros, and a stack of nine amber squares at 1 euro within four minutes, labelled nine 1-euro payments, nine cards, four minutes"
+  caption="Three ways a payment departs from normal: on its own, only for this card in this season, or only as part of a run."
+/>
+
+### Unusual on its own
+
+A *point anomaly* is an instance that is anomalous with respect to the rest
+of the data. A €15,000 payment on a consumer card is the plain case: in a
+stream where nearly every card payment lies between a euro and a few
+hundred euros, it is far from all of them before anyone asks whose card
+paid it. This is the only kind the global amount cut of the first section
+can see, and the 325 payments it caught were of this kind: leaked-card
+amounts multiplied by five until they were extreme for the whole stream.
+
+### Unusual given a context
+
+Most departures are not that far out. On a real card stream a €420 payment is an ordinary
+purchase, a phone or a flight. On a card whose
+payments sit around €40 it is ten times the habit, and it is unusual only
+once that card's payments are taken as the reference. That is the second
+kind. A *contextual anomaly* is an instance that
+is anomalous in a specific context and normal otherwise. Its attributes
+split in two. The *contextual attributes* fix the context: which card, which
+week of the year, which terminal. The *behavioural attributes* are the
+values judged within it: the amount, the week's spend, the hour.
+
+A cardholder who spends about €100 a week and €1,000 in Christmas week
+spends a normal €1,000 in December. The same €1,000 in a July week is
+anomalous. The behavioural value is identical; the contextual attribute,
+the week, decides. <Ref lesson="behavioural-profiles"
+id="one-pattern-under-four-features-the-card-is-the-context">The behavioural
+profiles</Ref> built four such scores by hand, with the card as the
+context: the in-arc flag, the break-point statistic, the peer score and the
+standardised gap.
+
+### Context turned into a column
+
+A context can be handled in two ways. One is to fit a separate model of
+normal for each context, one per card. The other is what <Ref
+lesson="transaction-aggregates">the windowed aggregates</Ref> and the
+profiles did: compute the comparison with the context and store it as a
+column. The ratio of the amount to the card's 30-day mean is the amount
+measured in units of the card's own habit. In a feature space that holds
+that ratio, the €420 payment on the €40 card is far from everything, a
+point anomaly, whatever other cards spend.
+
+This is why those features matter beyond supervised models. A detector that looks for points far from the rest can find a
+contextual anomaly only if the context is already in the columns it reads.
+
+<Example title="the three scripted frauds, as anomalies">
+Classify the simulator's three scenarios by what an unlabelled detector
+could see.
+
+**Amount above €220.** Every such payment is fraud, and €220 is about
+twice the largest personal mean amount the generator draws. A point anomaly
+against the whole stream, although the 99.9th-percentile cut sits above
+most of it.
+
+**Leaked card.** A third of the card's payments are multiplied by five. The
+inflated amount is extreme for this card and often ordinary for the
+stream: a contextual anomaly with the card as context, a point anomaly in
+the space that holds the amount-to-mean ratio. Its largest amounts are
+also global point anomalies: the 325 payments the global cut found.
+
+**Compromised terminal.** Every payment on the terminal for 28 days is
+fraud, but the generator keeps the terminal's traffic, the cards that pay
+there and their amounts exactly as before. <Ref lesson="transaction-aggregates"
+id="on-the-simulator-one-scenario-found-one-not">The terminal's counts did
+not move</Ref>. Nothing in the label-free data departs from normal in any
+context: only the label marks these payments. No anomaly detector can find
+them, and a supervised one finds them only through the terminal fraud rate,
+which is built from labels.
+</Example>
+
+## Collective anomalies: suspicious only as a run
+
+Card testing at the web shop is the third kind. Each €1 payment is
+unremarkable: small payments occur everywhere, and every card in the batch
+pays only once. What is anomalous is nine €1 payments from nine different
+cards at one shop within four minutes.
+
+A *collective anomaly* is a collection of related instances that is
+anomalous with respect to the whole data, although its members need not be
+anomalous on their own. "Related" is the condition: the instances must
+share something, a merchant, a card, a stretch of time, a chain of
+transfers. A collective anomaly exists only where the data carries such
+relations, which a table of independent rows does not.
+
+<Figure
+  src="./figures/ecg-collective-anomaly.png"
+  alt="A real electrocardiogram trace of about 3,000 samples: ten regular heartbeats, each a tall spike up to about -4.4 and a sharp dip down to about -7, with small bumps between them around -5.8. Between samples 1050 and 1380, where the fifth beat should be, the trace instead stays flat at about -5.75, drawn in a lighter grey. Every value in that stretch is within the range the normal beats pass through."
+  caption="A human heartbeat with one beat missing. No single sample in the grey stretch is out of range, since the trace passes through -5.75 on every beat. What is abnormal is that it stays there for 330 samples. That is an atrial premature contraction, and it can only be seen in the sequence, not in any one reading."
+  float="right"
+  width={380}
+/>
+
+Card testing has the structure of the missing heartbeat, in a stream of
+payments: every €1 amount is one the shop sees all day, and only the run of
+them, a new card each minute, is abnormal.
+
+A collective anomaly can also be turned into a column. A window over the
+merchant's recent payments, the count of €1 payments at this shop in the
+last ten minutes, or the number of distinct cards paying there in the last
+hour, gives each payment of the run a value far from the shop's usual
+level. <Ref lesson="transaction-aggregates"
+id="two-meanings-of-at-the-merchant">The aggregates conditioned on the
+current merchant</Ref> are this kind of column. Point, contextual and
+collective are therefore not three kinds of fraud. They describe where the
+departure lives before the features are built; a feature pipeline moves
+departures into single rows, and only departures that some column holds can
+be scored row by row.
+
+<Exercise>
+The cloned telephone of <Ref lesson="financial-crime-typology"
+id="a-telephone-account-call-by-call">the typology</Ref> had six genuine
+daytime calls from the New York area lasting minutes, then calls from
+Boston at 01:45, 01:46 and 01:50 lasting 34 to 39 seconds, a genuine call at
+11:23, and two more Boston calls at 22:00 and 22:04. Classify the fraud as
+point, contextual or collective anomalies. Name the contextual and the
+behavioural attributes where there is a context.
+
+<Solution>
+**Each call on its own.** A 35-second call from Boston at night is an
+ordinary call for millions of subscribers. Against the whole call stream
+no fraudulent call is a point anomaly.
+
+**Each call against this account.** With the account as the contextual
+attribute, the hour, the city and the duration are behavioural attributes,
+and each fraudulent call departs on all three: night against a daytime
+habit, Boston against New York, half a minute against minutes. Every
+fraudulent call is a contextual anomaly. The genuine 11:23 call is short
+too, but at a usual hour from a usual place.
+
+**The calls together.** Three calls within five minutes, after gaps of
+hours between genuine calls, form a run whose members are each explained by
+the contextual view already; the run adds the burst, which is a collective
+anomaly in the sequence of the account's calls. The account's own
+standardised log-gap, from the behavioural profiles, is that collective
+anomaly turned into a column.
+</Solution>
+</Exercise>
+
+## Where "normal" comes from: three label regimes
+
+A model of normal has to be fitted to some data. The obvious source is the
+payments the bank has labelled genuine: train on them as a classifier
+trains on a class.
+
+Two things go wrong. First, a payment is "genuine" in the bank's labels
+because nobody reported it within the verification latency δ, and
+<Ref lesson="fraud-detection-system"
+id="silence-read-as-genuine-is-a-decision-not-a-fact">silence read as
+genuine is a decision, not a fact</Ref>: some of those payments are
+undiscovered fraud. Second, if the fraud labels are used as well, the
+result is a classifier again, and it finds the fraud it saw. Which labels a
+detector uses decides what it can find, and there are three possibilities.
+
+<Definition title="label regimes">
+A detector is trained in one of three *label regimes*:
+
+- **supervised**: labels for both classes, normal and anomalous; the
+  detector learns to discriminate between them;
+- **semi-supervised**: labels for the normal class only; the detector
+  models normal behaviour and flags departures from it;
+- **unsupervised**: no labels; the detector models whatever the data holds,
+  on the assumption that normal instances are far more frequent than
+  anomalies.
+</Definition>
+
+"Semi-supervised" here does not carry its usual machine-learning meaning,
+a few labels of both classes plus many unlabelled rows. In anomaly
+detection it means that the training data is known to be normal.
+
+<Figure
+  src="./figures/regimes.svg"
+  alt="Three rows. Supervised: blue labelled genuine dots and amber labelled fraud squares separated by a line; labelled genuine and fraud; learns where past fraud differs from genuine; blind to fraud unlike any it was shown. Semi-supervised: blue labelled genuine dots inside a dashed boundary; labelled normal only; learns a boundary around normal; needs normal data with no fraud hidden in it. Unsupervised: grey unlabelled dots with a dashed boundary around the dense mass and a few points outside; labelled nothing; learns where most of the data lies; needs anomalies far fewer than normal payments"
+  caption="What each regime is given, what it learns, and what it depends on."
+/>
+
+### What each regime can find
+
+**Supervised** detection is the previous module. It needs labels that
+represent the fraud to come, and a new scheme has none by definition.
+
+**Semi-supervised** detection needs only a sample the bank believes normal,
+and a bank always has one: last quarter's payments that nobody alerted or
+disputed. That availability makes it the most widely applicable regime in
+practice. It finds anything unlike its sample, so it inherits whatever
+undiscovered fraud the sample contains as part of normal.
+
+**Unsupervised** detection needs nothing. Most semi-supervised methods can
+be run unsupervised by fitting them to an unlabelled sample, on the
+assumption that the few anomalies in it barely move the fitted model.
+
+### The rarity assumption, and where it breaks
+
+The unsupervised regime rests on one premise, that anomalies are rare. Card
+fraud usually obliges: one payment in several hundred. The premise fails
+when the anomalies arrive in bulk. Suppose the testing ring sends 3,000
+€1 attempts through the web shop in one night, against 500 genuine
+payments. In that shop's night, "what most of the data looks like" is
+card testing. An unsupervised model fitted to the night calls the €1
+payments normal and the genuine purchases unusual. A semi-supervised model
+fitted to the shop's previous month has never seen a night like this and
+flags it.
+
+<KeyFact>
+Unsupervised detection is not free of assumptions: it assumes that normal
+data dominates whatever sample it is fitted to.
+</KeyFact>
+
+## Whose normal: by owner or by operation
+
+A semi-supervised model still has to decide whose normal it describes. The
+obvious choice is one model of all genuine payments.
+
+One model for everybody fails for the reason the contextual anomaly showed.
+Take one cardholder, whose weekly purchases are a small cloud in some
+feature space. All cardholders' weeks together form a cloud so wide that a
+boundary around it encloses a takeover week of this one card: the thief's
+spending is someone's ordinary week. The departure is from this card's
+pattern, so the reference has to be this card. Detecting fraud this way,
+by watching each entity's activity against its own past, is called
+*activity monitoring*.
+
+Two references are used, and they differ in the entity whose past is
+watched.
+
+<Figure
+  src="./figures/owner-operation.svg"
+  alt="Two tables of payment rows. Left, titled by owner: the card is the context, card C17's earlier payments: grocery 42 euros, fuel 55 euros, grocery 38 euros, café 4 euros, grocery 61 euros, highlighted in blue, then the scored payment highlighted amber: 7 March 02:13, card C17, web W42, 1 euro; verdict: a new merchant, a small amount, a late hour: mildly unusual for this card. Right, titled by operation: the merchant is the context, the payments at web W42 before it: five rows of 1 euro from cards C903, C118, C561, C440, C276 between 02:05 and 02:11, then the same scored payment in amber; verdict: 1 euro from a different card every minute or two: a run nobody's own history shows"
+  caption="The same payment judged against two contexts: the card's past barely notices it, the merchant's past shows the run."
+/>
+
+**By owner.** Every card gets a profile from its own history, and each new
+payment is compared with it. It catches what changes a card: a stolen card
+spending fast, an account taken over. It costs a lookup of the card's
+profile for every payment, against a store holding every card. The
+behavioural profiles are by-owner scores, and the peer score is a by-owner
+score whose reference is <Ref lesson="behavioural-profiles"
+id="choosing-the-peers">a fixed group of similar cards</Ref> instead of the
+card's own past.
+
+**By operation.** The payments at one place, a terminal, a merchant or a
+region, are compared with that place's usual payments. It catches what
+changes a place: card testing at a web shop, a burst of foreign cards at
+one cash machine. Each card in the testing batch pays once, so no by-owner
+profile holds the run; the merchant's history does.
+
+Both are contextual anomaly detection, with different contextual
+attributes. Fraud added to a legitimate account's own stream,
+<Ref lesson="financial-crime-typology"
+id="superimposed-and-subscription-fraud">superimposed fraud</Ref>, is the
+case by-owner monitoring was built for; a scheme that touches many accounts
+once each is the case for by-operation monitoring.
+
+## One fuzzy ball or two: what a boundary around normal buys
+
+Once normal is modelled for the right entity, the obvious rule is to flag
+whatever falls outside it. Picture one cardholder's past weeks as points
+in a plane: spend in the week, and the share of the week's payments made
+online. Nobody has labelled them, but almost all of them are the owner's
+own, so they form a fuzzy ball of normal weeks with perhaps a stray point
+or two. The *one-ball rule* draws a boundary around the ball and flags
+anything outside. It uses no label, so it is the unsupervised regime run
+per card; fitted to weeks known to be clean, the same rule would be
+semi-supervised. Either way it asks only whether a week is unlike the
+ball.
+
+<FigureSequence
+  name="balls"
+  alt="Four frames on axes spend in the week from 0 to 2,000 euros and share of the week's payments made online from 0 to 1. Frame 1: one cardholder's normal weeks, blue dots around 300 euros and 0.2, inside a dashed blue boundary. Frame 2: adds a black ring at 620 euros and 0.08 labelled holiday abroad, outside: alarm. Frame 3: adds amber squares around 1,450 euros and 0.75 labelled fraud weeks of other cards and an amber discriminating line between them and the normal weeks; the holiday week is now labelled normal side: no alarm. Frame 4: adds a green dot at 280 euros and 0.93 labelled a new scheme: outside the boundary, on the normal side of the line"
+  caption="One ball flags everything outside it; two balls flag only what lies toward known fraud."
+/>
+
+<Task>
+Step through to frame 4. Before reading on, say which of the two rules
+raises an alarm on the holiday week and which on the new scheme.
+</Task>
+
+### Outside normal is not toward fraud
+
+The second frame shows what one ball cannot know. A holiday week abroad
+spends more than any normal week, so it falls outside the boundary and
+raises an alarm, yet nothing in it points toward fraud. Every honest
+surprise in a customer's life lands outside the ball, and each one is an
+alert.
+
+The *two-ball rule* is the supervised one. It adds a second ball, the
+weeks of known fraud, and flags a week only when it is more likely to belong to the fraud ball than
+to the normal one. The holiday week is far from both balls and closer to
+normal: no alarm. This is why supervised scores give fewer false alarms
+wherever they apply.
+
+### Two assumptions inside the second ball
+
+The two-ball rule rests on two assumptions: that future fraud on this
+card will look like past fraud, and that it will look like the fraud on
+other cards, whose weeks fill the second ball. The fourth frame breaks
+both. A card being tested pays tiny amounts online: its week sits outside
+the normal ball, where the one-ball rule flags it, and on the normal side
+of the line, where the two-ball rule does not.
+
+The trade is measurable in this course already. <Ref
+lesson="behavioural-profiles" id="exercises">The peer-group detector</Ref>,
+built with no labels, put about 11 compromised cards in each daily
+hundred alerts (card precision at 100 of 0.11), against 0.02 for a random
+draw. The depth-2 tree trained with labels reached a mean <Ref
+lesson="alert-budget-metrics"
+id="card-precision-at-k-the-team-calls-cards">card precision at 100</Ref>
+of about 0.29 over the simulator's test week. The comparison is rough,
+since the peer detector ran on a different seeded run of the simulator,
+but the supervised model finds between two and three times as many. A
+label-free score ranks well above chance and well below a supervised
+model at the top of the list, because its top holds every honest surprise
+as well as the fraud.
+
+<KeyFact>
+An anomaly score answers "unlike normal", not "like fraud". Expect it to
+rank well above chance and to put many honest surprises in the alert
+queue: it complements the supervised score, it does not replace it.
+</KeyFact>
+
+## Every detector family assumes one thing about normal data
+
+A boundary around normal can be drawn in many ways, and the next lessons
+build several. The obvious way to choose among them is a benchmark: run
+each on a labelled dataset and keep the best. The trouble is that the
+benchmark's geometry picks the winner, and the next stream has a different
+geometry.
+
+There is a better way to predict. Each family of detectors rests on one
+statement about what normal data looks like, and that statement doubles as
+its failure condition: wherever it is false, the family fails, whatever the
+benchmark said.
+
+| family | assumes that normal data | fails where |
+|---|---|---|
+| nearest-neighbour distance or density | lies in dense neighbourhoods, anomalies far from their neighbours | anomalies are dense among themselves; normal regions differ in density |
+| clustering (k-means and its relatives) | belongs to large, dense clusters, anomalies to none or to small ones | anomalies form a cluster of their own, large enough |
+| statistical model | lies in high-probability regions of a fitted distribution | the fitted family has the wrong shape |
+| one-class boundary | can be enclosed by a boundary learnable from normal data | the region normal data surrounds is not itself normal |
+| subspace (PCA and its relatives) | lies near a low-dimensional subspace that anomalies leave | anomalies lie in the subspace, or no such subspace exists |
+
+Most cells of the last column are the assumption negated. The
+nearest-neighbour row adds one case that follows from how the score is
+measured: a neighbour distance is in absolute units, one scale for the
+whole space. Where normal data has a dense region and a sparse one, the
+ordinary spacing of the sparse region is larger than the distance that
+would be suspicious beside the dense one, so the sparse normal points
+look anomalous and an outlier just off the dense region looks normal.
+
+### Three planar experiments
+
+The table becomes a prediction tool on small examples. Here are three
+datasets in the plane, normal points as dots and anomalies as squares.
+
+<Figure
+  src="./figures/geometries.svg"
+  alt="Three panels of points in the plane, normal points as black dots and anomalies as amber squares. (a) one cloud: one tight cloud of dots and three squares far from it; ticks for neighbour distance, cluster membership, fitted Gaussian and one-class boundary. (b) a ring of clouds: eight tight clouds of dots on a circle, three squares at the centre, a dashed blue circle around the whole ring labelled one-class boundary; ticks for neighbour distance, cluster membership and mixture of Gaussians, crosses for single Gaussian and one-class boundary. (c) a ring, an anomalous cloud: the same ring with a tight cloud of about 25 squares at the centre; crosses for neighbour distance, unlabelled and cluster membership, unlabelled, a tick for either, trained on normal only"
+  caption="The same families on three geometries: every assumption holds in (a); the one-class boundary and the single Gaussian fail in (b); the unlabelled neighbour and cluster scores fail in (c)."
+/>
+
+<Task>
+Before reading the panels' verdicts, take the table's "fails where" column
+and predict, for panels (b) and (c), which families miss the squares.
+</Task>
+
+**(a) One tight cloud, a few far points.** Normal data is one Gaussian
+cloud; the anomalies are few and far. Every assumption in the table holds,
+and every family finds them. Benchmarks built like this cannot separate
+the families.
+
+**(b) A ring of tight clouds, anomalies at the centre.** A one-class method
+that learns one smooth boundary around the training data draws it around
+the whole ring, and the centre is inside. A single Gaussian fitted to the
+ring puts its mean at the centre, so the centre is the most probable place
+in the plane. Both call the squares normal. A nearest-neighbour score finds
+them, since they are far from every dot; so does a clustering score, since
+they belong to no cloud; so does a mixture of Gaussians, one per cloud.
+
+**(c) The same ring, with a tight cloud of anomalies at the centre.** Now
+the squares are many and close together. Each has close neighbours, all
+squares, so its neighbour distance is small; together they form a dense
+cluster of reasonable size. Fitted to the unlabelled data, both the
+neighbour score and the clustering score call them normal. Fitted to
+normal data only, the semi-supervised versions of the same two methods
+find them at once: no training point lies near the centre.
+
+<KeyFact>
+A dense cluster of anomalies is normal to any unlabelled neighbour or
+cluster score. Organised fraud, many similar payments from one scheme, is
+such a cluster; a model of normal fitted to data known to be clean is what
+sees it.
+</KeyFact>
+
+### Reading the geometry of a card stream
+
+The panels are not exotic. Panel (c) is the card-testing night, the
+organised fraud of the box above. Panel (b) is any stream whose normal behaviour has several
+modes, such as cards used for groceries, for travel and for business,
+around a region no honest card occupies. And there is a case below every
+row of the table. As the three-scenario example showed, the compromised
+terminals' frauds leave no trace in the label-free columns at all, so no
+family finds them: every assumption in the table is about where payments
+lie, and these lie exactly where the genuine payments they replaced
+would have.
+
+## What the detector should output
+
+The last decision is the form of the answer. The obvious form is a verdict
+for each payment, anomalous or not. The investigators, though, work
+<Ref lesson="alert-budget-metrics"
+id="card-precision-at-k-the-team-calls-cards">a fixed number of cards a
+day</Ref>, and a verdict can only be tuned by changing the method's
+internal settings until the number of "anomalous" payments roughly matches
+that budget. A score that ranks payments from most to least anomalous is
+cut at $k$ directly, scored with average precision and card precision at
+$k$ like any other ranking, and can still be turned into a verdict by a
+threshold. Every detector of this module is therefore built as a score.
+
+An anomaly at the top of that ranking is a reason to look, not a finding.
+The investigator's call decides whether it was fraud, noise or a novelty,
+and that call is a label: the cases an anomaly score surfaces become the
+training data of the supervised model, which can then explain and
+recognise the scheme the next time. A bank building its detection usually
+adds the tools in that order: hand-written rules first, then anomaly
+scores, then supervised models trained on what the first two found, then
+the network of links between accounts.
+
+<Conclusion>
+You can now classify a departure as a point anomaly (unusual on its own),
+a contextual anomaly (unusual for this card, this terminal, this season)
+or a collective anomaly (unusual only as a run of related payments), and
+say which column would turn it into a point a row-by-row detector can see.
+You can place a detector in its label regime, supervised, semi-supervised
+on data believed normal, or unsupervised on the assumption that normal
+dominates, and name the case that breaks each: a new scheme, fraud hidden
+in the normal sample, a flood. You can choose between by-owner and
+by-operation monitoring, explain why an anomaly score ranks above chance
+and below a supervised model, and predict from a family's one assumption
+the geometry on which it fails.
+
+The first family to build is the simplest: score a payment by its distance
+to its neighbours. <Ref lesson="density-and-distance-scores">Distance and
+density scores</Ref> computes it, meets the failure of panel (c) and a
+second one, normal regions of different density, and repairs the second.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+Classify each payment as a point, contextual or collective anomaly, or as
+no anomaly, and name the context where there is one. (a) A student card
+that pays €5 to €30 at a time pays €4,000 to a jeweller. (b) A card pays
+€1 nine times in an hour, at nine web shops it has never used. (c) A night
+nurse's card pays at a supermarket at 03:00 on a Tuesday, as it does most
+weeks. (d) A card pays €80 for fuel, the amount and the station it uses
+every week, while the owner is abroad on holiday. (e) A cash machine pays
+out €200 to 40 different foreign cards between 02:00 and 03:00, where it
+usually serves a dozen local cards a night.
+
+<Solution>
+**(a)** Contextual, with the card as the context: €4,000 is an ordinary
+jewellery purchase in the stream and far outside this card's range. In a
+feature space holding the amount-to-mean ratio it becomes a point anomaly.
+
+**(b)** Collective, with the card's recent sequence as the relation: each
+€1 payment is ordinary, the run of nine in an hour at nine new shops is
+not. It is also the by-owner view of card testing run on a single card, and
+a window count of new merchants turns it into a column.
+
+**(c)** No anomaly. 03:00 is unusual for the stream and usual for this
+card, so the contextual view, the one that matters, says normal. A global
+"night payment" flag would raise it, which is the false alarm the context
+exists to prevent.
+
+**(d)** No anomaly in the data: amount, merchant and time are the card's
+habit. The departure is in a fact the payment does not record, the owner's
+location. A card cloned and used in the owner's usual pattern is
+undetectable by any anomaly score built on these columns.
+
+**(e)** Collective, by operation, with the machine as the context: each
+withdrawal is ordinary, forty foreign cards in an hour at a machine that
+serves a dozen local ones is not. No single card's history shows it.
+</Solution>
+</Exercise>
+
+<Exercise>
+A card-testing ring hits one web shop so hard that on one day 60% of its
+payments are €1 tests. (a) Which label regime's assumption fails, and what
+does an unsupervised density score fitted to that shop's day rank highest?
+(b) What does a semi-supervised model fitted to the shop's previous month
+do on that day? (c) What happens to the semi-supervised model if the bank
+refits it every night on the last 30 days of unflagged payments and the
+attack runs, unflagged, for two weeks?
+
+<Solution>
+**(a)** The unsupervised regime assumes normal instances are far more
+frequent than anomalies; here the anomalies are the majority. A density
+score fitted to the day finds the €1 tests in the densest region, so it
+scores them most normal, and ranks highest the genuine purchases, which are
+now the rare and scattered points. The ranking is inverted.
+
+**(b)** The previous month holds no such cloud of €1 payments at this shop,
+so each test lies far from the training data and scores as anomalous. The
+semi-supervised model finds the attack on its first night, provided the
+features carry the context: a model of all the bank's payments, with no
+merchant column, sees €1 web payments everywhere and finds nothing.
+
+**(c)** Each night the unflagged tests enter the training window as normal
+data. After a few nights the €1 cloud is part of "normal" and the scores
+fall; after two weeks the tests are close to half the window and score as
+ordinary. The fix is to keep in the training window only payments whose
+normality has had time to be contradicted, older than the label delay, and
+to exclude payments the model itself scored as anomalous: the same rule as
+the delay block, applied to the model of normal.
+</Solution>
+</Exercise>
+
+<Exercise>
+"An anomaly detector trained on last quarter's unflagged payments is
+label-free, so it is immune to the bias that alert feedback puts into a
+supervised model's training data." Refute the claim, naming where the bias
+enters.
+
+<Solution>
+**The claim's step.** "Unflagged" is treated as "not labelled". It is a
+label: the bank's decision that a payment is normal, made by the same loop
+that labels fraud.
+
+**Where the bias enters.** A payment is unflagged because the deployed
+model did not alert it, or because it was alerted and the investigator
+cleared it, and no customer complained within δ. The first filter is the
+model's own ranking: <Ref lesson="fraud-detection-system"
+id="the-fast-labels-are-a-sample-the-model-chose">the fast labels are a
+sample the model chose</Ref>, and so is their complement. Fraud the model
+missed and nobody reported stays in the "normal" sample. That missed fraud
+is exactly the fraud unlike what the model learned, the fraud the anomaly
+detector was meant to find, and the detector now learns it as normal.
+
+**What follows.** The anomaly model inherits the supervised model's blind
+spots instead of covering them. Excluding the alerted payments makes it
+worse, since the cleared genuine payments near the alert threshold leave
+the sample too. Using a sample old enough for most disputes to have
+arrived, and checking how much reported fraud the "normal" sample of past
+quarters turned out to contain, bounds the contamination; nothing removes
+it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Panel (b) of the planar experiments placed normal data in eight tight
+clouds on a circle of radius $r$ around the origin. (a) Show that any
+convex region that contains the normal points contains the origin, so a
+one-class method whose boundary is convex cannot flag points at the
+centre. (b) Show that a single Gaussian fitted by maximum likelihood to
+equal-sized clouds placed symmetrically on the circle has its mean at the
+origin, so the centre is its highest-density point. (c) Explain why the
+distance from a central point to its nearest normal neighbour flags it,
+and give the condition under which it would stop doing so.
+
+<Solution>
+**(a)** Take two clouds on opposite sides of the circle, centred at $c$ and
+$-c$ with $\|c\| = r$. A convex region containing points near both contains
+the segment between them, and that segment passes within the clouds'
+spread of the origin; with cloud centres themselves as the normal points,
+it passes through the origin exactly, since $\tfrac12 c + \tfrac12(-c) = 0$.
+A boundary that encloses the normal data and is convex therefore encloses
+the centre. A one-class boundary can avoid this only by being non-convex,
+an annulus, which a method must be flexible enough to learn.
+
+**(b)** The maximum-likelihood mean of a Gaussian is the sample mean. Eight
+equal clouds centred at $r(\cos\tfrac{2\pi j}{8}, \sin\tfrac{2\pi j}{8})$
+have centres summing to zero, because the eighth roots of unity sum to
+zero; with equal numbers of points spread symmetrically in each cloud, the
+sample mean is the origin. A Gaussian density is largest at its mean, so
+the fitted model gives the centre the highest density in the plane.
+
+**(c)** A central point lies at distance about $r$ from every normal
+point, while normal points have neighbours within their cloud's spread
+$s \ll r$; its neighbour distance is about $r/s$ times a normal point's.
+The score stops working when the central points have close neighbours of
+their own: when there are at least $k$ of them within distance about $s$
+of each other, a $k$-th neighbour distance treats them as a dense normal
+region. That is panel (c), and the number of anomalies, compared with $k$,
+is what decides it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Take the simulator run used in the first section (the evaluation lab's
+generator, seed 0, 63 days) and its twelve label-free inputs: amount,
+weekend flag, night flag, the card's count and mean amount over 1, 7 and 30
+days, and the terminal's count over 1, 7 and 30 days, as the lab's feature
+builder computes them. On days 30 to 62, standardise each input over all
+payments and call a payment *extreme* if at least one input has $|z| > 3$.
+(a) Predict, for genuine payments and for each scenario's frauds, the share
+that is extreme. (b) State in advance what result would count as "this
+scenario has no single-column signal". (c) Compute the shares and
+interpret them.
+
+<Solution>
+**(a)** A reasoned prediction: nearly all amount-rule frauds (the amount is
+more than twice any personal mean); most leaked-card frauds (amount ×5,
+and the card's 1-day mean amount pulled up); for compromised terminals,
+about the genuine share, since the script changes none of the inputs; for
+genuine payments a few percent, since twelve columns each give a fraction
+of a percent beyond $|z| = 3$, more where a column is skewed.
+
+**(b)** A scenario has no single-column signal if its extreme share is not
+above the genuine share, the rate at which a fraud-free payment is extreme
+by chance. Any excess would be signal a global cut could use.
+
+**(c)** The run gives: genuine 2.9%; amount rule 100% (179 frauds);
+leaked cards 68% (814); compromised terminals 1.9% (1,776). The terminal
+frauds are less often extreme than genuine payments, a difference that
+comes from which customers happen to pay at the drawn terminals, not from
+the script. They carry no single-column signal and, by the argument of the
+first worked example, no signal in any label-free combination either. The
+leaked cards are found mostly through the amount and the card's 1-day and
+7-day means, which is the contextual anomaly reaching the columns through
+the card's windows. A global check over twelve columns would flag 2.9% of
+genuine payments, about 9,300 over the stretch, to find 28% of the fraud.
+</Solution>
+</Exercise>
+
+<Exercise>
+Draw 500 points from a 2-D Gaussian centred at $(0, 0)$ with standard
+deviation 0.2 in each coordinate, 50 points from one centred at $(8, 0)$
+with standard deviation 2, and add one planted point at $(1, 0)$. Score
+every point by the distance to its 5th nearest neighbour and rank from
+largest to smallest. (a) Before computing, say where the planted point
+should rank, given that it lies five standard deviations from the dense
+cloud's centre. (b) Compute (with seed 0 of numpy's default generator the
+planted point's score is about 0.62; the sparse cloud's median score is
+about 1.4, and the dense cloud's largest about 0.38). Where does the
+planted point rank? (c) Which assumption of the table failed?
+
+<Solution>
+**(a)** It is the only point that is anomalous by any reasonable reading:
+five standard deviations from its neighbours' centre, while every sparse
+point is within a few of its own. It should rank first.
+
+**(b)** It ranks 51st of 551: all 50 points of the sparse cloud score
+higher. Its 5th-neighbour distance, 0.62, is large for the dense cloud,
+whose largest score is 0.38, and small for the sparse one, whose median is
+1.4. The score measures distance in absolute units, and the sparse cloud's
+ordinary spacing is larger than the planted point's departure.
+
+**(c)** The neighbour family's assumption, "normal data lies in dense
+neighbourhoods", silently assumes one density for all of normal. Here
+normal has two densities, and the computation confirms the table's second
+failure condition for this row: the single distance scale calls the whole
+sparse region anomalous and hides the true outlier beside the dense one. Scoring a
+point's distance relative to the density of its own neighbours removes the
+failure; that is the local outlier factor of <Ref
+lesson="density-and-distance-scores">distance and density scores</Ref>.
+</Solution>
+</Exercise>
+
+<Exercise>
+The in-arc time flag of <Ref lesson="behavioural-profiles"
+id="the-arc-and-the-flag">the behavioural profiles</Ref> fits a von Mises
+distribution to a card's payment hours over the previous week and flags a
+payment outside the 90% arc. (a) Write it as an anomaly detector: name the
+anomaly type, the contextual and behavioural attributes, the label regime
+and the family from the table. (b) State the family's assumption for this
+detector and describe a genuine card on which it fails. (c) What happens to
+the flag on that card, using what the profiles lesson showed about $\bar R$?
+
+<Solution>
+**(a)** Contextual anomaly. Contextual attributes: the card and the
+previous seven days, which select the reference payments. Behavioural
+attribute: the payment's hour. Label regime: unsupervised per card, since
+the card's past week is used unlabelled on the assumption that most of it
+is the cardholder's own. Family: statistical model, a fitted von Mises
+distribution, with the arc as its high-probability region.
+
+**(b)** The assumption is that the card's normal hours lie in the
+high-probability region of one von Mises distribution, a single habit
+around one time of day. A card used for a morning coffee at 08:00 and a
+late shift purchase at 23:00 has two habits; the fitted family has the
+wrong shape, the table's failure condition.
+
+**(c)** Arrows at 08:00 and 23:00 point 135° apart and partly cancel:
+for equal numbers of each, $\bar R = \cos 67.5° = 0.38$, $\hat\kappa = 0.83$,
+and the 90% arc is 9.0 hours either side of 03:30, a time the card never
+uses: from 18:30 through the night to 12:30. A fraudulent payment at 03:00,
+in the middle of the hours the card has never paid, is called usual; the
+flag fires only between 12:30 and 18:30, so a genuine 18:00 purchase on the
+way home would be called unusual. A mixture of two von Mises distributions
+would fit the card, as the mixture of Gaussians fitted panel (b); the
+general move is to check the fitted family's shape before trusting its
+low-probability region.
+</Solution>
+</Exercise>
+
+<References>
+1. V. Chandola, A. Banerjee, V. Kumar, "Anomaly Detection: A Survey," *ACM Computing Surveys* 41(3), Article 15, 2009 — Sec. 1.1 (anomalies, outliers; noise removal and accommodation; novelty detection), Sec. 1.2 (why defining a normal region is hard: imprecise boundary, adaptive adversaries, evolving normal behaviour, labels), Sec. 2.2 (point, contextual and collective anomalies; contextual and behavioural attributes; the weekly spend at Christmas and in July; the electrocardiogram of Fig. 4), Sec. 2.3 (supervised, semi-supervised and unsupervised modes; the unsupervised assumption that normal instances are far more frequent), Sec. 2.4 (scores and labels), Sec. 3.2 (fraud detection as activity monitoring; by-owner and by-operation credit card detection as contextual anomaly detection), Secs. 4–9 (the key assumption of each family of techniques), Sec. 11 and Fig. 10 (the three two-dimensional datasets; anomalies that are not rare). https://doi.org/10.1145/1541880.1541882
+2. R. J. Bolton, D. J. Hand, "Statistical Fraud Detection: A Review," *Statistical Science* 17(3), 2002, pp. 235–255 — Sec. 1, p. 236 (supervised and unsupervised fraud detection), Sec. 2, p. 237 (profiling and outlier detection against a baseline of normal behaviour), Sec. 5, p. 242 (subscription and superimposed fraud), and L. Breiman's comment, pp. 252–253 (one cardholder's weekly purchases as a fuzzy ball; the unsupervised boundary and the supervised second ball; data outside the boundary not in the direction of fraud; the assumptions that future fraud resembles past fraud and other accounts' fraud). https://doi.org/10.1214/ss/1042727940
+3. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015 — Ch. 3, Introduction (the norm as an average customer or a customer's own average; the outlier definition; challenges of defining the norm; anomalies are not necessarily fraud; predictive models detect only past fraud patterns and help explain what descriptive ones find); Ch. 1, pp. 19–22 (descriptive, predictive and social network analytics as complementary tools; the order in which an organisation adopts them; the call records of Table 1.2).
+4. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 3.2 (the transaction simulator and its three fraud scenarios), Ch. 7.1 introduction (unsupervised and semi-supervised anomaly detection for card fraud). The simulator numbers in this chapter (the 99.9th-percentile amount cut, the per-column extreme shares) come from one seeded run of the re-implementation used in the course's evaluation lab, days 30 to 62. https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+</References>

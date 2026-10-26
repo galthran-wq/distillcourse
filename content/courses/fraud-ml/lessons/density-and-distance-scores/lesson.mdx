@@ -1,0 +1,1133 @@
+The simplest way to score how unusual a payment is: measure how far it sits from its nearest neighbours in feature space. A point at the edge of a sparse but legitimate group then scores higher than a true outlier beside a dense group. How do you score distance relative to the local crowd, and what do the statistical versions of the same idea assume?
+
+"Feature space" is the table the course has been building. Each payment is
+a row of numbers, the amount and the card's and the terminal's windows of
+<Ref lesson="transaction-aggregates">the aggregates</Ref>, so each payment
+is a point, and two payments that look alike are two points close
+together. The nearest-neighbour family of <Ref
+lesson="anomaly-detection-framing"
+id="every-detector-family-assumes-one-thing-about-normal-data">the
+framing lesson's table</Ref> assumes that normal payments sit in dense
+neighbourhoods and anomalies far from their neighbours, so a payment far
+from every other payment is suspect.
+
+The last exercise of that lesson already broke the plain version. A dense
+cloud of 500 points, a sparse cloud of 50, and one planted point five
+standard deviations off the dense cloud: scored by the distance to its 5th
+nearest neighbour, the planted point ranked 51st of 551, below every point
+of the sparse cloud. In payments, the dense cloud is a commuter's morning
+coffee, the same shop and nearly the same amount every weekday; the sparse
+cloud is a traveller's purchases, spread over cities and amounts. A stolen
+card used once beside the commuter's habit sits closer to its neighbours
+than the traveller's ordinary purchase in Lisbon sits to hers, and the
+global distance ranks the traveller first.
+
+## Distance to the k-th neighbour: a first score
+
+Before any neighbour can be found, the distance between two payments has to
+mean something, and a raw feature table gives it no meaning.
+
+### The columns have to share a scale
+
+Take two payments described by amount and by recency, the days since the
+card's previous payment: one at €1,000 after 5 days, one at €1,500 after
+10 days. The Euclidean distance is
+$\sqrt{500^2 + 5^2} \approx 500.02$, the Manhattan distance (the sum of the
+absolute differences) is $500 + 5 = 505$. Either way the recency, which
+doubled, contributes almost nothing, because euros come in hundreds and
+days in units. Every neighbour search on these columns is a search on
+amount alone.
+
+The fix is to standardise each column before measuring: subtract its mean
+and divide by its standard deviation, both taken from the reference period
+and reused unchanged on new payments, the rule <Ref
+lesson="neural-tabular-detectors"
+id="standardise-on-the-training-block-compress-a-long-tail-first">the
+network lesson</Ref> applied to its inputs. If amounts spread with a
+standard deviation of €400 and recencies with 4 days, the two differences
+become 1.25 and 1.25, and the doubling of the recency counts as much as the
+€500.
+
+<Aside title="Binary red flags need a different similarity">
+Some feature tables hold yes/no indicators: "new device", "billing and
+shipping address differ", "card added this week". Suppose two claims
+answer five such flags as (yes, no, yes, yes, no) and (yes, yes, no, no,
+no). The simple matching coefficient counts agreements of either kind: 2
+of 5. The Jaccard index leaves out the positions where both say no: 1
+agreement out of the 4 flags raised by at least one, so 1/4. With 100
+flags of which about 5 are raised on a typical case, nearly every pair
+agrees on 90-odd "no"s, every matching coefficient lands near 0.9, and no
+neighbourhood structure survives; the Jaccard index measures only the
+flags that fired, which is why it is the usual choice for red-flag data.
+</Aside>
+
+### One neighbour hides too much
+
+The obvious score is the distance to the single nearest neighbour. It
+fails on an ordinary event. A fraudulent payment that is declined is often
+retried a minute later: same card, same terminal, same amount, so the two
+rows are nearly identical and each one's nearest neighbour is the other,
+at distance close to zero. Two payments from the same scheme hide each
+other the same way.
+
+The repair is to look further down the list of neighbours. Score each
+payment by its distance to its *k-th nearest neighbour*: a retry pair has
+one close neighbour each, so with $k = 2$ each member's score is the
+distance to the nearest payment outside the pair.
+
+<Figure
+  src="./figures/kcurve.svg"
+  alt="Line chart of the distance to the k-th neighbour, k from 1 to 15. A black line for a normal point stays low, rising from 0.11 to 0.32. A blue line for one of a payment-and-retry pair starts at 0.03 at k equals 1 and jumps to 1.95 at k equals 2, then rises to about 3.4. An amber line for one of six tight anomalies stays near 0.1 up to k equals 5 and jumps to 1.61 at k equals 6, then to about 3."
+  caption="The pair's curve jumps at k = 2 and the six-point group's at k = 6; the normal point's curve rises smoothly."
+/>
+
+The figure scores three points of a planted dataset: 1,000 normal points
+in a Gaussian cloud, a pair of near-duplicates outside it, and six
+anomalies packed tightly together. At $k = 1$ the duplicate ranks 794th of
+the 1,008 points, among the most normal; at $k = 2$ it ranks second, behind
+its own twin. A member of the six-point group stays hidden until $k = 6$,
+when the sixth neighbour has to come from outside the group.
+
+<KeyFact>
+A member of a group of $g$ anomalies has $g - 1$ close neighbours, so a
+k-th neighbour score sees the group only when $k \ge g$.
+</KeyFact>
+
+### Counting within a radius: the same score read as a density
+
+The score has a dual. Instead of fixing $k$ and measuring the radius that
+holds $k$ neighbours, fix a radius $r$ and count the neighbours inside it:
+few neighbours within $r$ means unusual. Both are estimates of the same
+quantity. A ball of radius $r$ around $x$ that holds $n$ other payments
+says the data around $x$ has about $n$ payments per volume of that ball;
+in two dimensions the density is about $n / (\pi r^2)$.
+
+<Definition title="k-th neighbour distance score">
+Let $d$ be the distance on standardised columns and $N$ the number of
+payments in the reference set. The *k-distance* $r_k(x)$ of a payment $x$ is the
+distance from $x$ to its $k$-th nearest neighbour in the reference set,
+and $\mathcal{N}_k(x)$ is the set of those $k$ nearest neighbours. The
+k-th neighbour distance score of $x$ is $r_k(x)$; the radius-count score
+fixes $r$ and uses $1/n(x, r)$, with $n(x, r)$ the number of reference
+payments within distance $r$ of $x$.
+</Definition>
+
+Since a ball of radius $r_k(x)$ in $p$ columns has volume proportional to
+$r_k(x)^p$ and holds $k$ points, $k / r_k(x)^p$ is a density estimate, and
+the score $r_k(x)$ ranks payments from the lowest estimated density to the
+highest. The neighbour family is therefore a density estimate in disguise.
+That reading predicts the failure of the opening: a fraud beside a dense
+group sits where the density is still higher than anywhere in a sparse
+group of honest payments.
+
+## What the score costs: every payment against every other
+
+With no labels and no period believed clean, the
+<Ref lesson="anomaly-detection-framing"
+id="where-normal-comes-from-three-label-regimes">unsupervised regime</Ref>,
+there is no separate reference to search: the anomalies have to be found
+inside the data itself, so every payment of the set is scored against all
+the others. That is $N(N-1)/2$ distances, and quadrupling the data
+multiplies the work by sixteen. Scoring one new payment against a
+reference that is already fixed is only a scan: $N$ distances, then the
+$k$ smallest.
+
+Measured on the ULB card set, <Ref lesson="canonical-datasets"
+id="the-ulb-card-set-two-days-with-the-card-removed">two days of European
+card payments</Ref> whose columns V1 to V28 are principal components of
+undisclosed features, a brute-force search for the neighbours of 32,000 of
+its rows among themselves takes about 3.7 seconds on one processor core.
+Scaled by the square of the row count:
+
+- one day of 400,000 payments scored against itself: about 10 minutes;
+- a 30-day reference of 12 million payments scored against itself: about
+  six days of one core;
+- for comparison, each new payment scored against that reference once it
+  is built: about 0.04 seconds, five core-hours a day for 400,000
+  payments.
+
+### Only the top of the ranking is needed
+
+Investigators read about a hundred alerts a day, so the score is used only
+for its top few hundred payments. That opens a shortcut. Process the
+payments in random order and keep the 500 highest scores found so far; let
+$c$ be the smallest of them. For the next payment, scan the reference in
+random order, keeping the $k$ closest points found so far. The distance to
+the $k$-th of those can only fall as the scan continues, so once it drops
+below $c$ the payment can no longer enter the top 500 and the scan stops.
+A normal payment in a dense region finds $k$ close neighbours among the
+first few hundred random draws and is abandoned there, so on randomly
+ordered data the average cost per payment stays close to constant and the
+whole pass close to linear. The price is that only the top 500 get exact
+scores.
+
+### Fewer comparisons: indexes and samples
+
+Two other speed-ups trade something different:
+
+- **Index trees** (k-d trees, R-trees) cut the space into boxes and skip
+  boxes too far away to hold a neighbour. In a handful of columns they
+  skip most of the data; as the columns grow toward the dozens a card
+  feature table holds, nearly every box is close to every query and the
+  search falls back toward brute force.
+- **Sub-sampling** compares each payment with a random sample of $M$
+  reference payments instead of all $N$, cost $O(MN)$. Scoring all
+  284,807 rows of the ULB card set against 20,000 of them takes about
+  21 seconds on the same core, against an estimated five minutes for the
+  full pairwise pass. The k-distances grow, since neighbours are sparser in a
+  sample, and a sample too small loses the small normal groups.
+
+## Two densities, one scale: the failure the local outlier factor repairs
+
+Return to the opening's failure with a dataset small enough to compute by
+hand: ten payments in two standardised columns, $k = 2$.
+
+<FigureSequence
+  name="density"
+  alt="Three frames of ten points in the plane. Frame 1: a dense knot of four black points D1 to D4 at the corners of a 0.2 by 0.2 square near the origin; a sparse group of four black points S1 to S4 at the corners of a 2 by 2 square from (4, 0) to (6, 2); an amber square v at (1.0, 0.1) beside the dense knot and an amber square u at (10, 5) far to the upper right. Frame 2: dashed circles show the radius holding two neighbours, 0.81 around v and 2.0 around S1, and a dashed line from u to its second neighbour labelled 6.4; title: distance to the 2nd neighbour ranks u, then S1 to S4, then v. Frame 3: the local outlier factor written beside each: 1.00 for every point of both groups, 4.03 for v, 2.85 for u."
+  caption="The k-th neighbour distance ranks the sparse group above v; the local outlier factor ranks v first and gives every honest point 1.00."
+/>
+
+<Task>
+Step to frame 2 and rank the ten points by distance to the 2nd neighbour.
+Before opening frame 3, predict the ratio of v's typical neighbour
+distance to its neighbours' typical neighbour distance.
+</Task>
+
+The dense knot holds four points at the corners of a square of side 0.2,
+D1 = (0, 0) to D4 = (0.2, 0.2); the sparse group four points at the
+corners of a square of side 2, S1 = (4, 0), S2 = (6, 0), S3 = (4, 2),
+S4 = (6, 2). Two outliers are planted: $u = (10, 5)$, far from
+everything, and $v = (1.0, 0.1)$, beside the knot.
+
+**The k-th neighbour distance.** Each knot point has two neighbours at 0.2,
+so $r_2 = 0.2$; each sparse point has two at 2, so $r_2 = 2$. The outlier
+$v$ has its two nearest, D2 and D4, at $\sqrt{0.8^2 + 0.1^2} = 0.806$, and
+$u$ has S4 at 5 and S2 at 6.40. The ranking is $u$ (6.40), then the four
+honest sparse points (2.0), then $v$ (0.806). The score compares distances
+across regions whose ordinary spacing differs by a factor of ten, and
+$v$'s departure, four times the knot's spacing, is smaller than the sparse
+group's ordinary spacing.
+
+### Comparing a point's density with its neighbours'
+
+A distance is unusual or not only relative to the spacing of the region it
+is in. So compare each point's density with the densities of its own
+neighbours: a point whose neighbours are much more tightly packed among
+themselves than it is with them is an outlier of that neighbourhood,
+whatever the absolute scale. In a uniform region the ratio is about 1,
+dense or sparse.
+
+<Definition title="local outlier factor">
+For payments $x$ and $o$, the *reachability distance* is
+$$
+\mathrm{reach}_k(x, o) = \max\bigl(r_k(o),\ d(x, o)\bigr).
+$$
+The *local reachability density* of $x$ is the inverse of its mean
+reachability distance to its neighbours,
+$$
+\mathrm{lrd}_k(x) = \Bigl(\frac{1}{k} \sum_{o \in \mathcal{N}_k(x)} \mathrm{reach}_k(x, o)\Bigr)^{-1},
+$$
+and the *local outlier factor* of $x$ is the mean ratio of its neighbours'
+densities to its own:
+$$
+\mathrm{LOF}_k(x) = \frac{1}{k} \sum_{o \in \mathcal{N}_k(x)} \frac{\mathrm{lrd}_k(o)}{\mathrm{lrd}_k(x)}.
+$$
+</Definition>
+
+The definition makes LOF quadratic even when the reference is clean. A new
+payment's reachability distances need $r_k(o)$ for each of its neighbours
+$o$, and its LOF needs their densities $\mathrm{lrd}_k(o)$, which need the
+k-distances of their own neighbours. Those are known only once every
+reference payment has been scored against the rest of the reference, and
+again each time the reference is rebuilt.
+
+The obvious version of this comparison is the ratio $r_k(x) / r_k(o)$,
+averaged over the neighbours $o$. The definition changes it in three ways.
+**The mean** over all $k$ neighbours replaces the single $k$-th distance,
+so one odd neighbour moves the density less. **The floor** $r_k(o)$ in the
+reachability distance handles the retry problem inside a cluster: a point
+sitting almost on top of a neighbour would otherwise get a near-zero
+distance and an enormous density, and every point within $o$'s own
+k-distance now counts as equally close to $o$. Points deep inside a
+cluster then get the same density as their neighbours and an LOF of
+exactly or nearly 1. **The ratio** cancels the scale of the region: halve
+every distance in the sparse group and its LOF values do not change.
+
+<Example title="LOF of v and of a sparse point, k = 2">
+**The knot.** D2's two nearest neighbours are D1 and D4, both at 0.2, and
+each has $r_2 = 0.2$. So $\mathrm{reach}_2(\text{D2}, \cdot) = \max(0.2,
+0.2) = 0.2$ for both, and $\mathrm{lrd}_2(\text{D2}) = 1/0.2 = 5$. By
+symmetry every knot point has density 5. The outlier $v$ is not among any
+knot point's two nearest neighbours, so these densities do not involve it.
+
+**The outlier v.** Its neighbours D2 and D4 lie at 0.806, above their
+k-distance 0.2, so $\mathrm{reach}_2(v, \cdot) = 0.806$ and
+$\mathrm{lrd}_2(v) = 1/0.806 = 1.24$. Then
+$$
+\mathrm{LOF}_2(v) = \frac{1}{2}\Bigl(\frac{5}{1.24} + \frac{5}{1.24}\Bigr) = 4.03 .
+$$
+
+**A sparse point.** S1's neighbours S2 and S3 lie at 2, with $r_2 = 2$:
+reachability 2, density 0.5. Its neighbours have density 0.5 as well, so
+$\mathrm{LOF}_2(\text{S1}) = 1$.
+
+The ranking by LOF: $v$ (4.03), then $u$, then all eight honest points at
+1.00.
+</Example>
+
+<Exercise>
+Compute $\mathrm{LOF}_2(u)$ for $u = (10, 5)$. Write $u$'s two nearest
+neighbours and their k-distances before opening the solution.
+
+<Solution>
+**Neighbours.** S4 = (6, 2) at $\sqrt{16 + 9} = 5$ and S2 = (6, 0) at
+$\sqrt{16 + 25} = 6.40$ (S3 is further, at $\sqrt{36 + 9} = 6.71$). Both
+have $r_2 = 2$.
+
+**Density of u.** $\mathrm{reach}_2(u, \text{S4}) = \max(2, 5) = 5$ and
+$\mathrm{reach}_2(u, \text{S2}) = \max(2, 6.40) = 6.40$, mean 5.70, so
+$\mathrm{lrd}_2(u) = 1/5.70 = 0.175$.
+
+**Ratio.** S4 and S2 have density 0.5, so
+$\mathrm{LOF}_2(u) = 0.5 / 0.175 = 2.85$. The point farthest from
+everything ranks second: its neighbours are the sparse group, and it is
+2.85 times as far from them as they are from each other, while $v$ is four
+times as far from the knot as the knot's points are from one another.
+</Solution>
+</Exercise>
+
+### Back to the planted point
+
+On the framing lesson's 551 points, the planted point at $(1, 0)$ that the
+5th-neighbour distance ranked 51st has $\mathrm{LOF}_5 = 4.8$ and ranks
+first; the sparse cloud's median LOF is 1.1. Nothing changed but the
+reference against which "far" is judged.
+
+<KeyFact>
+The local outlier factor is about 1 inside a group of normal points only
+if the group holds more than $k$ of them. In a group of $k$ or fewer, each
+member has to take neighbours from outside the group, and honest payments
+score as outliers.
+</KeyFact>
+
+## A crowd of anomalies is its own neighbourhood
+
+LOF repairs the varying-density failure. It inherits the other failure of
+the family, and makes it worse. A card-testing ring that runs 40 €1
+payments through one web shop in a night produces 40 nearly identical
+rows: each test has 39 close neighbours, all of them tests.
+<Ref lesson="anomaly-detection-framing" id="three-planar-experiments">Panel
+(c) of the planar experiments</Ref> was this geometry, and the group-size
+rule of the first section says when a k-th neighbour score is blind to
+it: whenever $k < 40$. LOF is blinder still. Even when a clump is loose
+enough that each member's k-th neighbour is far away in absolute terms,
+so that the plain distance flags it, the members are spaced just as
+loosely among themselves, and the density ratio stays near 1.
+
+### On real card data, fraud comes in clumps
+
+The ULB card set of the cost section shows how common this is. Take a
+random 50,000 of its rows, 78 of them fraud, score each row against the
+other rows of the sample using V1 to V28 as they are, and measure the
+ranking by <Ref lesson="alert-budget-metrics"
+id="what-the-team-sees-at-each-fraud">average precision</Ref> against the
+fraud labels.
+
+The first section said to standardise every column before measuring any
+distance. Here the V columns are used as they are, and the reason is
+where they came from:
+
+1. **A rotation keeps distances.** The processor's PCA turned its own
+   rows onto 28 perpendicular directions, the way turning a map moves
+   every town but keeps the distance between any two. Distances between
+   rows in V1 to V28 are distances between the processor's rows, as far
+   as the 28 released directions carry them.
+2. **So the V's already share one unit.** The euros-against-days problem
+   of the first section cannot arise: every V column is measured in the
+   unit of the rotated rows.
+3. **Their spreads are not units.** The variances fall from 3.8 for V1 to
+   0.11 for V28 because the data spreads widely along the first direction
+   and barely along the last. Dividing each column by its standard
+   deviation would multiply a difference along V28 by about 3 and one
+   along V1 by about 0.5, so the near-constant directions would count six
+   times as much, relative to the main one, as they do between the
+   original rows. That is a reweighting of the data, not a change of unit.
+
+<Figure
+  src="./figures/ulb-k.svg"
+  alt="Grouped bar chart of average precision against k. For k = 10, 50 and 200: distance to the k-th neighbour 0.160, 0.237 and 0.217 in blue; local outlier factor 0.003, 0.044 and 0.444 in amber. A dashed line marks the base rate 0.0016. Note under the chart: 50,000 rows of the ULB card set, 78 frauds; a fraud's 10 nearest rows are 59% fraud."
+  caption="With k below the size of the fraud clumps, LOF ranks no better than chance; with k = 200 it beats every distance score."
+/>
+
+A fraud's 10 nearest rows are on average 59% fraud, against 0.04% for a
+genuine row's: the frauds sit in clumps. With $k = 10$ the LOF ranking is
+no better than chance (average precision 0.003, base rate 0.0016), because
+each fraud's neighbourhood is other frauds. The plain k-th neighbour
+distance does better, 0.16, because the clumps lie in regions where the
+data is sparse in absolute terms. At $k = 200$ the neighbourhoods reach
+past the clumps into genuine rows and LOF climbs to 0.44, ahead of every
+distance score. Three other random samples give the same picture (LOF at
+$k = 10$: 0.002 to 0.003; at $k = 200$: 0.48 to 0.57).
+
+### Two ways out, each with a price
+
+**Raise k** above the size of any anomalous group. The price is
+locality: a neighbourhood of 200 points is not local to a normal group of
+fifty, and, as the LOF section showed, an honest group of $k$ or fewer is
+judged against points that are not its own.
+
+**Score new payments against a reference believed normal.** The
+semi-supervised version of the same score searches each new payment's
+neighbours among last month's payments only. Tonight's 40 tests are then
+not in the reference and cannot be one another's neighbours; each finds
+only the shop's genuine history, at a distance. This is why the framing
+lesson's panel (c) fell to the semi-supervised versions of the neighbour
+and cluster scores.
+
+<KeyFact>
+Scored against the data's own rows, a local score needs $k$ at least the
+size of the largest group of anomalies and smaller than the smallest
+group of honest payments. Nothing guarantees that such a $k$ exists; a
+reference the anomalies are not in removes the first bound.
+</KeyFact>
+
+<Aside title="Three variants of the local score">
+**Connectivity-based outlier factor** grows the neighbourhood one point at
+a time, always adding the point closest to the set built so far, instead
+of taking a ball. Normal data shaped like a line, a card's amounts drifting
+up month by month, then counts as one connected neighbourhood, where a
+ball would mix in empty space. **Outlier detection using in-degree number**
+counts how many of a point's $k$ nearest neighbours also list it among
+their own $k$ nearest; a point nobody chooses as a neighbour is an outlier.
+**Local correlation integral** compares each point's density with the
+spread of its neighbours' densities at several radii, so it can flag a
+small group of points as a whole, the micro-cluster that defeats a fixed
+$k$.
+</Aside>
+
+## Clustering: comparing with a few centroids instead of every neighbour
+
+A neighbour score compares each payment with its own neighbourhood, which
+is why it costs $O(N)$ per payment. A clustering summarises a set of
+payments in advance: run k-means, from the classical-ml course, and keep
+$K$ centroids. (The $k$ of this lesson counts neighbours; the number of
+clusters is written $K$.) Scoring a payment then costs $K$ distances, a
+few dozen instead of millions, and even fitting the clustering costs only
+$NK$ distances per pass of k-means, not $N^2/2$.
+
+### Which payments the centroids come from
+
+The neighbour score had two references: a period believed normal, or the
+data being scored itself. A clustering has the same two. It can be fitted
+to last month's payments and each of tonight's payments scored against
+those centroids, or, in the unsupervised regime, fitted to tonight's
+unlabelled payments and each of them scored against the clusters they
+form among themselves. What turns a clustering into an anomaly score
+depends on what is assumed about normal data, and which of the two sets
+it is fitted to decides whether a group of card tests can hide.
+
+<Figure
+  src="./figures/clusters.svg"
+  alt="Three panels. (1) in no cluster, normal points belong to one: two clouds of black points and an amber square away from both, labelled in no cluster; note: needs a method that may leave a point unassigned. (2) far from its centroid, normal points sit near one: one cloud with a blue cross labelled centroid and an amber square connected to it by a dashed line, labelled far from it; note: fails once anomalies form a cluster with its own centroid. (3) in a small cluster, normal clusters are large and dense: a large cloud and a tight group of eight amber squares labelled 8 points: small; note: cluster size and distance combined into one score."
+  caption="Three assumptions that turn a clustering into an anomaly score."
+/>
+
+1. **Normal payments belong to a cluster, anomalies to none.** This needs
+   an algorithm allowed to leave points unassigned, such as DBSCAN, which
+   grows clusters through dense regions of the data it is run on and
+   labels what it cannot reach as noise. K-means assigns every point
+   somewhere, so an anomaly lands in the nearest cluster and looks like a
+   member. Run on tonight's payments, DBSCAN fails on the card tests too:
+   40 nearly identical rows are a dense region like any other.
+2. **Normal payments lie near their centroid.** The score is the distance
+   to the nearest centroid. Fitted to last month, the centroids hold none
+   of tonight's tests, and each test lies far from all of them: this is
+   the reference believed normal of the neighbour score, and it works.
+   Fitted to tonight's unlabelled payments, the 40 tests are numerous and
+   tight enough to pull a centroid of their own, and each then sits at
+   distance almost zero from it.
+3. **Normal payments form large, dense clusters; anomalies small or sparse
+   ones.** This version needs the anomalies inside the data it clusters,
+   since a group can form a small cluster only where it is part of the
+   data: it is fitted to the set being scored, tonight's payments or the
+   month that includes them. A payment is judged by the size of the
+   cluster it lands in, set against the sizes of the other clusters, which
+   play the part of normal. The score combines that size with the
+   payment's distance from its centroid (the cluster-based local outlier
+   factor is one such combination), so 40 tests that form a cluster of
+   their own beside clusters of thousands are flagged for its size.
+
+### Does the small-cluster score find organised fraud?
+
+<Ref lesson="paysim-feature-matrix" id="exercises">The PaySim
+exercises</Ref> ran k-means with $K = 8$ on the 532,909 transfers,
+fraud included and labels unused, the third version's setting, on
+coordinates that include balances known only after the transfer. The two
+smallest clusters are close in size:
+
+| cluster | rows | of them fraud |
+|---|---|---|
+| smallest | 3,891 | 1 |
+| second smallest | 4,159 | 4,014 |
+| third smallest | 23,016 | 60 |
+| the other five | 59,287 to 137,266 | 22 in all |
+
+Ranked by the size of its cluster, smallest first, a transfer in the fraud
+cluster comes second. The first 3,891 alerts hold one fraud; the next
+4,159 are 96.5% fraud, and the 8,050 rows of the two smallest clusters
+hold 4,015 of the 4,097 fraud transfers, 98%. The fraud was found because
+it was organised: one scheme repeated thousands of times makes a cluster,
+the cluster is small because fraud is still a minority, and the very
+repetition that blinded the neighbour scores is what the small-cluster
+score detects. The price is the one LOF paid for honest groups of $k$ or
+fewer. "Small" is only relative to the other clusters, so an honest
+pattern rarer than the fraud ranks above it, and the score ranks whole
+clusters: all 3,891 honest rows reach the investigators before the first
+fraud transfer.
+
+<KeyFact>
+A score that flags small clusters turns the repetition of organised fraud
+into its signal, as long as the scheme stays a minority of the data. An
+honest pattern rarer than the scheme ranks above it.
+</KeyFact>
+
+## When "far" has units: z-scores, fences and Grubbs' test
+
+A neighbour score answers "how far, compared with the neighbours" and
+nothing more. An LOF of 4 is large on the toy; nothing says whether it is
+large enough to call, or how many honest payments score that high by
+chance. A model of how normal values are distributed answers both: "far"
+becomes "improbable under the model", with a probability attached.
+
+### One column: three standard deviations or the box-plot fence
+
+The oldest rule fits a Gaussian to a column, mean $\mu$ and standard
+deviation $\sigma$ estimated from the data, and flags any value more than
+$3\sigma$ from $\mu$, the rule $|z| > 3$ for the z-score
+$z = (x - \mu)/\sigma$. The interval $\mu \pm 3\sigma$ holds 99.73% of a
+Gaussian.
+
+The box-plot rule looks different. With quartiles $Q_1$ and $Q_3$ and
+interquartile range $\mathrm{IQR} = Q_3 - Q_1$, it flags anything below
+$Q_1 - 1.5\,\mathrm{IQR}$ or above $Q_3 + 1.5\,\mathrm{IQR}$. It uses no
+mean and no standard deviation, so it is not pulled by the very values it
+should flag.
+
+<Figure
+  src="./figures/fences.svg"
+  alt="A Gaussian density curve on an axis marked in standard deviations. Blue vertical lines at minus and plus 3 sigma, legend: mu plus or minus 3 sigma, 99.73 percent of a Gaussian inside. Amber vertical lines at minus and plus 2.70 sigma connected to a box from Q1 to Q3 drawn under the axis, legend: Q1 minus 1.5 IQR to Q3 plus 1.5 IQR equals mu plus or minus 2.70 sigma, 99.30 percent inside."
+  caption="On Gaussian data the box-plot fence is a 2.7σ rule: the two dialects keep 99.3% and 99.7%."
+/>
+
+On Gaussian data the two coincide. The quartiles of a Gaussian lie at
+$\mu \pm 0.674\sigma$, so $\mathrm{IQR} = 1.349\sigma$ and the upper fence
+is $0.674\sigma + 1.5 \times 1.349\sigma = 2.70\sigma$: the region between
+the fences holds 99.30% of the data. Both rules say "outside the
+region that holds about 99.5% of a fitted Gaussian".
+
+That makes them detectors of extreme values, which is narrower than
+anomalies. An *extreme value* sits in the tail of the same distribution
+as the normal data; an anomaly may come from a different distribution
+altogether and sit anywhere, including in the middle. On raw amounts,
+which are skewed, the lower fence lies below zero, so a €1 card test can
+never fall outside it.
+
+### Grubbs' test: how far is far for N values
+
+A fixed $|z| > 3$ ignores how many values were looked at. Among 100,000
+genuine Gaussian values about 270 lie beyond $3\sigma$ by chance, so the
+rule's false alarms grow with the sample. Grubbs' test fixes the error rate
+for the whole sample instead. It looks at the single most extreme value,
+$G = \max_i |x_i - \bar x| / s$ with $\bar x$ and $s$ the sample mean and
+standard deviation, and calls it an outlier at level $\alpha$ if
+$$
+G > \frac{N - 1}{\sqrt{N}} \sqrt{\frac{t^2}{N - 2 + t^2}}, \qquad t = t_{\alpha/(2N),\, N-2},
+$$
+the upper $\alpha/(2N)$ critical value of Student's t-distribution with
+$N - 2$ degrees of freedom. The $\alpha/(2N)$ is the price of looking at
+$N$ values in both directions and keeping only the largest: each of the
+$2N$ chances to be extreme is tested at a level $2N$ times stricter. The
+bar therefore rises with $N$: at $\alpha = 0.05$ the critical $G$ is 2.73
+for 21 values, 3.38 for 100, 4.04 for 1,000 and 5.03 for 100,000. If a
+value is flagged, it is removed and the test runs again on the rest.
+
+<Example title="Grubbs' test on one card's amounts">
+Take the 20 earlier amounts of <Ref lesson="behavioural-profiles"
+id="an-old-part-a-new-part-and-a-t-statistic">the break-point
+card</Ref>, mean €40.00, standard deviation €7.56, and add a new payment
+of €80.
+
+**Statistic.** With 21 values, $\bar x = 41.90$ and $s = 11.42$; the most
+extreme value is €80, and $G = (80 - 41.90)/11.42 = 3.33$.
+
+**Critical value.** $t_{0.05/42,\, 19} = 3.50$, so the bar is
+$\tfrac{20}{\sqrt{21}} \sqrt{3.50^2 / (19 + 3.50^2)} = 4.364 \times 0.626 = 2.73$.
+Since $3.33 > 2.73$, the €80 is an outlier at the 5% level.
+
+**Iteration.** Removing it leaves the 20 old amounts, whose most extreme
+value, €55, gives $G = 1.98$ against a bar of 2.71: nothing more to flag.
+</Example>
+
+The test has a blind spot that matters for fraud. Add three large
+payments, €80, €82 and €85, instead of one: they inflate $s$ to €16.20,
+the largest gives $G = 2.44$ against a bar of 2.78, and nothing is
+flagged. A run of large amounts masks itself, exactly as a clump of card
+tests masks itself from a neighbour score. A run is a change in the card's
+level, the question the break-point statistic asks; Grubbs' test asks
+whether one value does not belong.
+
+## Many columns at once: the Mahalanobis distance
+
+The rules so far score one column. A payment has many, and the obvious
+extension scores them one at a time and adds the results: a z-score per
+column, or, where a column is far from Gaussian, a *frequency profile*,
+which keeps a histogram of each column over the reference period and
+scores a new value by how rare its bin is.
+
+### A large payment on a small card
+
+Take two standardised columns: $x_1$, the log of the amount, and $x_2$,
+the log of the card's 30-day mean amount. Across payments they are
+strongly correlated, since cards that usually spend much make large
+payments; suppose the correlation is 0.8. Compare two payments:
+
+- **A** $= (2.5, 2.5)$: a large payment on a card that always spends
+  large;
+- **B** $= (1.5, -1.5)$: a moderately large payment on a card that usually
+  spends little.
+
+Column by column, B is ordinary: each of its values falls in a
+well-filled bin, with about 13% of payments further out on each axis.
+Every per-column score calls B ordinary, and so does any sum of them,
+including the standardised Euclidean distance from the centre, the square
+root of the summed squared z-scores: 3.54 for A, 2.12 for B, so A looks
+more unusual. The cloud says the opposite. Points like A lie along the
+cloud's long axis, where payments are plentiful; nothing lies near B,
+whose two values pull against the correlation. What is rare is the pair,
+a common amount on a card where it is not common.
+
+<Figure
+  src="./figures/combination.svg"
+  alt="Scatter of the correlated cloud with marginal histograms on the top (x1, log amount) and the right (x2, log of 30-day mean). Point B is amber, below-right of the cloud with no points near it. In each marginal histogram the bin holding B's value is amber and moderately filled. Text: B's value in each column: a well-filled bin of its histogram (13% of payments lie further out on each axis). In the plane, B has no neighbours at all."
+  caption="Each of B's values is common; the combination is not."
+/>
+
+<Definition title="Mahalanobis distance">
+For a payment $x$ with $p$ columns, sample mean $\bar x$ and sample
+covariance matrix $S$, the squared Mahalanobis distance is
+$$
+D^2(x) = (x - \bar x)^\top S^{-1} (x - \bar x).
+$$
+</Definition>
+
+For one column, $S = s^2$ and $D = |x - \bar x|/s$, the z-score. For
+uncorrelated columns $S$ is diagonal and $D^2$ is the sum of the squared
+z-scores, the standardised Euclidean distance: standardising the columns
+is the Mahalanobis distance with the correlations ignored.
+
+For the two columns with correlation $\rho$, inverting $S$ gives
+$D^2 = (x_1^2 - 2\rho x_1 x_2 + x_2^2)/(1 - \rho^2)$. For A:
+$(6.25 - 10 + 6.25)/0.36 = 6.94$, so $D = 2.64$. For B:
+$(2.25 + 3.6 + 2.25)/0.36 = 22.5$, so $D = 4.74$. The order is reversed.
+
+<Figure
+  src="./figures/mahalanobis.svg"
+  alt="Scatter of 400 grey points in a tilted elliptical cloud on axes x1 log amount and x2 log of the card's 30-day mean, correlation 0.8. A dashed blue circle of Euclidean radius 3.41 and an amber ellipse of Mahalanobis distance 3.41 are centred at the origin. Point A at (2.5, 2.5), blue, inside the ellipse and outside the circle, labelled Euclid 3.54, Mahalanobis 2.64. Point B at (1.5, minus 1.5), amber, inside the circle and outside the ellipse, labelled Euclid 2.12, Mahalanobis 4.74."
+  caption="The circle calls A unusual and B ordinary; the ellipse, drawn from the covariance, says the reverse."
+/>
+
+The distance comes with a scale. If the payments are Gaussian, $D^2$
+follows a chi-square distribution with $p$ degrees of freedom, so a
+threshold has a meaning: in two columns $P(D^2 > c) = e^{-c/2}$, and the
+region holding 99.7% of payments is $D^2 \le -2 \ln 0.003 = 11.62$, that
+is $D \le 3.41$, the ellipse in the figure. B lies outside it.
+
+<Exercise>
+A third payment C sits at $(0.5, -0.5)$ in the same two columns. Compute
+its Euclidean and Mahalanobis distances and say whether the 99.7%
+threshold flags it.
+
+<Solution>
+**Euclidean.** $\sqrt{0.25 + 0.25} = 0.71$.
+
+**Mahalanobis.** $D^2 = (0.25 + 2 \times 0.8 \times 0.25 + 0.25)/0.36 =
+(0.25 + 0.4 + 0.25)/0.36 = 2.5$, so $D = 1.58$. Below 3.41: not flagged.
+C has B's direction at a third of its size, and the squared distance
+scales with the square, $22.5/9 = 2.5$.
+</Solution>
+</Exercise>
+
+### What the Gaussian costs on real data
+
+The probability attached to $D$ is only as good as the Gaussian. On the
+ULB card set the columns V1 to V28 are principal components, so they are
+uncorrelated and $D^2$ is simply $\sum_j V_j^2 / \mathrm{var}(V_j)$. Over
+all 284,807 rows, the chi-square threshold that should flag 0.3% of a
+Gaussian sample (52.9 for 28 columns) flags 15,078 rows, 5.3%, eighteen
+times the promise. The columns have heavy tails, as amounts do.
+
+The ranking survives where the probability does not: those 15,078 rows
+hold 431 of the 492 frauds, a fraud share of 2.9% against 0.17% in the
+whole file. A Mahalanobis score is usable as a ranking on non-Gaussian
+data; its threshold is not a confidence level there.
+
+The mean and covariance are themselves estimated from data that contains
+the anomalies, and a few far-out rows can move them enough to hide
+themselves.
+
+## Where the rare combinations live: principal coordinates
+
+The Mahalanobis distance caught B from the covariance alone; nobody told
+it which pair of columns to compare. Which direction did it find, and
+what does a score see that keeps only some of the directions?
+
+Principal component analysis, from the classical-ml course, rotates the
+columns into uncorrelated directions $y_1, \dots, y_p$, ordered by their variances
+$\lambda_1 \ge \dots \ge \lambda_p$, the eigenvalues of $S$.
+
+<Theorem title="Mahalanobis distance in principal coordinates">
+Let $S = V \Lambda V^\top$ with $V$ orthogonal and
+$\Lambda = \mathrm{diag}(\lambda_1, \dots, \lambda_p)$, all $\lambda_i > 0$,
+and let $y = V^\top (x - \bar x)$. Then
+$$
+D^2(x) = \sum_{i=1}^{p} \frac{y_i^2}{\lambda_i}.
+$$
+<Proof>
+Since $V$ is orthogonal, $S^{-1} = V \Lambda^{-1} V^\top$. Substituting,
+$D^2 = (x - \bar x)^\top V \Lambda^{-1} V^\top (x - \bar x) = y^\top
+\Lambda^{-1} y = \sum_i y_i^2/\lambda_i$, because $\Lambda^{-1}$ is
+diagonal with entries $1/\lambda_i$.
+</Proof>
+</Theorem>
+
+Each principal coordinate is measured in units of its own standard
+deviation and the squares are added: the Mahalanobis distance is a
+standardised Euclidean distance in the rotated frame.
+
+For the two columns with correlation 0.8, the directions are
+$y_1 = (x_1 + x_2)/\sqrt 2$ with variance $\lambda_1 = 1.8$ and
+$y_2 = (x_1 - x_2)/\sqrt 2$ with $\lambda_2 = 0.2$. Payment A lies on the
+first axis, $y_1 = 3.54$, contributing $3.54^2/1.8 = 6.9$. Payment B lies
+on the second, $y_2 = 2.12$, contributing $2.12^2/0.2 = 22.5$: a modest
+displacement along a direction in which payments barely vary. That second
+direction, $x_1 - x_2$, is the log amount minus the log of the card's mean,
+the log of the ratio column that <Ref lesson="transaction-aggregates"
+id="an-amount-needs-a-reference-point">the aggregates</Ref> built by hand,
+up to scale. From the data alone, the covariance found the direction
+that column was designed to measure.
+
+<Figure
+  src="./figures/principal.svg"
+  alt="The same cloud rotated into principal coordinates, drawn at equal scale: a wide flat band along the horizontal axis y1 equals (x1 plus x2) over root 2, variance lambda 1 equals 1.8, and narrow along the vertical axis y2 equals (x1 minus x2) over root 2, variance lambda 2 equals 0.2. Point A, blue, on the horizontal axis at y1 = 3.54, at the edge of the band, labelled y1 squared over lambda 1 equals 6.9. Point B, amber, on the vertical axis at y2 = 2.12, far above the band, labelled y2 squared over lambda 2 equals 22.5."
+  caption="In principal coordinates A is at the end of the long axis; B is far out along the short one."
+/>
+
+The sum splits at any $q < p$ into two scores. The first $q$ terms,
+$\sum_{i \le q} y_i^2/\lambda_i$, are the Mahalanobis distance inside the
+subspace of the $q$ leading components: how far a payment lies along the
+directions in which normal payments vary most, its *major-component
+score*. The remaining terms, $\sum_{i > q} y_i^2/\lambda_i$, measure how
+far it lies off that subspace, each departure in units of the small
+variance of its direction: its *minor-component score*. The Mahalanobis
+distance is the sum of the two,
+$$
+D^2(x) = \sum_{i \le q} \frac{y_i^2}{\lambda_i} + \sum_{i > q} \frac{y_i^2}{\lambda_i}.
+$$
+With $q = 1$ in the two-column example, A scores $6.9 + 0$ and B scores
+$0 + 22.5$. The minor-component score is the subspace family of <Ref
+lesson="anomaly-detection-framing"
+id="every-detector-family-assumes-one-thing-about-normal-data">the
+framing lesson's table</Ref>: normal data lies near the subspace of the
+leading components, an anomaly leaves it, and the score fails on an
+anomaly that stays in the subspace and is only extreme along it, a
+payment like A pushed further out along the long axis.
+The major-component score has the opposite blind spot and gives B zero.
+Under a Gaussian the two halves follow chi-square distributions with $q$
+and $p - q$ degrees of freedom, so each has its own threshold. In
+practice the components are estimated with *robust PCA*, a method that
+resists anomalies, since a few far-out rows can tilt the leading
+directions toward themselves as they move the covariance.
+
+<KeyFact>
+Rare combinations of common values live in the low-variance directions,
+so a principal-component detector sees them only through its minor half.
+A score built from the leading components alone is blind to payment B,
+however robustly the components are estimated.
+</KeyFact>
+
+## Which score for which data
+
+<Ref lesson="anomaly-detection-framing"
+id="every-detector-family-assumes-one-thing-about-normal-data">The framing
+lesson's table</Ref> gave one assumption per family. This one splits the
+families into the scores of this chapter and adds what each costs per new
+payment.
+
+| score | normal data is assumed to | it misses | cost per new payment |
+|---|---|---|---|
+| k-th neighbour distance | have one density everywhere | an outlier beside a dense group; a group of more than $k$ anomalies | a scan of the reference |
+| local outlier factor | be locally uniform, in groups larger than $k$ | anomalous groups larger than $k$; honest groups of $k$ or fewer | a scan, plus every reference point's own density |
+| distance to a centroid | form clusters with anomalies outside | anomalies that form their own cluster | $K$ distances |
+| small-cluster score | form large clusters, anomalies small ones | an honest pattern rarer than the fraud | $K$ distances |
+| z-score, fence, Grubbs' test | follow one Gaussian per column | rare combinations; runs that inflate $s$; low-end anomalies | one subtraction per column |
+| Mahalanobis distance | follow one Gaussian in all columns | normal data with several modes; its probability, once tails are heavy | $p^2$ operations |
+| major-component score (first $q$ terms) | vary mostly along a few leading directions | rare combinations, which lie off those directions | $pq$ operations |
+| minor-component score (the other $p - q$) | lie near the subspace of the leading directions | anomalies inside the subspace, extreme only along it | $p(p - q)$ operations |
+
+The <Ref lesson="anomaly-detection-framing"
+id="three-planar-experiments">three planar experiments</Ref> read as they
+did there. The new row, LOF, sides with the neighbour distance: it
+succeeds on the ring of clouds and fails on the dense anomalous cloud of
+panel (c), more surely, since even a loose anomalous cloud has density
+ratios near 1.
+
+<Conclusion>
+You can now score a payment by its distance to its k-th neighbour or by
+the count within a radius, read either as a density estimate, and say why
+$k$ must reach the size of any group of anomalies you want to find. You can compute
+the local outlier factor by hand, explain that it repairs the
+varying-density failure by comparing a point's density with its
+neighbours', and explain why it fails when $k$ is smaller than the clumps
+of fraud.
+You can read the z-score, the box-plot fence, Grubbs' test and the
+Mahalanobis distance as the same idea under a Gaussian, compute each, and
+show that the Mahalanobis distance is a sum over principal components
+that splits into a major half along the leading directions and a minor
+half off them, the half that holds the rare combinations of common
+values.
+
+Two limits stay open. Every neighbour score costs a pass over a reference
+set that grows with the square of its size, and every one of them is
+blinded by a group of more than $k$ anomalies. <Ref
+lesson="isolation-forest">Isolation Forest</Ref> scores a payment by how
+few random cuts separate it from the rest, a computation linear in the
+data, and turns sub-sampling from a shortcut into the cure for the
+masking.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+Ten payments are described by one standardised column (multiplied by 10
+to keep the numbers whole): a dense group at 0, 1, 2, 3; a sparse group at
+100, 110, 120, 130; a payment $q$ at 7; a payment $r$ at 152. With
+$k = 2$, compute the k-distance of every point, then $\mathrm{LOF}_2(q)$,
+$\mathrm{LOF}_2(r)$ and $\mathrm{LOF}_2$ of the edge point 0. Rank the ten
+points by each score.
+
+<Solution>
+**k-distances.** Point 0: neighbours 1 and 2, $r_2 = 2$. Points 1 and 2:
+neighbours at 1 on both sides, $r_2 = 1$. Point 3: neighbours 2 and 1,
+$r_2 = 2$. Point $q = 7$: neighbours 3 (at 4) and 2 (at 5), $r_2 = 5$.
+Point 100: 110 and 120, $r_2 = 20$; 110 and 120: $r_2 = 10$; 130: 120 at
+10 and 110 at 20 ($r$ is at 22), $r_2 = 20$. Point $r = 152$: 130 at 22
+and 120 at 32, $r_2 = 32$. By k-distance: $r$ (32), then 100 and 130 (20), then 110 and
+120 (10), then $q$ (5): $q$ ranks sixth, below four honest sparse points.
+
+**Densities.** Point 1: neighbours 2 (distance 1, $r_2(2) = 1$,
+reachability 1) and 0 (distance 1, $r_2(0) = 2$, reachability 2); mean
+1.5, density 0.667. Point 2 likewise: neighbours 1 (reachability
+$\max(1, 1) = 1$) and 3 (reachability $\max(2, 1) = 2$), density 0.667.
+Point 3: neighbours 2 (reachability $\max(1, 1) = 1$) and 1 (reachability
+$\max(1, 2) = 2$), density 0.667. Point 0: neighbours 1 (reachability
+$\max(1, 1) = 1$) and 2 (reachability $\max(1, 2) = 2$), density 0.667.
+
+**LOF of 0.** Its neighbours 1 and 2 have density 0.667, the same as its
+own, so $\mathrm{LOF}_2(0) = 1$. Its k-distance, 2, is twice that of 1 and
+2, but the floor in the reachability distance gives the whole group one
+density: the edge point is not an outlier of its group.
+
+**LOF of q.** Reachability to 3: $\max(2, 4) = 4$; to 2: $\max(1, 5) = 5$;
+mean 4.5, density 0.222. Neighbours' densities 0.667 each:
+$\mathrm{LOF}_2(q) = 0.667/0.222 = 3.0$.
+
+**LOF of r.** Point 130 has neighbours 120 (reachability $\max(10, 10)
+= 10$) and 110 (reachability $\max(10, 20) = 20$), density $1/15$; point
+120 has neighbours 130 (reachability $\max(20, 10) = 20$) and 110
+(reachability $\max(10, 10) = 10$), density $1/15$. For $r$: reachability
+to 130 is $\max(20, 22) = 22$, to 120 is $\max(10, 32) = 32$, density
+$1/27 = 0.037$. $\mathrm{LOF}_2(r) = 0.0667/0.037 = 1.8$.
+
+**Ranking by LOF.** $q$ (3.0), $r$ (1.8), all eight group points (1.0).
+The k-distance put $r$ first and $q$ sixth; LOF puts $q$ first, because $q$
+is three times as far from its group as the group's points are from each
+other, and $r$ only 1.8 times.
+</Solution>
+</Exercise>
+
+<Exercise>
+In the ten-point toy of the lesson (knot D1 to D4, sparse group S1 to S4,
+$u$, $v$; $k = 2$), the sparse group shrinks to two honest payments,
+S1 = (4, 0) and S2 = (6, 0). (a) Without computing, say what happens to
+their k-distances and LOF values, and why. (b) Compute
+$\mathrm{LOF}_2(\text{S1})$ and $\mathrm{LOF}_2(u)$. (c) Which hypothesis
+of the local score does the shrunken group violate, and how does it
+mirror the clump of card tests?
+
+<Solution>
+**(a)** Each of S1 and S2 now has only one neighbour of its own kind. Its
+second neighbour has to come from outside the group, so its k-distance and
+its reachability distances jump, and its density falls below its
+neighbours'. Both honest points should score as outliers.
+
+**(b)** S1's neighbours: S2 at 2 and $v$ at $\sqrt{9 + 0.01} = 3.00$, so
+$r_2(\text{S1}) = 3.00$. S2's neighbours: S1 at 2 and $v$ at 5.00, so
+$r_2(\text{S2}) = 5.00$. The outlier $v$ keeps $r_2(v) = 0.806$ and density
+1.24. Reachabilities: from S1 to S2, $\max(5.00, 2) = 5.00$; from S1 to $v$,
+$\max(0.806, 3.00) = 3.00$; mean 4.00, density 0.250. From S2 to S1,
+$\max(3.00, 2) = 3.00$; to $v$, $\max(0.806, 5.00) = 5.00$; density 0.250.
+$\mathrm{LOF}_2(\text{S1}) = \tfrac12(0.250 + 1.24)/0.250 = 2.98$, and the
+same for S2.
+
+For $u = (10, 5)$: neighbours S2 at 6.40 and S1 at 7.81. Reachabilities
+$\max(5.00, 6.40) = 6.40$ and $\max(3.00, 7.81) = 7.81$, mean 7.11,
+density 0.141. $\mathrm{LOF}_2(u) = 0.250/0.141 = 1.78$. The ranking is
+now $v$ (4.03), S1 and S2 (2.98), then $u$ (1.78): two honest payments
+rank above the farthest outlier, whose neighbours are themselves sparse.
+
+**(c)** The local score assumes every normal group holds more than $k$
+points, so that a normal point's neighbourhood lies inside its group. A
+group of $k$ or fewer honest payments, a cardholder with two trips abroad
+a year, violates it and scores as anomalous. The clump of card tests is
+the same violation on the other side: a group of more than $k$ anomalies
+has its neighbourhoods inside itself and scores as normal. Here the
+bracket on $k$ has no room left: the largest anomalous group, $u$ alone,
+needs $k \ge 1$, and the smallest honest group, two points, needs $k < 2$,
+so only $k = 1$ fits, and a single retry pair, a group of two
+anomalies, would need $k \ge 2$ and leave no $k$ at all.
+</Solution>
+</Exercise>
+
+<Exercise>
+"The local outlier factor is a ratio of densities, so it does not depend
+on the units of the columns; there is no need to standardise before
+computing it." Refute the claim with three payments described by amount
+(€) and recency (days): $x = (1000, 5)$, $a = (1010, 30)$,
+$b = (1100, 6)$, using standard deviations of €200 for amount and 5 days
+for recency. Name the step of the claim that fails.
+
+<Solution>
+**Raw columns.** $d(x, a) = \sqrt{10^2 + 25^2} = 26.9$ and
+$d(x, b) = \sqrt{100^2 + 1^2} = 100.0$: $a$ is $x$'s nearest neighbour.
+
+**Standardised.** Differences in standard deviations: $x$ to $a$ is
+$(0.05, 5)$, distance 5.0; $x$ to $b$ is $(0.5, 0.2)$, distance 0.54: $b$
+is now the nearest neighbour, by a factor of nine.
+
+**The failing step.** LOF is invariant when every distance in the space is
+multiplied by the same constant: then all reachability distances scale
+together and the ratios cancel. Changing the unit of one column is not
+such a scaling; it changes which payments are neighbours at all. The
+ratio is computed after the neighbourhoods are chosen, and the
+neighbourhoods are chosen by the raw metric. On raw columns, $x$'s
+neighbourhood is decided by the amount alone, and a payment 25 days
+off the card's rhythm counts as its closest match.
+</Solution>
+</Exercise>
+
+<Exercise>
+(a) Derive the position of the upper box-plot fence $Q_3 + 1.5\,\mathrm{IQR}$
+for a Gaussian with mean $\mu$ and standard deviation $\sigma$, and the
+share of the distribution between the two fences. (b) Card amounts are
+closer to log-normal. For an amount $X = e^{Z}$ with $Z$ standard Gaussian,
+compute the share of amounts above the upper fence and above the mean
+plus three standard deviations of $X$. (c) What do the two rules do to the
+alert queue if applied to raw amounts, and what would you do instead?
+
+<Solution>
+**(a)** For a Gaussian, $Q_3 = \mu + 0.6745\sigma$ (the 75th percentile of
+the standard Gaussian is 0.6745), and $Q_1 = \mu - 0.6745\sigma$, so
+$\mathrm{IQR} = 1.349\sigma$. The upper fence is
+$\mu + 0.6745\sigma + 1.5 \times 1.349\sigma = \mu + 2.698\sigma$, and by
+symmetry the lower one is $\mu - 2.698\sigma$. The share between them is
+$2\Phi(2.698) - 1 = 0.9930$: the fence rule is a 2.7σ rule, with 0.70% of
+a Gaussian outside, against 0.27% outside $\mu \pm 3\sigma$.
+
+**(b)** The quartiles of $X$ are $e^{\pm 0.6745}$, 0.509 and 1.963, so
+$\mathrm{IQR} = 1.454$ and the upper fence is $1.963 + 2.181 = 4.14$.
+$P(X > 4.14) = P(Z > \ln 4.14) = P(Z > 1.42) = 7.8\%$. The mean of $X$
+is $e^{1/2} = 1.649$ and its standard deviation
+$\sqrt{(e - 1)e} = 2.161$, so the 3σ cut is 8.13 and
+$P(X > 8.13) = P(Z > 2.10) = 1.8\%$. The lower fence is negative, so
+neither rule ever flags a small amount.
+
+**(c)** On raw amounts the fence flags about one payment in 13 and the 3σ
+rule about one in 55, against upper-tail shares of 0.35% and 0.13% for a
+Gaussian: 22 and 13 times the promise, all of them
+large honest purchases from the long right tail, and neither can flag a
+€1 test. Take logs first: on $\ln X$ both rules return to their Gaussian
+shares, and small amounts become as visible as large ones. Better still,
+score the amount against the card's own history, the contextual version.
+</Solution>
+</Exercise>
+
+<Exercise>
+Load the ULB card set (284,807 rows, 492 frauds) and take V1 to V28.
+(a) Compute the Mahalanobis score with the mean and covariance of all rows,
+and again with the mean and covariance of the genuine rows only; report
+each ranking's average precision and the fraud count among its top 100
+rows. Before computing, predict which is better and by how much. (b)
+Split the all-rows score at $q = 2$: compute the score from the first two
+components only, $V_1^2/\lambda_1 + V_2^2/\lambda_2$, and the score from
+the other 26, and report each one's average precision and frauds in the
+top 100. (c) Explain both results.
+
+<Solution>
+**(a)** With all rows: average precision 0.16, 18 frauds in the top 100.
+With the genuine rows' mean and covariance: average precision 0.52, 92
+frauds in the top 100. The base rate is 0.0017. A reasonable prediction is
+"similar", since the 492 frauds are 0.17% of the rows; the measured gap is
+threefold.
+
+**(b)** First two components: average precision 0.03, 6 frauds in the
+top 100. V3 to V28: average precision 0.18, 22 frauds in the top 100,
+slightly better than the full sum.
+
+**(c)** **The covariance.** The V columns are principal components of
+all rows, frauds included, so over all rows they are exactly uncorrelated
+and the all-rows covariance is diagonal: its score is a sum of squared
+z-scores. Among the genuine rows alone the same columns are correlated
+(up to 0.17). The frauds take values up to 38 genuine standard deviations
+from zero in some columns, and their cross-products are large enough to
+cancel those correlations in the all-rows estimate. Fraud rows lie against
+the genuine correlations, which is the rare-combination case, and the
+diagonal covariance cannot see it. A check confirms where the gain comes
+from: the genuine rows' variances with the correlations dropped give an
+average precision of 0.17, no better than all rows. The anomalies masked
+themselves through the estimate. Estimating the covariance on rows
+believed normal, the semi-supervised regime, removes the masking; on a
+live stream the "genuine" rows are those not reported within the label
+delay, with the contamination that brings. **The subspace.** The first two
+components give the major-component score with $q = 2$: it measures how
+far a row lies along the two directions in which the data varies most.
+The other 26 terms are the minor-component score, the distance off that
+plane, and they hold nearly all the signal: fraud rows depart from the
+data in its low-variance directions, the rare-combination case, so the
+major half is close to blind and the minor half alone does as well as
+the whole distance. **Setup**: Python
+with numpy and scikit-learn's `average_precision_score`, the file as
+published on Kaggle or OpenML (dataset 1597).
+</Solution>
+</Exercise>
+
+<Exercise>
+Draw random samples of 2,000, 8,000 and 32,000 rows of the ULB set's V1 to
+V28 and time a brute-force search for every row's 10 nearest neighbours
+among the sample's own rows, on one processor core. (a) Fit the growth
+rate and extrapolate to one day of 400,000 payments and to a 30-day
+reference. (b) Plant 40 points in the 32,000-row sample: copies of a single
+point placed at twice the mean of the fraud rows, each perturbed by
+Gaussian noise of standard deviation 0.05 per column. Score all rows by
+the distance to the 10th neighbour, then to the 50th. Where do the 40
+rank? (c) Score the same 32,040 rows against a random reference of only
+2,000 of them, with $k = 10$. Where do the 40 rank now, and why?
+
+<Solution>
+**(a)** On one core of the machine used for this course: 0.04 s, 0.24 s
+and 3.7 s. Each fourfold increase multiplies the time by about 6, then 16;
+the larger step is the quadratic regime, once fixed overheads stop
+dominating. Extrapolating from 32,000 by the square: 400,000 rows,
+$(400{,}000/32{,}000)^2 \times 3.7 \approx 580$ s, about 10 minutes; 12
+million rows, about $5 \times 10^5$ s, six days. Your times will differ;
+the ratios should not.
+
+**(b)** With $k = 10$ the best-placed of the 40 planted points ranks
+30,945th of 32,040 and their median 31,323rd: among the most normal 4% of
+rows. Each has 39 neighbours inside its own group, about 0.35 away. With
+$k = 50$ the 50th neighbour lies outside the group: the best-placed ranks
+108th, the median 128th. A single copy of the planted point, alone, ranks 63rd: the group
+hides itself, and $k$ above the group size is the only fix the full
+reference offers.
+
+**(c)** Against a 2,000-row reference, all 40 rank in the top 100 (best
+around 30th). The reference holds each sampled row with probability
+$2{,}000/32{,}040 \approx 1/16$, so on average 2.5 of the 40 planted
+points, fewer than $k = 10$: the group can no longer fill its own
+neighbourhoods. Sub-sampling cut the cost sixteenfold and cleared the
+masking at the same time. A method built on tiny random sub-samples, and
+on cuts instead of distances, is <Ref lesson="isolation-forest">Isolation
+Forest</Ref>, which shows that sub-sampling to a few hundred points
+improves detection for exactly this reason.
+</Solution>
+</Exercise>
+
+<Exercise>
+A card's last 24 payments are the 20 amounts of the break-point card
+(32, 45, 38, 51, 29, 40, 36, 47, 55, 33, 41, 28, 44, 39, 50, 35, 42, 31,
+46, 38) followed by 80, 82, 85 and 78. (a) Compute the break-point
+statistic of <Ref lesson="behavioural-profiles"
+id="an-old-part-a-new-part-and-a-t-statistic">the behavioural
+profiles</Ref>, old part 20, new part 4. (b) Run Grubbs' test at
+$\alpha = 0.05$ on the 24 amounts. (c) Explain why the two disagree, and
+which question each answers.
+
+<Solution>
+**(a)** Old part: mean 40.00, standard deviation 7.56. New part 80, 82,
+85, 78: mean 81.25, standard deviation 2.99. Pooled variance
+$(19 \times 7.56^2 + 3 \times 2.99^2)/22 = (1{,}086 + 26.8)/22 = 50.6$, so
+$s_p = 7.11$. Then
+$t_{bp} = (81.25 - 40.00)/(7.11 \sqrt{1/20 + 1/4}) = 41.25/3.89 = 10.6$:
+a strong break.
+
+**(b)** All 24 amounts: mean 46.88, standard deviation 17.18. The most
+extreme value is 85, $G = (85 - 46.88)/17.18 = 2.22$. With $N = 24$,
+$t_{0.05/48,\, 22} = 3.49$ and the bar is
+$\tfrac{23}{\sqrt{24}} \sqrt{3.49^2/(22 + 3.49^2)} = 4.695 \times 0.597 = 2.80$.
+Since $2.22 < 2.80$, nothing is flagged.
+
+**(c)** Grubbs' test asks whether a single value does not belong to one
+Gaussian sample. Four large amounts inflate the sample's standard
+deviation from 7.6 to 17.2, so none of them stands out: the run masks
+itself. The break-point statistic asks whether the recent part of the
+sequence has a different mean from the earlier part, a question about the
+order of the values that Grubbs' test ignores. A card that starts
+spending at a new level, as a stolen card does, is a change in level; an
+isolated typo or a one-off purchase is a single outlying value. The first
+is the break point's case, the second Grubbs'.
+</Solution>
+</Exercise>
+
+<Exercise>
+For each situation, choose a score from this lesson and say which property
+of the data decides it. (a) A merchant's payments over a month, two
+columns (log amount, hour), with a lunchtime crowd of small payments and a
+thin spread of large evening orders; you want the single odd payment in
+either group. (b) Thirty standardised columns for every card payment of
+the last month, strongly correlated, and the payments to flag are those
+whose columns disagree with each other. (c) Tonight's payments at one web
+shop, scored as they arrive, with the risk of a burst of identical small
+payments. (d) The daily totals of one ATM over a year, to flag the single
+strangest day.
+
+<Solution>
+**(a)** Two groups of very different density: the local outlier factor,
+with $k$ below the size of the evening group. A global k-th neighbour
+distance would rank every large evening order above an odd lunchtime
+payment.
+
+**(b)** The anomalies are rare combinations, departures from the
+correlations: the Mahalanobis distance with all components, its
+covariance estimated on a period believed clean. A per-column profile or a
+major-component score would discard those directions; a minor-component
+score would keep them.
+
+**(c)** A burst of identical payments is a group that can mask itself:
+any score whose reference is tonight's data needs $k$ above the burst
+size. Score each arriving payment against the shop's previous month
+instead, so that tonight's payments are never one another's neighbours.
+
+**(d)** One column, one sample, a question about a single extreme value:
+Grubbs' test, on the log of the totals if they are skewed. If the strange
+days come as a run, test for a change in level instead.
+</Solution>
+</Exercise>
+
+<References>
+1. V. Chandola, A. Banerjee, V. Kumar, "Anomaly Detection: A Survey," *ACM Computing Surveys* 41(3), Article 15, 2009 — Sec. 5 (nearest-neighbour techniques: distance to the k-th neighbour and count within a radius as density estimates, Sec. 5.1; the O(N²) cost and the pruning, partition, hypergrid and sampling speed-ups; relative density, the varying-density failure of Fig. 7, LOF, COF, ODIN and LOCI, Sec. 5.2; advantages and disadvantages), Sec. 6 (the three assumptions of clustering-based detection, CBLOF, and the difference from nearest-neighbour techniques), Sec. 7.1.1 (the 3σ rule, the box-plot rule and its 99.3% coverage, Grubbs' test, Eqs. 1–2, the Mahalanobis variant, Eq. 3), footnote 2 (extreme values versus anomalies), Sec. 7.2.1 (histogram profiles) and the disadvantages of statistical techniques (attribute-wise histograms miss rare combinations of frequent values), Sec. 9 (projections on the low-variance components as the score for departures from the correlation structure; the robust-PCA score over the leading components, Eqs. 5–6, equal to the Mahalanobis distance when q = p). https://doi.org/10.1145/1541880.1541882
+2. M. M. Breunig, H.-P. Kriegel, R. T. Ng, J. Sander, "LOF: Identifying Density-Based Local Outliers," *Proceedings of the 2000 ACM SIGMOD International Conference on Management of Data*, pp. 93–104 — the definitions of k-distance, reachability distance, local reachability density and the local outlier factor. https://doi.org/10.1145/342009.335388
+3. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015 — Ch. 2, "Outlier Detection and Treatment" (box plots, the |z| > 3 rule, the Mahalanobis distance for multivariate outliers); Ch. 3, "Statistical Outlier Detection Procedures" (Grubbs' test with its t-based critical value, iterated by removal; the Mahalanobis form; the normality assumption as its weakness), "Distance Metrics" (Euclidean versus Manhattan distance, the amount dominating recency, standardisation; simple matching versus the Jaccard index on red flags) and "Clustering".
+4. F. E. Grubbs, "Procedures for Detecting Outlying Observations in Samples," *Technometrics* 11(1), 1969, pp. 1–21. https://doi.org/10.1080/00401706.1969.10490657
+5. A. Dal Pozzolo, O. Caelen, R. A. Johnson, G. Bontempi, "Calibrating Probability with Undersampling for Unbalanced Classification," *IEEE Symposium Series on Computational Intelligence (SSCI)*, 2015 — the release of the ULB credit-card dataset used here (284,807 payments, 492 frauds, V1–V28 principal components). https://doi.org/10.1109/SSCI.2015.33 The ULB computations in this chapter (k-th neighbour and LOF scores on 50,000-row samples, the Mahalanobis scores and chi-square threshold, timings, the planted cluster) were run on the copy published as OpenML dataset 1597 with numpy and scikit-learn's `NearestNeighbors` and `LocalOutlierFactor`. https://www.openml.org/d/1597
+6. scikit-learn developers, `sklearn.neighbors.LocalOutlierFactor` — the implementation used for every LOF value in this chapter: reachability distance as the maximum of the distance and the neighbour's k-distance, local reachability density as the inverse mean reachability distance. https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.LocalOutlierFactor.html
+</References>
