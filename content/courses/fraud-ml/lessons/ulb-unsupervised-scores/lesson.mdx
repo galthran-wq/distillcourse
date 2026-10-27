@@ -1,0 +1,798 @@
+On the public two-day credit-card set, a k-means cluster picked for its fraud share is 71% fraud on the test split, against a base rate of 0.2%. The rule built around it, which alerts every payment in the clusters whose training rows were mostly fraud, still floods the queue. What do isolation, reconstruction and clustering scores actually deliver on real card data, judged by the metrics investigators use?
+
+<Ref lesson="canonical-datasets"
+id="the-ulb-card-set-two-days-with-the-card-removed">The ULB card set</Ref>
+holds two days of September 2013: 284,807 online card payments of European
+cardholders, 492 of them fraud, each described by 28 anonymous principal
+components `V1` to `V28`, the seconds since the file's first payment and the
+amount. There is no card column, and nothing in it was built from labels.
+The module has scored it twice already, both times on the whole file: <Ref
+lesson="density-and-distance-scores"
+id="on-real-card-data-fraud-comes-in-clumps">a fraud's ten nearest rows are
+59% fraud</Ref>, so the frauds sit in small clumps, and <Ref
+lesson="isolation-forest"
+id="when-the-frauds-come-in-small-clumps-a-small-sample-buys-nothing">isolation
+forests built on all of it</Ref> ranked the frauds at an AUC of 0.95 and an
+average precision of 0.20 to 0.28. Those forests scored the rows they were
+built from, were read by average precision alone, and had no model trained
+on labels beside them to say how much they left on the table. The
+autoencoder and the small-cluster results came from the simulator and from
+PaySim, whose frauds follow scripts.
+
+What none of those runs did is the test a deployed scorer faces: built on
+one day, judged on the next, read at the investigators' budget of a hundred
+calls, and set beside a model trained on the same day's labels.
+
+The same file is where most people first try unsupervised fraud detection,
+because it is a standard coursework exercise: cluster the payments with
+k-means and say which clusters are fraud; train an autoencoder and report
+its F1 score. One submitted run of the clustering exercise produced the 71%
+cluster. Read at face value it is a detector that never saw a label and
+finds fraud at about 400 times the base rate, and the conclusion it invites
+is that clustering finds fraud on real data.
+
+## The coursework pipeline, run as written
+
+The 71% and the flood are outputs of one short pipeline, and neither can be
+read without its steps.
+
+### Eight steps from a split to an alert
+
+The file is split at random: 70% of the payments for training (199,364)
+and 30% for testing (85,443, of which 154 were fraud in the run). The
+training split is then resampled, because a clustering of a set that is
+0.2% fraud is not expected to give the frauds a cluster of their own. The
+run did it two ways.
+
+**SMOTE** is <Ref lesson="imbalance-techniques-revisited"
+id="synthetic-frauds-smote">the synthetic oversampler</Ref>: each new fraud
+lies on the segment between a real fraud and one of its five nearest fraud
+neighbours. The version used makes two synthetic frauds per real one and
+then keeps twice as many genuine payments as it made synthetic frauds. The
+run's 338 training frauds became 1,014 and its 199,026 genuine payments were
+cut to 1,352: a set of 2,366 rows, 43% fraud.
+
+**ROSE** draws a whole new training set of the same size as the split, half
+fraud and half genuine. Each row is a randomly chosen real row of the drawn
+class plus Gaussian noise, with a width per column proportional to that
+column's spread within the class. Every row it returns is synthetic, in both
+classes.
+
+Each resampled set then has `Time` and `Class` dropped and is standardised
+with its own mean and standard deviation. K-means is run for 1 to 20
+clusters, the within-cluster sum of squares is plotted, and the number of
+clusters $K$ is read off the bend of the curve, the *elbow*: 3 for SMOTE, 4
+for ROSE, each fitted from 25 random starts. The clusters are named by the
+classes of their training rows: a cluster made up mostly of frauds is a
+fraud cluster.
+
+The test split is standardised with its own mean and standard deviation.
+Each test payment is assigned to the nearest cluster centre by squared
+distance, and every payment in a fraud cluster is alerted.
+
+<Figure
+  src="./figures/pipeline.svg"
+  alt="Eight numbered boxes stacked top to bottom: 1 split 70/30 at random, 199,364 training and 85,443 test payments; 2 resample the training split, SMOTE or ROSE, the training set becomes 43% or 50% fraud; 3 standardise the resampled set with its own mean and standard deviation; 4 k-means at the elbow, k = 3 for SMOTE and 4 for ROSE, 25 random starts; 5 name the clusters, fraud if its training rows are mostly fraud; 6 standardise the test split with the test split's own mean and standard deviation; 7 assign each test payment to the nearest cluster centre; 8 alert every payment in a cluster named fraud. Boxes 2 and 6 are drawn in amber, with the notes labels enter the clusters and test payments in other coordinates."
+  caption="The coursework pipeline. Steps 2 and 6 produce, respectively, the 71% and the flood."
+/>
+
+### What the run reported
+
+The run printed, for each cluster, how many test payments landed in it and
+how many of those were fraud.
+
+| resampler | cluster | named | genuine | fraud | fraud share |
+|---|---|---|---|---|---|
+| SMOTE | A | fraud | 24,730 | 28 | 0.1% |
+| SMOTE | B | fraud | 47 | 119 | 71.7% |
+| SMOTE | C | genuine | 60,512 | 7 | 0.01% |
+| ROSE | 1 | fraud | 193 | 10 | 4.9% |
+| ROSE | 2 | fraud | 57 | 112 | 66.3% |
+| ROSE | 3 | genuine | 43,334 | 5 | 0.01% |
+| ROSE | 4 | fraud | 41,705 | 27 | 0.06% |
+
+A cluster's fraud share is the precision of a rule that alerts every
+payment in it. Whether such a rule is usable also depends on how many
+payments the cluster holds, and the share does not say.
+
+<Example title="the SMOTE run read as an alert rule">
+Alerting cluster B alone gives $47 + 119 = 166$ alerts, of which 119 are
+fraud: precision $119/166 = 0.72$, recall $119/154 = 0.77$.
+
+The run's rule alerts both fraud clusters, A and B:
+$24{,}730 + 28 + 47 + 119 = 24{,}924$ alerts holding $28 + 119 = 147$
+frauds. Precision is $147/24{,}924 = 0.0059$ and recall $147/154 = 0.95$.
+
+To compare with a team's hundred calls a day, convert to days of the full
+file. The test split is a random three tenths of two days, so a count on it
+stands for $\text{count}/(0.3 \times 2)$ a day of the full file, which
+carries about 142,000 payments a day. Cluster B alone becomes
+$166/0.6 \approx 280$ alerts a day. The rule becomes
+$24{,}924/0.6 \approx 41{,}500$ alerts a day, 29% of all payments, against
+100 calls.
+</Example>
+
+<Exercise>
+Do the same for the ROSE run, whose rule alerts clusters 1, 2 and 4: give
+the precision and recall of cluster 2 alone, the precision and recall of
+the rule, and both as alerts a day of the full file.
+
+<Solution>
+**Cluster 2 alone.** $57 + 112 = 169$ alerts, precision $112/169 = 0.66$,
+recall $112/154 = 0.73$, about $169/0.6 \approx 280$ alerts a day.
+
+**The rule.** Alerts $193 + 10 + 57 + 112 + 41{,}705 + 27 = 42{,}104$,
+frauds $10 + 112 + 27 = 149$: precision $149/42{,}104 = 0.0035$, recall
+$149/154 = 0.97$. A day of the full file gets $42{,}104/0.6 \approx 70{,}000$
+alerts, half the stream.
+</Solution>
+</Exercise>
+
+### The run is not a fluke
+
+Rerunning the pipeline on five other random splits gives the same two
+results. With SMOTE and the test split standardised by its own statistics,
+the purest cluster is 68% to 80% fraud and holds 122 to 163 test payments;
+the rule that alerts every fraud cluster flags between 16,000 and 25,000
+test payments in four of the five splits, and 237 in the fifth.
+
+## Where the 71% comes from: the resampler writes the labels into the clusters
+
+K-means never sees a label, so one would expect its clusters to be
+indifferent to fraud on a set that is 0.18% fraud. The clusters of the run
+are not indifferent, because the labels went in before the clustering
+started.
+
+### Without resampling, no cluster is mostly fraud
+
+Run the same pipeline with step 2 left out, so that k-means sees the
+training split as it is. With $K = 3$ the purest test cluster holds 6,138
+payments, 37 of them fraud: 0.6%, three and a half times the base rate.
+Across the five splits the purest cluster stays between 0.3% and 0.7%. A
+rule that alerts it sends about 10,000 payments a day to the team, and it
+is a flood without the resampler.
+
+### The elbow belongs to the resampler
+
+<Figure
+  src="./figures/elbow.svg"
+  alt="Line chart of the within-cluster sum of squares as a share of its value at one cluster, against the number of clusters from 1 to 12. Black, no resampling: falls almost evenly from 1.0 to 0.73, labelled about minus 3% per cluster, no elbow. Blue, ROSE: drops to 0.78 at 2, then 0.71, 0.66 at 4, circled and labelled k = 4 chosen, then flattens to 0.55. Amber, SMOTE: drops to 0.70 at 2, labelled first split minus 30%, a pure-fraud group cut off, then 0.60 at 3, circled and labelled k = 3 chosen, then flattens to 0.37."
+  caption="Without resampling no number of clusters is special; with SMOTE the first split removes 30% of the spread by cutting a group of frauds off."
+/>
+
+On the training split as it is, each added cluster removes about 3% of the
+within-cluster sum of squares, whatever the number already fitted: no
+number of clusters is special, and the curve has no elbow. With SMOTE the
+first split removes 30%, and it cuts off a group of 334 rows that are all
+fraud. The curves come from one of the five reruns, whose training split
+holds 349 frauds, so SMOTE gives it 1,047 fraud rows; the group cut off is a
+third of them. The curve bends where the separate
+fraud groups have each received a centre. The elbow the run read off was a
+property of the resampled set, in which frauds are 43% of the rows and
+k-means has to spend centres on them.
+
+### A classifier trained on labels
+
+After resampling, the centres sit where the labels put the mass. Naming the
+clusters reads the labels a second time, and assigning a test payment to
+the nearest centre and reading off the centre's name is then a
+nearest-centroid classifier fitted on labelled data. Among <Ref
+lesson="anomaly-detection-framing"
+id="where-normal-comes-from-three-label-regimes">the label regimes</Ref>
+this is the supervised one. The 71% measures how well labelled centres
+separate frauds, not how unlike normal the frauds are.
+
+<KeyFact>
+Resampling is a use of the labels. Any score fitted after it belongs among
+the supervised rows of a comparison, beside the models trained on the same
+labels; so does any score fitted after the training sample was cleaned by
+label, which is where the comparison further down puts the autoencoder
+trained on genuine payments.
+</KeyFact>
+
+## Where the flood comes from: test payments placed in other coordinates
+
+If the clusters are a classifier with 72% precision in cluster B, why does
+the rule alert 29% of the test split? Step 6 is the one step that treats the
+test payments differently from the training rows. The centres were fitted
+in coordinates set by the resampled set's mean and standard deviation; the
+test split is standardised with its own. Each of the two statistics moves
+the test payments in its own way, and the two can be undone one at a time.
+
+### The mean: the genuine cloud is moved toward the frauds
+
+Standardising subtracts a mean, so whatever point that mean is becomes the
+origin. The resampled set is 43% fraud, and its mean lies between its
+genuine rows and its frauds. In the coordinates the centres live in, the
+origin is therefore that mixed point, and the genuine payments sit off it,
+on the side away from the frauds. The figure below takes another of the
+reruns, the split whose test part holds 139 frauds. There, on `V14` and
+`V17` the genuine centre G sits at $(0.6, 0.5)$ training standard
+deviations and the fraud centre F2 at $(-1.0, -0.6)$.
+
+The test split is 99.8% genuine, so its mean is where its genuine payments
+are: at $(0.68, 0.52)$ on the same two columns, next to G. Centring the test
+split on its own mean moves that point to the origin, and with it the whole
+genuine cloud, by about 0.7 and 0.5 training standard deviations toward F2.
+Across all 29 columns the cloud's centre goes from 0.2 away from G to 2.0
+from G and 2.3 from F2: from the middle of the genuine cluster to nearly
+the boundary between the two.
+
+### The spread: the cloud is stretched around its new centre
+
+On the columns where frauds differ from genuine payments, the resampled
+set's spread is dominated by the gap between its two classes, and it is
+large. The test split's spread on the same columns is that of genuine
+payments alone: its standard deviation is 0.218 times the training set's
+on `V14` and 0.156 times on `V17`. Dividing by it multiplies the test
+values, in training units, by $1/0.218 = 4.6$ on `V14` and
+$1/0.156 = 6.4$ on `V17`. The re-centred cloud, already close to the
+boundary, is stretched across it.
+
+<FigureSequence
+  name="shift"
+  alt="Four scatter plots of V14 against V17, both in training standard deviations from minus 6 to 4, with three cluster centres marked by crosses: G near (0.6, 0.5) in black, F1 near (minus 1.7, minus 2.4) in amber, F2 near (minus 1.0, minus 0.6) in blue; from frame 2 on, a green ring marks the test split's mean. Frame 1, training set after SMOTE, 2,471 rows, 43% fraud: a tight black cloud around G, a blue cloud around F2, a sparse amber group around F1; G holds 1,412 genuine and 227 fraud, F1 0 genuine and 223 fraud, F2 0 genuine and 609 fraud. Frame 2, test split placed with the training mean and spread: the test mean sits at G and almost every dot is in the tight black cloud; G 85,310 payments with 33 fraud, F1 39 payments with 31 fraud, F2 94 payments with 75 fraud. Frame 3, test split centred on its own mean but divided by the training spread: the tight cloud has moved to the origin, many of its dots are blue; G 63,764 payments with 11 fraud, F1 48 with 39 fraud, F2 21,631 with 89 fraud. Frame 4, test split with its own mean and spread: the cloud is also stretched, fraud dots reach the far amber corner; G 60,139 payments with 6 fraud, F1 152 payments with 107 fraud, F2 25,152 payments with 26 fraud, labelled the flood."
+  caption="One rerun of the SMOTE pipeline on two of its 29 columns: the test payments placed with the training ruler, then with their own mean, then with their own mean and spread."
+/>
+
+<Task>
+In frame 2 the test split's mean sits next to G. Before opening frame 3,
+predict where it goes when the test split is centred on its own mean, and
+which centre the genuine payments near it will then be nearest to. Before
+frame 4, predict what dividing by the test split's smaller spread does to
+the genuine payments and to the frauds.
+</Task>
+
+Frame 2 places the test split with the training mean and standard
+deviation: 133 payments go to the two fraud clusters, 106 of them fraud.
+Frame 3 changes only the mean, and 21,631 payments move into F2, a cluster
+whose training rows were all fraud. Frame 4 also changes the spread: F2
+grows to 25,152 payments, and the stretch pushes the frauds outward into
+F1, the far cluster, which now holds 152 payments, 107 of them fraud, the
+counterpart of the run's cluster B. Dividing by the test split's spread
+alone, around the training mean, sends 134 payments to the fraud clusters,
+as many as frame 2: the stretch carries the genuine payments away from the
+frauds when the cloud has not been moved first.
+
+The same split of causes holds on the other reruns. In the four splits that
+flood, centring alone sends 11,000 to 22,000 test payments to the fraud
+clusters, and the spread alone 134 to 150, as many as the training
+placement.
+
+### Placing the test split with the training ruler
+
+The repair is the rule <Ref lesson="neural-tabular-detectors"
+id="standardise-on-the-training-block-compress-a-long-tail-first">the
+supervised network followed</Ref>: the scaler is fitted on the training
+block and applied unchanged to every later payment. With that one change,
+on the same five splits, the SMOTE rule alerts between 81 and 156 test
+payments, 75% to 82% of them fraud, and catches between 43% and 83% of the
+test frauds. ROSE gives the same picture, 129 to 152 alerts at about 80%.
+
+<KeyFact>
+A test payment has to be placed in the coordinates its model was fitted
+in. Standardising the test split by its own statistics cost the run about
+25,000 false alerts on 85,443 payments.
+</KeyFact>
+
+Repaired, the rule is a supervised classifier with about 80% precision on
+135 to 260 alerts a day of the full file. Inside its alert set every
+payment is equal, so a team with 100 calls takes any 100 of them, and
+nothing in the rule says which. It is also still a model trained on labels.
+
+## Scores at the budget: trained on day 1, judged on day 2
+
+Setting the label-free scores beside models trained on labels needs one
+test that is honest for all of them, and on this file the split is the hard
+part. The coursework split at random, which mixes later payments into the
+training set and puts payments of one card on both sides, so a model is
+tested on frauds whose siblings on the same card it was trained on: <Ref
+lesson="delayed-labels-prequential"
+id="a-shuffled-split-tests-a-model-that-cannot-exist">a test of a model that
+cannot exist</Ref>. Keeping each card on one side would remove the second
+leak, but the file has no card column to do it with. A cut in time removes
+the first leak and needs no card: every model is built on what came before
+and scores what comes after, as a deployed one does.
+
+### The split, the inputs, the metrics
+
+Day 1 is $\text{Time} < 86{,}400$ seconds, 144,786 payments with 281 frauds (0.19%),
+and day 2 is the rest, 140,021 payments with 211 frauds (0.15%). There is no
+delay block, because the file records no label dates: the models train on
+day 1's final labels, which makes every supervised number slightly
+optimistic.
+
+The inputs are `V1` to `V28` and $\log(1 + \text{Amount})$, the logarithm
+because amounts have a long tail, all standardised with day 1's mean and
+standard deviation. `Time` is dropped, since every value on day 2 lies
+beyond day 1's range.
+
+The metrics are ROC-AUC, average precision (AP), and the precision of the
+day's 100 highest-scored payments, <Ref lesson="alert-budget-metrics"
+id="precision-at-k-the-metric-cut-where-the-team-cuts">P@100</Ref>. Payments,
+not cards, because there are no cards. Day 2 has 211 frauds, more than 100,
+so a perfect ranking reaches 1. The coursework's own metric, F1 at a
+threshold, scores <Ref lesson="alert-budget-metrics"
+id="a-threshold-metric-judges-a-cut-nobody-chose">one cut nobody
+chose</Ref>.
+
+### The scorers
+
+- **distance to the day-1 mean**: the length of a payment's vector of
+  standardised inputs, with no model. Below, "distance" always means this
+  length, in day-1 standard deviations; its square, the sum of the squared
+  inputs, ranks the payments in the same order;
+- **isolation forest**: 100 trees on samples of $\psi = 256$ (five seeds)
+  and of $\psi = 4{,}096$ (three seeds);
+- **autoencoder**: 29-100-20-100-29 with ReLU units, trained <Ref
+  lesson="one-class-and-reconstruction"
+  id="training-it-the-supervised-pipeline-with-the-label-replaced-by-the-input">exactly
+  as in the last lesson</Ref>, early stopping on a held-out tenth of the
+  training payments and the last epoch's weights kept, either on all of
+  day 1 or on day 1's genuine payments only; three seeds each;
+- **k-means**: $K = 8$ centres fitted on day 1 without resampling, three
+  seeds, read two ways from <Ref lesson="density-and-distance-scores"
+  id="clustering-comparing-with-a-few-centroids-instead-of-every-neighbour">the
+  clustering assumptions</Ref>: distance to the nearest centre, and
+  smallest cluster first, and inside a cluster the payment farther from its
+  centre first.
+  $K = 8$ is the setting <Ref lesson="density-and-distance-scores"
+  id="does-the-small-cluster-score-find-organised-fraud">the small-cluster
+  score was run with on PaySim</Ref>, fixed before day 2 was looked at;
+  the elbow cannot supply one, since without resampling the curve has no
+  bend;
+- **supervised**: a logistic regression at library defaults and a random
+  forest of 100 trees (three seeds), trained on day 1's labels.
+
+Where a scorer was run with several seeds, each seed's run is scored
+separately and the table gives the mean of their metrics.
+
+### The table
+
+| score | labels used | ROC-AUC | AP | P@100 |
+|---|---|---|---|---|
+| distance to the day-1 mean | none | 0.96 | 0.10 | 0.34 |
+| isolation forest, $\psi = 256$ | none | 0.96 | 0.11 | 0.26 |
+| isolation forest, $\psi = 4{,}096$ | none | 0.96 | 0.19 | 0.38 |
+| autoencoder, all day-1 rows | none | 0.86 | 0.12 | 0.26 |
+| k-means, distance to centre | none | 0.96 | 0.06 | 0.08 |
+| k-means, smallest cluster first | none | 0.78 | 0.35 | 0.69 |
+| autoencoder, genuine day-1 rows | day 1 | 0.92 | 0.31 | 0.49 |
+| logistic regression | day 1 | 0.96 | 0.64 | 0.81 |
+| random forest | day 1 | 0.95 | 0.77 | 0.93 |
+
+<Figure
+  src="./figures/scores.svg"
+  alt="Horizontal bar chart, two bars per score, amber for average precision and blue for precision in the top 100, with ROC-AUC printed in a column on the right. Upper group, no labels used: distance to the day-1 mean 0.10 and 0.34, AUC 0.96; isolation forest psi 256 0.11 and 0.26, 0.96; isolation forest psi 4,096 0.19 and 0.38, 0.96; autoencoder on all day-1 rows 0.12 and 0.26, 0.86; k-means distance to centre 0.06 and 0.08, 0.96; k-means smallest cluster first 0.35 and 0.69, 0.78. Lower group, day-1 labels used: autoencoder on genuine rows 0.31 and 0.49, 0.92; logistic regression 0.64 and 0.81, 0.96; random forest 0.77 and 0.93, 0.95. Footnote: day 2, 140,021 payments, 211 frauds, base rate 0.0015."
+  caption="Day 2 of the ULB file: the AUC column barely moves, the two precision columns separate the scores by a factor of ten."
+/>
+
+**AUC cannot tell them apart.** Four label-free scores sit at 0.96, the
+logistic regression's own value.
+
+**Average precision and the top 100 can.** The label-free distance and
+isolation scores reach an average precision of 0.06 to 0.19 and put 8 to 38
+frauds in the day's top 100. The logistic regression puts 81 there, the
+forest 93. The larger isolation sample helps, as <Ref
+lesson="isolation-forest"
+id="when-the-frauds-come-in-small-clumps-a-small-sample-buys-nothing">it
+did on this file before</Ref>.
+
+**The autoencoder trained on all of day 1 does no better than no model**:
+an AUC of 0.86 against 0.96 for the plain distance from the mean, an
+average precision level with it (0.12 against 0.10) and 26 frauds in the
+top 100 against 34. Its AUC depends on how long it trained: the two seeds
+that stopped after 32 and 35 epochs reached 0.92, the one that ran 56
+epochs 0.75. That is what a network learning day 1's 281 frauds along with
+everything else would show, <Ref lesson="one-class-and-reconstruction"
+id="fraud-inside-the-training-sample-is-enclosed">as the boundary enclosed
+fraud in its training sample</Ref>: the longer it fits, the better it
+copies them. Trained on genuine payments only, it reaches 0.31 and 49
+frauds in the top 100, and that version needs day 1's labels.
+
+**One label-free score comes near the supervised top**: k-means read as
+smallest cluster first, 69 frauds in the top 100.
+
+## The small cluster: an alert set that fits the budget, at the right K
+
+Without resampling, $K = 3$ gave no fraud cluster at all. At $K = 8$ the
+smallest cluster is almost all fraud. What is in it, and why did it not
+appear before?
+
+### What sits in it
+
+The smallest of the eight clusters holds 185 day-1 payments, 145 of them
+fraud. On day 2, 67 to 70 payments are assigned to it, depending on the
+seed, and every one of them is fraud: a third of the day's 211. Its centre
+lies at a distance of 31 from the day-1 mean (squared, about 950), where the
+median genuine payment of day 2 lies at 4.8 (squared, 23): these are frauds
+that are extreme together, in the same directions. Being the smallest
+cluster, it heads the ranking; the next 30 places go to the second-smallest cluster, a few thousand payments
+among which fraud is rare.
+
+This is the small-cluster score of <Ref lesson="density-and-distance-scores"
+id="does-the-small-cluster-score-find-organised-fraud">the distance
+lesson</Ref>, which turned the repetition of organised fraud into signal on
+PaySim, here finding a group of frauds that repeat one pattern.
+
+### A window of K that no label-free criterion finds
+
+Refitted at every $K$ from 2 to 40, three seeds each, the small-cluster
+score works only inside a window. From $K = 5$ to $K = 18$ the fraud
+group is the smallest cluster and the score puts 62 to 70 frauds in the top 100. From $K = 24$ on, some honest
+group of a few dozen or a few hundred payments gets its own cluster, smaller
+still, and is ranked first: the top 100 holds 3 to 15 frauds on average.
+Below $K = 5$ the outcome depends on the random start. The value 8,
+carried over from PaySim, happened to fall inside the window; nothing on
+this file short of labels would have warned against 32, since the elbow
+curve without resampling has no elbow. Choosing $K$ needs labelled days,
+and it becomes a setting chosen on labelled folds, like the forest's
+sample size.
+
+<Figure
+  src="./figures/ksweep.svg"
+  alt="Line chart of precision in day 2's top 100 against the number of k-means clusters K from 2 to 40, fitted on day 1 without labels, three seeds per K drawn as faint dots and their mean as a line. Amber, smallest cluster first: erratic between 0 and 0.71 for K 2 to 4, about 0.62 to 0.70 for K 5 to 18 in a shaded band labelled far cluster smallest, a dip and spike at 19 and 20, then 0.13, 0.15, 0.03 and 0.07 at K 24, 28, 32 and 40. Blue, distance to nearest centre: 0.25 to 0.33 for K 2 to 4, then about 0.08 to 0.10 for every larger K. Dashed guides: random forest with labels 0.93, logistic regression with labels 0.81, isolation forest psi 4,096 0.38."
+  caption="The small-cluster score works for K from 5 to 18 and fails beyond 24; the distance-to-centre score fails from K = 5 on."
+/>
+
+### Same centres, opposite verdicts
+
+The same eight centres read as distances give the worst score in the table,
+8 frauds in the top 100, fewer than the plain distance from the mean finds.
+The fraud group has a centre of its own. Its day-2 members lie at a
+median distance of 43 from the day-1 mean (squared, about 1,860), farther
+out than the day-1 centre at 31: they are not scattered around that centre
+but beyond it, a median 40 along its direction from the mean and 12
+across. That is far enough for the distance from the mean to rank 34 of
+them in its top 100. From their own centre they lie at a median 17, and a
+place in the top 100 by distance to the nearest centre takes 38 to 39.
+Genuine payments that are unusual in directions where no centre went keep
+their full distance and take the places. This is <Ref
+lesson="anomaly-detection-framing" id="three-planar-experiments">panel (c)
+of the framing lesson</Ref> on real data: a group of anomalies that earns a
+centre looks normal to a near-centroid score.
+
+<KeyFact>
+The same eight centres put 8 frauds in the day's top 100 when read as
+distances and 69 when read as cluster sizes. Which reading works depends on
+whether the frauds form their own group, and on this file only labels can
+say that they do.
+</KeyFact>
+
+## Why the AUC flatters every score
+
+Four label-free scores tie the logistic regression on AUC with between a
+tenth and a third of its average precision. The plain distance from the
+day-1 mean shows how both can be true.
+
+<Figure
+  src="./figures/distance-hist.svg"
+  alt="Two step histograms on a log x axis, the squared distance of a day-2 payment from the day-1 mean from about 3 to 50,000, y axis share of the class. Blue, 139,810 genuine payments, median 23: a peak between 10 and 50 with a thin tail. Amber, 211 frauds, median 271: a broad hump from 20 to 700 with a peak near 300, and a separate group between 2,000 and 7,000. A green vertical line near 1,860 is labelled the day's top 100, beyond this line 34 frauds and 66 genuine; the other 177 frauds left of it."
+  caption="The frauds sit far above the typical genuine payment, which buys the AUC, and below the most extreme genuine payments, which costs the top 100."
+/>
+
+The histogram is drawn in squared distance, which spreads out the far
+tail. The frauds' median is 271, twelve times the genuine payments' 23
+(as distances, 16.5 and 4.8). 98% of the frauds lie above the genuine
+median and 88% above the genuine 95th percentile. The ROC-AUC is the probability that a random
+fraud outscores a random genuine payment, so it comes out at 0.96.
+
+The team reads only the top 100 of 140,021 payments, beyond the 99.93rd
+percentile, where the budget reaches <Ref lesson="alert-budget-metrics"
+id="how-much-of-the-curve-a-hundred-alerts-can-reach">a false-positive rate
+of at most $100/139{,}810 \approx 0.0007$</Ref>: a squared distance
+beyond about 1,860, a distance of 43. There 66 genuine payments
+take places from the frauds, and all 34 frauds that do reach the top are
+members of the far fraud group. Only 18% of the frauds lie above the genuine
+99.9th percentile; for the logistic regression the share is 70%. Measured
+the other way, 1,039 genuine payments score above the median fraud by
+distance from the mean, and 41 by the logistic regression.
+
+The reason is in what the distance adds up. The components are directions
+of a cloud of almost entirely genuine payments, and the squared distance
+adds the squared departures along all 29 inputs with equal weight. A genuine payment
+far out along any one of them scores as high as a fraud. Fraud departs along
+particular directions: the logistic regression learns from labels which ones
+and how much each counts, and an unlabelled score has no way to. This is
+<Ref lesson="anomaly-detection-framing"
+id="outside-normal-is-not-toward-fraud">"outside normal is not toward
+fraud"</Ref>, measured on real payments.
+
+## What the forward split confirms, and what the file cannot test
+
+The module's results were first measured in three kinds of place: on the
+simulator and PaySim, whose frauds follow scripts; on planar toys; and, for
+the forest's sample size, on the whole ULB file scored in place. Day 2 is
+the first forward test for all of them:
+
+| claim from this module | lesson | first measured on | on day 2 of the ULB file |
+|---|---|---|---|
+| unlike-normal scores get a decent AUC and a poor top | <Ref lesson="isolation-forest" id="a-decent-ranking-a-poor-top">isolation forest</Ref> | simulator | held, more sharply: AUC equal to the supervised one, AP a third or less |
+| an autoencoder fitted to a sample with fraud learns that fraud | <Ref lesson="one-class-and-reconstruction" id="three-readings-of-the-table">reconstruction</Ref> | simulator | held, more weakly: AUC 0.86 (0.75 to 0.92 across seeds) against the no-model distance's 0.96, AP level with it |
+| cleaning the training sample is the largest gain, and needs labels | <Ref lesson="one-class-and-reconstruction" id="three-readings-of-the-table">reconstruction</Ref> | simulator | held: AP 0.12 to 0.31 |
+| a group of anomalies is normal to a near-centroid score | <Ref lesson="anomaly-detection-framing" id="three-planar-experiments">framing</Ref> | planar toy | held: 8 frauds in the top 100 |
+| the small-cluster score finds organised fraud until a rarer honest group outranks it | <Ref lesson="density-and-distance-scores" id="does-the-small-cluster-score-find-organised-fraud">distance and density</Ref> | PaySim | held: K from 5 to 18 works, from 24 fails |
+| where frauds come in small clumps, $\psi = 256$ buys nothing | <Ref lesson="isolation-forest" id="when-the-frauds-come-in-small-clumps-a-small-sample-buys-nothing">isolation forest</Ref> | whole ULB file, scored in place: AP 0.20 against 0.28 | re-checked on a forward split, same order: AP 0.11 against 0.19 at $\psi = 4{,}096$ |
+
+Every one of these is a claim about scoring one payment from its own
+columns, and that is all the file can test.
+
+<Figure
+  src="./figures/untestable.svg"
+  alt="A loop of boxes. Solid: payment arrives, with Time, Amount and V1 to V28; score one payment, in amber, every scorer in this lesson; final label, Class, near-complete and undated. Dashed and faded: top 100 cards a day, needs a card column; investigators call, labels on alerted cards; labels arrive late, needs dated labels and weeks; retrain on a cadence, needs weeks of drift; card history features, needs a card column; explain the alert, needs named features. Arrows run from payment to score to top 100 cards to investigators to late labels to retraining and back to payment. Legend: solid, in the file; dashed, not in the file, so not testable on it."
+  caption="The detection loop with the parts the ULB file lacks drawn dashed: it can test a score, not a system."
+/>
+
+**No card.** There is no card precision, no card-history feature of <Ref
+lesson="transaction-aggregates">module 3</Ref>, no removal of cards already
+known. A random split also leaks one card's frauds across it: the logistic
+regression scores an average precision of 0.74 on a random 70/30 split and
+0.64 on the day split, the random forest 0.82 and 0.77. The two test sets
+differ, so the gap is the leak plus a different mix of days, and without
+cards the file cannot separate the two.
+
+**Two days.** One test day of 211 frauds means one draw: at a true
+precision of 0.7, the top 100 of a single day has a standard deviation of
+about $\sqrt{0.7 \times 0.3/100} \approx 0.05$, so the table separates
+0.34 from 0.81 but not 0.34 from 0.38. There is no room for a delay block,
+no drift, and no retraining cadence to test.
+
+**Anonymous columns.** No alert can be explained in words, and no feature
+can be built from knowledge of payments.
+
+**Final, undated labels.** No label clock and no feedback from alerts. What
+the file tests is a score; a detection system is tested on the
+simulator and the Belgian stream.
+
+<Conclusion>
+You can now take apart the coursework result. The 71% cluster exists
+because SMOTE made frauds 43% of the training set, which turned k-means into
+a classifier fitted on labels; the flood exists because the test split was
+standardised with its own statistics: its own mean moved the genuine cloud
+from the genuine centre to the resampled set's mixed mean, beside a fraud
+centre, and its own spread stretched the cloud across. Repaired, the rule
+is a supervised model at about 80% precision whose alerts cannot be ordered. You can run every scorer of
+the module on a forward split of the real file and read it at the budget:
+label-free distance and isolation scores reach the supervised AUC and a
+tenth to a third of its average precision, because
+genuine payments that are unusual in any direction fill the top 100; the
+small-cluster score finds a pure fraud group that fits the budget, at
+numbers of clusters only labels can choose; and an autoencoder fitted to
+data containing fraud does no better than no model.
+
+<Ref lesson="anomaly-scorers-lab">The lab</Ref> builds the isolation
+forest and the autoencoder from their formulas and scores day 2 of this
+file against the supervised ceiling measured here. After it, <Ref
+lesson="fraud-as-a-graph">the next module</Ref> takes up what this file
+removed first: the links between cards, accounts and merchants, where
+organised fraud is visible as structure rather than as a far group of rows.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+The SMOTE run's rule has, on the test split, 147 true positives, 7 false
+negatives, 24,777 false positives and 60,512 true negatives. Its software
+printed a precision of 0.0059 and a recall of 0.955. A write-up of the run
+defines recall as $TP/(TP + FP)$ and precision as $TP/(TP + FN)$.
+(a) Compute precision, recall, F1 and the specificity $TN/(TN + FP)$ with
+the correct definitions. (b) Which definitions did the software use? What
+would a reader who trusts the written formulas conclude from the printed
+"recall 0.955"? (c) How many alerts a day does the rule send on the full
+file, and what share of the stream is that?
+
+<Solution>
+**(a)** Precision $147/(147 + 24{,}777) = 147/24{,}924 = 0.0059$. Recall
+$147/(147 + 7) = 0.955$. F1 $= 2 \times 0.0059 \times 0.955/(0.0059 +
+0.955) = 0.0117$. Specificity $60{,}512/(60{,}512 + 24{,}777) = 0.71$.
+
+**(b)** The correct ones: the printed values match (a). The written
+formulas are swapped, so a reader who trusts them reads "recall 0.955" as
+$TP/(TP + FP)$, that is, as 95.5% of the alerts being fraud. The true
+statement is the opposite: 0.6% of the alerts are fraud. A swapped
+definition turns a flood into an apparently excellent detector.
+
+**(c)** The test split is three tenths of two days, so
+$24{,}924/0.6 \approx 41{,}500$ alerts a day of the full file, about 29% of
+its 142,000 daily payments.
+</Solution>
+</Exercise>
+
+<Exercise>
+Push the cluster rule to the ends of $K$, keeping SMOTE and the naming step
+("a cluster made up mostly of frauds is a fraud cluster"). (a) With
+$K = 1$, what is the one cluster's fraud share, how is it named, and what
+does the rule alert? (b) With $K$ equal to the number of resampled training
+rows, every row its own centre: what does the rule become, and what part do
+the synthetic frauds play? (c) Why does no $K$ in between let the team cut
+the alerts at exactly 100 a day?
+
+<Solution>
+**(a)** One cluster holds every resampled row, so its fraud share is the
+set's, 43%. That is not mostly fraud, so it is named genuine and the rule
+alerts nothing. (Had the rule been "fraud share above the set's", 43% is
+not above 43%, and the answer would be the same.)
+
+**(b)** Each test payment takes the class of its nearest resampled row: the
+rule is a one-nearest-neighbour classifier trained on the resampled set.
+Two thirds of its fraud rows are synthetic points on segments between real
+frauds, so they fill in the space between frauds and widen the region in
+which a test payment's nearest row is a fraud.
+
+**(c)** At every $K$ the rule is a set of regions, each wholly alerted or
+wholly not. Its alert count is the number of test payments that fall in
+the fraud regions, set by the clustering, and every payment inside a region
+is equal, so there is no order in which to stop at 100. Cutting at a budget
+needs a score that differs inside a region: a distance to the centre, a
+classifier's probability, or a cluster's size with ties broken by
+distance.
+</Solution>
+</Exercise>
+
+<Exercise>
+"Without labels, k-means finds no fraud on this file: at the elbow the
+purest cluster is 0.6% fraud. Clustering is useless as a label-free fraud
+detector." Refute the claim with the lesson's numbers, name the step of
+the argument that fails, and say which part of it survives.
+
+<Solution>
+**The counterexample.** Fitted on day 1 without labels at $K = 8$, the
+smallest cluster receives 67 to 70 day-2 payments, every one of them fraud,
+and the small-cluster score puts 69 frauds in day 2's top 100, against 81
+for a logistic regression trained on labels.
+
+**The failing step.** "At the elbow": without resampling the elbow curve
+has no elbow, so $K = 3$ was not chosen by the data. The claim also reads
+clusters only by their fraud share, which needs labels, and ignores the
+label-free reading by cluster size.
+
+**What survives.** The success holds only for $K$ from 5 to 18. From
+$K = 24$ on, a small honest group outranks the fraud cluster and the top
+100 holds 3 to 15 frauds on average. Nothing without labels marks the
+window, so the method is label-free in its scoring and needs labels to set
+$K$. The same eight centres read as distances put only 8 frauds in the top
+100.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce the coursework result. On five random 70/30 splits of the ULB
+file, apply SMOTE as described (two synthetic frauds per real one, then
+twice as many genuine as synthetic), standardise, fit k-means with $K = 3$
+from 25 starts and name the clusters. Assign the test split twice: once
+standardised with its own mean and standard deviation, once with the
+training set's. (a) Say in advance what would count as agreement with the
+run. (b) Report, for each scaling, the purest cluster's size and fraud
+share and the number of payments the rule alerts. (c) Repeat without
+resampling and report the purest cluster.
+
+<Solution>
+**(a)** The run is one draw, so agreement means the same shape, not the
+same counts: with the test split's own scaling, a purest cluster of 60% to
+80% fraud holding one or two hundred test payments and a rule alerting
+tens of thousands; with the training scaling, no flood.
+
+**(b)** The lesson's reruns give, with the test split's own scaling, purest
+clusters of 68% to 80% fraud on 122 to 163 test payments, and rules
+alerting between 16,210 and 25,304 test payments in four splits and 237 in
+the fifth. With the training scaling, the rule alerts 81 to 156 payments,
+75% to 82% of them fraud. Your counts will differ with the random draws;
+both shapes should not.
+
+**(c)** Without resampling and with $K = 3$, the purest test cluster holds
+about 6,100 payments at 0.6% fraud in four of the five splits, and about
+1,500 at 0.4% in the fifth.
+</Solution>
+</Exercise>
+
+<Exercise>
+In one rerun with the training scaling, the repaired SMOTE rule alerts 133
+of 85,443 test payments, 106 of them fraud, while the test split holds 139
+frauds. Treat the rule as <Ref lesson="delayed-labels-prequential"
+id="two-scores-one-corner">a two-score model</Ref>: alerted payments score
+1, the rest 0. (a) Compute $T$, $F$, $P_1$ and $\pi$, then the ROC-AUC
+$\tfrac12(1 + T - F)$ and the average precision $T P_1 + (1 - T)\pi$.
+(b) A logistic regression on another random split of the file reaches an
+AUC of 0.97 and an average precision of 0.74. What does the comparison say
+about the rule as a classifier, and what can it not do that the regression
+can?
+
+<Solution>
+**(a)** $T = 106/139 = 0.763$. $F = (133 - 106)/(85{,}443 - 139) =
+27/85{,}304 = 0.00032$. $P_1 = 106/133 = 0.797$. $\pi = 139/85{,}443 =
+0.0016$. ROC-AUC $= \tfrac12(1 + 0.763 - 0.0003) = 0.88$. Average precision
+$= 0.763 \times 0.797 + 0.237 \times 0.0016 = 0.608 + 0.0004 = 0.61$.
+
+**(b)** On average precision the rule is a reasonable supervised classifier,
+0.61 against 0.74; its AUC is lower because the 24% of frauds outside the
+alerted block are tied with every genuine payment and reached at the base
+rate. What it cannot do is order: its alerts form one block, so the team
+cannot take the 100 most suspicious, and at more than 100 alerts a day it
+cannot trade recall for precision at all. The regression's probability can
+be cut anywhere.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lab after this lesson asks for a ranking of day 2 that uses no labels
+in what it scores and beats an average-precision bar, using an isolation
+forest, an autoencoder trained on genuine day-1 rows, or a combination. The
+second of these is fitted to a sample cleaned by label, so by the lesson's
+own rule it sits among the supervised rows of the table. (a) From the table, which two scores are
+the obvious candidates, and what are their average precisions? (b) Ranking
+day 2 by the average of the two scores' ranks gives an average precision of
+0.32 and 44 frauds in the top 100, against 0.31 and 49 for the autoencoder
+alone. Explain why averaging gained almost nothing in average precision
+and lost places at the top. (c) Where does the lesson suggest a gain could come
+from instead?
+
+<Solution>
+**(a)** The forest with $\psi = 4{,}096$ (0.19) and the autoencoder trained
+on genuine day-1 rows (0.31), the second bought with day 1's labels.
+
+**(b)** Averaging ranks helps when the two scores make different mistakes
+at the top. Both rank payments by how far they lie from genuine day-1
+payments, so both fill their top with the same far-out genuine payments,
+and averaging keeps those while diluting the autoencoder's better order. The
+forest also has the weaker top, 38 frauds in its hundred against 49, so
+half the weight goes to the worse list, and the top 100 loses five frauds.
+Averaging does improve the bulk: its AUC is 0.96 against the
+autoencoder's 0.92. Since the top 100 got worse while the average precision
+rose by 0.01, that sliver was earned below the hundredth place, where the
+team does not look.
+
+**(c)** From a different kind of evidence, not a second distance: the
+small-cluster reading of k-means puts 69 frauds in the top 100, because it
+uses where the frauds group, not how far they are. Its $K$ has to be chosen
+on labelled days. <Ref lesson="anomaly-scorers-lab">The lab</Ref> builds
+both scorers from their formulas and leaves the combination to you, with
+the supervised average precision of this lesson printed as the ceiling.
+</Solution>
+</Exercise>
+
+<Exercise>
+The SMOTE step of one rerun turns a training split of 199,364 payments, 349
+of them fraud, into 1,047 fraud rows and 1,396 genuine rows. Suppose a
+logistic regression were trained on that set instead of k-means. (a) Using
+<Ref lesson="undersampling-calibration" id="reading-β-off-a-training-set">the
+keep rate read off the class shares</Ref>,
+$\beta = \pi(1 - \pi_s)/\big(\pi_s(1 - \pi)\big)$, compute $\beta$. (b)
+Which probability $p'$ on the training split's base rate does an output
+$p_s = 0.5$ correspond to? (c) Why is the correction only approximate
+here, when it was exact for plain undersampling?
+
+<Solution>
+**(a)** $\pi = 349/199{,}364 = 0.00175$, $\pi_s = 1{,}047/2{,}443 =
+0.4286$. Then
+$\beta = 0.00175 \times 0.5714/(0.4286 \times 0.99825) = 0.00234$. It is
+smaller than the genuine keep rate $1{,}396/199{,}015 = 0.0070$ by the
+factor 3 by which the frauds were multiplied: the formula reads only the
+two class shares, and both changes move them.
+
+**(b)** $p' = \beta p_s/(\beta p_s - p_s + 1) = 0.00117/(0.00117 + 0.5)
+= 0.0023$. A payment the model calls even odds is fraud about once in 430.
+
+**(c)** The correction assumes that rows entered the training set by a coin
+that looked only at the label. Two thirds of the fraud rows are new points
+placed between real frauds, so the training set's fraud rows have a
+different distribution in the inputs from the stream's frauds: <Ref
+lesson="undersampling-calibration"
+id="when-the-coin-looks-at-the-payment">the coin looks at the
+payment</Ref>. The class shares, and with them $\beta$, are right; the
+model's view of where frauds lie is not, and a reliability check on
+unresampled payments is the only way to see how far off it is.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Dal Pozzolo, O. Caelen, R. A. Johnson, G. Bontempi, "Calibrating Probability with Undersampling for Unbalanced Classification," *IEEE Symposium Series on Computational Intelligence (SSCI)*, 2015 — Sec. VI and its footnote: the credit-card dataset (two days of September 2013, 492 frauds of 284,807 transactions, 0.172%, minimum β ≈ 0.00173) and its release. https://doi.org/10.1109/SSCI.2015.33
+2. Machine Learning Group, Université Libre de Bruxelles, "Credit Card Fraud Detection" dataset (`creditcard.csv`: `Time`, `V1`–`V28`, `Amount`, `Class`). https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud
+3. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 2, section "Machine learning for credit card fraud detection" (the lack of public datasets: one public card dataset, two days, obfuscated features); Ch. 7, section "Autoencoders and anomaly detection" (the encoder–code–decoder recipe and the isolation-forest baseline reused here). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+4. V. Chandola, A. Banerjee, V. Kumar, "Anomaly Detection: A Survey," *ACM Computing Surveys* 41(3), Article 15, 2009 — Sec. 6 (the three clustering-based assumptions: no cluster, far from the centroid, small or sparse cluster), Sec. 6.1 (disadvantages: every point forced into a cluster; anomalies that form clusters of their own). https://doi.org/10.1145/1541880.1541882
+5. N. V. Chawla, K. W. Bowyer, L. O. Hall, W. P. Kegelmeyer, "SMOTE: Synthetic Minority Over-sampling Technique," *Journal of Artificial Intelligence Research* 16, 2002, pp. 321–357 — the interpolation between a minority row and one of its nearest minority neighbours. https://doi.org/10.1613/jair.953
+6. L. Torgo, *Data Mining with R: Learning with Case Studies*, Chapman & Hall/CRC, 2010 — the `DMwR` package whose `SMOTE` function the coursework called, with defaults `perc.over = 200`, `perc.under = 200`, `k = 5`.
+7. G. Menardi, N. Torelli, "Training and assessing classification rules with imbalanced data," *Data Mining and Knowledge Discovery* 28(1), 2014, pp. 92–122 — ROSE: the smoothed bootstrap that draws a balanced sample with Gaussian kernel noise around the rows of each class. https://doi.org/10.1007/s10618-012-0295-5
+8. F. T. Liu, K. M. Ting, Z.-H. Zhou, "Isolation Forest," *Proceedings of the 8th IEEE International Conference on Data Mining (ICDM)*, 2008, pp. 413–422 — the forest and the sub-sample size ψ used here. https://doi.org/10.1109/ICDM.2008.17
+9. FITE7410 Financial Fraud Analytics, The University of Hong Kong, 2022–23, Assignment 1, Part II (k-means cluster analysis of the ULB set), with one student's submitted report and R code (Figs. 13–17: elbow curves, cluster tables, confusion matrices) — the coursework pipeline and the run's numbers reproduced and re-scored here. https://github.com/Danny-CHLee/Fraud-Analytics-HKU
+10. CS6890 Fraud Analytics, IIT Hyderabad, 2023–24, Problem Statement 4 (an autoencoder and a variational autoencoder on the ULB set, log-scaled `Time` and `Amount`, evaluated by F1 on a test split) — the second coursework exercise this chapter re-scores. https://github.com/Yp1711/CS6890-Fraud-Analytics-2024 — The reruns, elbow curves, day-split scores, k-means sweeps and histograms of this chapter were computed for this course with numpy, scikit-learn (`KMeans`, `IsolationForest`, `LogisticRegression`, `RandomForestClassifier`) and PyTorch on the released file.
+</References>

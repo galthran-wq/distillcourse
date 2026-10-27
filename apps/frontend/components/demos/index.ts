@@ -109,4 +109,5 @@ export const demos: Record<
   QuadraticVariationZoom: () => import("./quant/QuadraticVariationZoom"),
   RankingBudgetExplorer: () => import("./fraud-ml/RankingBudgetExplorer"),
   CircularMeanClock: () => import("./fraud-ml/CircularMeanClock"),
+  IsolationSplitter: () => import("./fraud-ml/IsolationSplitter"),
 };

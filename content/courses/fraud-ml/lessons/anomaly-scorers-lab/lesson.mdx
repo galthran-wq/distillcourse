@@ -1,0 +1,69 @@
+Two scorers that use no labels — random isolation trees and a reconstruction network — built from the formulas, checked against the paper's constants and a finite-difference referee, and ranked on the real card set by average precision.
+
+Every label-free number in this module so far came out of a library call.
+A library call hides the lines those numbers depend on: which sample size
+the isolation score is normalised by, what a tree charges a point it
+stopped splitting, which rows the network learnt to reproduce, and in
+which coordinates a new payment is placed. Each is one line of code, and
+each can be wrong without any error being raised.
+
+The definitions all come from earlier lessons. The yardstick
+$c(n) = 2(H_n - 1)$, the score $s = 2^{-E[h]/c(n)}$, the tree grown to a
+height limit of $\lceil \log_2 \psi \rceil$ and the $c(\text{Size})$ added
+at a node the limit truncated come from <Ref lesson="isolation-forest" />.
+The autoencoder whose reconstruction error is the score, and the reason to
+train it on genuine payments only, come from
+<Ref lesson="one-class-and-reconstruction" />. The time split of the ULB
+file, its inputs (`V1` to `V28` and $\log(1 + \text{Amount})$) and the
+finding that the distance from the mean and both forests rank the frauds
+at a ROC-AUC of 0.96, level with the logistic regression, with the
+autoencoder below that (0.86 trained on all rows, 0.92 on genuine ones),
+while every label-free score trails the supervised ones far on average
+precision come from
+<Ref lesson="ulb-unsupervised-scores" />. Average precision itself is the
+step sum built in <Ref lesson="cost-aware-evaluation-lab" />, and it ships
+with this lab complete.
+
+You write the scorers in numpy, one checkpoint each: the yardstick and the
+score; one isolation tree; the path length through it; the forest, which
+calls all three; the forward pass and loss of a tied-weight autoencoder;
+its gradient, derived by you and refereed in the notebook by finite
+differences; and the training loop with the scorer around it, fitted on
+genuine rows and placing every payment in the training rows' coordinates.
+Along the way the forest reproduces the original paper's first experiment,
+a planted outlier isolated in 2.7 cuts on average where the central point
+of the cloud needs 13, and shows masking on a clump of 40 anomalies. Then both
+scorers are built on the first 16 hours of the ULB file's first day and
+judged on its last 8, beside the distance from the mean (no model) and a
+logistic regression trained on labels (the ceiling).
+
+The lab runs as a Jupyter notebook — open it in Colab with the button
+below, or in any Jupyter; it needs no GPU and fetches about 9 MB of data.
+Pair the notebook with the code from this page; each checkpoint submits
+your function's outputs for verification, and the checklist below tracks
+what stands. The seven exact checkpoints are the required set. The written
+answer (why ROC-AUC rates the label-free scores level with the regression
+while average precision does not) and the open task are optional. The open
+task takes the 1,000 payments of day 2 farthest from day 1's mean, 91 of
+them fraud, and asks for a label-free order of them that beats a ROC-AUC
+bar of 0.76 over the shortlist: among payments that are all unusual,
+ROC-AUC asks what average precision asks of the whole day, which of the
+unusual ones are fraud. Expect about five hours. When a check goes red,
+the verdict often names the bug — the data set's size where the sample
+size belongs, a sub-sample drawn with replacement, the decoder's half of a
+tied weight's gradient left out, a network fitted to frauds — so read it
+before rereading your code.
+
+The ULB file has no cards, merchants or accounts, so every score here
+judges one payment by its own columns.
+<Ref lesson="fraud-as-a-graph" /> starts on what the file removed: the
+links between cards, accounts and merchants, where organised fraud shows as
+structure.
+
+<References>
+1. F. T. Liu, K. M. Ting, Z.-H. Zhou, "Isolation Forest," *Proceedings of the 8th IEEE International Conference on Data Mining (ICDM)*, 2008, pp. 413–422 — Sec. 2 (the 135-point Gaussian and the mean paths of its outlier and central point, Fig. 1; $c(n)$, Eq. 1; the score, Eq. 2), Sec. 3 (swamping, masking, sub-sampling without replacement), Sec. 4 (Algorithms 1–3: the forest, the tree with height limit $\lceil\log_2\psi\rceil$, the path length with the $c(\text{Size})$ adjustment), whose semantics the forest checkpoints follow. https://doi.org/10.1109/ICDM.2008.17
+2. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 7, section "Autoencoders and anomaly detection" (the reconstruction error as a fraud score, the autoencoder trained on genuine transactions, the isolation-forest baseline). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+3. V. Chandola, A. Banerjee, V. Kumar, "Anomaly Detection: A Survey," *ACM Computing Surveys* 41(3), Article 15, 2009 — Sec. 4.1 (replicator neural networks: the reconstruction error as the anomaly score). https://doi.org/10.1145/1541880.1541882
+4. Machine Learning Group, Université Libre de Bruxelles, "Credit Card Fraud Detection" dataset (`creditcard.csv`), Open Database License — the lab ships its first day and a shortlist of its second, components rounded to three decimals. https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud
+5. CS6890 "Fraud Analytics," IIT Hyderabad, 2023–24, Problem Statement 4 (an autoencoder and a variational autoencoder for fraud detection on the ULB set, evaluated by F1 on a test split); FITE7410 "Financial Fraud Analytics," University of Hong Kong, 2022–23, Assignment 1 Part II (k-means cluster analysis of the ULB set). The two assignments this lab is modelled on; it builds the autoencoder without a framework so that its gradient can be checked, adds the isolation forest, and scores at the top of the ranking instead of by F1 at a threshold. https://github.com/Yp1711/CS6890-Fraud-Analytics-2024
+</References>
