@@ -16,18 +16,27 @@ theorems (history, philosophy, speech, music) use `<Remark>` and plain prose
 — never force the form (pedagogy L5).
 
 - `<Definition title?="surprisal">…</Definition>` — a precise definition.
-- `<Theorem title?="…">…</Theorem>` — a stated result; body renders italic.
+- `<Theorem title?="…">…</Theorem>` — a stated result; body renders italic,
+  between a heavy rule above and a light one below.
+- `<Lemma title?="…">…</Lemma>` — an auxiliary result, set like a Theorem
+  and numbered on Theorem's counter (Theorem 3.1, Lemma 3.2).
+- `<Proposition title?="…">…</Proposition>` — a result of standing below a
+  theorem; same look, same counter.
+- `<Corollary title?="…">…</Corollary>` — a result that follows directly
+  from the one before it; same look, same counter.
 - `<Proof>…</Proof>` — collapsed by default, ∎ appended. Always nested
-  INSIDE the `<Theorem>` (before its closing tag), never after it.
+  INSIDE the `<Theorem>`/`<Lemma>`/`<Proposition>`/`<Corollary>` (before
+  its closing tag), never after it; it renders after the statement's rules.
 - `<Example title?="…">…</Example>` — worked example, every step shown (L7).
 - `<Remark title?="…">…</Remark>` — numbered note; the generic
   in-text environment for any subject.
 
-## Role-colored callouts (colors constant course-wide)
+## Callouts
 
-- `<KeyFact>…</KeyFact>` — rose; the load-bearing/surprising fact of a
-  section, one sentence. What a returning reader scans for.
-- `<Task>…</Task>` — green; an instruction the reader executes right now,
+- `<KeyFact>…</KeyFact>` — a tinted panel, the one filled block in a
+  lesson; the load-bearing/surprising fact of a section, one sentence. What
+  a returning reader scans for.
+- `<Task>…</Task>` — on a dashed left rule; an instruction the reader executes right now,
   naming the observable ("compute H(0.75); it should land near 0.811").
 At most one of each per section (voita-playbook, callout roles).
 
@@ -36,7 +45,7 @@ At most one of each per section (voita-playbook, callout roles).
 - `<Conclusion>…</Conclusion>` — the lesson's closing (L10c), once, right
   before `## Exercises`: what the reader can now do, and the problem left
   open. The only place the lesson sums itself up. Not a callout: it stays in
-  the prose, under an accent rule and label, and is linkable as `#conclusion`.
+  the prose, under a rule and a label, and is linkable as `#conclusion`.
 
 ## Exercises
 
