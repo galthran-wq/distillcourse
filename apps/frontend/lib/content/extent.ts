@@ -1,8 +1,12 @@
 import type { Course, Lesson } from "./schema";
 
 /** A lab's `est_minutes` is nominal; its `est_hours` is what it takes. */
-export function lessonMinutes(lesson: Lesson): number {
-  return lesson.lab !== undefined ? lesson.lab.est_hours * 60 : lesson.est_minutes;
+export function minutesOf(lessons: Lesson[]): number {
+  return lessons.reduce(
+    (sum, lesson) =>
+      sum + (lesson.lab !== undefined ? lesson.lab.est_hours * 60 : lesson.est_minutes),
+    0,
+  );
 }
 
 export interface CourseExtent {
@@ -17,10 +21,9 @@ export interface CourseExtent {
  */
 export function courseExtent(course: Course): CourseExtent {
   const lessons = course.modules.flatMap((mod) => mod.lessons);
-  const minutes = lessons.reduce((sum, lesson) => sum + lessonMinutes(lesson), 0);
   return {
     parts: course.modules.length,
     lessons: lessons.length,
-    hours: Math.round(minutes / 60),
+    hours: Math.round(minutesOf(lessons) / 60),
   };
 }

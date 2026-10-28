@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import type { MDXComponents } from "mdx/types";
 import { getCourse, getCourses } from "@/lib/content/site";
 import type { LoadedLesson } from "@/lib/content/load";
-import { courseExtent, lessonMinutes } from "@/lib/content/extent";
+import { courseExtent, minutesOf } from "@/lib/content/extent";
 import { isReadable, readableLessons } from "@/lib/content/visibility";
 import CourseReadCount from "@/components/progress/CourseReadCount";
 import LessonMark from "@/components/progress/LessonMark";
@@ -15,7 +15,7 @@ import Figure from "@/components/mdx/Figure";
 import FigureSequence from "@/components/mdx/FigureSequence";
 import MathText from "@/components/mdx/MathText";
 import * as Blocks from "@/components/mdx/Blocks";
-import { assetUrl } from "@/lib/content/images";
+import { assetUrl, isRasterFile } from "@/lib/content/images";
 import { compileIntro, splitLead } from "@/lib/content/intro";
 import { lessonPath } from "@/lib/content/locator";
 import Lightbox from "@/components/mdx/Lightbox";
@@ -48,14 +48,14 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 // reader is shown the course, never its authoring state.
 const NOT_WRITTEN = "Not written yet";
 
-function plural(n: number, noun: string): string {
-  return `${n} ${n === 1 ? noun : `${noun}s`}`;
+function nounFor(n: number, noun: string): string {
+  return n === 1 ? noun : `${noun}s`;
 }
 
 function Count({ n, noun }: { n: number; noun: string }) {
   return (
     <>
-      <span className="font-medium text-ink">{n}</span> {n === 1 ? noun : `${noun}s`}
+      <span className="font-medium text-ink">{n}</span> {nounFor(n, noun)}
     </>
   );
 }
@@ -67,7 +67,7 @@ function LessonRow({ course, entry }: { course: string; entry: LoadedLesson }) {
     readable && lesson.key_image !== undefined
       ? assetUrl(course, lesson.slug, lesson.key_image)
       : undefined;
-  const drawn = lesson.key_image?.endsWith(".svg") ?? false;
+  const drawn = lesson.key_image !== undefined && !isRasterFile(lesson.key_image);
 
   const row = (
     <div className="flex items-center gap-4 py-2.5" title={readable ? undefined : NOT_WRITTEN}>
@@ -200,7 +200,7 @@ export default async function CoursePage({
                     <span className="text-lg font-semibold">{mod.title}</span>
                   </h2>
                 ),
-                extent: `${plural(mod.lessons.length, "lesson")} · ${mod.lessons.reduce((sum, lesson) => sum + lessonMinutes(lesson), 0)} min`,
+                extent: `${mod.lessons.length} ${nounFor(mod.lessons.length, "lesson")} · ${minutesOf(mod.lessons)} min`,
                 lessons: (
                   <ol className="mt-2">
                     {lessons.map((entry) => (

@@ -225,9 +225,12 @@ describe("the course page", () => {
     ],
   });
   writeFileSync(join(dir, "course.yaml"), stringify(course));
-  process.env.CONTENT_ROOT = root;
-  process.env.CONTENT_PREVIEW = "1";
-  afterAll(() => rmSync(root, { recursive: true, force: true }));
+  vi.stubEnv("CONTENT_ROOT", root);
+  vi.stubEnv("CONTENT_PREVIEW", "1");
+  afterAll(() => {
+    rmSync(root, { recursive: true, force: true });
+    vi.unstubAllEnvs();
+  });
 
   // The first import compiles the page and everything under it, which can
   // outlast a test's own timeout on a loaded machine.
