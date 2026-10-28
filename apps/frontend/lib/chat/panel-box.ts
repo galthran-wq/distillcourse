@@ -7,6 +7,7 @@ import {
   MIN_WIDTH,
   PANEL_MARGIN,
   panelBox,
+  setColumnWidth,
   setPanelBox,
   type PanelBox,
 } from "@/lib/chat/stored";
@@ -223,4 +224,51 @@ export function startPanelDrag(
   handle.addEventListener("pointerup", drop);
   handle.addEventListener("pointercancel", drop);
   dragging.set(true);
+}
+
+/** The narrowest the expanded panel's reading column is dragged to, in rem. */
+export const MIN_COLUMN_REM = 32;
+
+/**
+ * The reading column's width once its edge is dragged by `dx`. It is centred,
+ * so the edge under the pointer and the one across from it both move: the
+ * width changes by twice the drag. `room` is the pane it is centred in, and the
+ * column keeps a rem of it on either side.
+ */
+export function draggedColumn(from: number, dx: number, room: number, rem: number): number {
+  return px(from + 2 * dx, MIN_COLUMN_REM * rem, room - 2 * rem);
+}
+
+/**
+ * Resizes the expanded panel's reading column for as long as the pointer that
+ * pressed its edge is down — written to `pane`'s `--chat-column` while it
+ * moves, and stored once, at the release, the way `startPanelDrag` does it.
+ */
+export function startColumnDrag(press: Press<HTMLElement>, pane: HTMLElement | null): void {
+  if (press.button !== 0 || !press.isPrimary || pane === null) return;
+  const handle = press.currentTarget;
+  const column = pane.querySelector<HTMLElement>("[data-chat-column]");
+  if (column === null) return;
+  press.preventDefault();
+  handle.setPointerCapture(press.pointerId);
+
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+  const from = column.getBoundingClientRect().width;
+  const room = pane.getBoundingClientRect().width;
+  const startX = press.clientX;
+  let width = from;
+
+  const drag = (at: PointerEvent): void => {
+    width = draggedColumn(from, at.clientX - startX, room, rem);
+    pane.style.setProperty("--chat-column", `${width}px`);
+  };
+  const drop = (): void => {
+    handle.removeEventListener("pointermove", drag);
+    handle.removeEventListener("pointerup", drop);
+    handle.removeEventListener("pointercancel", drop);
+    if (width !== from) setColumnWidth(width);
+  };
+  handle.addEventListener("pointermove", drag);
+  handle.addEventListener("pointerup", drop);
+  handle.addEventListener("pointercancel", drop);
 }

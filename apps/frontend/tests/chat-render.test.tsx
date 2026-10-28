@@ -45,46 +45,81 @@ describe("a rendered reply", () => {
     expect(html).not.toContain(">tutor<");
   });
 
-  it("shows a tool the tutor is still running", () => {
-    const html = reply({
-      type: "tool-search_lessons",
-      toolCallId: "call-1",
-      state: "input-available",
-      input: { query: "entropy" },
-    });
+  it("sums up what the tutor did in one line above the answer", () => {
+    const html = reply(
+      { type: "reasoning", text: "they want the intuition", state: "done" },
+      ...searched("entropy", "surprisal", "coding"),
+      read("lesson:info-theory/entropy#the-average"),
+      read("lesson:info-theory/cross-entropy"),
+      { type: "text", text: "Because it is a mean." },
+    );
 
-    expect(html).toContain("search lessons…");
+    expect(html).toContain("Searched 3× · read 2 lessons · thought");
+    expect(html.indexOf("Searched 3×")).toBeLessThan(html.indexOf("Because it is a mean."));
+    // Collapsed: neither a stack of chips nor the trace itself is on screen.
+    expect(html).not.toContain("they want the intuition");
+    expect(html).not.toContain("<details");
   });
 
-  it("shows a tool that has answered, with what it was asked", () => {
-    const html = reply({
-      type: "tool-search_lessons",
-      toolCallId: "call-1",
-      state: "output-available",
-      input: { query: "entropy" },
-      output: { hits: [] },
-    });
+  it("shows only the step under way while the answer streams", () => {
+    const reading = rendered(
+      [
+        turn("user", { type: "text", text: "why?" }),
+        turn("assistant", ...searched("isolation"), {
+          type: "tool-fetch_content",
+          toolCallId: "r1",
+          state: "input-available",
+          input: { locator: "lesson:fraud-ml/isolation-forest#path-length" },
+        }),
+      ],
+      { status: "streaming" },
+    );
+    const thinking = rendered(
+      [
+        turn("user", { type: "text", text: "why?" }),
+        turn("assistant", { type: "reasoning", text: "hm", state: "streaming" }),
+      ],
+      { status: "streaming" },
+    );
 
-    // One chip, opening onto the query and the answer — not a row of its own.
-    expect(html).toContain("<details");
-    expect(html).toContain("search lessons");
-    expect(html).toContain("&quot;entropy&quot;");
-    // Named without the ellipsis that says it is still going.
-    expect(html).not.toContain("search lessons…");
+    expect(reading).toContain("reading isolation-forest…");
+    expect(reading).not.toContain("Searched");
+    expect(thinking).toContain("thinking…");
   });
 
-  it("says a tool failed", () => {
-    const html = reply({
-      type: "tool-search_lessons",
-      toolCallId: "call-1",
-      state: "output-error",
-      input: { query: "entropy" },
-      errorText: "the index is unreachable",
-    });
+  it("is one turn with one line for an answer stored as several messages", () => {
+    // How the backend replays a run: one message per model response.
+    const html = rendered([
+      turn("user", { type: "text", text: "why?" }),
+      turn("assistant", ...searched("entropy")),
+      turn("assistant", { type: "text", text: "Because it is a mean." }),
+    ]);
 
-    expect(html).toContain("search lessons failed");
+    expect(html.match(/aria-label="Tutor"/g)).toHaveLength(1);
+    expect(html.match(/aria-expanded/g)).toHaveLength(1);
   });
 });
+
+/** Finished `search_content` calls, one per query. */
+function searched(...queries: string[]): UIMessage["parts"] {
+  return queries.map((query, index) => ({
+    type: "tool-search_content",
+    toolCallId: `s${index}-${query}`,
+    state: "output-available",
+    input: { query },
+    output: [],
+  }));
+}
+
+function read(locator: string): UIMessage["parts"][number] {
+  return {
+    type: "tool-fetch_content",
+    toolCallId: `r-${locator}`,
+    state: "output-available",
+    input: { locator },
+    output: {},
+  };
+}
 
 describe("waiting for the tutor", () => {
   const asked = [turn("user", { type: "text", text: "why is this true?" })];
@@ -121,6 +156,37 @@ describe("waiting for the tutor", () => {
 });
 
 const { host, show } = shown();
+
+describe("the activity line, opened", () => {
+  it("lists every step in the order it happened, failures said", () => {
+    show([
+      turn("user", { type: "text", text: "why?" }),
+      turn(
+        "assistant",
+        ...searched("entropy"),
+        { type: "reasoning", text: "the search was thin", state: "done" },
+        {
+          type: "tool-web_search",
+          toolCallId: "w1",
+          state: "output-error",
+          input: { query: "shannon 1948" },
+          errorText: "the provider failed",
+        },
+        { type: "text", text: "Because it is a mean." },
+      ),
+    ]);
+    const line = host().querySelector<HTMLButtonElement>("button[aria-expanded]")!;
+
+    act(() => line.click());
+
+    expect(line.getAttribute("aria-expanded")).toBe("true");
+    expect([...host().querySelectorAll("li")].map((step) => step.textContent)).toEqual([
+      "search content: entropy",
+      "the search was thin",
+      "web search: shannon 1948 — failed",
+    ]);
+  });
+});
 
 /** Who spoke, in the order the transcript puts them on screen. */
 function speakers(): (string | null)[] {

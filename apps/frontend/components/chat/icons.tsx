@@ -73,18 +73,18 @@ export function SendIcon(props: IconProps) {
   );
 }
 
-export function PlusIcon(props: IconProps) {
+export function StopIcon(props: IconProps) {
   return (
     <Glyph {...props}>
-      <path d="M8 3.5v9M3.5 8h9" />
+      <rect x="4.5" y="4.5" width="7" height="7" rx="1" />
     </Glyph>
   );
 }
 
-export function CheckIcon(props: IconProps) {
+export function PlusIcon(props: IconProps) {
   return (
     <Glyph {...props}>
-      <path d="M3 8.5l3.5 3.5L13 5" />
+      <path d="M8 3.5v9M3.5 8h9" />
     </Glyph>
   );
 }

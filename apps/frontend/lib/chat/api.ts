@@ -1,5 +1,5 @@
 import type { UIMessage } from "ai";
-import { call } from "@/lib/http";
+import { ApiError, call } from "@/lib/http";
 
 export interface ChatSummary {
   id: string;
@@ -41,6 +41,25 @@ export function loadMessages(id: string): Promise<UIMessage[]> {
 
 export function compactChat(id: string): Promise<{ summary: string }> {
   return call<{ summary: string }>(`/chats/${id}/compact`, "POST");
+}
+
+/** Cancels the run in flight, server-side; resolves once the chat is free again. */
+export function stopChat(id: string): Promise<void> {
+  return call<void>(`/chats/${id}/stop`, "POST");
+}
+
+/**
+ * Hands a message to the run in flight. False when there is none to take it —
+ * it ended before the message got there — and the message is then a turn.
+ */
+export async function steerChat(id: string, steer: { id: string; text: string }): Promise<boolean> {
+  try {
+    await call<void>(`/chats/${id}/steer`, "POST", steer);
+    return true;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 409) return false;
+    throw error;
+  }
 }
 
 export function listModels(): Promise<ChatModel[]> {

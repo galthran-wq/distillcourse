@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import ChatList from "@/components/chat/ChatList";
 import ChatMenu from "@/components/chat/ChatMenu";
 import Composer from "@/components/chat/Composer";
@@ -14,14 +14,19 @@ import {
   PlusIcon,
 } from "@/components/chat/icons";
 import { Button } from "@/components/ui";
-import { listModels, webChats, type ChatModel, type ChatSummary } from "@/lib/chat/api";
+import {
+  listModels,
+  stopChat,
+  webChats,
+  type ChatModel,
+  type ChatSummary,
+} from "@/lib/chat/api";
 import { parseCommand } from "@/lib/chat/commands";
-import { startPanelDrag } from "@/lib/chat/panel-box";
+import { startColumnDrag, startPanelDrag } from "@/lib/chat/panel-box";
 import { restoreQuotes, type Quote } from "@/lib/chat/quote";
 import { plain } from "@/lib/chat/references";
 import {
   adoptSummary,
-  busy,
   changeModel,
   clearSession,
   compactSession,
@@ -29,7 +34,8 @@ import {
   streamFailure,
   type Session,
 } from "@/lib/chat/session";
-import { closePanel, toggleExpanded } from "@/lib/chat/stored";
+import { busy, steer } from "@/lib/chat/steer";
+import { closePanel, toggleExpanded, useColumnWidth } from "@/lib/chat/stored";
 import { useLessons } from "@/lib/content/links";
 import { useSections } from "@/lib/content/sections";
 import { ApiError } from "@/lib/http";
@@ -65,7 +71,7 @@ function failure(error: unknown): string {
 const STREAM_THROTTLE_MS = 120;
 
 export default function ChatPanel({ session, panel, expanded }: Props) {
-  const { messages, sendMessage, status, error } = useChat({
+  const { messages, sendMessage, stop, status, error } = useChat({
     chat: session.chat,
     experimental_throttle: STREAM_THROTTLE_MS,
   });
@@ -75,6 +81,8 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const header = useRef<HTMLElement>(null);
   const title = useRef<HTMLParagraphElement>(null);
+  const pane = useRef<HTMLDivElement>(null);
+  const column = useColumnWidth();
   const lessons = useLessons();
   const sections = useSections();
 
@@ -137,11 +145,19 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
     if (command === "clear") return run(clearSession());
     if (command === "compact") return run(compactSession(), "history compacted");
     setNotice(null);
+    if (busy(status)) return void steer(session.chat, text);
     // The passages ride along on the message so the bubble shows them at once.
     // What is actually sent to the backend is still the field the transport
     // takes them out of the composer for; this copy is the widget's own, and
     // the backend has no use for it.
     void sendMessage({ text, metadata: { quotes } });
+  }
+
+  // The run is the server's: aborting the request alone stops only the
+  // reading of it, so the backend is told as well.
+  function halt(): void {
+    void stop();
+    stopChat(session.summary.id).catch(report);
   }
 
   const line = error === undefined ? notice : streamFailure(error);
@@ -243,7 +259,26 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
           </nav>
         )}
 
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div
+          ref={pane}
+          // The reading column the transcript and the composer share. Docked,
+          // it is the panel's to bound; expanded, it is the reader's to drag.
+          style={
+            {
+              "--chat-column": !expanded ? "42rem" : column > 0 ? `${column}px` : "56rem",
+            } as CSSProperties
+          }
+          className="relative flex min-w-0 flex-1 flex-col"
+        >
+          {expanded && (
+            <div
+              aria-hidden
+              onPointerDown={(press) => startColumnDrag(press, pane.current)}
+              // On the column's right edge: the column is centred in this pane
+              // and as wide as it lets it be.
+              className="absolute inset-y-0 left-[calc(50%_+_min(var(--chat-column),_100%_-_2rem)_/_2)] z-10 w-2 -translate-x-1/2 cursor-ew-resize touch-none max-sm:hidden"
+            />
+          )}
           <Messages messages={messages} chatId={session.summary.id} status={status} />
           {line !== null && (
             <p role="status" className="px-4 pb-1 text-[13px] text-accent">
@@ -251,7 +286,8 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
             </p>
           )}
           <Composer
-            disabled={busy(status)}
+            busy={busy(status)}
+            onStop={halt}
             onSubmit={submit}
             models={models}
             model={session.summary.model}
