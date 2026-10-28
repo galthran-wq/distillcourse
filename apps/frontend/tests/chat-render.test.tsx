@@ -3,6 +3,7 @@ import { act } from "react";
 import { describe, expect, it } from "vitest";
 import type { UIMessage } from "ai";
 import { rendered, shown, turn } from "./chat-fixture";
+import { expectCurrentKatexClasses, FORMULA } from "./utils/katex";
 
 function reply(...parts: UIMessage["parts"]): string {
   return rendered([
@@ -26,6 +27,10 @@ describe("a rendered reply", () => {
     });
 
     expect(html).toContain("katex-display");
+  });
+
+  it("typesets with the class names the page's KaTeX stylesheet styles", () => {
+    expectCurrentKatexClasses(reply({ type: "text", text: `$$\n${FORMULA}\n$$` }));
   });
 
   it("renders markdown, not the source of it", () => {
