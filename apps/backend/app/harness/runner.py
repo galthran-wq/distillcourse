@@ -73,8 +73,9 @@ class _Run:
     over: asyncio.Event = field(default_factory=asyncio.Event)
 
 
-# In-process: the backend is one process, and a run is only ever stopped or
-# steered from the web, whose runs all start here.
+# In-process: the API is one process (`--workers 1`, apps/backend/Dockerfile),
+# and a run is only ever stopped or steered from the web, whose runs all start
+# here.
 _runs: dict[uuid.UUID, _Run] = {}
 
 # asyncio holds only a weak reference to a running task, and a detached one
@@ -101,8 +102,13 @@ async def stop(run_id: uuid.UUID | None) -> None:
     """Cancel the answer and wait until the turn is stored and the chat free,
     so the learner's next message finds it unclaimed. Nothing in flight is
     not an error: the click can race the run's own end."""
-    run = _runs.get(run_id) if run_id is not None else None
+    if run_id is None:
+        return
+    run = _runs.get(run_id)
     if run is None:
+        # Usually the race above; a run held by another process looks the same,
+        # and this line is the only trace that one ever did.
+        logfire.warning("stop for a run this process does not hold", run_id=str(run_id))
         return
     run.stopped = True
     if run.stream is not None:

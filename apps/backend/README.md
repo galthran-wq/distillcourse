@@ -195,7 +195,10 @@ the model's context.
 
 A web run can be stopped and steered while it streams, both through requests
 of their own — the stream stays one-way. The runs in flight are an in-process
-registry (`runner._runs`; the backend is one process). `POST
+registry (`runner._runs`), so the API is one process: `--workers 1` on the
+`CMD` in `apps/backend/Dockerfile`. A stop or steer that lands on a process
+not holding the run finds nothing to stop — raise that count only with a
+cross-process stop. `POST
 /chats/{id}/stop` cancels the agent's part of the run and returns once what it
 had produced — the text streamed so far, the tool calls that completed — is
 stored like the turn of a run that died, unmarked and with what it cost,

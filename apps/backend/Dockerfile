@@ -23,4 +23,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY apps/backend /app
 
 EXPOSE 8000
-CMD ["fastapi", "run", "app/main.py", "--workers", "4"]
+# One process: `runner._runs`, stop and steer are in-process; see
+# apps/backend/README.md (Harness).
+CMD ["fastapi", "run", "app/main.py", "--workers", "1"]
