@@ -253,6 +253,10 @@ async def test_stopping_with_nothing_in_flight_does_nothing(
     unknown = uuid.uuid4()
     await asyncio.wait_for(runner.stop(unknown), timeout=1)
     [warning] = capfire.exporter.exported_spans_as_dict()
+    assert warning["attributes"]["logfire.msg"] == (
+        "stop for a run this process does not hold"
+    )
+    # logfire's number for `warning`; it exports no public name for it.
     assert warning["attributes"]["logfire.level_num"] == 13
     assert warning["attributes"]["run_id"] == str(unknown)
     assert runner._runs == {}

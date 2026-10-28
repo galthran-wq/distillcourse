@@ -7,7 +7,7 @@ import ChatPanel, { RENAME_MS } from "@/components/chat/ChatPanel";
 import type { ChatSummary } from "@/lib/chat/api";
 import { LessonsProvider } from "@/lib/content/links";
 import { SectionsProvider } from "@/lib/content/sections";
-import { LESSONS, SECTIONS } from "./chat-fixture";
+import { CHAT_SUMMARY, LESSONS, SECTIONS } from "./chat-fixture";
 import { mounted, stubResizeObserver } from "./utils/dom";
 
 const push = vi.fn();
@@ -15,16 +15,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
 stubResizeObserver();
 
-const SUMMARY: ChatSummary = {
-  id: "c1",
-  kind: "web",
-  lab_lesson: null,
-  model: "moonshotai/kimi-k3",
-  title: "what is entropy?",
-  course: "info-theory",
-  created_at: "2026-08-07T09:00:00Z",
-  last_message_at: "2026-08-07T09:00:00Z",
-};
+const SUMMARY: ChatSummary = { ...CHAT_SUMMARY, title: "what is entropy?" };
 
 /** What the listing route answers with, changed between one call and the next. */
 let listing: ChatSummary[] = [];

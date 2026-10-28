@@ -4,10 +4,9 @@ import { Chat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ChatPanel from "@/components/chat/ChatPanel";
-import type { ChatSummary } from "@/lib/chat/api";
 import { LessonsProvider } from "@/lib/content/links";
 import { SectionsProvider } from "@/lib/content/sections";
-import { composing, LESSONS, SECTIONS, turn } from "./chat-fixture";
+import { CHAT_SUMMARY, composing, LESSONS, SECTIONS, turn } from "./chat-fixture";
 import { mounted, stubResizeObserver, stubScrollIntoView, type } from "./utils/dom";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
@@ -67,16 +66,7 @@ describe("the composer while the tutor answers", () => {
 });
 
 describe("stopping the tutor", () => {
-  const SUMMARY: ChatSummary = {
-    id: "c1",
-    kind: "web",
-    lab_lesson: null,
-    model: "moonshotai/kimi-k3",
-    title: "why?",
-    course: "info-theory",
-    created_at: "2026-08-07T09:00:00Z",
-    last_message_at: "2026-08-07T09:00:00Z",
-  };
+  const SUMMARY = CHAT_SUMMARY;
   const { host, render } = mounted();
 
   afterEach(() => {
