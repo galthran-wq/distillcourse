@@ -51,10 +51,11 @@ chats and opens one on its lab's page, from `?chat=<id>` as well.
 Every `distill.check` is followed, once its verdict is printed, by a short
 code review (`POST /labs/{course}/{lesson}/review`, `app/labs/check_review.py`):
 one toolless call on `LAB_REVIEW_MODEL`, handed the checked function's source
-(`submission.source`), the verdict, the checkpoint's key and the reference
+(`lab_submissions.source`), the verdict, the checkpoint's key and the reference
 solution, streamed as `ask`'s four events and stored as two turns of the
-lab's latest chat, so `ask` continues from it. A review that fails stores
-nothing and is one line under a verdict it never touches.
+lab's latest chat, so `ask` continues from it. A review that fails stores no
+turn (its cost goes on `lab_submissions.usage`) and is one line under a
+verdict it never touches.
 The harness's prompt modules
 (`app/harness/prompts/*.md`) are content, not configuration: `docs/pedagogy.md`
 governs them exactly as it governs lessons, and they are written in the same

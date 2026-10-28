@@ -8,8 +8,9 @@ the lab chat it is written into, so `distill.ask` continues from it and the
 site shows it, and the claim on that chat, so a review and a question never
 write into it at once.
 
-The review comes after the verdict and never touches it: the submission is
-read, not written, and a review that fails stores nothing.
+The review comes after the verdict and never touches it, and a review that
+fails stores nothing the learner sees — only what it cost, on the submission's
+usage, where the monthly ceiling counts it.
 """
 
 import asyncio
@@ -19,7 +20,6 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 import logfire
-from pydantic import BaseModel
 from pydantic_ai import Agent
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 from pydantic_ai.usage import RunUsage
@@ -28,16 +28,16 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.core.config import settings
 from app.harness import runner
 from app.harness.agent import model_for
-from app.harness.limits import check_cost_ceiling
+from app.harness.limits import check_run_allowed
 from app.harness.prompts import learner_attachment, module, untrusted
 from app.harness.repository import HarnessRepository
 from app.harness.usage import usage_row
 from app.labs import repository
-from app.labs.chat import url
-from app.labs.schemas import DoneEvent, ErrorEvent, TextEvent
+from app.labs.chat import line, url
+from app.labs.judge import ANSWER_SOURCE
+from app.labs.schemas import ATTACHMENT_CHARS, DoneEvent, ErrorEvent, TextEvent
 from app.models import Chat, LabChallenge, LabSolution, LabSubmission
 
-SOURCE = "lab-submission"
 # A few sentences. Past this the model is not coming back with them, and the
 # lab chat is claimed for as long as it is out.
 TIMEOUT_SECONDS = 60
@@ -55,10 +55,6 @@ class NotFound(Exception):
 class Unreviewable(Exception):
     """A submission with no function to read: another kind of checkpoint, or a
     source the notebook could not read."""
-
-
-def _line(event: BaseModel) -> str:
-    return f"data: {event.model_dump_json()}\n\n"
 
 
 async def start(
@@ -86,7 +82,10 @@ async def start(
     if submitted.source is None or challenge is None or challenge.kind != "exact":
         raise Unreviewable("that submission has no function to review")
     question = await _question(session, submitted, challenge)
-    await check_cost_ceiling(session)
+    # The learner's daily allowance as well as the deployment's budget: each
+    # review stores a turn of theirs, and nothing else bounds how often one
+    # submission is asked about.
+    await check_run_allowed(repo)
     chat = await repo.lab_chat(lesson)
     run_id = uuid.uuid4()
     if not await repo.claim_run(chat, run_id):
@@ -98,6 +97,7 @@ async def start(
             user_id=repo.user_id,
             chat_id=chat.id,
             run_id=run_id,
+            submission_id=submitted.id,
             check=_check(submitted),
             question=question,
             queue=queue,
@@ -106,23 +106,25 @@ async def start(
     return runner.relay(queue)
 
 
-def _passed(submitted: LabSubmission) -> bool:
-    return bool(submitted.verdict.get("passed"))
+def _outcome(submitted: LabSubmission) -> str:
+    return "passed" if submitted.verdict.get("passed") else "failed"
 
 
 def _check(submitted: LabSubmission) -> str:
     """The learner's turn, as the lab chat stores it: what was checked and how
     it went, then the function, fenced as the notebook's attachments are."""
     assert submitted.source is not None
-    outcome = "passed" if _passed(submitted) else "failed"
     return (
-        f"check {submitted.checkpoint}: {outcome}\n\n"
+        f"check {submitted.checkpoint}: {_outcome(submitted)}\n\n"
         f"{learner_attachment(submitted.checkpoint, 'function', submitted.source)}"
     )
 
 
 def _block(title: str, value: Any) -> str:
-    return f"## {title}\n\n```json\n{json.dumps(value, indent=2)}\n```"
+    # Cut like an attachment: an expected output can be a whole table, and
+    # every check would pay for reading it.
+    text = json.dumps(value, indent=2)[:ATTACHMENT_CHARS]
+    return f"## {title}\n\n```json\n{text}\n```"
 
 
 async def _question(
@@ -131,13 +133,19 @@ async def _question(
     assert submitted.source is not None
     declared = await repository.lab(session, submitted.lesson)
     order = declared.checkpoints if declared else []
-    ids = [entry.id for entry in order]
-    position = ids.index(submitted.checkpoint) if submitted.checkpoint in ids else -1
-    wording = order[position].text if position >= 0 else "(not in the index)"
-    following = order[position + 1] if 0 <= position < len(order) - 1 else None
+    position = next(
+        (i for i, entry in enumerate(order) if entry.id == submitted.checkpoint),
+        None,
+    )
+    wording = order[position].text if position is not None else "(not in the index)"
+    following = (
+        order[position + 1]
+        if position is not None and position + 1 < len(order)
+        else None
+    )
     solution = await session.get(LabSolution, submitted.lesson)
     hint = submitted.verdict.get("hint")
-    verdict = "passed" if _passed(submitted) else "failed"
+    verdict = _outcome(submitted)
     if hint:
         verdict += (
             f" — their output matches a known wrong answer, whose hint is: {hint}"
@@ -159,7 +167,7 @@ async def _question(
             if solution is not None
             else "(none stored for this lab)"
         ),
-        f"## The learner's function\n\n{untrusted(SOURCE, submitted.source)}",
+        f"## The learner's function\n\n{untrusted(ANSWER_SOURCE, submitted.source)}",
     ]
     return "\n\n".join(parts)
 
@@ -170,6 +178,7 @@ async def _review(
     user_id: uuid.UUID,
     chat_id: uuid.UUID,
     run_id: uuid.UUID,
+    submission_id: uuid.UUID,
     check: str,
     question: str,
     queue: asyncio.Queue[str | None],
@@ -177,10 +186,12 @@ async def _review(
     async with session_factory() as session:
         repo = HarnessRepository(session, user_id)
         chat: Chat | None = None
+        # Counted into as the call goes, so a review that never arrives is
+        # still charged for what it asked — the reason `judge.grade` does it.
+        usage = RunUsage()
         try:
             chat = await repo.get_chat(chat_id)
             assert chat is not None
-            usage = RunUsage()
             text: list[str] = []
             async with asyncio.timeout(TIMEOUT_SECONDS):
                 async with agent.run_stream(
@@ -191,31 +202,42 @@ async def _review(
                 ) as streamed:
                     async for delta in streamed.stream_text(delta=True):
                         text.append(delta)
-                        queue.put_nowait(_line(TextEvent(delta=delta)))
-            # Stored only once whole: a review that broke off is not one, and
-            # the learner's next question must not continue from half of it.
-            await repo.add_messages(
-                chat,
-                [ModelRequest(parts=[UserPromptPart(content=check)])],
-                role="user",
-                run_id=run_id,
-            )
-            await repo.add_messages(
-                chat,
-                [ModelResponse(parts=[TextPart(content="".join(text))])],
-                role="agent",
-                run_id=run_id,
-                usage=usage_row(usage),
-            )
+                        queue.put_nowait(line(TextEvent(delta=delta)))
+            # Stored only once whole, and both turns or neither: a review that
+            # broke off is not one, and the learner's next question must not
+            # continue from half of it. The savepoint is what lets a failed
+            # write go without taking the session the failure path below needs.
+            async with session.begin_nested():
+                await repo.add_messages(
+                    chat,
+                    [ModelRequest(parts=[UserPromptPart(content=check)])],
+                    role="user",
+                    run_id=run_id,
+                    commit=False,
+                )
+                await repo.add_messages(
+                    chat,
+                    [ModelResponse(parts=[TextPart(content="".join(text))])],
+                    role="agent",
+                    run_id=run_id,
+                    usage=usage_row(usage),
+                    commit=False,
+                )
+            await session.commit()
             if chat.title is None:
                 await repo.set_title(chat, check.partition("\n")[0])
-            queue.put_nowait(_line(DoneEvent(chat_id=chat.id, url=url(chat))))
+            queue.put_nowait(line(DoneEvent(chat_id=chat.id, url=url(chat))))
         except Exception as exc:
             # The verdict is printed and stored already; whatever went wrong
             # here — the model, the budget, the database — costs the learner
             # only the review.
             logfire.exception("a check review failed", run_id=str(run_id))
-            queue.put_nowait(_line(ErrorEvent(detail=str(exc) or type(exc).__name__)))
+            queue.put_nowait(line(ErrorEvent(detail=str(exc) or type(exc).__name__)))
+            await runner.guarded(
+                _charge(session, submission_id, usage),
+                "charging the failed review of run {run_id} failed",
+                run_id,
+            )
         finally:
             if chat is not None:
                 await runner.guarded(
@@ -224,3 +246,21 @@ async def _review(
                     run_id,
                 )
             queue.put_nowait(None)
+
+
+async def _charge(
+    session: AsyncSession, submission_id: uuid.UUID, usage: RunUsage
+) -> None:
+    """What a failed review spent, on the row of the submission it reviewed —
+    a row the monthly ceiling sums, which no message of a failed review is."""
+    if not usage.requests:
+        return
+    submitted = await session.get_one(LabSubmission, submission_id)
+    spent = usage_row(usage)
+    if submitted.usage is not None:
+        spent = {
+            key: (submitted.usage.get(key) or 0) + (value or 0)
+            for key, value in spent.items()
+        }
+    submitted.usage = spent
+    await session.commit()

@@ -96,7 +96,8 @@ def _step(chunk: ToolInputAvailableChunk) -> StepEvent:
     return StepEvent(label=label(args) if label else chunk.tool_name.replace("_", " "))
 
 
-def _line(event: BaseModel) -> str:
+def line(event: BaseModel) -> str:
+    """One event of an answer, as the notebook reads it off the stream."""
     return f"data: {event.model_dump_json()}\n\n"
 
 
@@ -109,13 +110,13 @@ async def events(
     or one `error`."""
     if attachments:
         names = ", ".join(attachment.name for attachment in attachments)
-        yield _line(StepEvent(label=f"reading your {names}"))
+        yield line(StepEvent(label=f"reading your {names}"))
     async for chunk in chunks:
         if isinstance(chunk, TextDeltaChunk):
-            yield _line(TextEvent(delta=chunk.delta))
+            yield line(TextEvent(delta=chunk.delta))
         elif isinstance(chunk, ToolInputAvailableChunk):
-            yield _line(_step(chunk))
+            yield line(_step(chunk))
         elif isinstance(chunk, ErrorChunk):
-            yield _line(ErrorEvent(detail=chunk.error_text))
+            yield line(ErrorEvent(detail=chunk.error_text))
             return
-    yield _line(DoneEvent(chat_id=chat.id, url=url(chat)))
+    yield line(DoneEvent(chat_id=chat.id, url=url(chat)))

@@ -172,6 +172,7 @@ class HarnessRepository:
         run_id: uuid.UUID | None = None,
         usage: dict[str, Any] | None = None,
         marker: Marker | None = None,
+        commit: bool = True,
     ) -> None:
         """Store messages that belong to one turn.
 
@@ -195,7 +196,9 @@ class HarnessRepository:
                     marker=marker,
                 )
             )
-        await self.session.commit()
+        # Off for a caller storing two turns that exist only together.
+        if commit:
+            await self.session.commit()
 
     async def fail_run(self, chat: Chat, run_id: uuid.UUID, error: str) -> None:
         await self.session.execute(

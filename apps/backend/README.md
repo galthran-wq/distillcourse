@@ -554,15 +554,16 @@ POST /labs/{course}/{lesson}/review      # bearer: the code review of a check, S
 - `review` follows every `distill.check` once its verdict is printed. It is
   not a tutor run: one toolless call (`check_review.py`, on
   `LAB_REVIEW_MODEL`, prompt `lab_check_review.md`) handed the checked
-  function's source — `submissions.source`, optional on the wire, so an older
+  function's source — `lab_submissions.source`, optional on the wire, so an older
   client is still graded — the verdict and the wrong answer's hint, the
   checkpoint's inputs and expected output, the next checkpoint and the
   reference solution. It streams `ask`'s events, holds the lab chat's claim
-  (409 while a question runs there), honours the monthly ceiling (429), and on
-  success stores two turns in the lab's latest chat — `check <id>:
-  passed|failed` with the source fenced, then the review with its usage — so
-  the next `ask` continues from it. A failed review stores nothing, and
-  nothing it does reaches the submission.
+  (409 while a question runs there), honours the daily cap and the monthly
+  ceiling (429), and on success stores two turns in the lab's latest chat, in
+  one transaction — `check <id>: passed|failed` with the source fenced, then
+  the review with its usage — so the next `ask` continues from it. A failed
+  review stores no turn; what its call cost lands on the submission's
+  `usage`, which the ceiling sums. The verdict is never touched.
 
 - The manifest is the display half from `documents.metadata.lab` joined with
   `lab_challenges.spec["public"]`, and it is public by construction rather

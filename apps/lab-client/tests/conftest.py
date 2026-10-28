@@ -111,6 +111,15 @@ def verdict(
     }
 
 
+def _streamed(events: list[dict[str, Any]]) -> httpx.Response:
+    """An answer as the server streams one: an event per `data:` line."""
+    return httpx.Response(
+        200,
+        headers={"content-type": "text/event-stream"},
+        content="".join(f"data: {json.dumps(event)}\n\n" for event in events),
+    )
+
+
 class Server:
     """What the client talked to, and what it will be told next."""
 
@@ -168,13 +177,7 @@ class Server:
         if request.url.path.endswith(f"/labs/{LAB}/ask"):
             self.bearers.append(request.headers.get("authorization"))
             self.asked.append(json.loads(request.content))
-            return httpx.Response(
-                200,
-                headers={"content-type": "text/event-stream"},
-                content="".join(
-                    f"data: {json.dumps(event)}\n\n" for event in self.answer_events
-                ),
-            )
+            return _streamed(self.answer_events)
         if request.url.path.endswith(f"/labs/{LAB}/review"):
             self.bearers.append(request.headers.get("authorization"))
             self.reviewed.append(json.loads(request.content))
@@ -182,13 +185,7 @@ class Server:
                 raise httpx.ConnectError("no route to host", request=request)
             if self.review_refusal is not None:
                 return self.review_refusal
-            return httpx.Response(
-                200,
-                headers={"content-type": "text/event-stream"},
-                content="".join(
-                    f"data: {json.dumps(event)}\n\n" for event in self.review_events
-                ),
-            )
+            return _streamed(self.review_events)
         self.bearers.append(request.headers.get("authorization"))
         self.posted.append(json.loads(request.content))
         return httpx.Response(200, json=self.answer)

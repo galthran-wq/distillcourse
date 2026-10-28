@@ -23,6 +23,7 @@ from app.core.config import settings
 from app.harness.agent import model_for
 from app.harness.repository import HarnessRepository
 from app.labs import check_review
+from app.labs.schemas import ATTACHMENT_CHARS
 from app.models import Chat, LabCheckpointState, LabSolution, LabSubmission, User
 from tests.conftest import replying, settled
 from tests.labs.conftest import (
@@ -190,8 +191,11 @@ async def test_the_review_is_asked_with_everything_it_needs(
     prompt = prompt_of(asked)
     assert "Return the surprisal of each probability." in prompt
     assert '"seed": 1337' in prompt
-    assert "1.0" in prompt and "expects" in prompt
-    assert "passed" in prompt
+    assert (
+        '## The output it expects\n\n```json\n{\n  "values": [\n    [\n      1.0,'
+        in prompt
+    )
+    assert "## The verdict\n\npassed\n\n" in prompt
     assert "`entropy-terms`: Return the per-term entropy contributions." in prompt
     assert SOLUTION in prompt
     assert f'<untrusted source="lab-submission">\n{SOURCE}\n</untrusted>' in prompt
@@ -208,8 +212,10 @@ async def test_a_failed_check_hands_the_wrong_answers_hint_to_the_review(
 
     assert response.status_code == 200
     prompt = prompt_of(asked)
-    assert "failed" in prompt
-    assert "Natural log, not base two." in prompt
+    assert (
+        "## The verdict\n\nfailed — their output matches a known wrong answer, "
+        "whose hint is: Natural log, not base two."
+    ) in prompt
     asked_row, _ = await HarnessRepository(session, user.id).history(
         await lab_chat(session, user)
     )
@@ -254,6 +260,51 @@ async def test_a_failing_review_stores_nothing_and_leaves_the_verdict_alone(
     # The claim went with it: the learner's next question is not refused.
     with replying():
         assert (await ask(notebook, "why?")).status_code == 200
+
+
+async def test_a_review_whose_storing_fails_stores_neither_turn(
+    notebook: AsyncClient,
+    session: AsyncSession,
+    user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    submission = await checked(notebook)
+    store = HarnessRepository.add_messages
+
+    async def failing(self: HarnessRepository, *args: Any, **kwargs: Any) -> None:
+        if kwargs["role"] == "agent":
+            raise RuntimeError("the database hiccuped")
+        await store(self, *args, **kwargs)
+
+    monkeypatch.setattr(HarnessRepository, "add_messages", failing)
+    with answering(reviewing()):
+        response = await review(notebook, submission)
+    monkeypatch.undo()
+
+    assert events(response.text)[-1]["type"] == "error"
+    chat = await lab_chat(session, user)
+    assert await HarnessRepository(session, user.id).rows(chat) == []
+    # What the call cost is still counted, on the submission's row.
+    stored = await session.get(LabSubmission, submission)
+    assert stored is not None
+    await session.refresh(stored)
+    assert stored.usage is not None and stored.usage["requests"] == 1
+    with replying():
+        assert (await ask(notebook, "why?")).status_code == 200
+
+
+async def test_the_daily_allowance_refuses_the_review(
+    notebook: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    submission = await checked(notebook)
+    monkeypatch.setattr(settings, "DAILY_MESSAGE_CAP", 0)
+    asked: list[list[ModelMessage]] = []
+
+    with answering(reviewing(asked=asked)):
+        response = await review(notebook, submission)
+
+    assert response.status_code == 429
+    assert asked == []
 
 
 async def test_a_spent_budget_refuses_the_review_before_asking(
@@ -340,10 +391,10 @@ async def test_a_submission_from_a_client_without_source_is_still_graded(
 async def test_a_long_source_is_clamped_rather_than_refused(
     notebook: AsyncClient, session: AsyncSession
 ) -> None:
-    submission = await checked(notebook, source="x" * 30_000)
+    submission = await checked(notebook, source="x" * (ATTACHMENT_CHARS + 1))
 
     stored = await session.get(LabSubmission, submission)
-    assert stored is not None and stored.source == "x" * 20_000
+    assert stored is not None and stored.source == "x" * ATTACHMENT_CHARS
 
 
 async def test_the_review_model_is_the_setting(
