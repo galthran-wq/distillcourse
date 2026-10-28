@@ -571,7 +571,7 @@ everything else: `lab_challenges` (the answer key, per checkpoint),
 ```
 GET  /labs/{course}/{lesson}/manifest    # public: what the notebook computes on
 POST /labs/submissions                   # bearer: one attempt at one checkpoint
-GET  /labs/{course}/{lesson}/progress    # cookie: what the lesson page draws
+GET  /labs/{course}/{lesson}/progress    # cookie: what the lesson page draws, and `paired`
 POST /labs/{course}/{lesson}/ask         # bearer: a question to the tutor, SSE back
 POST /labs/{course}/{lesson}/chat        # bearer: a new lab chat (distill.clear_chat)
 POST /labs/{course}/{lesson}/review      # bearer: the code review of a check, SSE back
