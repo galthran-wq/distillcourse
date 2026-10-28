@@ -1,7 +1,8 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { figures } from "@/components/figures";
 import { creditFor, loadCredits } from "@/lib/content/credits";
+import { loadFigureSvg } from "@/lib/content/figure-svg";
 import { RASTER_EXTENSIONS } from "@/lib/content/images";
 import FrameStepper from "./FrameStepper";
 import FrameStepperNodes from "./FrameStepperNodes";
@@ -88,9 +89,9 @@ export default function FigureSequence({ name, alt, caption, lessonDir }: Props)
     }
   }
 
-  const frames: string[] = files
+  const frames = files
     .filter((f) => f.endsWith(".svg"))
-    .map((f) => readFileSync(join(lessonDir, "figures", f), "utf8"));
+    .flatMap((f) => loadFigureSvg(lessonDir, `figures/${f}`) ?? []);
 
   if (frames.length === 0) {
     return (

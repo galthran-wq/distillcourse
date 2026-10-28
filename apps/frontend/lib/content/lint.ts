@@ -34,6 +34,7 @@ import {
   probeImageFile,
 } from "./images";
 import { collectJsx, stringAttr } from "./mdx-jsx";
+import { figurePrefix, loadFigureSvg, unscopedSelectors } from "./figure-svg";
 
 export interface Diagnostic {
   level: "error" | "warn";
@@ -334,6 +335,30 @@ function lintLessonMdx(
         message: `${where} points at ${rel}, which does not exist in the lesson directory`,
       });
       return;
+    }
+    if (rel.endsWith(".svg")) {
+      // Checked on what the page receives, after prefixing: only a selector
+      // whose subject is one of the figure's own classes or ids stays inside it.
+      let leaks: string[];
+      try {
+        leaks = unscopedSelectors(loadFigureSvg(entry.dir, rel) ?? "", figurePrefix(entry.dir, rel));
+      } catch (err) {
+        diags.push({
+          level: "error",
+          rule: "figure-style-scope",
+          file: path,
+          message: `${where}: not well-formed XML, so it cannot be scoped for inlining — ${(err as Error).message.split("\n")[0]}`,
+        });
+        return;
+      }
+      if (leaks.length > 0) {
+        diags.push({
+          level: "error",
+          rule: "figure-style-scope",
+          file: path,
+          message: `${where}: <style> selector(s) ${leaks.map((l) => `"${l}"`).join(", ")} would style the whole page — use class or id selectors only (docs/figures.md)`,
+        });
+      }
     }
     if (!isRasterFile(rel)) return;
 
