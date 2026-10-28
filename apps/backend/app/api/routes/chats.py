@@ -24,6 +24,9 @@ class ChatSummary(BaseModel):
 
     id: uuid.UUID
     kind: str
+    # The lab a lab chat belongs to, as its lesson locator: the page the site
+    # opens it on.
+    lab_lesson: str | None = None
     model: str
     title: str | None
     created_at: datetime
@@ -110,14 +113,15 @@ async def _owned_chat(repo: HarnessRepository, chat_id: uuid.UUID) -> Chat:
 
 
 async def _web_chat(repo: HarnessRepository, chat_id: uuid.UUID) -> Chat:
-    """A chat this API may run in, switch models on, or compact.
+    """A chat this API may run in, switch models on, or compact: a web chat,
+    or a lab chat continued on the site.
 
     The Telegram thread is none of those: its model is the platform's (system
     runs bill the instance), and a run started into it from the browser closes
     review slots the learner never answered.
     """
     chat = await _owned_chat(repo, chat_id)
-    if chat.kind != "web":
+    if chat.kind == "telegram":
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, "the Telegram thread is driven from Telegram"
         )
@@ -203,7 +207,7 @@ async def stream(
             chat=chat,
             adapter=adapter,
             current_locator=_current_locator(adapter.run_input),
-            quotes=_quotes(adapter.run_input),
+            attached=_quotes(adapter.run_input),
         )
     except LimitExceeded as exc:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc))

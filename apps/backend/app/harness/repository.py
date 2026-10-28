@@ -52,16 +52,46 @@ class HarnessRepository:
     user_id: uuid.UUID
 
     async def create_chat(
-        self, *, kind: Literal["web", "telegram"], model: str | None = None
+        self,
+        *,
+        kind: Literal["web", "telegram", "lab"],
+        model: str | None = None,
+        lab_lesson: str | None = None,
     ) -> Chat:
+        # The newest lab chat is the one a question continues, so its stamp has
+        # to tell two of them apart even when both are made in one
+        # transaction, where `now()` is a single instant.
+        stamp = {"created_at": func.clock_timestamp()} if kind == "lab" else {}
         chat = Chat(
             user_id=self.user_id,
             kind=kind,
             model=model or settings.DEFAULT_CHAT_MODEL,
+            lab_lesson=lab_lesson,
+            **stamp,
         )
         self.session.add(chat)
         await self.session.commit()
         return chat
+
+    async def lab_chat(self, lesson: str) -> Chat:
+        """The chat a notebook's question lands in when it names none: the
+        latest one of this learner in this lab, or a first one.
+
+        Latest by creation, not by use: a new chat is how the learner asked for
+        a fresh start, so it is the one that continues even before anything is
+        said in it.
+        """
+        chat: Chat | None = await self.session.scalar(
+            select(Chat)
+            .where(
+                Chat.user_id == self.user_id,
+                Chat.kind == "lab",
+                Chat.lab_lesson == lesson,
+            )
+            .order_by(Chat.created_at.desc(), Chat.id.desc())
+            .limit(1)
+        )
+        return chat or await self.create_chat(kind="lab", lab_lesson=lesson)
 
     async def user(self) -> User:
         return await self.session.get_one(User, self.user_id)

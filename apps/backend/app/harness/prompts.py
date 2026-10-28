@@ -16,7 +16,7 @@ QUOTE_LENGTH = 2000
 QUOTE_COUNT = 8
 QUOTE_SOURCE = "learner-quote"
 
-Medium = Literal["web", "telegram"]
+Medium = Literal["web", "telegram", "notebook"]
 RunKind = Literal["chat", "review", "proactive", "compact"]
 
 _MODULES: dict[RunKind, tuple[str, ...]] = {

@@ -269,6 +269,14 @@ describe.skipIf(!hasUv)("lab build", () => {
     }
   });
 
+  it("hands the reference solution to the private half, as authored", () => {
+    // The tutor of a lab chat reads it from the API, which reaches content
+    // only through what is ingested — never from content/.
+    expect(JSON.parse(priv).solution).toBe(
+      readFileSync(join(FIXTURE, LAB_DIR, "solution.py"), "utf8"),
+    );
+  });
+
   it("retires the artifacts of a lab that no longer exists", () => {
     // The ingest reads the private half as the complete list of labs, so an
     // artifact nothing rebuilds is an answer key nothing can retire.

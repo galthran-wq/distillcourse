@@ -14,13 +14,20 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.labs.schemas import (
+    Ask,
+    Attachment,
     CheckpointProgress,
     Completion,
     Device,
+    DoneEvent,
+    ErrorEvent,
+    LabChat,
     Manifest,
     ManifestCheckpoint,
+    StepEvent,
     Submission,
     SubmissionResult,
+    TextEvent,
     Token,
 )
 from tests.labs.conftest import DECLARED, SPECS
@@ -46,6 +53,22 @@ def test_every_message_the_notebook_exchanges_has_the_pinned_fields() -> None:
     assert fields(SubmissionResult) == set(SHAPES["submission_result"])
     assert fields(Completion) == set(SHAPES["completion"])
     assert fields(CheckpointProgress) == set(SHAPES["checkpoint_progress"])
+    assert fields(Ask) == set(SHAPES["ask"])
+    assert fields(Attachment) == set(SHAPES["attachment"])
+    assert fields(LabChat) == set(SHAPES["lab_chat"])
+
+
+def test_every_event_of_an_answer_has_the_pinned_fields() -> None:
+    events: dict[str, type[BaseModel]] = {
+        "step": StepEvent,
+        "text": TextEvent,
+        "done": DoneEvent,
+        "error": ErrorEvent,
+    }
+    assert set(events) == set(SHAPES["ask_events"])
+    for kind, event in events.items():
+        assert fields(event) == set(SHAPES["ask_events"][kind]), kind
+        assert event.model_fields["type"].default == kind
 
 
 def test_the_artifact_this_suite_ingests_is_the_one_the_build_writes() -> None:

@@ -39,6 +39,7 @@ from app.harness.prompts import ContextBlock, Medium, RunKind, assemble
 from app.harness.repository import HarnessRepository, Role
 from app.harness.title import retitle
 from app.harness.usage import usage_row
+from app.labs import tools as lab_tools
 from app.memory import repository as memory
 from app.memory.repository import Recollection
 from app.models import Chat
@@ -376,6 +377,7 @@ async def _drain(
     adapter: VercelAIAdapter[HarnessDeps, str],
     history: list[ModelMessage],
     current_locator: str | None,
+    medium: Medium,
     queue: asyncio.Queue[BaseChunk | None],
 ) -> None:
     async with session_factory() as session:
@@ -394,21 +396,30 @@ async def _drain(
                 nonlocal result
                 result = completed
 
+            # A lab chat is the same conversation from the notebook and from
+            # the site, so what makes it a lab's — the lab prompt and the lab
+            # tools — follows the chat, not the medium it is continued in.
+            lab = chat.kind == "lab"
             try:
                 instructions = assemble(
-                    "web",
+                    medium,
                     "chat",
-                    await context.blocks(repo, current_locator=current_locator),
+                    await context.blocks(
+                        repo,
+                        current_locator=current_locator,
+                        extra=(lab_tools.briefing(chat),) if lab else (),
+                    ),
                 )
                 async for chunk in adapter.run_stream(
                     message_history=history,
                     deps=deps,
                     # The web dialogue is the only run whose client shows a
                     # reasoning trace, so it is the only one that asks for one.
-                    model=_model(chat, "chat", reasoning=True),
+                    model=_model(chat, "chat", reasoning=medium == "web"),
                     instructions=instructions,
                     run_id=str(run_id),
                     on_complete=capture,
+                    toolsets=[lab_tools.toolset] if lab else None,
                 ):
                     queue.put_nowait(chunk)
                     if isinstance(chunk, TextDeltaChunk):
@@ -462,13 +473,17 @@ async def start_stream(
     chat: Chat,
     adapter: VercelAIAdapter[HarnessDeps, str],
     current_locator: str | None = None,
-    quotes: str | None = None,
+    attached: str | None = None,
+    medium: Medium = "web",
 ) -> AsyncGenerator[BaseChunk]:
     """Start the run and hand back the client's view of it.
 
     The run is a task of its own, with its own session: a client that walks
     away mid-stream stops reading the queue, and the run keeps going to
     completion and persistence anyway.
+
+    `attached` is the block that goes above the learner's words — the passages
+    they referenced on the page, the objects a notebook sent along.
     """
     await check_run_allowed(repo)
     run_id = uuid.uuid4()
@@ -481,9 +496,9 @@ async def start_stream(
     # chat named after that is a chat named after the passage the learner
     # attached rather than after what they asked about it.
     prompt = _prompt_text(user_messages)
-    if quotes is not None:
-        _prefix(user_messages, quotes)
-    history = await _open_run(repo, chat, run_id, user_messages, "web", "user", prompt)
+    if attached is not None:
+        _prefix(user_messages, attached)
+    history = await _open_run(repo, chat, run_id, user_messages, medium, "user", prompt)
     queue: asyncio.Queue[BaseChunk | None] = asyncio.Queue()
     task = asyncio.create_task(
         _drain(
@@ -494,6 +509,7 @@ async def start_stream(
             adapter=adapter,
             history=history,
             current_locator=current_locator,
+            medium=medium,
             queue=queue,
         )
     )

@@ -314,14 +314,21 @@ def private_artifact(
     challenges: dict[str, dict[str, Any]],
     version: str,
     config: dict[str, Any],
+    source: str,
 ) -> dict[str, Any]:
     # The answer key and, under `public`, the same half the manifest above
     # publishes — one file, because the checkpoint API serves the manifest
     # itself and the inputs a learner computes on must come from the build that
     # captured the outputs they are compared against.
     #
-    # The model answer is left out of both: it is solution material, and the
-    # judge grades against the rubric rather than against the author's wording.
+    # The model answer is left out of both: the judge grades against the rubric
+    # rather than against the author's wording.
+    #
+    # The reference solution rides along whole, for the tutor of a lab chat to
+    # read: the API reaches content only through what is ingested, and this
+    # artifact is the lab's half of that. It is not secret — the repository is
+    # public — but it stays out of the public half all the same: the notebook
+    # is the exercise, and the mirror is what the learner opens.
     checkpoints = {
         cid: {
             **{key: value for key, value in record.items() if key != "model_answer"},
@@ -329,7 +336,12 @@ def private_artifact(
         }
         for cid, record in captured.items()
     }
-    return {"lab": config["lab"], "content_version": version, "checkpoints": checkpoints}
+    return {
+        "lab": config["lab"],
+        "content_version": version,
+        "checkpoints": checkpoints,
+        "solution": source,
+    }
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -362,7 +374,7 @@ def main() -> int:
         shutil.copytree("data", public / "data")
     write_json(
         Path(config["private_path"]),
-        private_artifact(captured, challenges, version, config),
+        private_artifact(captured, challenges, version, config, source),
     )
     print(f"[build] {config['lab']}: {len(captured)} checkpoints green")
     return 0

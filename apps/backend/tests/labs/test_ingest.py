@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.labs.ingest import ingest
-from app.models import LabChallenge
+from app.models import LabChallenge, LabSolution
 from tests.labs.conftest import DIGEST, LESSON, SPECS, VERSION
 
 # The shape `apps/frontend/lib/labs/python/build_lab.py` writes: the answer key
@@ -27,6 +27,7 @@ ARTIFACT: dict[str, Any] = {
             "public": {},
         },
     },
+    "solution": "def surprisal(p):\n    return -np.log2(p)\n",
 }
 
 
@@ -112,3 +113,32 @@ async def test_the_answer_key_never_reaches_the_public_half(
         served = json.dumps(row.spec["public"])
         for secret in ("expected", "wrong", "rubric", "labels", DIGEST):
             assert secret not in served
+
+
+async def test_a_built_lab_stores_its_reference_solution(
+    session: AsyncSession, built: Path
+) -> None:
+    await ingest(session, built)
+    await ingest(session, built)
+
+    [solution] = await session.scalars(select(LabSolution))
+    assert solution.lesson == LESSON
+    assert solution.source == ARTIFACT["solution"]
+    assert solution.content_version == bytes.fromhex(VERSION)
+
+
+async def test_the_solution_of_a_lab_that_disappeared_is_deleted(
+    session: AsyncSession, built: Path
+) -> None:
+    await ingest(session, built)
+    (built / "information-theory" / "surprisal-lab.json").unlink()
+    other = built / "other-course"
+    other.mkdir()
+    (other / "a-lab.json").write_text(
+        json.dumps(ARTIFACT | {"lab": "other-course/a-lab"})
+    )
+
+    await ingest(session, built)
+
+    lessons = [row.lesson for row in await session.scalars(select(LabSolution))]
+    assert lessons == ["lesson:other-course/a-lab"]

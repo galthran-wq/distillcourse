@@ -59,8 +59,8 @@ async def retitle(
 ) -> None:
     """Name a chat again once it has moved past the question it was named for.
 
-    Web chats only: the Telegram thread is one eternal conversation that no
-    rail lists, so a name for it is a completion nobody reads.
+    Not the Telegram thread: it is one eternal conversation that no rail
+    lists, so a name for it is a completion nobody reads.
 
     The platform's own bookkeeping, on the footing `summarize()` stands on — it
     spends the instance's budget and not the learner's daily allowance, which
@@ -69,7 +69,7 @@ async def retitle(
     row rather than written with it; there is no turn of its own to hang a row
     on, and an invented one would be a message the next run reads.
     """
-    if chat.kind != "web":
+    if chat.kind == "telegram":
         return
     # The chat was loaded before the run began and this session does not expire
     # what it holds on commit, so the stamp on it is minutes old by here. A

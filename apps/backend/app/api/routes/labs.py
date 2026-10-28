@@ -1,18 +1,26 @@
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import logfire
 from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.api.deps import CurrentUser, LessonKey, SessionDep
+from app.api.deps import CurrentUser, LessonKey, SessionDep, SessionFactoryDep
 from app.api.size import size_limited
 from app.core.config import settings
 from app.core.rate_limit import FixedWindow, client_address, register
+from app.harness import runner
+from app.harness.limits import LimitExceeded
+from app.harness.repository import HarnessRepository
+from app.labs import chat as lab_chat
 from app.labs import repository, verify
 from app.labs.deps import LabUser
 from app.labs.schemas import (
     MAX_SUBMISSION_BYTES,
+    Ask,
     Device,
+    LabChat,
     Manifest,
     ManifestCheckpoint,
     Progress,
@@ -21,6 +29,7 @@ from app.labs.schemas import (
     SubmissionResult,
     Token,
 )
+from app.models import Chat
 
 router = APIRouter(
     prefix="/labs", tags=["labs"], route_class=size_limited(MAX_SUBMISSION_BYTES)
@@ -221,3 +230,66 @@ async def progress(key: LessonKey, user: CurrentUser, session: SessionDep) -> Pr
     if standing is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no lab at that lesson")
     return standing
+
+
+async def _lab_repo(
+    session: SessionDep, user: LabUser, key: LessonKey
+) -> HarnessRepository:
+    if await repository.lab(session, key) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no lab at that lesson")
+    return HarnessRepository(session, user.id)
+
+
+@router.post("/{course}/{lesson}/chat", status_code=status.HTTP_201_CREATED)
+async def new_chat(key: LessonKey, session: SessionDep, user: LabUser) -> LabChat:
+    """`distill.clear_chat()`: a fresh chat in this lab, which the next question
+    continues by being the latest. The old one stays, here and on the site."""
+    repo = await _lab_repo(session, user, key)
+    chat = await repo.create_chat(kind="lab", lab_lesson=key)
+    return LabChat(chat_id=chat.id, url=lab_chat.url(chat))
+
+
+async def _asked_in(
+    repo: HarnessRepository, key: str, chat_id: uuid.UUID | None
+) -> Chat:
+    if chat_id is None:
+        return await repo.lab_chat(key)
+    chat = await repo.get_chat(chat_id)
+    if chat is None or chat.kind != "lab" or chat.lab_lesson != key:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such chat in this lab")
+    return chat
+
+
+@router.post("/{course}/{lesson}/ask")
+async def ask(
+    key: LessonKey,
+    posted: Ask,
+    session: SessionDep,
+    session_factory: SessionFactoryDep,
+    user: LabUser,
+) -> StreamingResponse:
+    """`distill.ask(...)`: one question, answered as a stream of the four
+    events `lab_chat.events` writes, in the chat it names or else the latest of
+    this learner in this lab."""
+    repo = await _lab_repo(session, user, key)
+    chat = await _asked_in(repo, key, posted.chat_id)
+    try:
+        chunks = await runner.start_stream(
+            session_factory=session_factory,
+            repo=repo,
+            chat=chat,
+            adapter=lab_chat.question(posted.text),
+            # The lab's page is where the learner is, as far as the tutor's
+            # tools are concerned: its brief is the lesson they are working to.
+            current_locator=key,
+            attached=lab_chat.attached(posted.attachments),
+            medium="notebook",
+        )
+    except LimitExceeded as exc:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc))
+    except runner.RunBusy:
+        raise HTTPException(status.HTTP_409_CONFLICT, "this chat has a run in flight")
+    return StreamingResponse(
+        lab_chat.events(chunks, chat, posted.attachments),
+        media_type="text/event-stream",
+    )
