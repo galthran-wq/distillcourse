@@ -75,7 +75,7 @@ export default function UserMenu() {
       </Button>
       {open && (
         <div className={`${MENU_CLASS} w-60`}>
-          <p className="truncate px-2.5 pb-2 pt-1 font-mono text-[11px] text-faint">
+          <p className="truncate px-2.5 pb-2 pt-1 text-[12px] text-faint">
             {user.email}
           </p>
           {item("/profile", "Profile")}

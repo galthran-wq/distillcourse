@@ -144,7 +144,7 @@ export default async function LessonPage({
   const { Content: MDXContent, toc } = await compileLesson(entry.mdx as string);
 
   return (
-    <div className="lesson-grid mx-auto w-full max-w-7xl px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_230px] lg:gap-14">
+    <div className="lesson-grid mx-auto w-full max-w-[calc(42rem+230px+3.5rem+3rem)] px-6 lg:grid lg:grid-cols-[minmax(0,42rem)_230px] lg:justify-center lg:gap-14">
       {/* The locator is the index's, so an event names the same place a
           search hit or a tutor citation does. */}
       <LessonTelemetry lesson={key} />
@@ -156,7 +156,7 @@ export default async function LessonPage({
         headings={toc.map((h) => h.id)}
       />
       <SelectionReference course={course.course.slug} lesson={lesson.slug} />
-      <article className="min-w-0">
+      <article className="mx-auto min-w-0 max-w-[42rem] lg:mx-0">
         {/* Keyed by the lesson: moving to the next one must not show the
             previous one's bookmark while the new state loads. */}
         <LessonStateProvider key={key} lesson={key}>
@@ -182,7 +182,7 @@ export default async function LessonPage({
             exit="none"
             default="none"
           >
-            <header className="border-b border-line py-10">
+            <header className="border-b border-line pt-[3.25rem] pb-[1.6rem]">
               <p className={LABEL_CLASS}>
                 <Link href={`/courses/${course.course.slug}`} className="hover:text-accent">
                   {course.course.title}
@@ -190,13 +190,15 @@ export default async function LessonPage({
                 · {moduleTitle}
               </p>
               <h1 className="mt-3 flex items-baseline gap-3">
-                <span className="font-mono text-sm text-faint">{number}</span>
-                <span className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
+                <span className="text-[1.6rem] font-semibold tabular-nums text-accent sm:text-[1.85rem]">
+                  {number}
+                </span>
+                <span className="text-[1.6rem] font-semibold leading-[1.2] tracking-[-0.005em] sm:text-[1.85rem]">
                   {lesson.title}
                 </span>
               </h1>
-              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 font-mono text-[12px] text-faint">
-                <span className="text-soft">{lesson.goal}</span>
+              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-base text-faint">
+                <span className="italic text-soft">{lesson.goal}</span>
                 <span>
                   {lesson.lab !== undefined
                     ? `~${lesson.lab.est_hours} h`
@@ -207,7 +209,7 @@ export default async function LessonPage({
             </header>
           </ViewTransition>
 
-          <div className="prose-lesson py-10">
+          <div className="prose-lesson pt-7 pb-10">
             <MDXContent components={components} />
           </div>
 

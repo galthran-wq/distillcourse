@@ -11,11 +11,11 @@ export default function SiteHeader() {
   const onCourses = pathname === "/" || pathname.startsWith("/courses");
 
   return (
-    <header className="border-b border-line">
+    <header className="border-b border-line bg-paper">
       <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-2 px-4 sm:gap-5 sm:px-6">
         <Link
           href="/"
-          className="shrink-0 rounded-sm text-[15px] font-semibold tracking-tight transition-colors duration-(--motion-fast) hover:text-accent"
+          className="shrink-0 rounded-sm text-[17px] font-bold tracking-[-0.01em] transition-colors duration-(--motion-fast) hover:text-accent"
         >
           distillcourse
         </Link>

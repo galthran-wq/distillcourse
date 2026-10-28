@@ -59,7 +59,7 @@ export function MemoryRow({
     <li className="border-b border-line py-5">
       <div className="flex items-baseline justify-between gap-4">
         <span className="font-mono text-[11px] text-faint">{memory.slug}</span>
-        <span className="shrink-0 font-mono text-[11px] text-faint">
+        <span className="shrink-0 text-[12px] tabular-nums text-faint">
           {memory.source === "user" ? "edited by you" : "written by the tutor"} ·{" "}
           {day(memory.updated_at)}
         </span>

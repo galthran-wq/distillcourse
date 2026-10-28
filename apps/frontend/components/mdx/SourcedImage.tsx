@@ -65,7 +65,7 @@ export default function SourcedImage({
       width={image.width}
       height={image.height}
       className={`mx-auto block h-auto w-full rounded-sm${
-        background === "light" ? " bg-white p-3" : ""
+        background === "light" ? " bg-white p-3 [filter:var(--photo-filter)]" : ""
       }`}
     />
   );

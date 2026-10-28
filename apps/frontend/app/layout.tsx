@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { IBM_Plex_Mono, Source_Sans_3 } from "next/font/google";
 import SiteHeader from "@/components/SiteHeader";
 import ChatWidget from "@/components/chat/ChatWidget";
 import TelegramBanner from "@/components/settings/TelegramBanner";
@@ -7,10 +7,11 @@ import { getLessonLinks } from "@/lib/content/site";
 import "./globals.css";
 import "katex/dist/katex.min.css";
 
-const plexSans = IBM_Plex_Sans({
-  variable: "--font-plex-sans",
-  subsets: ["latin"],
+const sourceSans = Source_Sans_3({
+  variable: "--font-source-sans",
+  subsets: ["latin", "latin-ext"],
   weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
 });
 
 const plexMono = IBM_Plex_Mono({
@@ -41,7 +42,7 @@ export default function RootLayout({
       // the page has it, and a route change that smooth-scrolls to the top
       // drags the new page up through the transition to it.
       data-scroll-behavior="smooth"
-      className={`${plexSans.variable} ${plexMono.variable} h-full antialiased`}
+      className={`${sourceSans.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
         <script
@@ -55,7 +56,7 @@ export default function RootLayout({
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <footer className="border-t border-line">
-          <div className="mx-auto w-full max-w-7xl px-4 py-4 font-mono text-[11px] text-faint sm:px-6">
+          <div className="mx-auto w-full max-w-7xl px-4 py-4 text-[13px] text-faint sm:px-6">
             distillcourse
           </div>
         </footer>

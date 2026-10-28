@@ -29,7 +29,7 @@ export function Slider({
     <label className="block text-sm">
       <span className="flex items-baseline justify-between">
         <span>{label}</span>
-        {display !== undefined && <span className="font-mono">{display}</span>}
+        {display !== undefined && <span className="tabular-nums">{display}</span>}
       </span>
       <input
         type="range"

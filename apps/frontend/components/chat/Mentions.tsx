@@ -53,7 +53,7 @@ export default function MentionPalette({ mentions, active, onPick }: Props) {
             {/* Which of the three depths the row is: at the top of the list a
                 course and a lesson of it can read almost the same. */}
             {mixed && (
-              <span className="shrink-0 font-mono text-[11px] text-faint">
+              <span className="shrink-0 text-[12px] text-faint">
                 {mention.kind}
               </span>
             )}

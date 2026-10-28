@@ -71,10 +71,10 @@ export function LessonRow({
           </Link>
         )}
         {link !== undefined && (
-          <span className="ml-3 font-mono text-[11px] text-faint">{link.course}</span>
+          <span className="ml-3 text-[12px] text-faint">{link.course}</span>
         )}
       </span>
-      <span className="shrink-0 font-mono text-[11px] text-faint">{note}</span>
+      <span className="shrink-0 text-[12px] tabular-nums text-faint">{note}</span>
     </li>
   );
 }
