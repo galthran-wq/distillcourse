@@ -183,7 +183,7 @@ export function Aside({ children }: { children: ReactNode }) {
       className="aside my-8 rounded-sm border border-dashed border-line px-5 py-3"
       data-toggle="aside"
     >
-      <summary className="cursor-pointer font-mono text-[12px] text-faint">
+      <summary className="cursor-pointer text-[0.95em] italic text-faint">
         Aside
       </summary>
       <div className="mt-3">{children}</div>
