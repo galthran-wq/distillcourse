@@ -20,7 +20,7 @@ import { wantedAssets } from "../lib/content/assets";
 import { appRoot, contentRoot, repoRoot } from "./paths";
 
 const publicRoot = join(appRoot, "public", "course-assets");
-const wanted = wantedAssets(join(contentRoot, "courses"), publicRoot);
+const wanted = wantedAssets(contentRoot, publicRoot);
 
 let copied = 0;
 for (const [dest, src] of wanted) {

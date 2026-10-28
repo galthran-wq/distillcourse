@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { courseCover } from "@/lib/content/assets";
+import { courseCover } from "@/lib/content/images";
 import { getCourses } from "@/lib/content/site";
 
 /**
@@ -29,12 +29,12 @@ export default function Home() {
             <li key={slug}>
               <Link href={`/courses/${slug}`} className="group block">
                 <span
-                  className={`relative block aspect-[4/3] overflow-hidden border border-line [--pad:0.35rem] sm:aspect-[16/10] sm:[--pad:0.9rem] ${
+                  className={`relative block aspect-[4/3] overflow-hidden border border-line sm:aspect-[16/10] ${
                     cover === undefined
                       ? "bg-panel"
                       : cover.drawn
-                        ? "bg-paper [:root[data-theme=dark]_&]:bg-panel"
-                        : "bg-paper [--pad:0px] sm:[--pad:0px] [:root[data-theme=dark]_&]:bg-transparent"
+                        ? "bg-paper [--pad:0.35rem] sm:[--pad:0.9rem] [:root[data-theme=dark]_&]:bg-panel"
+                        : "bg-paper [--pad:0px] [:root[data-theme=dark]_&]:bg-transparent"
                   }`}
                 >
                   {cover !== undefined && (

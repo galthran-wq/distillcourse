@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { courseCover, wantedAssets } from "@/lib/content/assets";
+import { wantedAssets } from "@/lib/content/assets";
+import { courseCover } from "@/lib/content/images";
 import { loadCourse, type LoadedCourse } from "@/lib/content/load";
 
 const FIXTURE = join(__dirname, "fixtures", "lint-course");
@@ -73,7 +74,7 @@ describe("wantedAssets", () => {
       ),
     );
 
-    const wanted = wantedAssets(join(root, "courses"), "/public");
+    const wanted = wantedAssets(root, "/public");
 
     expect(wanted.get("/public/lint-course/intro-surprise/cover.svg")).toBe(figure);
     // The key_image SVGs are still published beside it.

@@ -920,7 +920,6 @@ export function lintCourse(
     }
   }
 
-  // cover: the home page's figure, held to what a key_image is held to.
   const { cover } = loaded.course;
   if (cover !== undefined) {
     const owner = loaded.lessons.find((entry) => entry.lesson.slug === cover.lesson);
