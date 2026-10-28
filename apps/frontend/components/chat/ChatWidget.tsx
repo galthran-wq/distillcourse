@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import ChatPanel from "@/components/chat/ChatPanel";
 import PanelGrips from "@/components/chat/PanelGrips";
@@ -17,7 +17,18 @@ import { SectionsProvider, useLoadedSections } from "@/lib/content/sections";
 import { useExitDelay } from "@/lib/ui/exit";
 import { lockScroll } from "@/lib/ui/scroll-lock";
 
+// Forms with one action of their own — signing in, the settings, a notebook's
+// approval — where the tutor has nothing to answer.
+const WITHOUT_TUTOR = /^\/(login|signup|settings|labs\/pair\/[^/]+)\/?$/;
+
 export default function ChatWidget({ lessons }: { lessons: Lessons }) {
+  // A component of its own below this rather than an early return in it: the
+  // panel's effects, the scroll lock above all, are let go of with it.
+  if (WITHOUT_TUTOR.test(usePathname())) return null;
+  return <Widget lessons={lessons} />;
+}
+
+function Widget({ lessons }: { lessons: Lessons }) {
   const auth = useAuth();
   const session = useSession();
   // The course of the page, from its route — a course page, a lesson, a lab;
@@ -143,14 +154,14 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
         )}
         {!expanded && (
           <Button
-            variant={open ? "outline" : "solid"}
+            variant="outline"
             size="pill"
             onClick={togglePanel}
             aria-expanded={open}
-            className="fixed right-6 bottom-6 z-40 shadow-card"
+            className="fixed right-6 bottom-6 z-40 shadow-card max-sm:size-11 max-sm:px-0"
           >
-            <ChatIcon />
-            Tutor
+            <ChatIcon className="size-4 text-accent" />
+            <span className="max-sm:sr-only">Tutor</span>
           </Button>
         )}
       </LessonsProvider>

@@ -1,6 +1,7 @@
 "use client";
 
 import { sectionKey } from "@/lib/content/locator";
+import type { TocEntry } from "@/lib/content/toc";
 import { createStore } from "@/lib/store";
 
 export interface LessonPosition {
@@ -77,6 +78,38 @@ export function anchorUnder(
     current = heading.id;
   }
   return current;
+}
+
+/**
+ * The `##` section the reader is in, with its ordinal among the `##`s: a `###`
+ * anchor names the section it sits under. Null before the first `##`.
+ */
+export function sectionAt(
+  toc: readonly TocEntry[],
+  anchor: string | null,
+): { ordinal: number; entry: TocEntry } | null {
+  let section: { ordinal: number; entry: TocEntry } | null = null;
+  let ordinal = 0;
+  for (const entry of toc) {
+    if (entry.depth === 2) {
+      ordinal += 1;
+      section = { ordinal, entry };
+    }
+    if (entry.id === anchor) return section;
+  }
+  return null;
+}
+
+/**
+ * How far through the article the reader is, 0..1: none while its top is at
+ * the top of the viewport, all of it once its bottom reaches the bottom.
+ * `top` is the article's distance from the top of the viewport.
+ */
+export function articleProgress(top: number, height: number, viewport: number): number {
+  // An article no taller than the viewport has no span to scroll through; the
+  // floor keeps it from dividing by zero or by a negative.
+  const span = Math.max(height - viewport, 1);
+  return Math.min(1, Math.max(0, -top / span));
 }
 
 /** The reader's position in the locator namespace the harness tools speak. */

@@ -104,6 +104,13 @@ export interface LessonView {
   moduleTitle: string;
   prev?: LoadedLesson;
   next?: LoadedLesson;
+  /** Every lesson in course.yaml, planned ones too: the "of" in "04 of 32". */
+  total: number;
+}
+
+/** The one number a lesson has across the site: its place in course order. */
+export function lessonNumber(entry: LoadedLesson): string {
+  return String(entry.index + 1).padStart(2, "0");
 }
 
 export function getLessonView(
@@ -126,5 +133,6 @@ export function getLessonView(
     moduleTitle,
     prev: at > 0 ? readable[at - 1] : undefined,
     next: at < readable.length - 1 ? readable[at + 1] : undefined,
+    total: course.lessons.length,
   };
 }

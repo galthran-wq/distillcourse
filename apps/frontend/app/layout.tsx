@@ -42,6 +42,9 @@ export default function RootLayout({
       // the page has it, and a route change that smooth-scrolls to the top
       // drags the new page up through the transition to it.
       data-scroll-behavior="smooth"
+      // The theme script below stamps `data-theme` here before hydration, so
+      // the attribute the server sent is never the one React finds.
+      suppressHydrationWarning
       className={`${sourceSans.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
@@ -54,7 +57,8 @@ export default function RootLayout({
         />
         <TelegramBanner />
         <SiteHeader />
-        <main className="flex-1">{children}</main>
+        {/* Room under the last line for the tutor launcher floating over it. */}
+        <main className="flex-1 pb-20">{children}</main>
         <footer className="border-t border-line">
           <div className="mx-auto w-full max-w-7xl px-4 py-4 text-[13px] text-faint sm:px-6">
             distillcourse

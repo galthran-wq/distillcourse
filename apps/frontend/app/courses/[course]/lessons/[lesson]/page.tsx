@@ -7,6 +7,7 @@ import LabPanel from "@/components/labs/LabPanel";
 import DemoHost from "@/components/mdx/DemoHost";
 import LessonTelemetry from "@/components/LessonTelemetry";
 import LessonPosition from "@/components/LessonPosition";
+import LessonSectionBar from "@/components/LessonSectionBar";
 import LessonToc from "@/components/LessonToc";
 import {
   BookmarkToggle,
@@ -40,7 +41,7 @@ import {
 } from "@/components/mdx/Blocks";
 import { lessonKey } from "@/lib/content/locator";
 import { compileLesson } from "@/lib/content/render";
-import { getCourses, getLessonView } from "@/lib/content/site";
+import { getCourses, getLessonView, lessonNumber } from "@/lib/content/site";
 import { isReadable } from "@/lib/content/visibility";
 
 interface Params {
@@ -77,9 +78,9 @@ export default async function LessonPage({
   const p = await params;
   const view = getLessonView(p.course, p.lesson);
   if (view === undefined) notFound();
-  const { course, entry, moduleTitle, prev, next } = view;
+  const { course, entry, moduleTitle, prev, next, total } = view;
   const lesson = entry.lesson;
-  const number = String(entry.index + 1).padStart(2, "0");
+  const number = lessonNumber(entry);
   // The one name this lesson has on the API — telemetry, rating and bookmark
   // all send it, and the profile looks a row up by it.
   const key = lessonKey(course.course.slug, lesson.slug);
@@ -211,6 +212,7 @@ export default async function LessonPage({
               </div>
             </header>
           </ViewTransition>
+          <LessonSectionBar number={number} toc={toc} />
 
           {/* A lab lesson's MDX is the brief; the work it briefs starts here,
               above it. The lab is named by the pair the mirror names it by,
@@ -225,34 +227,35 @@ export default async function LessonPage({
 
           <LessonRating />
 
-          <nav className="mt-10 mb-16 flex items-stretch justify-between gap-4 border-t border-line pt-6">
-            {prev !== undefined ? (
+          {/* Below 640px the next lesson takes the first line to itself: it is
+              where a reader at the end is going. */}
+          <nav className="mt-12 mb-16 flex items-baseline gap-6 border-t border-ink pt-3 text-[0.93rem] max-sm:flex-wrap max-sm:gap-x-4 max-sm:gap-y-2.5">
+            {prev !== undefined && (
               <Link
                 href={`/courses/${course.course.slug}/lessons/${prev.lesson.slug}`}
                 transitionTypes={["nav-back"]}
-                className="group max-w-[45%]"
+                className="group flex min-w-0 items-baseline gap-2 text-soft max-sm:order-2 max-sm:basis-full max-sm:text-[0.85rem]"
               >
-                <span className="font-mono text-[11px] tracking-wide text-faint">← previous</span>
-                <span className="block font-medium leading-snug group-hover:text-accent">
-                  {prev.lesson.title}
-                </span>
+                <span className="text-faint">←</span>
+                <span className="text-[12px] tabular-nums text-faint">{lessonNumber(prev)}</span>
+                <span className="truncate group-hover:text-accent">{prev.lesson.title}</span>
               </Link>
-            ) : (
-              <span />
             )}
-            {next !== undefined ? (
+            <span className="shrink-0 whitespace-nowrap text-[12px] tabular-nums text-faint max-sm:hidden">
+              {number} of {total}
+            </span>
+            {next !== undefined && (
               <Link
                 href={`/courses/${course.course.slug}/lessons/${next.lesson.slug}`}
                 transitionTypes={["nav-forward"]}
-                className="group max-w-[45%] text-right"
+                className="group ml-auto flex min-w-0 items-baseline gap-2 font-medium text-ink max-sm:ml-0 max-sm:basis-full"
               >
-                <span className="font-mono text-[11px] tracking-wide text-faint">next →</span>
-                <span className="block font-medium leading-snug group-hover:text-accent">
+                <span className="text-[12px] tabular-nums text-faint">{lessonNumber(next)}</span>
+                <span className="truncate group-hover:text-accent max-sm:flex-1 max-sm:whitespace-normal">
                   {next.lesson.title}
                 </span>
+                <span className="text-faint">→</span>
               </Link>
-            ) : (
-              <span />
             )}
           </nav>
         </LessonStateProvider>
