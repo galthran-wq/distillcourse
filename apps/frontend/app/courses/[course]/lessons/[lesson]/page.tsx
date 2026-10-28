@@ -205,26 +205,23 @@ export default async function LessonPage({
               </h1>
               <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-base text-faint">
                 <span className="italic text-soft">{lesson.goal}</span>
-                <span>
-                  {lesson.lab !== undefined
-                    ? `~${lesson.lab.est_hours} h`
-                    : `~${lesson.est_minutes} min`}
-                </span>
+                {/* A lab's hours are said once, in the lab block below. */}
+                {lesson.lab === undefined && <span>~{lesson.est_minutes} min</span>}
                 <BookmarkToggle />
               </div>
             </header>
           </ViewTransition>
 
-          <div className="prose-lesson pt-7 pb-10">
-            <MDXContent components={components} />
-          </div>
-
-          {/* A lab lesson's MDX is the brief; the work it briefs is here. The
-              lab is named by the pair the mirror names it by, which is also
-              what the checkpoint API takes as its path. */}
+          {/* A lab lesson's MDX is the brief; the work it briefs starts here,
+              above it. The lab is named by the pair the mirror names it by,
+              which is also what the checkpoint API takes as its path. */}
           {lesson.lab !== undefined && (
             <LabPanel lab={`${course.course.slug}/${lesson.slug}`} spec={lesson.lab} />
           )}
+
+          <div className="prose-lesson pt-7 pb-10">
+            <MDXContent components={components} />
+          </div>
 
           <LessonRating />
 

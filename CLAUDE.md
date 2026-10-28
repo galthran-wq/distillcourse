@@ -117,11 +117,12 @@ Rules that override defaults:
   the same `canon_vectors.json`; the wire shapes it posts belong to
   `app/labs/schemas.py`, so a change to either is one PR touching both. The
   package is the source, `client/` in the public mirror is a copy of it.
-- A lab lesson renders the standard lesson shell and then
-  `components/labs/LabPanel`. Its checklist IS the lesson's own `lab` block —
+- A lab lesson renders `components/labs/LabPanel` directly under the lesson
+  header, before the brief. Its checklist IS the lesson's own `lab` block —
   content, never a second read of the build — and only the state beside each
   row is the API's, through `lib/labs/api.ts` (the browser half of a directory
-  that is otherwise the build's). The one thing the page takes from the built
+  that is otherwise the build's); so is the pairing status, the progress
+  response's `paired`. The one thing the page takes from the built
   manifest is a `metric` checkpoint's threshold: the build calibrates it, so
   course.yaml cannot state it. Nothing is pushed to that page — it re-asks on
   focus and on a slow beat, and asks nothing while the tab is hidden.
@@ -175,7 +176,8 @@ Rules that override defaults:
   hands its ring over. Every micro-cap label (sans small caps) carries `LABEL_CLASS`,
   except the heads of lesson environments and callouts (`.env-head`,
   `.callout-label`, `.conclusion-label`), which are prose and styled in
-  `globals.css` with the blocks they head.
+  `globals.css` with the blocks they head; a link inside a run of chrome text
+  (not lesson prose) carries `LINK_CLASS`.
   The chip a referenced passage is shown as carries
   `CHIP_CLASS`; a menu or a preview that hangs open over the page carries
   `POPOVER_CLASS`, plus `MENU_CLASS`/`MENU_ITEM_CLASS` when it is a dropdown,

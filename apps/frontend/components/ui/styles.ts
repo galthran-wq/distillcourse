@@ -64,6 +64,13 @@ export const FIELD_BOX_INPUT_CLASS = `${FIELD_TEXT} bg-transparent focus:outline
  */
 export const FIELD_LABEL_CLASS = "mb-1 block text-soft";
 
+/**
+ * A link — or a button that reads as one — inside a run of text: the accent
+ * word over a quiet underline that takes the accent on hover.
+ */
+export const LINK_CLASS =
+  "text-accent underline decoration-line underline-offset-2 hover:decoration-accent";
+
 /** Micro-cap labels, sans small caps: section headings, group labels. */
 export const LABEL_CLASS = "text-[11.5px] font-semibold uppercase tracking-[0.08em] text-faint";
 

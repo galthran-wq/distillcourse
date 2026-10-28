@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, exists, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -365,7 +365,12 @@ async def standing(
                 feedback=state.feedback if state else None,
             )
         )
-    return Progress(checkpoints=checkpoints)
+    paired = await session.scalar(
+        select(
+            exists().where(LabToken.user_id == user_id, LabToken.revoked_at.is_(None))
+        )
+    )
+    return Progress(checkpoints=checkpoints, paired=bool(paired))
 
 
 async def last_submitted(

@@ -23,6 +23,8 @@ export interface CheckpointProgress {
 
 export interface LabProgress {
   checkpoints: CheckpointProgress[];
+  /** Any notebook paired with this account — per account, not per lab. */
+  paired: boolean;
 }
 
 export interface PairingCode {
