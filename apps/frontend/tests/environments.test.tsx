@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -22,7 +23,7 @@ async function lesson(mdx: string): Promise<string> {
  */
 function headLabels(root: Element): string[] {
   const style = document.createElement("style");
-  style.textContent = readFileSync("app/globals.css", "utf8");
+  style.textContent = readFileSync(join(__dirname, "..", "app", "globals.css"), "utf8");
   document.head.append(style);
   const rules = [...style.sheet!.cssRules].filter(
     (r): r is CSSStyleRule => r instanceof CSSStyleRule,

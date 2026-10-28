@@ -9,8 +9,9 @@ import { CONCLUSION_ANCHOR } from "@/lib/content/locator";
 
 /**
  * Textbook environments. Numbering is done with CSS counters (see
- * globals.css): each environment class increments its own counter and the
- * label ("Definition 2", "Exercise 1", …) is injected via ::before on
+ * globals.css): each environment class increments its own counter — except
+ * Lemma, Proposition and Corollary, which share Theorem's — and the label
+ * ("Definition 1.1", "Exercise 1", …) is injected via ::before on
  * .env-head. Optional `title` renders in parentheses after the label.
  *
  * `data-toggle` on the collapsible ones is telemetry's hook
@@ -143,7 +144,7 @@ export function References({
   );
 }
 
-/** The load-bearing fact of a section: the one environment with a fill. */
+/** The load-bearing fact of a section: the one block in a lesson with a fill. */
 export function KeyFact({ children }: { children: ReactNode }) {
   return (
     <section className="callout callout-keyfact">

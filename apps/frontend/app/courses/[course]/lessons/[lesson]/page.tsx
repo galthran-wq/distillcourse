@@ -150,7 +150,7 @@ export default async function LessonPage({
   const { Content: MDXContent, toc } = await compileLesson(entry.mdx as string);
 
   return (
-    <div className="lesson-grid mx-auto w-full max-w-[calc(42rem+230px+3.5rem+3rem)] px-6 lg:grid lg:grid-cols-[minmax(0,42rem)_230px] lg:justify-center lg:gap-14">
+    <div className="mx-auto w-full max-w-[calc(42rem+230px+3.5rem+3rem)] px-6 lg:grid lg:grid-cols-[minmax(0,42rem)_230px] lg:justify-center lg:gap-14">
       {/* The locator is the index's, so an event names the same place a
           search hit or a tutor citation does. */}
       <LessonTelemetry lesson={key} />
