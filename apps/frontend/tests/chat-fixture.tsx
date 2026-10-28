@@ -111,8 +111,8 @@ export function shown(): {
 
 export interface Composing {
   host: () => HTMLElement;
-  /** Mount it. Disabled is a run in flight: the chat takes one at a time. */
-  composer: (disabled?: boolean) => void;
+  /** Mount it. Busy is a run in flight: what is sent then steers it. */
+  composer: (busy?: boolean) => void;
   field: () => HTMLTextAreaElement;
   /** A key the field itself answers: Enter, Escape, an arrow. */
   press: (key: string) => void;
@@ -124,6 +124,8 @@ export interface Composing {
   reloads: (draft: string) => void;
   /** What the composer handed the widget, in the order it was sent. */
   sent: string[];
+  /** How many times the reader asked for the run to stop. */
+  stops: () => number;
 }
 
 /**
@@ -139,14 +141,18 @@ export interface Composing {
 export function composing(): Composing {
   const dom = mounted();
   const sent: string[] = [];
+  let stops = 0;
 
-  const composer = (disabled = false): void => {
+  const composer = (busy = false): void => {
     act(() =>
       dom.render(
         <SectionsProvider value={SECTIONS}>
           <LessonsProvider value={LESSONS}>
             <Composer
-              disabled={disabled}
+              busy={busy}
+              onStop={() => {
+                stops += 1;
+              }}
               onSubmit={(text) => {
                 sent.push(text);
               }}
@@ -179,6 +185,7 @@ export function composing(): Composing {
   beforeEach(() => {
     // The same array throughout, so a caller can hold on to it.
     sent.length = 0;
+    stops = 0;
     composer();
   });
 
@@ -190,6 +197,7 @@ export function composing(): Composing {
   return {
     host: dom.host,
     composer,
+    stops: () => stops,
     field,
     press: (key) =>
       act(() =>

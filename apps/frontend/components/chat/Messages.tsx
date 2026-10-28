@@ -1,12 +1,13 @@
 "use client";
 
-import { isToolUIPart, type ChatStatus, type UIMessage } from "ai";
-import { memo, useEffect, useRef } from "react";
+import type { ChatStatus, UIMessage } from "ai";
+import { memo, useEffect, useRef, type RefObject } from "react";
+import Activity from "@/components/chat/Activity";
 import Markdown from "@/components/chat/Markdown";
 import { QuoteRow, SentQuote } from "@/components/chat/Quotes";
-import ToolChip from "@/components/chat/ToolChip";
+import { LABEL_CLASS } from "@/components/ui/styles";
 import { attachedQuotes, quoted, type Quote } from "@/lib/chat/quote";
-import Reasoning from "@/components/chat/Reasoning";
+import { steerMark } from "@/lib/chat/steer";
 
 // Within this much of the end counts as reading the newest message. Anything
 // further up is the reader looking at something, and the transcript stays put.
@@ -43,65 +44,82 @@ function Question({ text, attached }: { text: string; attached: Quote[] }) {
 }
 
 /**
- * One turn of the transcript. Memoised so a settled turn does not re-render
- * while a later one streams: the SDK clones only the streaming message, so its
- * `message` reference changes per throttled tick while settled turns keep
- * theirs, and only it carries `streaming`. Even were a settled turn to
- * re-render, its `Markdown` is memoised on unchanged text and would not
- * re-parse — this keeps it from reconciling at all. The stream itself is
- * throttled at the source (`ChatPanel`'s `experimental_throttle`).
+ * The messages the transcript shows as one turn: a question, or the answer to
+ * it. A stored answer comes back as one message per model response — the
+ * search, then the reply — where the stream wrote one, and both are one turn
+ * with one activity line.
  */
-const Turn = memo(function Turn({
-  message,
-  streaming,
-}: {
-  message: UIMessage;
-  /** This is the answer being written right now: throttle its markdown. */
-  streaming: boolean;
-}) {
-  return (
-    <article
-      aria-label={message.role === "user" ? "You" : "Tutor"}
-      // A turn rises into place as it is added. The answer inside it is written
-      // a token at a time and does not animate: the element is there from the
-      // first token, and this only plays on the node React inserts.
-      className={`transition-[opacity,translate] duration-(--motion-base) starting:translate-y-1.5 starting:opacity-0 ${
-        message.role === "user"
-          ? "ml-auto w-fit max-w-[85%] rounded-md bg-accent/10 px-3 py-2"
-          : ""
-      }`}
-    >
-      {message.parts.map((part, index) => {
-        if (part.type === "reasoning") {
-          // Open and streaming while the model is still thinking this block;
-          // collapsed once it is done (the answer proper has begun).
-          return (
-            <Reasoning
-              key={index}
-              text={part.text}
-              active={streaming && part.state !== "done"}
-            />
-          );
-        }
-        if (part.type === "text") {
-          return message.role === "user" ? (
-            <Question
-              key={index}
-              text={part.text}
-              attached={attachedQuotes(message.metadata)}
-            />
-          ) : (
-            <Markdown key={index} text={part.text} />
-          );
-        }
-        if (isToolUIPart(part)) {
-          return <ToolChip key={index} part={part} />;
-        }
-        return null;
-      })}
-    </article>
-  );
-});
+function turns(messages: UIMessage[]): UIMessage[][] {
+  const grouped: UIMessage[][] = [];
+  for (const message of messages) {
+    const last = grouped.at(-1);
+    if (message.role === "assistant" && last?.[0].role === "assistant") last.push(message);
+    else grouped.push([message]);
+  }
+  return grouped;
+}
+
+/**
+ * One turn of the transcript. Memoised so a settled turn does not re-render
+ * while a later one streams: the SDK clones only the streaming message, so the
+ * messages of settled turns keep their references — compared one by one,
+ * since the list holding them is rebuilt per render — and only the streaming
+ * turn carries `streaming`. Even were a settled turn to re-render, its
+ * `Markdown` is memoised on unchanged text and would not re-parse. The stream
+ * itself is throttled at the source (`ChatPanel`'s `experimental_throttle`).
+ */
+const Turn = memo(
+  function Turn({
+    messages,
+    streaming,
+  }: {
+    messages: UIMessage[];
+    /** This is the answer being written right now: throttle its markdown. */
+    streaming: boolean;
+  }) {
+    const [first] = messages;
+    const mark = steerMark(first);
+    return (
+      <article
+        aria-label={first.role === "user" ? "You" : "Tutor"}
+        // A turn rises into place as it is added. The answer inside it is
+        // written a token at a time and does not animate: the element is there
+        // from the first token, and this only plays on the node React inserts.
+        className={`transition-[opacity,translate] duration-(--motion-base) starting:translate-y-1.5 starting:opacity-0 ${
+          first.role === "user"
+            ? "ml-auto w-fit max-w-[85%] rounded-md bg-accent/10 px-3 py-2"
+            : ""
+        }`}
+      >
+        {first.role === "assistant" && (
+          <Activity messages={messages} streaming={streaming} />
+        )}
+        {messages.flatMap((message) =>
+          message.parts.map((part, index) => {
+            if (part.type !== "text") return null;
+            return message.role === "user" ? (
+              <Question
+                key={`${message.id}:${index}`}
+                text={part.text}
+                attached={attachedQuotes(message.metadata)}
+              />
+            ) : (
+              <Markdown key={`${message.id}:${index}`} text={part.text} />
+            );
+          }),
+        )}
+        {/* Sent while the tutor answered, and not yet read by it. */}
+        {(mark === "queued" || mark === "returned") && (
+          <p className={`${LABEL_CLASS} mt-1`}>queued</p>
+        )}
+      </article>
+    );
+  },
+  (before, after) =>
+    before.streaming === after.streaming &&
+    before.messages.length === after.messages.length &&
+    before.messages.every((message, index) => message === after.messages[index]),
+);
 
 /**
  * The question is in and nothing has come back yet: three dots waiting where
@@ -138,14 +156,18 @@ export default function Messages({
   messages,
   chatId,
   status,
+  column,
 }: {
   messages: UIMessage[];
   /** Which conversation this is. The component is not remounted between two. */
   chatId: string;
   status: ChatStatus;
+  /** The reading column, which the panel resizes. */
+  column?: RefObject<HTMLDivElement | null>;
 }) {
   const view = useRef<HTMLDivElement>(null);
   const following = useRef(true);
+  const grouped = turns(messages);
 
   // Reading something further up is the only thing that unpins the transcript,
   // and neither of the two below is that — so both put it back. Nothing else
@@ -185,8 +207,8 @@ export default function Messages({
       // its scroll into the page behind the panel.
       className="flex-1 overflow-y-auto overscroll-contain px-4 py-3"
     >
-      {/* Expanded, the panel is far wider than a column of prose should be. */}
-      <div className="mx-auto max-w-2xl">
+      {/* The reading column: `ChatPanel` sets how wide, and drags it. */}
+      <div ref={column} className="mx-auto max-w-(--chat-column)">
         <div className="space-y-4">
           {messages.length === 0 && (
             <p className="text-sm text-faint">
@@ -194,7 +216,7 @@ export default function Messages({
               <code>/compact</code> summarises this one.
             </p>
           )}
-          {messages.map((message, turn) => (
+          {grouped.map((group, turn) => (
             <Turn
               // By position, not by id: the backend gives every stored question
               // of every chat the same id — it derives one from fields a
@@ -203,13 +225,13 @@ export default function Messages({
               // nodes. A transcript is only ever appended to, which makes
               // position one.
               key={turn}
-              message={message}
+              messages={group}
               // The last turn, while the run streams, is the answer being
               // written: throttle its markdown. Everything above it is settled.
               streaming={
                 status === "streaming" &&
-                turn === messages.length - 1 &&
-                message.role === "assistant"
+                turn === grouped.length - 1 &&
+                group[0].role === "assistant"
               }
             />
           ))}

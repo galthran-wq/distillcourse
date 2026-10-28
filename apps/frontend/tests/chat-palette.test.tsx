@@ -11,7 +11,7 @@ stubResizeObserver();
 stubScrollIntoView();
 
 describe("the command palette", () => {
-  const { host, composer, field, press, options, listed, reloads, sent } = composing();
+  const { host, field, press, options, listed, reloads, sent } = composing();
 
   function send(): HTMLButtonElement {
     const button = host().querySelector<HTMLButtonElement>('[aria-label="Send"]');
@@ -180,15 +180,6 @@ describe("the command palette", () => {
 
     expect(sent).toEqual(["/compact"]);
   });
-
-  it("stays away while the tutor is answering", () => {
-    composer(true);
-
-    type(field(), "/");
-
-    // Nothing can be sent in the middle of a run, a command included.
-    expect(listed()).toEqual([]);
-  });
 });
 
 const SUMMARY: ChatSummary = {
@@ -197,6 +188,7 @@ const SUMMARY: ChatSummary = {
   lab_lesson: null,
   model: "moonshotai/kimi-k3",
   title: "Entropy",
+  course: null,
   created_at: "2026-08-01T09:00:00Z",
   last_message_at: null,
 };
@@ -215,6 +207,7 @@ describe("the chat menu", () => {
           expanded={false}
           onSelect={() => {}}
           onNew={() => {}}
+          onMove={() => {}}
         />,
       ),
     );

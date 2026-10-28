@@ -17,6 +17,7 @@ function chat(id: string, last: string | null): ChatSummary {
     lab_lesson: null,
     model: "moonshotai/kimi-k3",
     title: `chat ${id}`,
+    course: null,
     created_at: "2026-07-01T09:00:00Z",
     last_message_at: last,
   };

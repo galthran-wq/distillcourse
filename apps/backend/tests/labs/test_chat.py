@@ -127,7 +127,7 @@ async def test_a_question_streams_its_answer_and_ends_with_the_chat_link(
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
     [chat] = await lab_chats(session, user)
-    assert (chat.kind, chat.lab_lesson) == ("lab", LESSON)
+    assert (chat.kind, chat.lab_lesson, chat.course) == ("lab", LESSON, COURSE)
     assert answer(response.text) == "the log goes the other way round"
     assert events(response.text)[-1] == {
         "type": "done",
@@ -164,7 +164,7 @@ async def test_clearing_starts_a_new_chat_the_next_question_continues(
         "chat_id": str(new.id),
         "url": f"{settings.FRONTEND_HOST}/courses/{COURSE}/lessons/{SLUG}?chat={new.id}",
     }
-    assert (new.kind, new.lab_lesson) == ("lab", LESSON)
+    assert (new.kind, new.lab_lesson, new.course) == ("lab", LESSON, COURSE)
     assert seen[-1] == ["and is my binning ok?"]
     # The old conversation is kept, not cut: it is still a chat on the site.
     assert old.id != new.id
@@ -358,6 +358,21 @@ async def test_a_lab_chat_continued_on_the_site_keeps_its_lab(
     assert LAB_TOOLS <= offered[0]
     listed = (await signed_in.get("/api/v1/chats")).json()
     assert [(item["kind"], item["lab_lesson"]) for item in listed] == [("lab", LESSON)]
+
+
+async def test_a_lab_chat_is_listed_under_its_labs_course(
+    signed_in: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    repo = HarnessRepository(session, user.id)
+    lab = await repo.lab_chat(LESSON)
+    general = await repo.create_chat(kind="web")
+
+    async def listed(query: str) -> list[str]:
+        response = await signed_in.get(f"/api/v1/chats{query}")
+        return [item["id"] for item in response.json()]
+
+    assert await listed(f"?course={COURSE}") == [str(lab.id)]
+    assert await listed("?course=") == [str(general.id)]
 
 
 async def test_the_lab_prompt_and_the_notebook_medium_reach_the_model(

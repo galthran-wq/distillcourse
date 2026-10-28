@@ -23,6 +23,7 @@ app/
     routes/chats.py  # chat CRUD + the Vercel AI data stream
     routes/lessons.py # per-lesson user state: rating, bookmark
     routes/profile.py # bookmarks for the profile page
+    routes/progress.py # GET /progress: read/started per lesson, for the course pages
     routes/telemetry.py # reading events in, the activity grid and its feed out
     routes/settings.py # the learner's own settings, pairing included
     routes/telegram.py # POST /api/tg/webhook — Telegram's only entry point
@@ -39,7 +40,8 @@ app/
     repository.py    # user-scoped reads and writes over chats and messages
     usage.py         # the shape of messages.usage, written once, read by caps
     limits.py        # the daily cap, the monthly ceiling, the web search cap
-    runner.py        # claim, persist, stream, compact
+    runner.py        # claim, persist, stream, stop, compact
+    steering.py      # messages a web run takes while it answers
     title.py         # naming a chat, and naming it again as it moves on
   core/
     config.py        # pydantic-settings; env vars only, no .env reading
@@ -82,6 +84,8 @@ app/
   models.py          # SQLAlchemy 2.0 declarative tables
   crud.py            # user reads/writes
   lessons/state.py   # what a user did to a lesson: rating, bookmark
+  lessons/progress.py # read/started per lesson: telemetry's completion, a lab's
+                     # required checkpoints in place of it
   content/           # the indexed corpus: ingest CLI, FTS search, course spine
   telemetry/         # reading events, the lesson aggregate, completion, the
                      # reading days behind the activity grid and its feed
@@ -127,6 +131,19 @@ uv run python -m app.cli deactivate-user someone@example.com  # revokes sessions
                                                               # lab tokens, keeps what
                                                               # it wrote
 uv run python -m app.cli activate-user someone@example.com    # opens it again
+```
+
+Chats are filed under the course of the page they were started on
+(`chats.course`, NULL is "General"). The chats from before that column were
+filed once, by hand: `propose-chat-courses` prints `chat_id, title, proposed
+course, evidence, first question` tab-separated, with `?` wherever the locators
+a chat carries disagree or are absent; a person settles every `?` to a course
+slug or `general`, and `file-chats` applies the settled file — refusing it
+whole while any row is undecided or names a course the index does not carry.
+
+```bash
+uv run python -m app.cli propose-chat-courses > chats.tsv
+uv run python -m app.cli file-chats chats.tsv
 ```
 
 ## Running
@@ -175,6 +192,21 @@ response, not the run. Messages are stored twice: as native pydantic-ai JSON,
 which is what the next run replays, and as the Vercel AI projection the widget
 renders. A failed run marks its rows, which keeps them on screen and out of
 the model's context.
+
+A web run can be stopped and steered while it streams, both through requests
+of their own — the stream stays one-way. The runs in flight are an in-process
+registry (`runner._runs`; the backend is one process). `POST
+/chats/{id}/stop` cancels the agent's part of the run and returns once what it
+had produced — the text streamed so far, the tool calls that completed — is
+stored like the turn of a run that died, unmarked and with what it cost,
+and the chat is free.
+`POST /chats/{id}/steer` queues a message for the run: a history processor on
+the tutor (`ProcessHistory`) appends it as a user request before the next model
+request, it is stored as a `user` row between the model messages it came
+between, and the stream announces it as a `data-steer` part. A steer still
+queued when the run makes its last request goes back to the client as
+`data-steer-unused`, ahead of the finish, to be sent as a turn; one sent with
+no run in flight is a 409 and the same thing.
 
 The history a run is given is the one in the database. A Vercel AI client
 posts every message it holds on every turn; `POST /chats/{id}/stream` takes
@@ -717,6 +749,13 @@ The **recently read** list beside the panel is a different question with a
 different source: `GET /profile` over `lesson_progress`, every lesson once by
 when it was last opened, as it always has been. The panel answers "which
 days"; that answers "which lessons".
+
+The course list and the course page ask a third question — how far through a
+course — of `GET /progress[?course=]`: every lesson the reader has started, as
+`read` or `started`, most recently seen first. Read is `completed_at` as
+telemetry wrote it, except on a lab, which is read only once its required
+checkpoints have passed and is started by a submission as much as by a visit
+(`app/lessons/progress.py`).
 
 ## Not here
 

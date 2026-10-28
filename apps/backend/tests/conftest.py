@@ -46,7 +46,10 @@ async def settled(*, raising: bool = True) -> None:
     back. A teardown asks for `raising=False`: a drain that died is the test's
     story to tell, not the fixture's.
     """
-    await asyncio.gather(*runner._drains, return_exceptions=not raising)
+    await asyncio.gather(
+        *list(runner._detached),
+        return_exceptions=not raising,
+    )
 
 
 @dataclass(frozen=True)

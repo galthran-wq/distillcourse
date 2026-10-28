@@ -13,7 +13,7 @@ import CommandPalette, {
   PALETTE_ID,
   commandRowId,
 } from "@/components/chat/CommandPalette";
-import { SendIcon } from "@/components/chat/icons";
+import { SendIcon, StopIcon } from "@/components/chat/icons";
 import MentionPalette, {
   MENTIONS_ID,
   MentionRow,
@@ -33,8 +33,12 @@ import { useSections } from "@/lib/content/sections";
 import { useDismiss } from "@/lib/ui/dismiss";
 
 interface Props {
-  /** A run is in flight: the chat takes one at a time. */
-  disabled: boolean;
+  /**
+   * A run is in flight. The field stays open — what is sent now steers the
+   * answer — and the send button is the way to stop it.
+   */
+  busy: boolean;
+  onStop: () => void;
   /** The passages come with the text: they are what the question is about. */
   onSubmit: (text: string, quotes: Quote[]) => void;
   /** The model picker in the footer reads these; the menu no longer carries it. */
@@ -43,7 +47,14 @@ interface Props {
   onModel: (id: string) => void;
 }
 
-export default function Composer({ disabled, onSubmit, models, model, onModel }: Props) {
+export default function Composer({
+  busy,
+  onStop,
+  onSubmit,
+  models,
+  model,
+  onModel,
+}: Props) {
   // Outside the component, so that an unsent message survives a reload.
   const text = useDraft();
   const quotes = useQuotes();
@@ -51,7 +62,7 @@ export default function Composer({ disabled, onSubmit, models, model, onModel }:
   const sections = useSections();
   const field = useRef<HTMLTextAreaElement>(null);
   const column = useRef<HTMLDivElement>(null);
-  const ready = !disabled && text.trim() !== "";
+  const ready = text.trim() !== "";
 
   // What either list offers is the draft read at the caret, not a state of its
   // own. Whether one is up at all is one, and typing is what puts it there:
@@ -93,7 +104,7 @@ export default function Composer({ disabled, onSubmit, models, model, onModel }:
             <MentionPalette mentions={places} active={row} onPick={insert} />
           ),
         };
-  const open = offered && list.rows > 0 && !disabled;
+  const open = offered && list.rows > 0;
   // The list shortens as the reader types; the highlight cannot outrun it.
   const active = Math.min(chosen, list.rows - 1);
 
@@ -203,6 +214,12 @@ export default function Composer({ disabled, onSubmit, models, model, onModel }:
     // Enter sends, shift+Enter breaks the line — a chat input, not a form
     // field. What it sends with a list up is `submit`'s to say.
     if (event.key === "Enter" && !event.shiftKey) submit(event);
+    // With nothing over the field, Escape is the stop button's — and spent on
+    // it, not handed on to the expanded panel, which would collapse.
+    if (event.key === "Escape" && busy && !open) {
+      event.stopPropagation();
+      onStop();
+    }
   }
 
   function type(draft: string, at: number): void {
@@ -221,7 +238,7 @@ export default function Composer({ disabled, onSubmit, models, model, onModel }:
           since it is about the line being written rather than them. It is the
           list's extent too — a press anywhere in here is aimed at the message
           being written and leaves the list up. */}
-      <div ref={column} className="relative mx-auto max-w-2xl">
+      <div ref={column} className="relative mx-auto max-w-(--chat-column)">
         {open && list.palette(active)}
         {quotes.length > 0 && (
           <QuoteRow>
@@ -268,7 +285,7 @@ export default function Composer({ disabled, onSubmit, models, model, onModel }:
               aria-expanded={open || undefined}
               aria-controls={open ? list.id : undefined}
               aria-activedescendant={open ? list.rowId(active) : undefined}
-              placeholder={disabled ? "the tutor is answering…" : "Ask about this section"}
+              placeholder={busy ? "Add to your question…" : "Ask about this section"}
               // Geometry only: the fill, the line and the ring are the box's.
               className={`${FIELD_BOX_INPUT_CLASS} max-h-36 min-h-9 w-full resize-none overflow-y-auto px-1.5 py-1`}
             />
@@ -276,18 +293,24 @@ export default function Composer({ disabled, onSubmit, models, model, onModel }:
               <ModelPicker
                 models={models}
                 current={model}
-                disabled={disabled}
+                disabled={busy}
                 onModel={onModel}
               />
-              <Button
-                type="submit"
-                variant="solid"
-                size="icon"
-                disabled={!ready}
-                aria-label="Send"
-              >
-                <SendIcon />
-              </Button>
+              {busy ? (
+                <Button variant="outline" size="icon" onClick={onStop} aria-label="Stop">
+                  <StopIcon />
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  variant="solid"
+                  size="icon"
+                  disabled={!ready}
+                  aria-label="Send"
+                >
+                  <SendIcon />
+                </Button>
+              )}
             </div>
           </div>
         </div>

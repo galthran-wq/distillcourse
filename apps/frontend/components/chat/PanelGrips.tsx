@@ -9,7 +9,7 @@ import { startPanelDrag } from "@/lib/chat/panel-box";
  * that lands on the corner. Under the menu, which is z-50 and hangs clear of
  * all three anyway.
  */
-const GRIP = "absolute z-10 touch-none max-sm:hidden";
+export const GRIP = "absolute z-10 touch-none max-sm:hidden";
 
 /**
  * The two edges of the docked panel that face into the page, and the corner

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, createRef } from "react";
 import { Chat } from "@ai-sdk/react";
-import type { UIMessage } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ChatPanel, { RENAME_MS } from "@/components/chat/ChatPanel";
 import type { ChatSummary } from "@/lib/chat/api";
@@ -21,6 +21,7 @@ const SUMMARY: ChatSummary = {
   lab_lesson: null,
   model: "moonshotai/kimi-k3",
   title: "what is entropy?",
+  course: "info-theory",
   created_at: "2026-08-07T09:00:00Z",
   last_message_at: "2026-08-07T09:00:00Z",
 };
@@ -28,6 +29,8 @@ const SUMMARY: ChatSummary = {
 /** What the listing route answers with, changed between one call and the next. */
 let listing: ChatSummary[] = [];
 let listings = 0;
+/** The listing URLs asked for, in order. */
+let asked: string[] = [];
 
 function serve(): void {
   vi.stubGlobal(
@@ -36,7 +39,7 @@ function serve(): void {
       const body =
         url.endsWith("/chats/models") || url.endsWith("/messages")
           ? []
-          : ((listings += 1), listing);
+          : ((listings += 1), asked.push(url), listing);
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -48,7 +51,7 @@ function serve(): void {
 const { host, render } = mounted();
 
 /** The panel expanded, so the rail is on screen and its rows can be read. */
-async function panel(): Promise<void> {
+async function panel(expanded = true): Promise<void> {
   const session = {
     summary: SUMMARY,
     chat: new Chat<UIMessage>({ id: SUMMARY.id, messages: [] }),
@@ -57,7 +60,12 @@ async function panel(): Promise<void> {
     render(
       <SectionsProvider value={SECTIONS}>
         <LessonsProvider value={LESSONS}>
-          <ChatPanel session={session} panel={createRef<HTMLElement>()} expanded />
+          <ChatPanel
+            session={session}
+            course="info-theory"
+            panel={createRef<HTMLElement>()}
+            expanded={expanded}
+          />
         </LessonsProvider>
       </SectionsProvider>,
     ),
@@ -75,6 +83,7 @@ beforeEach(() => {
   listing = [SUMMARY];
   listings = 0;
   push.mockReset();
+  asked = [];
   serve();
   vi.useFakeTimers({ shouldAdvanceTime: true });
 });
@@ -145,5 +154,74 @@ describe("a lab chat in the rail", () => {
     await act(async () => row?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 
     expect(push).not.toHaveBeenCalled();
+  });
+});
+
+describe("which chats the panel lists", () => {
+  it("docked, only the page's course", async () => {
+    await panel(false);
+
+    expect(asked).toEqual(["/api/v1/chats?course=info-theory"]);
+  });
+
+  it("expanded, every chat, filed in folders with the page's open", async () => {
+    await panel();
+
+    expect(asked).toEqual(["/api/v1/chats"]);
+    expect(host().querySelector("nav section button")?.getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+  });
+});
+
+describe("stopping the tutor", () => {
+  it("aborts the stream and tells the backend, which owns the run", async () => {
+    const posted: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit = {}) => {
+        if ((init.method ?? "GET") === "POST") posted.push(url);
+        // The answer never comes: the run is in flight until it is stopped.
+        if (url.endsWith("/stream"))
+          return new Promise<Response>((_, reject) =>
+            init.signal?.addEventListener("abort", () =>
+              reject(new DOMException("aborted", "AbortError")),
+            ),
+          );
+        const body = url.endsWith("/chats/models") ? [] : listing;
+        return new Response(init.method === "POST" ? null : JSON.stringify(body), {
+          status: url.endsWith("/stop") ? 204 : 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+    const chat = new Chat<UIMessage>({
+      id: SUMMARY.id,
+      messages: [],
+      transport: new DefaultChatTransport({ api: "/api/v1/chats/c1/stream" }),
+    });
+    await act(async () =>
+      render(
+        <SectionsProvider value={SECTIONS}>
+          <LessonsProvider value={LESSONS}>
+            <ChatPanel
+              session={{ summary: SUMMARY, chat }}
+              course="info-theory"
+              panel={createRef<HTMLElement>()}
+              expanded={false}
+            />
+          </LessonsProvider>
+        </SectionsProvider>,
+      ),
+    );
+    await act(async () => {
+      void chat.sendMessage({ text: "why?" });
+    });
+
+    const stop = host().querySelector<HTMLButtonElement>('[aria-label="Stop"]')!;
+    await act(async () => stop.click());
+
+    expect(posted).toContain("/api/v1/chats/c1/stop");
+    await vi.waitFor(() => expect(chat.status).toBe("ready"));
   });
 });

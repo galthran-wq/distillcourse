@@ -9,6 +9,7 @@ from pydantic_ai.ui.vercel_ai import VercelAIAdapter
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.content.locators import course_of
 from app.core.config import settings
 from app.harness.usage import INPUT_TOKENS, OUTPUT_TOKENS, WEB_SEARCH_CALLS
 from app.models import Chat, Incident, Message, User
@@ -56,6 +57,7 @@ class HarnessRepository:
         *,
         kind: Literal["web", "telegram", "lab"],
         model: str | None = None,
+        course: str | None = None,
         lab_lesson: str | None = None,
     ) -> Chat:
         # The newest lab chat is the one a question continues, so its stamp has
@@ -66,6 +68,8 @@ class HarnessRepository:
             user_id=self.user_id,
             kind=kind,
             model=model or settings.DEFAULT_CHAT_MODEL,
+            # A lab chat is filed under its lab's course, wherever it was asked.
+            course=course_of(lab_lesson) if lab_lesson else course,
             lab_lesson=lab_lesson,
             **stamp,
         )
@@ -102,9 +106,12 @@ class HarnessRepository:
         )
         return chat
 
-    async def list_chats(self) -> list[tuple[Chat, datetime | None]]:
+    async def list_chats(
+        self, course: str | None = None
+    ) -> list[tuple[Chat, datetime | None]]:
         """Every chat of this learner with the moment it was last written in,
-        most recently used first.
+        most recently used first — or only those filed under `course`, where
+        "" is the chats filed under none.
 
         The date is a maximum over the chat's own messages rather than a column
         kept on it: the listing is the only reader, and a maximum cannot fall
@@ -123,16 +130,25 @@ class HarnessRepository:
             .group_by(Message.chat_id)
             .subquery()
         )
-        rows = await self.session.execute(
+        statement = (
             select(Chat, last.c.at)
             .outerjoin(last, last.c.chat_id == Chat.id)
             .where(Chat.user_id == self.user_id)
             .order_by(func.coalesce(last.c.at, Chat.created_at).desc())
         )
+        if course is not None:
+            statement = statement.where(
+                Chat.course.is_(None) if course == "" else Chat.course == course
+            )
+        rows = await self.session.execute(statement)
         return list(rows.tuples().all())
 
     async def set_model(self, chat: Chat, model: str) -> None:
         chat.model = model
+        await self.session.commit()
+
+    async def set_course(self, chat: Chat, course: str | None) -> None:
+        chat.course = course
         await self.session.commit()
 
     async def claim_run(self, chat: Chat, run_id: uuid.UUID) -> bool:

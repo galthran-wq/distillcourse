@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
+import { lessonParts } from "@/lib/content/locator";
 import type { LessonLink } from "@/lib/content/site";
 
 /** Every lesson the site renders, keyed by its `lesson:` locator. */
@@ -18,4 +19,17 @@ export const LessonsProvider = context.Provider;
 
 export function useLessons(): Lessons {
   return useContext(context);
+}
+
+/**
+ * Every course with a readable lesson, slug to title, in the site's order.
+ * The lesson set is all the client is handed, and each lesson names its course.
+ */
+export function courseNames(lessons: Lessons): Map<string, string> {
+  const named = new Map<string, string>();
+  for (const [key, link] of Object.entries(lessons)) {
+    const path = lessonParts(key);
+    if (path !== null && !named.has(path.course)) named.set(path.course, link.course);
+  }
+  return named;
 }

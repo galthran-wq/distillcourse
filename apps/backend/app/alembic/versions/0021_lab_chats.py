@@ -1,7 +1,7 @@
 """lab chats: a chat per lab, and the reference solutions the tutor reads
 
-Revision ID: 0020
-Revises: 0019
+Revision ID: 0021
+Revises: 0020
 Create Date: 2026-10-28
 
 """
@@ -9,8 +9,8 @@ Create Date: 2026-10-28
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0020"
-down_revision = "0019"
+revision = "0021"
+down_revision = "0020"
 branch_labels = None
 depends_on = None
 
@@ -37,7 +37,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("lab_solutions")
     op.drop_index("ix_chats_user_id_lab_lesson_created_at", table_name="chats")
-    # Before 0020 the site lists and runs web chats only: a lab conversation
+    # Before 0021 the site lists and runs web chats only: a lab conversation
     # kept as one is still readable rather than stranded.
     op.execute("UPDATE chats SET kind = 'web' WHERE kind = 'lab'")
     op.drop_column("chats", "lab_lesson")

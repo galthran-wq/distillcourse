@@ -6,7 +6,7 @@ import { answered } from "@/lib/load";
 
 /**
  * Loads something that exists only for a signed-in reader; `null` until it is
- * there. One copy of the rule, so what "not loaded" means cannot drift between
+ * there, and again once they sign out. One copy of the rule, so what "not loaded" means cannot drift between
  * the profile and the lesson controls.
  *
  * `load` must be a stable reference (a module function) — it is an effect
@@ -24,5 +24,5 @@ export function useSignedIn<T>(
     return answered(load(key), setValue);
   }, [auth.status, load, key]);
 
-  return [value, setValue];
+  return [auth.status === "signed-in" ? value : null, setValue];
 }
