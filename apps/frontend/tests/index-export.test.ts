@@ -9,6 +9,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
 import rehypePrettyCode from "rehype-pretty-code";
+import { Conclusion } from "@/components/mdx/Blocks";
 import { courseDocuments, type IndexDocument } from "@/lib/content/index-export";
 import type { LoadedCourse, LoadedLesson } from "@/lib/content/load";
 
@@ -59,6 +60,12 @@ const LESSON_MDX = [
   "</Exercise>",
   "",
   "#### Deep heading",
+  "",
+  "<Conclusion>",
+  "",
+  "The closing word.",
+  "",
+  "</Conclusion>",
   "",
 ].join("\n");
 
@@ -128,7 +135,7 @@ function lessonChunks(docs: IndexDocument[], slug: string): IndexDocument[] {
 }
 
 /** The lesson page's pipeline, verbatim — the reference for the slug gate. */
-async function renderedHeadingIds(mdx: string): Promise<string[]> {
+async function renderedIds(mdx: string): Promise<string[]> {
   const { default: MDXContent } = await evaluate(mdx, {
     ...runtime,
     remarkPlugins: [remarkGfm, remarkMath],
@@ -151,10 +158,11 @@ async function renderedHeadingIds(mdx: string): Promise<string[]> {
         Ref: passthrough,
         Figure: () => null,
         Demo: () => null,
+        Conclusion,
       },
     }),
   );
-  return [...html.matchAll(/<h[1-6][^>]*\bid="([^"]*)"/g)].map((m) => m[1]);
+  return [...html.matchAll(/<[a-z][^>]*\sid="([^"]*)"/g)].map((m) => m[1]);
 }
 
 afterEach(() => {
@@ -166,12 +174,13 @@ describe("courseDocuments", () => {
     vi.stubEnv("CONTENT_PREVIEW", "1");
     const anchors = lessonChunks(exportDocuments(), "main").flatMap((d) => d.anchors);
 
-    expect(anchors).toEqual(await renderedHeadingIds(LESSON_MDX));
+    expect(anchors).toEqual(await renderedIds(LESSON_MDX));
     // Not vacuous: the adversarial cases are all in there.
     expect(anchors).toContain("setup");
     expect(anchors).toContain("setup-1");
     expect(anchors).toContain("inside-a-block");
     expect(anchors).toContain("deep-heading");
+    expect(anchors).toContain("conclusion");
   });
 
   it("chunks a lesson into its h2 sections, h3s folded into their parent", () => {
@@ -187,6 +196,8 @@ describe("courseDocuments", () => {
     expect(chunks.map((c) => c.position)).toEqual([0, 1, 2, 3]);
     // An h3 anchor resolves to the chunk of the h2 containing it.
     expect(chunks[1].anchors).toEqual(["setup", "nested-detail"]);
+    // So does the conclusion's, which is a component's id and not a heading's.
+    expect(chunks[3].anchors).toContain("conclusion");
     expect(chunks[0].text).toBe("The lead paragraph, before any heading.");
     expect(chunks[3].breadcrumb).toBe(
       "Demo Course › Basics › The main lesson › Code and figures",

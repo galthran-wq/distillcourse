@@ -11,7 +11,7 @@ import { visit } from "unist-util-visit";
 import type { Root, RootContent, Element } from "hast";
 import { rawUrlBase } from "../labs/mirror";
 import type { LoadedCourse, LoadedLesson } from "./load";
-import { lessonKey, type Corpus } from "./locator";
+import { CONCLUSION_ANCHOR, lessonKey, type Corpus } from "./locator";
 import { isMdxJsxNode, stringAttr, type MdxJsxNode } from "./mdx-jsx";
 import { isReadable } from "./visibility";
 
@@ -224,11 +224,16 @@ function headingText(node: Element): string {
   return render(segments);
 }
 
-/** Every id rehype-slug put on the subtree — the chunk's usable anchors. */
+/** Every id the page carries within the subtree — the chunk's usable anchors. */
 function anchorsIn(nodes: RootContent[]): string[] {
   const found: string[] = [];
-  visit(treeOf(nodes), "element", (node: Element) => {
-    if (typeof node.properties?.id === "string") found.push(node.properties.id);
+  visit(treeOf(nodes), (node: unknown) => {
+    if (isMdxJsxNode(node)) {
+      if (node.name === "Conclusion") found.push(CONCLUSION_ANCHOR);
+      return;
+    }
+    const id = (node as Partial<Element>).properties?.id;
+    if (typeof id === "string") found.push(id);
   });
   return found;
 }
