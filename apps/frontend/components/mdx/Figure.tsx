@@ -1,7 +1,7 @@
-import { readFileSync } from "node:fs";
-import { basename, join, normalize } from "node:path";
+import { basename } from "node:path";
 import { figures } from "@/components/figures";
 import { creditFor, loadCredits } from "@/lib/content/credits";
+import { loadFigureSvg } from "@/lib/content/figure-svg";
 import { isRasterFile } from "@/lib/content/images";
 import SourcedImage, { resolveImage } from "./SourcedImage";
 
@@ -65,15 +65,7 @@ export default function Figure({
       );
     }
   } else if (src !== undefined) {
-    const rel = normalize(src.replace(/^\.\//, ""));
-    let svg: string | null = null;
-    if (!rel.startsWith("..")) {
-      try {
-        svg = readFileSync(join(lessonDir, rel), "utf8");
-      } catch {
-        svg = null;
-      }
-    }
+    const svg = loadFigureSvg(lessonDir, src);
     if (svg !== null) {
       body = (
         <div

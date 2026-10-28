@@ -28,6 +28,10 @@ composition rules. Gold example:
 - **Raw SVG** (simple plots/diagrams with few short labels): author
   `figures/<name>.svg` in the lesson dir per docs/figures.md; embed via
   `<Figure src="./figures/<name>.svg" …/>`.
+  Its `<style>` may use class and id selectors only — they are prefixed
+  per figure at inline time, while a type selector (`text{…}`, `svg{…}`)
+  would restyle the whole page; and it must be well-formed XML. Validate's
+  `figure-style-scope` rule enforces both (docs/figures.md §Anatomy).
 - **Sourced image** (the artefact tier): a real photograph, apparatus, page
   scan, portrait, or published plot of measured data — something a redrawing
   would falsify. You do not invent it and you do not redraw it: the reading
