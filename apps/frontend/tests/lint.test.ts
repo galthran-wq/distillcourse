@@ -200,6 +200,36 @@ describe("lintCourse", () => {
     expect(errors(lintDir(dir)).map((d) => d.rule)).toContain("figure-src");
   });
 
+  describe("figure-style-scope", () => {
+    const withStyle = (css: string) =>
+      brokenCopy((d) =>
+        rewrite(
+          join(d, "lessons/intro-surprise/figures/rarity.svg"),
+          'font-family="system-ui, sans-serif">',
+          `font-family="system-ui, sans-serif"><style>${css}</style>`,
+        ),
+      );
+    const scopeErrors = (dir: string) =>
+      errors(lintDir(dir)).filter((d) => d.rule === "figure-style-scope");
+
+    it("flags a raw figure whose <style> has a type selector", () => {
+      const found = scopeErrors(withStyle(".muted { opacity: .5 } text { fill: currentColor }"));
+      expect(found).toHaveLength(1);
+      expect(found[0].message).toContain('"text"');
+    });
+
+    it("passes a raw figure whose <style> uses only class and id selectors", () => {
+      expect(scopeErrors(withStyle(".muted { opacity: .5 } #arr .head { fill: red }"))).toEqual([]);
+    });
+
+    it("flags a raw figure that is not well-formed XML", () => {
+      const dir = brokenCopy((d) =>
+        rewrite(join(d, "lessons/intro-surprise/figures/rarity.svg"), "green-fixture", "x < 1"),
+      );
+      expect(scopeErrors(dir)[0].message).toContain("not well-formed XML");
+    });
+  });
+
   it("flags a sourced image with no credits entry (image-credit)", () => {
     const dir = brokenCopy((d) => {
       writeFileSync(join(d, "lessons/intro-surprise/figures/photo.png"), PNG_1PX);

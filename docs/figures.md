@@ -49,6 +49,16 @@ and always ships with its provenance. Three tiers:
   are inlined and must survive both themes. Secondary text uses
   `opacity="0.55"` (the `.muted` convention).
 - Font: `font-family="system-ui, sans-serif"`, sizes 11–14.
+- A `<style>` block may use class and id selectors only: no type selectors
+  (`text`, `svg`), no `*`, `:root` or attribute-only selectors — the
+  subject of every selector is one of the figure's own classes or ids. The
+  figure is inlined into the page, so at inline time every class and id in
+  it (with the selectors and `url(#…)`/`href="#…"` references that name
+  them) is prefixed with the lesson and file name; a type selector cannot be
+  prefixed and would restyle every element of that type on the page, KaTeX
+  included. Put inherited attributes such as `font-family` on the root
+  `<svg>`. The file must be well-formed XML (`&lt;` for a literal `<`).
+  `npm run validate` enforces both (`figure-style-scope`).
 - Palette (sparingly, on top of currentColor):
   - **Accent** `#e2903a` (amber) — the subject of the figure: the curve, the
     highlighted path, the current element.
