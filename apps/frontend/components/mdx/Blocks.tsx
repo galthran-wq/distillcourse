@@ -35,12 +35,51 @@ function Env({
   );
 }
 
+/**
+ * A stated result. Authors nest its <Proof> inside it; it is lifted out and
+ * set after the statement's closing rule, as a printed book does, since a
+ * rule cannot stop halfway down a section in CSS. Lemma, Proposition and
+ * Corollary share Theorem's counter (globals.css), as in amsthm.
+ */
+function Result({
+  kind,
+  title,
+  children,
+}: {
+  kind: string;
+  title?: string;
+  children: ReactNode;
+}) {
+  const parts = Children.toArray(children);
+  const isProof = (c: ReactNode) => isValidElement(c) && c.type === Proof;
+  return (
+    <>
+      <Env kind={kind} title={title}>
+        {parts.filter((c) => !isProof(c))}
+      </Env>
+      {parts.filter(isProof)}
+    </>
+  );
+}
+
 export function Definition(props: { title?: string; children: ReactNode }) {
   return <Env kind="definition" {...props} />;
 }
 
 export function Theorem(props: { title?: string; children: ReactNode }) {
-  return <Env kind="theorem" {...props} />;
+  return <Result kind="theorem" {...props} />;
+}
+
+export function Lemma(props: { title?: string; children: ReactNode }) {
+  return <Result kind="lemma" {...props} />;
+}
+
+export function Proposition(props: { title?: string; children: ReactNode }) {
+  return <Result kind="proposition" {...props} />;
+}
+
+export function Corollary(props: { title?: string; children: ReactNode }) {
+  return <Result kind="corollary" {...props} />;
 }
 
 export function Example(props: { title?: string; children: ReactNode }) {
@@ -104,7 +143,7 @@ export function References({
   );
 }
 
-/** Course-wide color roles (voita-playbook): rose = key takeaway. */
+/** The load-bearing fact of a section: the one environment with a fill. */
 export function KeyFact({ children }: { children: ReactNode }) {
   return (
     <section className="callout callout-keyfact">
@@ -118,19 +157,17 @@ export function KeyFact({ children }: { children: ReactNode }) {
  * The lesson's closing (L10c): what the reader can now do, and the problem
  * left open. It is the end of the chapter's prose rather than an aside, so it
  * is not boxed: a rule and a label are enough to make the end read as an end.
- * Accent, because it is the lesson's own voice rather than one of the role
- * colors.
  */
 export function Conclusion({ children }: { children: ReactNode }) {
   return (
     <section id={CONCLUSION_ANCHOR} className="conclusion">
-      <p className={`conclusion-label mb-2 ${LABEL_CLASS}`}>Conclusion</p>
+      <p className="conclusion-label">Conclusion</p>
       <div className="env-body">{children}</div>
     </section>
   );
 }
 
-/** Green = something the reader does right now (compute, try, check). */
+/** Something the reader does right now (compute, try, check). */
 export function Task({ children }: { children: ReactNode }) {
   return (
     <section className="callout callout-task">

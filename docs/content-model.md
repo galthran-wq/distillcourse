@@ -121,7 +121,7 @@ never duplicate them in the MDX. The body is a free-form textbook chapter:
 `##` sections (numbered automatically, listed in the right-hand contents
 sidebar), KaTeX math, and the component vocabulary from
 `docs/components.md`: numbered environments `Definition`, `Theorem`,
-`Proof`, `Example`, `Remark`; `Figure`, `Demo`, `Aside`; an `## Exercises`
+`Lemma`, `Proposition`, `Corollary`, `Proof`, `Example`, `Remark`; `Figure`, `Demo`, `Aside`; an `## Exercises`
 section of `<Exercise>` blocks with collapsible `<Solution>`s; a final
 `<References>` section.
 
