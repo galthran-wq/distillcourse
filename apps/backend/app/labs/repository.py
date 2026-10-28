@@ -1,11 +1,11 @@
 import secrets
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -237,23 +237,12 @@ class Lab:
     checkpoints: list[Checkpoint]
     data_files: list[str]
 
+    @property
+    def required(self) -> set[str]:
+        return {entry.id for entry in self.checkpoints if entry.required}
 
-async def lab(session: AsyncSession, lesson: str) -> Lab | None:
-    """What the index says this lab asks for, in display order.
 
-    The lesson's whole `lab` block is mirrored onto each of its chunks, so the
-    first chunk answers for the lesson — the same read `telemetry/progress.py`
-    makes for the word count.
-    """
-    meta: dict[str, Any] | None = await session.scalar(
-        select(Document.meta)
-        .where(search.chunks_of(lesson))
-        .order_by(Document.position)
-        .limit(1)
-    )
-    declared = (meta or {}).get("lab")
-    if declared is None:
-        return None
+def _declared(block: dict[str, Any]) -> Lab:
     return Lab(
         checkpoints=[
             Checkpoint(
@@ -262,12 +251,78 @@ async def lab(session: AsyncSession, lesson: str) -> Lab | None:
                 text=entry["text"],
                 required=entry["required"],
             )
-            for entry in sorted(declared["checkpoints"], key=lambda e: e["order"])
+            for entry in sorted(block["checkpoints"], key=lambda e: e["order"])
         ],
         # A lesson indexed before the field existed lists none rather than
         # costing the whole lab its manifest.
-        data_files=declared.get("data_files", []),
+        data_files=block.get("data_files", []),
     )
+
+
+async def labs(session: AsyncSession, lessons: Collection[str]) -> dict[str, Lab]:
+    """What the index says each of these labs asks for, in display order. A
+    lesson that is not a lab is absent.
+
+    The lesson's whole `lab` block is mirrored onto each of its chunks, so the
+    first chunk answers for the lesson — the same read `telemetry/progress.py`
+    makes for the word count.
+    """
+    if not lessons:
+        return {}
+    rows = await session.execute(
+        select(Document.locator, Document.meta["lab"])
+        .where(or_(*(search.chunks_of(lesson) for lesson in lessons)))
+        .order_by(Document.position)
+    )
+    first: dict[str, dict[str, Any] | None] = {}
+    for locator, block in rows:
+        first.setdefault(locator.partition("#")[0], block)
+    return {
+        lesson: _declared(block) for lesson, block in first.items() if block is not None
+    }
+
+
+async def lab(session: AsyncSession, lesson: str) -> Lab | None:
+    return (await labs(session, [lesson])).get(lesson)
+
+
+async def finished(
+    session: AsyncSession, user_id: uuid.UUID, lessons: Collection[str]
+) -> dict[str, bool]:
+    """Which of these lessons are labs, and whether this learner has finished
+    each: every required checkpoint passed — the bar `submit` finishes a lab
+    by, so a lab with nothing required is never finished here either."""
+    declared = await labs(session, lessons)
+    if not declared:
+        return {}
+    passed: dict[str, set[str]] = {lesson: set() for lesson in declared}
+    for lesson, checkpoint in await session.execute(
+        select(LabCheckpointState.lesson, LabCheckpointState.checkpoint).where(
+            LabCheckpointState.user_id == user_id,
+            LabCheckpointState.lesson.in_(declared),
+            LabCheckpointState.passed_at.is_not(None),
+        )
+    ):
+        passed[lesson].add(checkpoint)
+    return {
+        lesson: bool(entry.required) and entry.required <= passed[lesson]
+        for lesson, entry in declared.items()
+    }
+
+
+async def submitted(
+    session: AsyncSession, user_id: uuid.UUID, *, course: str | None = None
+) -> dict[str, datetime]:
+    """Every lab this learner has submitted to, with when they last did — a
+    notebook is worked in without the lesson page open, so the page's events
+    alone would not know the lab was started."""
+    statement = select(LabSubmission.lesson, func.max(LabSubmission.created_at)).where(
+        LabSubmission.user_id == user_id
+    )
+    if course is not None:
+        statement = statement.where(progress.in_course(LabSubmission.lesson, course))
+    rows = await session.execute(statement.group_by(LabSubmission.lesson))
+    return dict(rows.tuples().all())
 
 
 async def challenges(session: AsyncSession, lesson: str) -> dict[str, LabChallenge]:
@@ -498,11 +553,7 @@ async def _completion(
     session: AsyncSession, user_id: uuid.UUID, lesson: str
 ) -> Completion:
     declared = await lab(session, lesson)
-    required = (
-        {entry.id for entry in declared.checkpoints if entry.required}
-        if declared is not None
-        else set()
-    )
+    required = declared.required if declared is not None else set()
     passed = await states(session, user_id, lesson)
     return Completion(
         passed_required=sum(
