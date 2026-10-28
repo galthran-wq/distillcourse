@@ -162,7 +162,7 @@ async function renderedIds(mdx: string): Promise<string[]> {
       },
     }),
   );
-  return [...html.matchAll(/<[a-z][^>]*\bid="([^"]*)"/g)].map((m) => m[1]);
+  return [...html.matchAll(/<[a-z][^>]*\sid="([^"]*)"/g)].map((m) => m[1]);
 }
 
 afterEach(() => {
