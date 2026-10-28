@@ -104,6 +104,8 @@ export interface LessonView {
   moduleTitle: string;
   prev?: LoadedLesson;
   next?: LoadedLesson;
+  /** Every lesson in course.yaml, planned ones too: the "of" in "04 of 32". */
+  total: number;
 }
 
 export function getLessonView(
@@ -126,5 +128,6 @@ export function getLessonView(
     moduleTitle,
     prev: at > 0 ? readable[at - 1] : undefined,
     next: at < readable.length - 1 ? readable[at + 1] : undefined,
+    total: course.lessons.length,
   };
 }
