@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field
 
 from app.content import locators
 
@@ -54,6 +54,13 @@ class Submission(BaseModel):
     checkpoint: Checkpoint
     content_version: ContentVersion
     payload: Any
+    # The checked function as the notebook read it, for the review that follows
+    # the verdict; null where the source cannot be read, and absent from a
+    # client older than the review. Held to an attachment's cap by clamping
+    # rather than refusing: nothing about the review may cost the verdict.
+    source: (
+        Annotated[str, AfterValidator(lambda text: text[:ATTACHMENT_CHARS])] | None
+    ) = None
 
 
 class Completion(BaseModel):
@@ -133,13 +140,20 @@ class Ask(BaseModel):
     attachments: Annotated[list[Attachment], Field(max_length=ATTACHMENTS)] = []
 
 
+class CheckReview(BaseModel):
+    """`distill.check` asking for the review of the verdict it just printed:
+    the submission it posted names everything the review reads."""
+
+    submission_id: uuid.UUID
+
+
 class LabChat(BaseModel):
     chat_id: uuid.UUID
     # Where the chat opens on the site: the lab's lesson page.
     url: str
 
 
-# The answer to an `Ask`, one of these per `data:` line. Four events and
+# The answer to an `Ask` or a `CheckReview`, one of these per `data:` line. Four events and
 # nothing else: a notebook renders a line of steps and a growing answer, and a
 # client that must stay httpx + numpy has no use for the web chat's protocol.
 class StepEvent(BaseModel):

@@ -67,7 +67,7 @@ async def moved_on(
 def counting(text: str, calls: list[str]) -> FunctionModel:
     """A model that records having been reached.
 
-    A naming pass runs inside `_guarded`, so a title left unchanged is not on
+    A naming pass runs inside `guarded`, so a title left unchanged is not on
     its own evidence that no completion was paid for.
     """
 

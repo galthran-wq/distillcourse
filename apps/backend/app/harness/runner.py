@@ -60,7 +60,7 @@ def _finished(task: asyncio.Task[None]) -> None:
     returned long ago, so the traceback is only ever seen if it is logged."""
     _drains.discard(task)
     if not task.cancelled() and task.exception() is not None:
-        logfire.error("the drain of a chat run died", _exc_info=task.exception())
+        logfire.error("a detached run died", _exc_info=task.exception())
 
 
 def _prompt_text(messages: Sequence[ModelMessage]) -> str:
@@ -262,7 +262,7 @@ async def _close_run(
         await repo.fail_run(chat, run_id, failure)
 
 
-async def _guarded(
+async def guarded(
     work: Coroutine[Any, Any, None], failure: str, run_id: uuid.UUID
 ) -> None:
     """Cleanup that must not raise.
@@ -313,8 +313,8 @@ async def _close_safely(
             "storing the turn of run {run_id} failed; retrying on a clean session",
             run_id=str(run_id),
         )
-    await _guarded(repo.session.rollback(), "rolling back run {run_id} failed", run_id)
-    await _guarded(store(), "storing the turn of run {run_id} failed", run_id)
+    await guarded(repo.session.rollback(), "rolling back run {run_id} failed", run_id)
+    await guarded(store(), "storing the turn of run {run_id} failed", run_id)
 
 
 async def run(
@@ -362,7 +362,7 @@ async def run(
         # Never the reason a caller sees a different exception: the claim is
         # released by its deadline anyway, and the run's own failure is the one
         # worth reporting.
-        await _guarded(
+        await guarded(
             repo.release_run(chat, run_id), "releasing run {run_id} failed", run_id
         )
     return result.output
@@ -442,7 +442,7 @@ async def _drain(
                     partial_text="".join(text),
                     failure=failure,
                 )
-                await _guarded(
+                await guarded(
                     repo.release_run(chat, run_id),
                     "releasing run {run_id} failed",
                     run_id,
@@ -454,16 +454,26 @@ async def _drain(
             # is everything the learner's next message needs.
             queue.put_nowait(None)
         if chat is not None and result is not None and failure is None:
-            await _guarded(
+            await guarded(
                 retitle(repo, chat, run_id, result.usage),
                 "renaming the chat after run {run_id} failed",
                 run_id,
             )
 
 
-async def _relay(queue: asyncio.Queue[BaseChunk | None]) -> AsyncGenerator[BaseChunk]:
-    while (chunk := await queue.get()) is not None:
-        yield chunk
+def detach(work: Coroutine[Any, Any, None]) -> None:
+    """Run work that must outlive the request that started it: a client that
+    walks away mid-stream stops reading, and the run still finishes and stores
+    what it produced."""
+    task = asyncio.create_task(work)
+    _drains.add(task)
+    task.add_done_callback(_finished)
+
+
+async def relay[T](queue: asyncio.Queue[T | None]) -> AsyncGenerator[T]:
+    """A detached run's output as the client reads it, ended by a None."""
+    while (item := await queue.get()) is not None:
+        yield item
 
 
 async def start_stream(
@@ -500,7 +510,7 @@ async def start_stream(
         _prefix(user_messages, attached)
     history = await _open_run(repo, chat, run_id, user_messages, medium, "user", prompt)
     queue: asyncio.Queue[BaseChunk | None] = asyncio.Queue()
-    task = asyncio.create_task(
+    detach(
         _drain(
             session_factory=session_factory,
             user_id=repo.user_id,
@@ -513,6 +523,4 @@ async def start_stream(
             queue=queue,
         )
     )
-    _drains.add(task)
-    task.add_done_callback(_finished)
-    return _relay(queue)
+    return relay(queue)
