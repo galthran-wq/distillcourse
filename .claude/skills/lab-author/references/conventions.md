@@ -8,7 +8,8 @@ file is the file-format contract.
 
 ```
 content/courses/<course>/lessons/<lesson>/
-  lesson.mdx          # short intro: goal, what gets built, prerequisites
+  lesson.mdx          # short intro: goal, what gets built, prerequisites (the page draws
+                      #   the Colab button and checklist ABOVE this text: refer to them as "above")
   solution.py         # the reference solution, jupytext percent format
   challenges.yaml     # verification contract
   pyproject.toml      # the lab's deps (direct, pinned)
