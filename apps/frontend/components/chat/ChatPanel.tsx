@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 
 import ChatFolders from "@/components/chat/ChatFolders";
 import ChatMenu from "@/components/chat/ChatMenu";
 import Composer from "@/components/chat/Composer";
-import Messages from "@/components/chat/Messages";
+import Messages, { turns } from "@/components/chat/Messages";
 import { GRIP } from "@/components/chat/PanelGrips";
 import {
   CloseIcon,
@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui";
 import {
   listModels,
+  loadMessages,
   siteChats,
   stopChat,
   type ChatModel,
@@ -89,6 +90,10 @@ export default function ChatPanel({ session, course, panel, expanded }: Props) {
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [menu, setMenu] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // Client state only: a stopped turn is stored unmarked, so a reload shows the
+  // partial answer without it. Keyed by chat as well as by position — the
+  // stored transcript arrives after a round trip the reader can switch chats in.
+  const [stopped, setStopped] = useState<{ chat: string; turn: number } | null>(null);
   const header = useRef<HTMLElement>(null);
   const title = useRef<HTMLParagraphElement>(null);
   const pane = useRef<HTMLDivElement>(null);
@@ -152,6 +157,7 @@ export default function ChatPanel({ session, course, panel, expanded }: Props) {
   function run(work: Promise<unknown>, done: string | null = null): void {
     setMenu(false);
     setNotice(null);
+    setStopped(null);
     work.then(() => setNotice(done), report);
   }
 
@@ -177,14 +183,26 @@ export default function ChatPanel({ session, course, panel, expanded }: Props) {
     // the backend has no use for it.
     // After a stop has landed: until then the chat is still claimed by the run
     // being stopped, and the turn would be refused as one too many.
-    void stopping.current.then(() => sendMessage({ text, metadata: { quotes } }));
+    void stopping.current.then(() => {
+      setStopped(null);
+      return sendMessage({ text, metadata: { quotes } });
+    });
   }
 
   // The run is the server's: aborting the request alone stops only the
-  // reading of it, so the backend is told as well.
+  // reading of it, so the backend is told as well. What the aborted stream
+  // had buffered is not what was kept — mid-search it is no answer at all —
+  // so the stored turn replaces it: it is what the next run continues from.
   function halt(): void {
     void stop();
-    stopping.current = stopChat(session.summary.id).catch(report);
+    const { summary, chat } = session;
+    stopping.current = stopChat(summary.id)
+      .then(() => loadMessages(summary.id))
+      .then((stored) => {
+        chat.messages = stored;
+        setStopped({ chat: summary.id, turn: turns(stored).length - 1 });
+      })
+      .catch(report);
   }
 
   const line = error === undefined ? notice : streamFailure(error);
@@ -319,6 +337,7 @@ export default function ChatPanel({ session, course, panel, expanded }: Props) {
             chatId={session.summary.id}
             status={status}
             column={reading}
+            stopped={stopped?.chat === session.summary.id ? stopped.turn : null}
           />
           {line !== null && (
             <p role="status" className="px-4 pb-1 text-[13px] text-accent">

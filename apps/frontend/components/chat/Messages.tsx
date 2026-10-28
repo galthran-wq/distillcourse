@@ -49,7 +49,7 @@ function Question({ text, attached }: { text: string; attached: Quote[] }) {
  * search, then the reply — where the stream wrote one, and both are one turn
  * with one activity line.
  */
-function turns(messages: UIMessage[]): UIMessage[][] {
+export function turns(messages: UIMessage[]): UIMessage[][] {
   const grouped: UIMessage[][] = [];
   for (const message of messages) {
     const last = grouped.at(-1);
@@ -72,10 +72,13 @@ const Turn = memo(
   function Turn({
     messages,
     streaming,
+    stopped,
   }: {
     messages: UIMessage[];
     /** This is the answer being written right now: throttle its markdown. */
     streaming: boolean;
+    /** The run that wrote this turn — or never answered it — was stopped. */
+    stopped: boolean;
   }) {
     const [first] = messages;
     const mark = steerMark(first);
@@ -112,11 +115,13 @@ const Turn = memo(
         {(mark === "queued" || mark === "returned") && (
           <p className={`${LABEL_CLASS} mt-1`}>queued</p>
         )}
+        {stopped && <p className={`${LABEL_CLASS} mt-1`}>stopped</p>}
       </article>
     );
   },
   (before, after) =>
     before.streaming === after.streaming &&
+    before.stopped === after.stopped &&
     before.messages.length === after.messages.length &&
     before.messages.every((message, index) => message === after.messages[index]),
 );
@@ -157,6 +162,7 @@ export default function Messages({
   chatId,
   status,
   column,
+  stopped = null,
 }: {
   messages: UIMessage[];
   /** Which conversation this is. The component is not remounted between two. */
@@ -164,6 +170,8 @@ export default function Messages({
   status: ChatStatus;
   /** The reading column, which the panel resizes. */
   column?: RefObject<HTMLDivElement | null>;
+  /** The position in `turns(messages)` of the turn a stop cut short. */
+  stopped?: number | null;
 }) {
   const view = useRef<HTMLDivElement>(null);
   const following = useRef(true);
@@ -233,6 +241,7 @@ export default function Messages({
                 turn === grouped.length - 1 &&
                 group[0].role === "assistant"
               }
+              stopped={turn === stopped}
             />
           ))}
         </div>
