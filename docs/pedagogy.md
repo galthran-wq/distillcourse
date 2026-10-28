@@ -147,7 +147,8 @@ only by someone who already knows the material.
   cases. Neither order is a dogma; the choice is per-concept
   (playbook-core invariant 5).
 - **L5 — Textbook environments where natural.** Mathematical material uses
-  numbered `<Definition>`, `<Theorem>`, `<Proof>`, `<Example>`; key facts in
+  numbered `<Definition>`, `<Theorem>` (and `<Lemma>`, `<Proposition>`,
+  `<Corollary>`), `<Proof>`, `<Example>`; key facts in
   non-mathematical courses (history, philosophy, speech, music) use
   `<Remark>` or plain prose. The mathematical textbook is the reference
   aesthetic, never a straitjacket: if the material has no theorems, don't
