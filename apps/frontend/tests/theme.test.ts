@@ -7,9 +7,8 @@ const css = readFileSync(join(__dirname, "..", "app", "globals.css"), "utf8").re
   "",
 );
 
-/** The selector of every rule whose body picks Shiki's dark palette. */
-const darkPicks = [...css.matchAll(/([^{}]+)\{[^{}]*var\(--shiki-dark\)[^{}]*\}/g)].map((m) =>
-  m[1].trim(),
+const darkPicks = [...css.matchAll(/([^{}]+)\{[^{}]*var\(--shiki-dark\)[^{}]*\}/g)].flatMap(
+  (m) => m[1].split(",").map((s) => s.trim()),
 );
 
 // The site has one theme model — light unless data-theme="dark" — and a
