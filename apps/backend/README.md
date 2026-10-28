@@ -23,6 +23,7 @@ app/
     routes/chats.py  # chat CRUD + the Vercel AI data stream
     routes/lessons.py # per-lesson user state: rating, bookmark
     routes/profile.py # bookmarks for the profile page
+    routes/progress.py # GET /progress: read/started per lesson, for the course pages
     routes/telemetry.py # reading events in, the activity grid and its feed out
     routes/settings.py # the learner's own settings, pairing included
     routes/telegram.py # POST /api/tg/webhook — Telegram's only entry point
@@ -79,6 +80,8 @@ app/
   models.py          # SQLAlchemy 2.0 declarative tables
   crud.py            # user reads/writes
   lessons/state.py   # what a user did to a lesson: rating, bookmark
+  lessons/progress.py # read/started per lesson: telemetry's completion, a lab's
+                     # required checkpoints in place of it
   content/           # the indexed corpus: ingest CLI, FTS search, course spine
   telemetry/         # reading events, the lesson aggregate, completion, the
                      # reading days behind the activity grid and its feed
@@ -685,6 +688,13 @@ The **recently read** list beside the panel is a different question with a
 different source: `GET /profile` over `lesson_progress`, every lesson once by
 when it was last opened, as it always has been. The panel answers "which
 days"; that answers "which lessons".
+
+The course list and the course page ask a third question — how far through a
+course — of `GET /progress[?course=]`: every lesson the reader has started, as
+`read` or `started`, most recently seen first. Read is `completed_at` as
+telemetry wrote it, except on a lab, which is read only once its required
+checkpoints have passed and is started by a submission as much as by a visit
+(`app/lessons/progress.py`).
 
 ## Not here
 
