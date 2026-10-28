@@ -18,8 +18,9 @@ async function lesson(mdx: string): Promise<string> {
  * The labels globals.css draws in front of each environment head. jsdom
  * computes no counters, so this applies the stylesheet's own
  * counter-reset/counter-increment rules in document order and evaluates the
- * `content` of each head's ::before — flat counters, last matching rule
- * wins, which is all the lesson's stylesheet relies on.
+ * `content` of each head's ::before — flat counters, every matching counter
+ * rule applied and the last matching `content` taken, which is all the
+ * lesson's stylesheet relies on.
  */
 function headLabels(root: Element): string[] {
   const style = document.createElement("style");
