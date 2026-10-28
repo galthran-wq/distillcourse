@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { MDXComponents } from "mdx/types";
-import { getCourse, getCourses } from "@/lib/content/site";
+import { getCourse, getCourses, lessonNumber } from "@/lib/content/site";
 import { isReadable, previewMode, readableLessons } from "@/lib/content/visibility";
 import CourseProgress from "@/components/progress/CourseProgress";
 import LessonMark from "@/components/progress/LessonMark";
@@ -127,7 +127,7 @@ export default async function CoursePage({
                   {mod.lessons.map((lesson) => {
                     const entry = bySlug.get(lesson.slug)!;
                     const readable = isReadable(entry);
-                    const number = String(entry.index + 1).padStart(2, "0");
+                    const number = lessonNumber(entry);
 
                     const thumb =
                       lesson.key_image !== undefined

@@ -36,10 +36,9 @@ import {
   Task,
   Theorem,
 } from "@/components/mdx/Blocks";
-import type { LoadedLesson } from "@/lib/content/load";
 import { lessonKey } from "@/lib/content/locator";
 import { compileLesson } from "@/lib/content/render";
-import { getCourses, getLessonView } from "@/lib/content/site";
+import { getCourses, getLessonView, lessonNumber } from "@/lib/content/site";
 import { isReadable } from "@/lib/content/visibility";
 
 interface Params {
@@ -48,11 +47,6 @@ interface Params {
 }
 
 export const dynamicParams = false;
-
-// The one number a lesson has across the site: its place in course order.
-function numberOf(entry: LoadedLesson): string {
-  return String(entry.index + 1).padStart(2, "0");
-}
 
 export function generateStaticParams(): Params[] {
   return getCourses().flatMap((c) =>
@@ -83,7 +77,7 @@ export default async function LessonPage({
   if (view === undefined) notFound();
   const { course, entry, moduleTitle, prev, next, total } = view;
   const lesson = entry.lesson;
-  const number = numberOf(entry);
+  const number = lessonNumber(entry);
   // The one name this lesson has on the API — telemetry, rating and bookmark
   // all send it, and the profile looks a row up by it.
   const key = lessonKey(course.course.slug, lesson.slug);
@@ -230,10 +224,8 @@ export default async function LessonPage({
 
           <LessonRating />
 
-          {/* The running footer: where this lesson sits in the course, and the
-              two lessons on either side of it. Below 640px the next lesson
-              takes the first line to itself — it is where a reader at the end
-              is going. */}
+          {/* Below 640px the next lesson takes the first line to itself: it is
+              where a reader at the end is going. */}
           <nav className="mt-12 mb-16 flex items-baseline gap-6 border-t border-ink pt-3 text-[0.93rem] max-sm:flex-wrap max-sm:gap-x-4 max-sm:gap-y-2.5">
             {prev !== undefined && (
               <Link
@@ -242,7 +234,7 @@ export default async function LessonPage({
                 className="group flex min-w-0 items-baseline gap-2 text-soft max-sm:order-2 max-sm:basis-full max-sm:text-[0.85rem]"
               >
                 <span className="text-faint">←</span>
-                <span className="text-[12px] tabular-nums text-faint">{numberOf(prev)}</span>
+                <span className="text-[12px] tabular-nums text-faint">{lessonNumber(prev)}</span>
                 <span className="truncate group-hover:text-accent">{prev.lesson.title}</span>
               </Link>
             )}
@@ -255,7 +247,7 @@ export default async function LessonPage({
                 transitionTypes={["nav-forward"]}
                 className="group ml-auto flex min-w-0 items-baseline gap-2 font-medium text-ink max-sm:ml-0 max-sm:basis-full"
               >
-                <span className="text-[12px] tabular-nums text-faint">{numberOf(next)}</span>
+                <span className="text-[12px] tabular-nums text-faint">{lessonNumber(next)}</span>
                 <span className="truncate group-hover:text-accent max-sm:flex-1 max-sm:whitespace-normal">
                   {next.lesson.title}
                 </span>

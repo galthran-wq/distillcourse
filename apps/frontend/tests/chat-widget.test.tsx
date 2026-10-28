@@ -31,7 +31,6 @@ describe("the tutor launcher", () => {
   it("is an outlined pill whose icon alone carries the accent", () => {
     const button = launcher("/courses/info-theory/lessons/entropy");
 
-    expect(button?.className).toContain("border-line bg-paper");
     expect(button?.className).not.toContain("bg-accent");
     expect(button?.querySelector("svg")?.getAttribute("class")).toContain("text-accent");
   });

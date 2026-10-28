@@ -76,8 +76,13 @@ function Bar({
     measure();
     window.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
+    // A solution opened or a figure settling grows the article under a reader
+    // who has not scrolled.
+    const observer = new ResizeObserver(schedule);
+    observer.observe(article);
     return () => {
       cancel();
+      observer.disconnect();
       window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
     };
@@ -132,7 +137,7 @@ function Bar({
               }`}
             >
               <span className="w-[1.6rem] shrink-0 tabular-nums text-faint">
-                {h.depth === 2 ? sectionAt(toc, h.id)?.ordinal : ""}
+                {h.depth === 2 ? sections.indexOf(h) + 1 : ""}
               </span>
               <span className={h.depth === 3 ? "pl-3" : undefined}>{h.text}</span>
             </a>

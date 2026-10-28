@@ -108,6 +108,11 @@ export interface LessonView {
   total: number;
 }
 
+/** The one number a lesson has across the site: its place in course order. */
+export function lessonNumber(entry: LoadedLesson): string {
+  return String(entry.index + 1).padStart(2, "0");
+}
+
 export function getLessonView(
   courseSlug: string,
   lessonSlug: string,

@@ -9,7 +9,9 @@ import {
   sectionAt,
   setPosition,
 } from "@/lib/lesson/position";
-import { mounted } from "./utils/dom";
+import { mounted, stubResizeObserver } from "./utils/dom";
+
+stubResizeObserver();
 
 const TOC: TocEntry[] = [
   { depth: 2, id: "four-bits", text: "Four bits a letter" },
