@@ -18,6 +18,7 @@ from tests.conftest import (
     DEVICE,
     LAB_CHAT,
     MANIFEST,
+    REVIEW,
     TOKEN_ANSWER,
     Server,
     verdict,
@@ -53,10 +54,12 @@ def test_the_body_this_client_posts_is_the_one_the_api_takes(paired: Server) -> 
     distill.check("surprisal", lambda p: p)
 
     assert set(paired.posted[0]) == set(SHAPES["submission"])
+    [reviewed] = paired.reviewed
+    assert set(reviewed) == set(SHAPES["check_review"])
 
 
 def test_the_answer_the_fake_streams_is_the_one_the_api_streams() -> None:
-    for event in ANSWER:
+    for event in [*ANSWER, *REVIEW]:
         assert set(event) == set(SHAPES["ask_events"][event["type"]])
     assert set(LAB_CHAT) == set(SHAPES["lab_chat"])
 

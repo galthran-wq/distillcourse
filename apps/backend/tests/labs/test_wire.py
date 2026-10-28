@@ -17,6 +17,7 @@ from app.labs.schemas import (
     Ask,
     Attachment,
     CheckpointProgress,
+    CheckReview,
     Completion,
     Device,
     DoneEvent,
@@ -56,6 +57,7 @@ def test_every_message_the_notebook_exchanges_has_the_pinned_fields() -> None:
     assert fields(Ask) == set(SHAPES["ask"])
     assert fields(Attachment) == set(SHAPES["attachment"])
     assert fields(LabChat) == set(SHAPES["lab_chat"])
+    assert fields(CheckReview) == set(SHAPES["check_review"])
 
 
 def test_every_event_of_an_answer_has_the_pinned_fields() -> None:

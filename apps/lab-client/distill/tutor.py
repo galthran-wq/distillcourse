@@ -30,14 +30,21 @@ TRACEBACK_LINES = 30
 REDRAW_SECONDS = 0.2
 
 
+def source(fn: Any) -> str | None:
+    """A function's source within an attachment's cap, or None where Python
+    cannot find it: a builtin, or a function defined somewhere its source is
+    gone."""
+    try:
+        return _cut(inspect.getsource(fn), ATTACHMENT_CHARS)
+    except (OSError, TypeError):
+        return None
+
+
 def _rendered(obj: Any) -> tuple[str, str]:
     """An object as the tutor reads it, and the kind that says how."""
     if inspect.isroutine(obj) or inspect.isclass(obj):
-        try:
-            return "function", inspect.getsource(obj)
-        except (OSError, TypeError):
-            # A builtin, or a function defined somewhere its source is gone.
-            return "function", repr(obj)
+        text = source(obj)
+        return "function", repr(obj) if text is None else text
     # A DataFrame, recognised by what it can do: this package does not
     # depend on pandas, and neither need the table.
     if all(hasattr(obj, name) for name in ("shape", "dtypes", "head")):

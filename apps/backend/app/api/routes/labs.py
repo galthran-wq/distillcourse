@@ -14,11 +14,12 @@ from app.harness import runner
 from app.harness.limits import LimitExceeded
 from app.harness.repository import HarnessRepository
 from app.labs import chat as lab_chat
-from app.labs import repository, verify
+from app.labs import check_review, repository, verify
 from app.labs.deps import LabUser
 from app.labs.schemas import (
     MAX_SUBMISSION_BYTES,
     Ask,
+    CheckReview,
     Device,
     LabChat,
     Manifest,
@@ -293,3 +294,32 @@ async def ask(
         lab_chat.events(chunks, chat, posted.attachments),
         media_type="text/event-stream",
     )
+
+
+@router.post("/{course}/{lesson}/review")
+async def review(
+    key: LessonKey,
+    posted: CheckReview,
+    session: SessionDep,
+    session_factory: SessionFactoryDep,
+    user: LabUser,
+) -> StreamingResponse:
+    """The code review `distill.check` asks for once its verdict is printed,
+    streamed as an answer to `ask` is and written into the lab's latest chat."""
+    repo = await _lab_repo(session, user, key)
+    try:
+        lines = await check_review.start(
+            session_factory=session_factory,
+            repo=repo,
+            lesson=key,
+            submission_id=posted.submission_id,
+        )
+    except check_review.NotFound as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
+    except check_review.Unreviewable as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+    except LimitExceeded as exc:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc))
+    except runner.RunBusy:
+        raise HTTPException(status.HTTP_409_CONFLICT, "this chat has a run in flight")
+    return StreamingResponse(lines, media_type="text/event-stream")

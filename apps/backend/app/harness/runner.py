@@ -74,20 +74,27 @@ class _Run:
 
 
 # In-process: the backend is one process, and a run is only ever stopped or
-# steered from the web, whose runs all start here. It is also what keeps the
-# drains alive — asyncio holds only a weak reference to a running task, and
-# this one outlives the request that started it.
+# steered from the web, whose runs all start here.
 _runs: dict[uuid.UUID, _Run] = {}
 
+# asyncio holds only a weak reference to a running task, and a detached one
+# outlives the request that started it.
+_detached: set[asyncio.Task[None]] = set()
 
-def _finished(run_id: uuid.UUID, task: asyncio.Task[None]) -> None:
-    """A drain that died has nobody to raise to: the request it started under
-    returned long ago, so the traceback is only ever seen if it is logged."""
+
+def _finished(task: asyncio.Task[None]) -> None:
+    """A detached run that died has nobody to raise to: the request it started
+    under returned long ago, so the traceback is only ever seen if it is
+    logged."""
+    _detached.discard(task)
+    if not task.cancelled() and task.exception() is not None:
+        logfire.error("a detached run died", _exc_info=task.exception())
+
+
+def _unregister(run_id: uuid.UUID, _task: asyncio.Task[None]) -> None:
     run = _runs.pop(run_id, None)
     if run is not None:
         run.over.set()
-    if not task.cancelled() and task.exception() is not None:
-        logfire.error("the drain of a chat run died", _exc_info=task.exception())
 
 
 async def stop(run_id: uuid.UUID | None) -> None:
@@ -330,7 +337,7 @@ async def _close_run(
         await repo.fail_run(chat, run_id, failure)
 
 
-async def _guarded(
+async def guarded(
     work: Coroutine[Any, Any, None], failure: str, run_id: uuid.UUID
 ) -> None:
     """Cleanup that must not raise.
@@ -383,8 +390,8 @@ async def _close_safely(
             "storing the turn of run {run_id} failed; retrying on a clean session",
             run_id=str(run_id),
         )
-    await _guarded(repo.session.rollback(), "rolling back run {run_id} failed", run_id)
-    await _guarded(store(), "storing the turn of run {run_id} failed", run_id)
+    await guarded(repo.session.rollback(), "rolling back run {run_id} failed", run_id)
+    await guarded(store(), "storing the turn of run {run_id} failed", run_id)
 
 
 async def run(
@@ -438,7 +445,7 @@ async def run(
         # Never the reason a caller sees a different exception: the claim is
         # released by its deadline anyway, and the run's own failure is the one
         # worth reporting.
-        await _guarded(
+        await guarded(
             repo.release_run(chat, run_id), "releasing run {run_id} failed", run_id
         )
     return result.output
@@ -477,7 +484,7 @@ async def _store_and_release(
         usage=usage,
         failure=failure,
     )
-    await _guarded(
+    await guarded(
         repo.release_run(chat, run_id), "releasing run {run_id} failed", run_id
     )
 
@@ -661,16 +668,27 @@ async def _drain(
             # is free, which is everything the learner's next message needs.
             queue.put_nowait(None)
         if chat is not None and result is not None and failure is None:
-            await _guarded(
+            await guarded(
                 retitle(repo, chat, run_id, result.usage),
                 "renaming the chat after run {run_id} failed",
                 run_id,
             )
 
 
-async def _relay(queue: asyncio.Queue[BaseChunk | None]) -> AsyncGenerator[BaseChunk]:
-    while (chunk := await queue.get()) is not None:
-        yield chunk
+def detach(work: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
+    """Run work that must outlive the request that started it: a client that
+    walks away mid-stream stops reading, and the run still finishes and stores
+    what it produced."""
+    task = asyncio.create_task(work)
+    _detached.add(task)
+    task.add_done_callback(_finished)
+    return task
+
+
+async def relay[T](queue: asyncio.Queue[T | None]) -> AsyncGenerator[T]:
+    """A detached run's output as the client reads it, ended by a None."""
+    while (item := await queue.get()) is not None:
+        yield item
 
 
 async def start_stream(
@@ -724,7 +742,7 @@ async def start_stream(
         _runs.pop(run_id, None)
         run.over.set()
         raise
-    run.drain = asyncio.create_task(
+    run.drain = detach(
         _drain(
             session_factory=session_factory,
             user_id=repo.user_id,
@@ -738,5 +756,5 @@ async def start_stream(
             queue=queue,
         )
     )
-    run.drain.add_done_callback(partial(_finished, run_id))
-    return _relay(queue)
+    run.drain.add_done_callback(partial(_unregister, run_id))
+    return relay(queue)

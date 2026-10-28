@@ -69,6 +69,7 @@ app/
     judge.py         # the third kind: a written answer, one model call, a verdict
     ingest.py        # the build's answer keys and solutions into `lab_challenges`/`lab_solutions`
     chat.py          # distill.ask: a question in, the answer out as four SSE events
+    check_review.py  # the code review under a check's verdict: one toolless call, into the lab chat
     tools.py         # the lab toolset a lab chat's runs get, and the lab prompt
     schemas.py       # the wire shapes a notebook and the lab page speak
     deps.py          # LabUser — the learner a notebook is calling for
@@ -227,8 +228,9 @@ governs lessons. Blocks carrying text from outside the platform are fenced
 with their provenance, and `base.md` is where the tutor is told that anything
 inside such a fence is data. The same directory also holds modules for the
 passes that are not the tutor — `title.md` is the whole prompt of the namer and
-`lab_review.md` the whole prompt of a lab's judge, neither of which sees
-`base.md`; both are loaded by `module()` rather than `assemble()`.
+`lab_review.md` the whole prompt of a lab's judge and `lab_check_review.md`
+of the review under a check, none of which sees `base.md`; all are loaded by
+`module()` rather than `assemble()`.
 
 A web or lab chat is named from the learner's first question and named again by
 `harness/title.py` once `TITLE_REFRESH_MESSAGES` more have gone by: one short
@@ -569,6 +571,7 @@ POST /labs/submissions                   # bearer: one attempt at one checkpoint
 GET  /labs/{course}/{lesson}/progress    # cookie: what the lesson page draws
 POST /labs/{course}/{lesson}/ask         # bearer: a question to the tutor, SSE back
 POST /labs/{course}/{lesson}/chat        # bearer: a new lab chat (distill.clear_chat)
+POST /labs/{course}/{lesson}/review      # bearer: the code review of a check, SSE back
 ```
 
 - `ask` runs on the web chat's harness path — claim, daily cap and monthly
@@ -579,6 +582,20 @@ POST /labs/{course}/{lesson}/chat        # bearer: a new lab chat (distill.clear
   `step` / `text` / `done` | `error` events (`wire_shapes.json`). Any run in a
   lab chat, from the notebook or continued on the site, gets the lab prompt
   and the lab toolset; no other chat does.
+
+- `review` follows every `distill.check` once its verdict is printed. It is
+  not a tutor run: one toolless call (`check_review.py`, on
+  `LAB_REVIEW_MODEL`, prompt `lab_check_review.md`) handed the checked
+  function's source — `lab_submissions.source`, optional on the wire, so an older
+  client is still graded — the verdict and the wrong answer's hint, the
+  checkpoint's inputs and expected output, the next checkpoint and the
+  reference solution. It streams `ask`'s events, holds the lab chat's claim
+  (409 while a question runs there), honours the daily cap and the monthly
+  ceiling (429), and on success stores two turns in the lab's latest chat, in
+  one transaction — `check <id>: passed|failed` with the source fenced, then
+  the review with its usage — so the next `ask` continues from it. A failed
+  review stores no turn; what its call cost lands on the submission's
+  `usage`, which the ceiling sums. The verdict is never touched.
 
 - The manifest is the display half from `documents.metadata.lab` joined with
   `lab_challenges.spec["public"]`, and it is public by construction rather

@@ -468,6 +468,7 @@ async def submit(
             checkpoint=posted.checkpoint,
             verdict=asdict(verdict),
             usage=usage,
+            source=posted.source,
         )
     )
     await _record_attempt(session, user_id, posted, verdict, now)

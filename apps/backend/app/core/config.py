@@ -75,6 +75,9 @@ class Settings(BaseSettings):
         ),
     ]
     DEFAULT_CHAT_MODEL: str = "moonshotai/kimi-k3.1-pro"
+    # What writes the short code review under every `distill.check` verdict.
+    # Every check asks for one, so this is where its cost is tuned.
+    LAB_REVIEW_MODEL: str = DEFAULT_CHAT_MODEL
 
     # The tutor's only route out to the open web. Unset, web_search reports
     # itself unavailable and the agent answers from the corpus.
@@ -140,10 +143,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _guard_deployments(self) -> Self:
-        if self.DEFAULT_CHAT_MODEL not in self.chat_model_pool:
-            raise ValueError(
-                f"DEFAULT_CHAT_MODEL={self.DEFAULT_CHAT_MODEL} is not in CHAT_MODELS"
-            )
+        # `model_for` falls back to the default for an id outside the pool, so
+        # a review model set to one would be ignored without a word.
+        for name in ("DEFAULT_CHAT_MODEL", "LAB_REVIEW_MODEL"):
+            if getattr(self, name) not in self.chat_model_pool:
+                raise ValueError(f"{name}={getattr(self, name)} is not in CHAT_MODELS")
         # The defaults above exist so tests and a bare `uv run` work with no
         # environment at all; carrying them into a deployment must be loud.
         if self.ENVIRONMENT != "local":

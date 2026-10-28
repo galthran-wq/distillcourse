@@ -610,6 +610,10 @@ class LabSubmission(Base):
     # row `messages.usage` carries, summed by the same monthly ceiling. Null
     # for every checkpoint a comparison answered.
     usage: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
+    # The checked function's source, as `distill.check` read it: what the code
+    # review after the verdict reads. Null for every other kind, and for a
+    # function whose source the notebook could not read.
+    source: Mapped[str | None] = mapped_column(Text, default=None)
 
 
 # Rating and bookmark are keyed by the same `lesson:` locator `events` and

@@ -48,6 +48,13 @@ ANSWER: list[dict[str, Any]] = [
     {"type": "done", "chat_id": CHAT_ID, "url": CHAT_URL},
 ]
 
+# The review a check's verdict is followed by, streamed as an answer is.
+REVIEW: list[dict[str, Any]] = [
+    {"type": "text", "delta": "Correct. "},
+    {"type": "text", "delta": "Nothing to change."},
+    {"type": "done", "chat_id": CHAT_ID, "url": CHAT_URL},
+]
+
 INPUTS_CODE = "p = rng.random(4)\ninputs = (p,)\n"
 ATOL = 1e-06
 THRESHOLD = 0.85
@@ -104,6 +111,15 @@ def verdict(
     }
 
 
+def _streamed(events: list[dict[str, Any]]) -> httpx.Response:
+    """An answer as the server streams one: an event per `data:` line."""
+    return httpx.Response(
+        200,
+        headers={"content-type": "text/event-stream"},
+        content="".join(f"data: {json.dumps(event)}\n\n" for event in events),
+    )
+
+
 class Server:
     """What the client talked to, and what it will be told next."""
 
@@ -123,6 +139,12 @@ class Server:
         self._device_polls = 0
         self.asked: list[dict[str, Any]] = []
         self.answer_events: list[dict[str, Any]] = deepcopy(ANSWER)
+        self.reviewed: list[dict[str, Any]] = []
+        self.review_events: list[dict[str, Any]] = deepcopy(REVIEW)
+        # A refusal or an outage of the review alone: the verdict before it
+        # was answered.
+        self.review_refusal: httpx.Response | None = None
+        self.review_unreachable = False
 
     def spec(self, checkpoint: str) -> dict[str, Any]:
         """The public half of one checkpoint, to edit before `open_lab`."""
@@ -155,13 +177,15 @@ class Server:
         if request.url.path.endswith(f"/labs/{LAB}/ask"):
             self.bearers.append(request.headers.get("authorization"))
             self.asked.append(json.loads(request.content))
-            return httpx.Response(
-                200,
-                headers={"content-type": "text/event-stream"},
-                content="".join(
-                    f"data: {json.dumps(event)}\n\n" for event in self.answer_events
-                ),
-            )
+            return _streamed(self.answer_events)
+        if request.url.path.endswith(f"/labs/{LAB}/review"):
+            self.bearers.append(request.headers.get("authorization"))
+            self.reviewed.append(json.loads(request.content))
+            if self.review_unreachable:
+                raise httpx.ConnectError("no route to host", request=request)
+            if self.review_refusal is not None:
+                return self.review_refusal
+            return _streamed(self.review_events)
         self.bearers.append(request.headers.get("authorization"))
         self.posted.append(json.loads(request.content))
         return httpx.Response(200, json=self.answer)

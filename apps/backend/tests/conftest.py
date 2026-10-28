@@ -47,7 +47,7 @@ async def settled(*, raising: bool = True) -> None:
     story to tell, not the fixture's.
     """
     await asyncio.gather(
-        *(run.drain for run in list(runner._runs.values()) if run.drain is not None),
+        *list(runner._detached),
         return_exceptions=not raising,
     )
 

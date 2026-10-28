@@ -63,7 +63,8 @@ def test_a_pass_prints_the_standing(
 
     distill.check("surprisal", lambda p: p)
 
-    assert capsys.readouterr().out.endswith("✓ surprisal (3/5 required)\n")
+    # The review below it is `test_check_review`'s.
+    assert capsys.readouterr().out.startswith("✓ surprisal (3/5 required)\n")
 
 
 def test_a_declared_mistake_prints_the_hint_that_names_it(
@@ -73,7 +74,7 @@ def test_a_declared_mistake_prints_the_hint_that_names_it(
 
     distill.check("surprisal", lambda p: -np.log(p))
 
-    assert capsys.readouterr().out.endswith(
+    assert capsys.readouterr().out.startswith(
         "✗ surprisal — Natural log, not base two. (0/2 required)\n"
     )
 
