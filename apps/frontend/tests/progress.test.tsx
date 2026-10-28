@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import CourseProgress from "@/components/progress/CourseProgress";
+import CourseReadCount from "@/components/progress/CourseReadCount";
 import LessonMark from "@/components/progress/LessonMark";
+import StartHere from "@/components/progress/StartHere";
 import { getProgress, type Standing } from "@/lib/progress/api";
 import { ProgressProvider } from "@/lib/progress/context";
 import { byLesson, courseProgress } from "@/lib/progress/summary";
@@ -83,88 +84,112 @@ describe("the course page", () => {
     auth.status = "signed-in";
   });
 
-  it("marks read and started lessons, leaves unopened ones bare and heads the page with the count", async () => {
+  // The contents as the page lays them out: one StartHere per lesson, each
+  // carrying its mark, under the quiet line's read count.
+  const page = (lessons = LESSONS) => (
+    <ProgressProvider course="fraud-ml">
+      <p data-quiet>
+        58 lessons
+        <CourseReadCount course="fraud-ml" lessons={lessons} />
+      </p>
+      <ol>
+        {LESSONS.map((l) => (
+          <StartHere key={l.slug} course="fraud-ml" lessons={lessons} slug={l.slug}>
+            <span data-lesson={l.slug}>
+              <LessonMark lesson={`fraud-ml/${l.slug}`} />
+            </span>
+          </StartHere>
+        ))}
+      </ol>
+    </ProgressProvider>
+  );
+
+  const banded = () =>
+    [...host().querySelectorAll("li")]
+      .filter((li) => li.firstElementChild?.tagName === "P")
+      .map((li) => ({
+        label: li.firstElementChild!.textContent,
+        lesson: li.querySelector("[data-lesson]")!.getAttribute("data-lesson"),
+      }));
+  const quiet = () => host().querySelector("[data-quiet]")!.textContent;
+
+  it("marks read and started lessons, leaves unopened ones bare and counts what is read", async () => {
     const fetch = stubFetch([
       standing("fraud-ml/framing", "read", "2026-10-03T10:00:00Z"),
       standing("fraud-ml/density", "started", "2026-10-02T10:00:00Z"),
     ]);
 
-    await mount(
-      <ProgressProvider course="fraud-ml">
-        <CourseProgress course="fraud-ml" lessons={LESSONS} />
-        {LESSONS.map((l) => (
-          <p key={l.slug} data-lesson={l.slug}>
-            <LessonMark lesson={`fraud-ml/${l.slug}`} />
-          </p>
-        ))}
-      </ProgressProvider>,
-    );
+    await mount(page());
 
     expect(requestOf(fetch)[0]).toBe("/api/v1/progress?course=fraud-ml");
     const mark = (slug: string) => host().querySelector(`[data-lesson="${slug}"]`)!;
     expect(mark("framing").querySelector('[title="Read"]')?.textContent).toBe("✓");
     expect(mark("density").querySelector('[title="Started"]')).not.toBeNull();
     expect(mark("isolation-forest").childElementCount).toBe(0);
-    expect(host().textContent).toContain("1 of 3 read");
+    expect(quiet()).toBe("58 lessons · 1 of 3 read");
   });
 
-  it("takes the marks off when the reader signs out", async () => {
+  it("bands the next unread lesson as where to continue", async () => {
+    stubFetch([
+      standing("fraud-ml/framing", "read", "2026-10-03T10:00:00Z"),
+      standing("fraud-ml/density", "started", "2026-10-02T10:00:00Z"),
+    ]);
+
+    await mount(page());
+
+    expect(banded()).toEqual([{ label: "Continue here", lesson: "density" }]);
+  });
+
+  it("bands no row once everything readable is read", async () => {
+    stubFetch(LESSONS.map((l) => standing(`fraud-ml/${l.slug}`, "read", "2026-10-03T10:00:00Z")));
+
+    await mount(page());
+
+    expect(banded()).toEqual([]);
+    expect(quiet()).toBe("58 lessons · 3 of 3 read");
+  });
+
+  it("takes the marks and the count off when the reader signs out", async () => {
     stubFetch([standing("fraud-ml/framing", "read", "2026-10-03T10:00:00Z")]);
     // A fresh element each time: the mocked auth is not a store that notifies,
     // so the second mount is what tells the tree the reader is gone.
-    const tree = () => (
-      <ProgressProvider course="fraud-ml">
-        <CourseProgress course="fraud-ml" lessons={LESSONS} />
-        <LessonMark lesson="fraud-ml/framing" />
-      </ProgressProvider>
-    );
-    await mount(tree());
-    expect(host().textContent).toContain("1 of 3 read");
+    await mount(page());
+    expect(quiet()).toContain("1 of 3 read");
 
     auth.status = "anonymous";
-    await mount(tree());
+    await mount(page());
 
     expect(host().querySelector('[title="Read"]')).toBeNull();
-    expect(host().textContent).not.toContain("read");
+    expect(quiet()).toBe("58 lessons");
+    expect(banded()).toEqual([{ label: "Start here", lesson: "framing" }]);
   });
 
-  it("points an anonymous reader at the first lesson and marks nothing", async () => {
+  it("starts an anonymous reader at the first readable lesson and marks nothing", async () => {
     auth.status = "anonymous";
     stubFetch([]);
 
-    await mount(
-      <ProgressProvider course="fraud-ml">
-        <CourseProgress course="fraud-ml" lessons={LESSONS} />
-        <LessonMark lesson="fraud-ml/framing" />
-      </ProgressProvider>,
-    );
+    // The first lesson in course order is not written yet: it is not readable,
+    // so the band goes to the first one that is.
+    await mount(page(LESSONS.slice(1)));
 
-    const start = host().querySelector("a");
-    expect(start?.getAttribute("href")).toBe("/courses/fraud-ml/lessons/framing");
-    expect(host().textContent).toBe("Start with: Framing the problem");
+    expect(banded()).toEqual([{ label: "Start here", lesson: "density" }]);
+    expect(quiet()).toBe("58 lessons");
   });
 
-  it("points a signed-in reader who has not started at the first lesson too", async () => {
+  it("starts a signed-in reader who has not opened this course at the first lesson too", async () => {
     stubFetch([standing("nietzsche/drives", "read", "2026-10-01T10:00:00Z")]);
 
-    await mount(
-      <ProgressProvider course="fraud-ml">
-        <CourseProgress course="fraud-ml" lessons={LESSONS} />
-      </ProgressProvider>,
-    );
+    await mount(page());
 
-    expect(host().textContent).toBe("Start with: Framing the problem");
+    expect(banded()).toEqual([{ label: "Start here", lesson: "framing" }]);
+    expect(quiet()).toBe("58 lessons");
   });
 
-  it("has no start line for a course with nothing to read yet", async () => {
+  it("bands nothing in a course with nothing to read yet", async () => {
     auth.status = "anonymous";
 
-    await mount(
-      <ProgressProvider course="fraud-ml">
-        <CourseProgress course="fraud-ml" lessons={[]} />
-      </ProgressProvider>,
-    );
+    await mount(page([]));
 
-    expect(host().innerHTML).toBe("");
+    expect(banded()).toEqual([]);
   });
 });
