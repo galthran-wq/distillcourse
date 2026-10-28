@@ -48,7 +48,8 @@ style YAML, one lesson per list entry, slugs immutable once status ≥ `drafted`
 | `key_results` | list of `{text, lesson}` — the course's headline theorems/facts, each linking the lesson that establishes it (lesson must exist) |
 | `spine` | the course's argument as an ordered chain of steps, each `{step, lessons: [slugs]}` — every core lesson belongs to a step (L10); errors on unknown slugs, warns on uncovered core lessons |
 | `sources` | main sources used to compile the course (course page bibliography); warn if empty |
-| `slug`, `title`, `tagline` | identity |
+| `slug`, `title`, `tagline` | identity; the home page shows the title and the tagline as written under the course's figure |
+| `cover` | optional `{lesson, image}` — the figure the home page frames for the course, `image` a path relative to that lesson's dir (an `.svg` is drawn art the dark theme inverts; a raster fills the frame and is only dimmed). Unset: the `key_image` of the first lesson in course order that has one, any status; neither: an empty frame. Errors as `key_image` does (missing file, uncredited or broken raster), plus when `lesson` is not a lesson of the course. Human-curated: agents never set it |
 | `status` | `planned \| in_progress \| published \| archived` |
 | `audience`, `tone` | prose hints consumed by lesson-author |
 | `outcomes[]` | backward design: `id`, `text`, `bloom` level |

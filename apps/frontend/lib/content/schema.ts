@@ -174,6 +174,12 @@ export const CourseSchema = z.object({
   status: z.enum(COURSE_STATUSES),
   audience: z.string().min(1),
   tone: z.string().min(1),
+  /**
+   * The figure the home page shows for the course, `image` relative to
+   * `lesson`'s dir. Unset: the first lesson in course order with a
+   * key_image. Human-curated; agents never set it.
+   */
+  cover: z.object({ lesson: slug, image: z.string().min(1) }).optional(),
   /** Short introduction (markdown) shown at the top of the course page. */
   intro: z.string().min(1).optional(),
   prerequisites: z.array(CoursePrereqSchema).default([]),
