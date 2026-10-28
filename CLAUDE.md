@@ -172,7 +172,8 @@ Rules that override defaults:
   box and `FIELD_BOX_INPUT_CLASS` on the control inside it, which leaves the
   caller only geometry (the tutor's composer, whose send button is inside the
   field): the border, the fill and the ring are the box's, and the control
-  hands its ring over. Every micro-cap label (sans small caps) carries `LABEL_CLASS`.
+  hands its ring over. Every micro-cap label (sans small caps) carries `LABEL_CLASS`;
+  a link inside a run of chrome text (not lesson prose) carries `LINK_CLASS`.
   The chip a referenced passage is shown as carries
   `CHIP_CLASS`; a menu or a preview that hangs open over the page carries
   `POPOVER_CLASS`, plus `MENU_CLASS`/`MENU_ITEM_CLASS` when it is a dropdown,
