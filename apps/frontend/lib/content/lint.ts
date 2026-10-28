@@ -678,6 +678,50 @@ export interface LintOptions {
   allCourseSlugs?: string[];
 }
 
+/**
+ * A course.yaml image reference (`key_image`, `cover.image`): the file must
+ * exist in the lesson dir, and a raster must be a real image with a credit.
+ */
+function imageFileDiags(
+  rule: string,
+  coursePath: string,
+  lessonDir: string,
+  image: string,
+  what: string,
+): Diagnostic[] {
+  const path = join(lessonDir, image);
+  if (!existsSync(path)) {
+    return [
+      {
+        level: "error",
+        rule,
+        file: coursePath,
+        message: `${what} "${image}" does not exist in the lesson directory`,
+      },
+    ];
+  }
+  if (!isRasterFile(image)) return [];
+  const diags: Diagnostic[] = [];
+  const probe = probeImageFile(path);
+  if (isProbeError(probe)) {
+    diags.push({
+      level: "error",
+      rule,
+      file: path,
+      message: `${what} is not a usable image: ${probe.error}`,
+    });
+  }
+  if (creditFor(loadCredits(lessonDir), basename(image)) === undefined) {
+    diags.push({
+      level: "error",
+      rule,
+      file: creditsPath(lessonDir),
+      message: `${what} "${basename(image)}" has no credits.yaml entry`,
+    });
+  }
+  return diags;
+}
+
 export function lintCourse(
   loaded: LoadedCourse,
   options: LintOptions = {},
@@ -876,6 +920,22 @@ export function lintCourse(
     }
   }
 
+  // cover: the home page's figure, held to what a key_image is held to.
+  const { cover } = loaded.course;
+  if (cover !== undefined) {
+    const owner = loaded.lessons.find((entry) => entry.lesson.slug === cover.lesson);
+    if (owner === undefined) {
+      diags.push({
+        level: "error",
+        rule: "cover",
+        file: coursePath,
+        message: `cover.lesson "${cover.lesson}" is not a lesson of this course`,
+      });
+    } else {
+      diags.push(...imageFileDiags("cover", coursePath, owner.dir, cover.image, "cover.image"));
+    }
+  }
+
   // Per-lesson metadata guidance (warnings) + file/registry checks (errors).
   for (const entry of loaded.lessons) {
     const { lesson } = entry;
@@ -899,33 +959,15 @@ export function lintCourse(
 
     // key-image: the contents thumbnail must exist; rasters must be credited.
     if (lesson.key_image !== undefined) {
-      const kiPath = join(entry.dir, lesson.key_image);
-      if (!existsSync(kiPath)) {
-        diags.push({
-          level: "error",
-          rule: "key-image",
-          file: coursePath,
-          message: `lesson "${lesson.slug}": key_image "${lesson.key_image}" does not exist in the lesson directory`,
-        });
-      } else if (isRasterFile(lesson.key_image)) {
-        const probe = probeImageFile(kiPath);
-        if (isProbeError(probe)) {
-          diags.push({
-            level: "error",
-            rule: "key-image",
-            file: kiPath,
-            message: `lesson "${lesson.slug}": key_image is not a usable image: ${probe.error}`,
-          });
-        }
-        if (creditFor(loadCredits(entry.dir), basename(lesson.key_image)) === undefined) {
-          diags.push({
-            level: "error",
-            rule: "key-image",
-            file: creditsPath(entry.dir),
-            message: `lesson "${lesson.slug}": key_image "${basename(lesson.key_image)}" has no credits.yaml entry`,
-          });
-        }
-      }
+      diags.push(
+        ...imageFileDiags(
+          "key-image",
+          coursePath,
+          entry.dir,
+          lesson.key_image,
+          `lesson "${lesson.slug}": key_image`,
+        ),
+      );
     } else if (STATUS_RANK[lesson.status] >= STATUS_RANK.drafted) {
       diags.push({
         level: "warn",

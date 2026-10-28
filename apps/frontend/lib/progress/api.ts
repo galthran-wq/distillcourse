@@ -7,9 +7,6 @@ export interface Standing {
   last_seen: string;
 }
 
-/** `course` empty for every course the reader has started. */
 export function getProgress(course: string): Promise<Standing[]> {
-  return call<Standing[]>(
-    course === "" ? "/progress" : `/progress?course=${encodeURIComponent(course)}`,
-  );
+  return call<Standing[]>(`/progress?course=${encodeURIComponent(course)}`);
 }
