@@ -17,6 +17,7 @@ next question in a fresh conversation.
 
 from __future__ import annotations
 
+import sys
 import time
 import uuid
 from collections.abc import Callable
@@ -160,6 +161,11 @@ def ask(text: str, *objects: Any) -> None:
     """
     global _chat
     lab = _opened()
+    if len(text) > tutor.QUESTION_CHARS:
+        raise LabError(
+            f"a question is at most {tutor.QUESTION_CHARS} characters — "
+            "attach long material as an object instead"
+        )
     _chat = tutor.show(
         _api.ask(
             _path(lab),
@@ -170,6 +176,8 @@ def ask(text: str, *objects: Any) -> None:
             },
         )
     )
+    # Sent and answered: the next question must not carry the same error.
+    sys.last_value = None
 
 
 def clear_chat() -> None:

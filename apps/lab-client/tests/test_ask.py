@@ -181,9 +181,11 @@ class Notebook:
 
     def __init__(self) -> None:
         self.drawn: list[str] = []
+        self.displayed = 0
 
     def display(self, _markdown: Any, *, display_id: bool) -> Any:
         assert display_id
+        self.displayed += 1
         return types.SimpleNamespace(
             update=lambda markdown: self.drawn.append(markdown)
         )
@@ -274,5 +276,37 @@ def test_asking_needs_an_open_lab_and_a_pairing() -> None:
 def test_more_objects_than_the_server_takes_is_refused_here(paired: Server) -> None:
     with pytest.raises(LabError, match="at most"):
         distill.ask("too many?", *range(tutor.ATTACHMENTS + 1))
+
+    assert paired.asked == []
+
+
+def test_an_error_stays_for_the_retry_when_the_question_was_refused(
+    paired: Server, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    error = ValueError("bad bins")
+    monkeypatch.setattr(sys, "last_value", error, raising=False)
+    paired.refusal = httpx.Response(409, json={"detail": "busy"})
+
+    with pytest.raises(LabError):
+        distill.ask("why?")
+
+    assert sys.last_value is error
+
+
+def test_a_refused_question_leaves_no_empty_output(
+    paired: Server, notebook: Notebook
+) -> None:
+    paired.refusal = httpx.Response(409, json={"detail": "busy"})
+
+    with pytest.raises(LabError):
+        distill.ask("why?")
+
+    assert notebook.drawn == []
+    assert notebook.displayed == 0
+
+
+def test_an_overlong_question_is_refused_here(paired: Server) -> None:
+    with pytest.raises(LabError, match="at most"):
+        distill.ask("x" * (tutor.QUESTION_CHARS + 1))
 
     assert paired.asked == []

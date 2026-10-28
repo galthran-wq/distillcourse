@@ -20,6 +20,7 @@ ATTACHMENT_CHARS = 20_000
 ATTACHMENTS_CHARS = 60_000
 # How many objects one question carries, the error included; the server's cap.
 ATTACHMENTS = 16
+QUESTION_CHARS = 8_000
 TRUNCATED = "\n[… truncated]"
 TABLE_ROWS = 5
 TRACEBACK_LINES = 30
@@ -53,15 +54,12 @@ def _rendered(obj: Any) -> tuple[str, str]:
 
 
 def _last_error() -> dict[str, str] | None:
-    """The error the learner's last cell died of, once.
-
-    IPython leaves it in `sys.last_value` until the next one replaces it; it
-    is cleared here so the question after this one does not carry it again.
-    """
+    """The error the learner's last cell died of: IPython leaves it in
+    `sys.last_value` until the next one replaces it. `distill.ask` clears it
+    once a question carrying it has been answered."""
     error = getattr(sys, "last_value", None)
     if not isinstance(error, BaseException):
         return None
-    sys.last_value = None
     lines = "".join(
         traceback.format_exception(type(error), error, error.__traceback__)
     ).splitlines()
@@ -128,7 +126,10 @@ def show(events: Iterator[dict[str, Any]]) -> str | None:
     In a notebook it is Markdown under the cell, redrawn as it grows. Anywhere
     else there is nothing to redraw, so it is printed once, whole, at the end.
     """
-    draw = _drawer()
+    # Made on the first event rather than up front: a question the server
+    # refuses outright must not leave an empty output above its error.
+    draw: Callable[[str], None] | None = None
+    started = False
     steps: list[str] = []
     parts: list[str] = []
     url: str | None = None
@@ -136,6 +137,8 @@ def show(events: Iterator[dict[str, Any]]) -> str | None:
     failure: str | None = None
     drawn = 0.0
     for event in events:
+        if not started:
+            draw, started = _drawer(), True
         if event["type"] == "step":
             steps.append(event["label"])
         elif event["type"] == "text":
