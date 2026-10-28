@@ -9,6 +9,8 @@ import { moduleFolds } from "@/lib/progress/summary";
 export interface ModuleFold {
   slug: string;
   readable: ReadableLesson[];
+  /** Every lesson in it is still to be written: shaded, and nothing more. */
+  planned: boolean;
   heading: React.ReactNode;
   extent: React.ReactNode;
   lessons: React.ReactNode;
@@ -41,14 +43,16 @@ export default function ModuleFolds({
   );
   return modules.map((mod, i) => (
     <details key={mod.slug} open={i === folds.open} className="fold group/fold mt-5 first:mt-0">
-      <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 py-1 [&::-webkit-details-marker]:hidden">
+      <summary
+        className={`flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 py-1 [&::-webkit-details-marker]:hidden ${mod.planned ? "text-faint" : ""}`}
+      >
         {mod.heading}
         {folds.done[i] && (
           // `!`: LABEL_CLASS carries text-faint, and two colour utilities
           // resolve by stylesheet order, where faint wins.
           <span className={`${LABEL_CLASS} text-accent!`}>✓ done</span>
         )}
-        <span className="ml-auto flex items-baseline gap-3 font-mono text-[11px] text-faint">
+        <span className="ml-auto flex items-baseline gap-3 text-[0.8rem] tabular-nums text-faint">
           {mod.extent}
           <FoldChevron />
         </span>

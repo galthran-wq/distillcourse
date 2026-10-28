@@ -207,10 +207,17 @@ export function assetUrl(course: string, lesson: string, file: string): string {
 }
 
 /**
+ * Drawn art — an SVG, which the theme may invert; anything else is a
+ * photograph or a scan, which it only dims.
+ */
+export function isDrawnFile(path: string): boolean {
+  return path.toLowerCase().endsWith(".svg");
+}
+
+/**
  * The figure the home page shows for a course: its `cover`, else the first
  * lesson in course order with a `key_image` (planned ones too — the file
- * exists either way). `drawn` is an SVG, which the theme may invert; anything
- * else is a photograph or a scan, which it only dims.
+ * exists either way).
  */
 export function courseCover(
   loaded: LoadedCourse,
@@ -223,7 +230,7 @@ export function courseCover(
   if (pick?.image === undefined) return undefined;
   return {
     src: assetUrl(loaded.course.slug, pick.lesson, pick.image),
-    drawn: pick.image.toLowerCase().endsWith(".svg"),
+    drawn: isDrawnFile(pick.image),
   };
 }
 
