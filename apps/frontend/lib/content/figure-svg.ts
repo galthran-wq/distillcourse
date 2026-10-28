@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { basename, join, normalize } from "node:path";
 // The self-contained bundles, not the package entries: those load css-tree's
 // data through a JSON require that tsx hands its own ESM transform of the
-// JSON under `--conditions=import` (validate, export-index, preview).
+// JSON under `--conditions=import` (validate, export-index, preview). The
+// svgo bundle resolves only under that condition, as ESM does by default.
 import * as csstree from "css-tree/dist/csstree.esm";
 import { optimize } from "svgo/browser";
 
@@ -20,15 +21,22 @@ const XML_ENTITIES: Record<string, string> = {
   amp: "&",
 };
 
-/** Deterministic, so server and client renders of a frame agree. */
+/**
+ * Deterministic, so server and client renders of a frame agree. A lesson slug
+ * may start with a digit, which no class or id selector can.
+ */
 export function figurePrefix(lessonDir: string, file: string): string {
   return `${basename(lessonDir)}-${basename(file, ".svg")}`
     .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, "-");
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^(?=[0-9])/, "f");
 }
 
 export function inlineSvg(markup: string, prefix: string): string {
   return optimize(markup, {
+    // A self-closed non-void element inside <foreignObject> is not closed by
+    // the HTML parser, which would swallow its following siblings.
+    js2svg: { useShortTags: false },
     plugins: [
       { name: "prefixIds", params: { prefix, delim: DELIM } },
       {
@@ -55,7 +63,10 @@ export function inlineSvg(markup: string, prefix: string): string {
   }).data;
 }
 
-/** The lesson's raw figure at `rel`, scoped for inlining; null if unreadable. */
+/**
+ * The lesson's raw figure at `rel`, scoped for inlining; null if unreadable or
+ * not well-formed XML, so the page shows its placeholder (validate names why).
+ */
 export function loadFigureSvg(lessonDir: string, rel: string): string | null {
   const path = normalize(rel.replace(/^\.\//, ""));
   if (path.startsWith("..")) return null;
@@ -65,7 +76,11 @@ export function loadFigureSvg(lessonDir: string, rel: string): string | null {
   } catch {
     return null;
   }
-  return inlineSvg(markup, figurePrefix(lessonDir, path));
+  try {
+    return inlineSvg(markup, figurePrefix(lessonDir, path));
+  } catch {
+    return null;
+  }
 }
 
 /**

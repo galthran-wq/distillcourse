@@ -36,6 +36,10 @@ describe("inlineSvg", () => {
     }
   });
 
+  it("starts every prefix with a letter, as a selector must", () => {
+    expect(figurePrefix("/c/lessons/2d-rotations", "figures/a.svg")).toBe("f2d-rotations-a");
+  });
+
   it("is deterministic", () => {
     expect(inlineSvg(FIGURE, "one-a")).toBe(a);
   });
@@ -52,6 +56,10 @@ describe("unscopedSelectors", () => {
     expect(scoped("text { fill: red } .a text { fill: red }")).toEqual(["text", ".p__a text"]);
     expect(scoped("@media (max-width: 1px) { * { fill: red } }")).toEqual(["*"]);
     expect(scoped(":root, [fill] { color: red }")).toEqual([":root", "[fill]"]);
+  });
+
+  it("flags a <style> that does not parse", () => {
+    expect(scoped(".a { fill: red } }")).toEqual(["<style> that does not parse"]);
   });
 
   it("does not take keyframe stops for selectors", () => {

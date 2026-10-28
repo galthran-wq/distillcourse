@@ -34,7 +34,7 @@ import {
   probeImageFile,
 } from "./images";
 import { collectJsx, stringAttr } from "./mdx-jsx";
-import { figurePrefix, loadFigureSvg, unscopedSelectors } from "./figure-svg";
+import { figurePrefix, inlineSvg, unscopedSelectors } from "./figure-svg";
 
 export interface Diagnostic {
   level: "error" | "warn";
@@ -341,7 +341,8 @@ function lintLessonMdx(
       // whose subject is one of the figure's own classes or ids stays inside it.
       let leaks: string[];
       try {
-        leaks = unscopedSelectors(loadFigureSvg(entry.dir, rel) ?? "", figurePrefix(entry.dir, rel));
+        const prefix = figurePrefix(entry.dir, rel);
+        leaks = unscopedSelectors(inlineSvg(readFileSync(path, "utf8"), prefix), prefix);
       } catch (err) {
         diags.push({
           level: "error",
