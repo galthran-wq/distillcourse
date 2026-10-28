@@ -194,6 +194,7 @@ describe("the command palette", () => {
 const SUMMARY: ChatSummary = {
   id: "c1",
   kind: "web",
+  lab_lesson: null,
   model: "moonshotai/kimi-k3",
   title: "Entropy",
   created_at: "2026-08-01T09:00:00Z",

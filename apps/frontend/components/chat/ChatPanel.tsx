@@ -1,6 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import ChatList from "@/components/chat/ChatList";
 import ChatMenu from "@/components/chat/ChatMenu";
@@ -14,7 +15,13 @@ import {
   PlusIcon,
 } from "@/components/chat/icons";
 import { Button } from "@/components/ui";
-import { listModels, webChats, type ChatModel, type ChatSummary } from "@/lib/chat/api";
+import {
+  chatPage,
+  listModels,
+  siteChats,
+  type ChatModel,
+  type ChatSummary,
+} from "@/lib/chat/api";
 import { parseCommand } from "@/lib/chat/commands";
 import { startPanelDrag } from "@/lib/chat/panel-box";
 import { restoreQuotes, type Quote } from "@/lib/chat/quote";
@@ -77,6 +84,7 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
   const title = useRef<HTMLParagraphElement>(null);
   const lessons = useLessons();
   const sections = useSections();
+  const router = useRouter();
 
   useDismiss(menu, header, setMenu);
 
@@ -101,7 +109,7 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
     // and they are not ordered, so a superseded one must not be what lands.
     let live = true;
     const load = (): void => {
-      webChats().then((listed) => {
+      siteChats().then((listed) => {
         if (!live) return;
         setChats(listed);
         adoptSummary(listed);
@@ -130,6 +138,13 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
     setMenu(false);
     setNotice(null);
     work.then(() => setNotice(done), report);
+  }
+
+  /** A lab chat is had beside its lab, so choosing one goes to that page. */
+  function select(chat: ChatSummary): void {
+    run(selectSession(chat));
+    const page = chatPage(chat);
+    if (page !== null && page !== window.location.pathname) router.push(page);
   }
 
   function submit(text: string, quotes: Quote[]): void {
@@ -213,7 +228,7 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
             current={session.summary}
             chats={chats}
             expanded={expanded}
-            onSelect={(chat) => run(selectSession(chat))}
+            onSelect={select}
             onNew={() => run(clearSession())}
           />
         )}
@@ -238,7 +253,7 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
               chats={chats}
               current={session.summary.id}
               dated
-              onSelect={(chat) => run(selectSession(chat))}
+              onSelect={select}
             />
           </nav>
         )}

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui";
 import { MOTION_BASE_MS } from "@/components/ui/styles";
 import { useAuth } from "@/lib/auth/store";
 import { panelVars, usePanelDragging, usePanelFit } from "@/lib/chat/panel-box";
-import { resumeSession, useSession } from "@/lib/chat/session";
+import { openChat, resumeSession, useSession } from "@/lib/chat/session";
 import { collapsePanel, togglePanel, usePanel, usePanelBox } from "@/lib/chat/stored";
 import { LessonsProvider, type Lessons } from "@/lib/content/links";
 import { SectionsProvider, useLoadedSections } from "@/lib/content/sections";
@@ -45,6 +45,16 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
   // prompt and the line of status while auth is still loading are as tall as
   // their text, and a 24rem by 32rem box holding one line is an empty box.
   const shape = expanded ? "expanded" : auth.status === "signed-in" ? "docked" : "prompt";
+
+  // A link that names a chat — what a notebook's answer ends with — opens it.
+  // Before the resume below, which is what then reads the chat it remembered.
+  useEffect(() => {
+    if (auth.status !== "signed-in") return;
+    const named = new URLSearchParams(window.location.search).get("chat");
+    // A chat that is not the reader's is not in their listing and is simply
+    // not opened; only a listing that never came back is worth a word.
+    if (named !== null) openChat(named).catch(() => setUnreachable(true));
+  }, [auth.status]);
 
   useEffect(() => {
     if (!open || auth.status !== "signed-in" || session !== null) return;

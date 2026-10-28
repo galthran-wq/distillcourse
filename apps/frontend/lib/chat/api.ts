@@ -1,9 +1,12 @@
 import type { UIMessage } from "ai";
+import { lessonParts } from "@/lib/content/locator";
 import { call } from "@/lib/http";
 
 export interface ChatSummary {
   id: string;
   kind: string;
+  /** The lab a lab chat belongs to, as its lesson locator; null for any other. */
+  lab_lesson: string | null;
   model: string;
   title: string | null;
   created_at: string;
@@ -18,13 +21,19 @@ export interface ChatModel {
 }
 
 /**
- * The reader's chats with the site, most recently spoken in first. Telegram
- * threads are left out: the widget cannot render an eternal thread it does not
- * own.
+ * The reader's chats with the site — the panel's own, and the ones a lab
+ * notebook asked in — most recently spoken in first. Telegram threads are left
+ * out: the widget cannot render an eternal thread it does not own.
  */
-export async function webChats(): Promise<ChatSummary[]> {
+export async function siteChats(): Promise<ChatSummary[]> {
   const chats = await call<ChatSummary[]>("/chats");
-  return chats.filter((chat) => chat.kind === "web");
+  return chats.filter((chat) => chat.kind !== "telegram");
+}
+
+/** The page a chat belongs on: a lab chat's lab, null for any other chat. */
+export function chatPage(chat: ChatSummary): string | null {
+  const parts = chat.lab_lesson === null ? null : lessonParts(chat.lab_lesson);
+  return parts === null ? null : `/courses/${parts.course}/lessons/${parts.lesson}`;
 }
 
 export function createChat(model?: string): Promise<ChatSummary> {

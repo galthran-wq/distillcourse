@@ -10,11 +10,15 @@ import { SectionsProvider } from "@/lib/content/sections";
 import { LESSONS, SECTIONS } from "./chat-fixture";
 import { mounted, stubResizeObserver } from "./utils/dom";
 
+const push = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+
 stubResizeObserver();
 
 const SUMMARY: ChatSummary = {
   id: "c1",
   kind: "web",
+  lab_lesson: null,
   model: "moonshotai/kimi-k3",
   title: "what is entropy?",
   created_at: "2026-08-07T09:00:00Z",
@@ -29,7 +33,10 @@ function serve(): void {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
-      const body = url.endsWith("/chats/models") ? [] : ((listings += 1), listing);
+      const body =
+        url.endsWith("/chats/models") || url.endsWith("/messages")
+          ? []
+          : ((listings += 1), listing);
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -67,6 +74,7 @@ function rail(): string[] {
 beforeEach(() => {
   listing = [SUMMARY];
   listings = 0;
+  push.mockReset();
   serve();
   vi.useFakeTimers({ shouldAdvanceTime: true });
 });
@@ -102,5 +110,40 @@ describe("the listing the panel keeps", () => {
     });
 
     expect(listings).toBe(settled + 1);
+  });
+});
+
+describe("a lab chat in the rail", () => {
+  it("is opened on its lab's page", async () => {
+    listing = [
+      SUMMARY,
+      {
+        ...SUMMARY,
+        id: "lab1",
+        kind: "lab",
+        lab_lesson: "lesson:fraud-ml/scorecard-vs-gbm-lab",
+        title: "why is my IV negative?",
+      },
+    ];
+    await panel();
+
+    const row = [...host().querySelectorAll("nav button")].find((button) =>
+      button.textContent?.includes("why is my IV negative?"),
+    );
+    await act(async () => row?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+
+    expect(push).toHaveBeenCalledWith("/courses/fraud-ml/lessons/scorecard-vs-gbm-lab");
+  });
+
+  it("leaves a web chat where the reader is", async () => {
+    listing = [SUMMARY, { ...SUMMARY, id: "c2", title: "another" }];
+    await panel();
+
+    const row = [...host().querySelectorAll("nav button")].find((button) =>
+      button.textContent?.includes("another"),
+    );
+    await act(async () => row?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+
+    expect(push).not.toHaveBeenCalled();
   });
 });

@@ -7,14 +7,14 @@ import {
   createChat,
   loadMessages,
   setChatModel,
-  webChats,
+  siteChats,
   type ChatSummary,
 } from "@/lib/chat/api";
 import { API } from "@/lib/api-base";
 import { errorDetail } from "@/lib/http";
 import { currentLocator } from "@/lib/lesson/position";
 import { takeQuotes } from "@/lib/chat/quote";
-import { rememberChat, storedChatId } from "@/lib/chat/stored";
+import { openPanel, rememberChat, storedChatId } from "@/lib/chat/stored";
 import { createStore } from "@/lib/store";
 
 export interface Session {
@@ -62,7 +62,7 @@ export function resumeSession(): Promise<Session> {
   // Without a single in-flight bootstrap, a second render would create a
   // second chat before the first request came back.
   opening ??= (async () => {
-    const chats = await webChats();
+    const chats = await siteChats();
     // The stored one can be gone — deleted, or belonging to whoever was
     // signed in on this browser before — and then the most recent stands in.
     const last = chats.find((chat) => chat.id === storedChatId());
@@ -81,6 +81,21 @@ export function resetSession(): void {
 
 export function selectSession(summary: ChatSummary): Promise<Session> {
   return open(summary);
+}
+
+/**
+ * Open the chat a link names — `?chat=<id>`, the way a notebook's answer sends
+ * the reader to the site. With nothing open yet it is only remembered: the
+ * panel opening is what resumes, and resuming reads the remembered chat, so
+ * there is one bootstrap rather than two racing to set the session.
+ */
+export async function openChat(id: string): Promise<void> {
+  rememberChat(id);
+  openPanel();
+  const current = session.get();
+  if (current === null || current.summary.id === id) return;
+  const named = (await siteChats()).find((chat) => chat.id === id);
+  if (named !== undefined) await open(named);
 }
 
 /** `/clear` on the web: a new chat, not a marker in this one. */

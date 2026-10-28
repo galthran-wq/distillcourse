@@ -141,10 +141,12 @@ describe.skipIf(!hasUv)("lab build", () => {
     ]) {
       expect(published).not.toContain(secret);
     }
-    // The private half is the answer key and nothing else: no model answer,
-    // which is the author's own wording, not a grading input.
-    expect(priv).not.toContain("model_answer");
-    expect(priv).not.toContain("any concentration of");
+    // The answer key is the grading inputs and nothing else: no model answer,
+    // which is the author's own wording. It does reach the tutor, as a line of
+    // the reference solution the private half also carries.
+    const key = JSON.stringify(JSON.parse(priv).checkpoints);
+    expect(key).not.toContain("model_answer");
+    expect(key).not.toContain("any concentration of");
   });
 
   it("publishes the inputs but never the outputs", () => {

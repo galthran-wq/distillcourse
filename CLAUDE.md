@@ -39,6 +39,15 @@ outranks both. Its one kind no comparison can answer, a `review`
 checkpoint, is decided by a single toolless model call (`app/labs/judge.py`)
 that borrows the harness's plumbing — the model, the usage row and the monthly
 ceiling, which sums `lab_submissions.usage` alongside `messages.usage`.
+`distill.ask(text, *objects)` is the tutor itself, not a second agent: the
+web chat's stream path (`runner.start_stream`) in a chat of kind `lab`
+(`chats.lab_lesson`), one per lab and kept on the server — a question naming
+no chat continues the latest, `distill.clear_chat()` makes a new one — with
+the `notebook` medium, and, on any run in a lab chat, the lab prompt
+(`prompts/lab.md`) and the lab toolset (`app/labs/tools.py`: progress, a
+checkpoint's key, the reference solution). It answers in four SSE events of
+its own (`app/labs/chat.py`), not the Vercel AI protocol; the site lists lab
+chats and opens one on its lab's page, from `?chat=<id>` as well.
 The harness's prompt modules
 (`app/harness/prompts/*.md`) are content, not configuration: `docs/pedagogy.md`
 governs them exactly as it governs lessons, and they are written in the same
@@ -119,7 +128,9 @@ Rules that override defaults:
   follows automatically; if you fork either, search starts lying.
   The one exception is a lab's answer key: the same command also loads
   `labs-dist/private/` (`npm run build-labs`, which `make reindex` runs) into
-  `lab_challenges` via `app/labs/ingest.py`. It is an exception because it is
+  `lab_challenges` via `app/labs/ingest.py`, and the lab's `solution.py`
+  into `lab_solutions` — not secret (the repo is public), read only by the
+  lab tools of a lab chat. It is an exception because it is
   the opposite rule — expected outputs, held-out labels and rubrics must NEVER
   become `documents` rows, which search returns and the tutor quotes. The
   manifest the notebook reads is served from `lab_challenges.spec["public"]`,
