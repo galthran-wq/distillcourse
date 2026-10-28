@@ -19,6 +19,11 @@ export type StoredChat = {
   bottom: number;
   width: number;
   height: number;
+  /**
+   * How wide the expanded panel's reading column was dragged, in CSS pixels;
+   * 0 for never, which is the default `ChatPanel` sets.
+   */
+  column: number;
   /** The chat the reader had open, "" for none. It may since have been deleted. */
   chatId: string;
   /** The message they were in the middle of writing. */
@@ -65,6 +70,7 @@ const stored = createPersistedStore<StoredChat>("distillcourse.chat", {
   bottom: LAUNCHER_CLEARANCE,
   width: MIN_WIDTH,
   height: MIN_HEIGHT,
+  column: 0,
   chatId: "",
   draft: "",
   quotes: "",
@@ -134,9 +140,21 @@ export function setPanelBox(box: PanelBox): void {
   stored.set(box);
 }
 
+export function useColumnWidth(): number {
+  return stored.use("column");
+}
+
+export function setColumnWidth(column: number): void {
+  if (column !== stored.get().column) stored.set({ column });
+}
+
 /** The message being written, kept here so a reload does not lose it. */
 export function useDraft(): string {
   return stored.use("draft");
+}
+
+export function storedDraft(): string {
+  return stored.get().draft;
 }
 
 export function setDraft(draft: string): void {

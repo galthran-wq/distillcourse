@@ -1,7 +1,6 @@
 import asyncio
 import json
 import uuid
-from collections.abc import AsyncGenerator, Sequence
 from datetime import UTC, datetime
 
 import pytest
@@ -14,10 +13,8 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.test import TestModel
-from pydantic_ai.ui.vercel_ai import VercelAIAdapter
-from pydantic_ai.ui.vercel_ai.request_types import SubmitMessage, TextUIPart, UIMessage
+from pydantic_ai.ui.vercel_ai.request_types import TextUIPart, UIMessage
 from pydantic_ai.ui.vercel_ai.response_types import (
-    BaseChunk,
     ErrorChunk,
     TextDeltaChunk,
     ToolInputAvailableChunk,
@@ -27,13 +24,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.core.config import settings
 from app.harness import runner
 from app.harness.agent import namer, tutor
-from app.harness.deps import HarnessDeps
 from app.harness.limits import LimitExceeded
 from app.harness.repository import HarnessRepository
 from app.harness.usage import REQUESTS
-from app.models import Chat, Message
+from app.models import Chat
 from tests.conftest import settled
-from tests.harness.conftest import compacting
+from tests.harness.conftest import compacting, start, stored
 
 QUESTION = ModelRequest(parts=[UserPromptPart(content="what is entropy?")])
 
@@ -78,10 +74,6 @@ def counting(text: str, calls: list[str]) -> FunctionModel:
     return FunctionModel(turn)
 
 
-def stored(rows: Sequence[Message]) -> str:
-    return json.dumps([row.pydantic_ai for row in rows])
-
-
 def sent(messages: list[ModelMessage]) -> str:
     """The prompt a pass was given, as the model received it."""
     return "".join(
@@ -90,28 +82,6 @@ def sent(messages: list[ModelMessage]) -> str:
         if isinstance(message, ModelRequest)
         for part in message.parts
         if isinstance(part, UserPromptPart) and isinstance(part.content, str)
-    )
-
-
-async def start(
-    session_factory: async_sessionmaker[AsyncSession],
-    repo: HarnessRepository,
-    chat: Chat,
-    question: str = "what is entropy?",
-    earlier: Sequence[UIMessage] = (),
-) -> AsyncGenerator[BaseChunk]:
-    adapter = VercelAIAdapter[HarnessDeps, str](
-        agent=tutor,
-        run_input=SubmitMessage(
-            id=str(chat.id),
-            messages=[
-                *earlier,
-                UIMessage(id="m1", role="user", parts=[TextUIPart(text=question)]),
-            ],
-        ),
-    )
-    return await runner.start_stream(
-        session_factory=session_factory, repo=repo, chat=chat, adapter=adapter
     )
 
 

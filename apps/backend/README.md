@@ -40,7 +40,8 @@ app/
     repository.py    # user-scoped reads and writes over chats and messages
     usage.py         # the shape of messages.usage, written once, read by caps
     limits.py        # the daily cap, the monthly ceiling, the web search cap
-    runner.py        # claim, persist, stream, compact
+    runner.py        # claim, persist, stream, stop, compact
+    steering.py      # messages a web run takes while it answers
     title.py         # naming a chat, and naming it again as it moves on
   core/
     config.py        # pydantic-settings; env vars only, no .env reading
@@ -175,6 +176,21 @@ response, not the run. Messages are stored twice: as native pydantic-ai JSON,
 which is what the next run replays, and as the Vercel AI projection the widget
 renders. A failed run marks its rows, which keeps them on screen and out of
 the model's context.
+
+A web run can be stopped and steered while it streams, both through requests
+of their own — the stream stays one-way. The runs in flight are an in-process
+registry (`runner._runs`; the backend is one process). `POST
+/chats/{id}/stop` cancels the agent's part of the run and returns once what it
+had produced — the text streamed so far, the tool calls that completed — is
+stored like the turn of a run that died, unmarked and with what it cost,
+and the chat is free.
+`POST /chats/{id}/steer` queues a message for the run: a history processor on
+the tutor (`ProcessHistory`) appends it as a user request before the next model
+request, it is stored as a `user` row between the model messages it came
+between, and the stream announces it as a `data-steer` part. A steer still
+queued when the run makes its last request goes back to the client as
+`data-steer-unused`, ahead of the finish, to be sent as a turn; one sent with
+no run in flight is a 409 and the same thing.
 
 The history a run is given is the one in the database. A Vercel AI client
 posts every message it holds on every turn; `POST /chats/{id}/stream` takes

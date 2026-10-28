@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { UIMessage } from "ai";
 import type { ChatSummary } from "@/lib/chat/api";
 import type { StoredChat } from "@/lib/chat/stored";
 
@@ -89,7 +90,8 @@ const REPLY = [
 async function session() {
   const store = await import("@/lib/chat/session");
   const position = await import("@/lib/lesson/position");
-  return { ...store, ...position };
+  const steering = await import("@/lib/chat/steer");
+  return { ...store, ...position, ...steering };
 }
 
 /** What a previous visit left in storage, read as the modules are built. */
@@ -245,6 +247,99 @@ describe("the chat session", () => {
     await answered;
 
     expect(busy(open.chat.status)).toBe(false);
+  });
+
+  it("marks steers queued until the run reads them, and resends the rest as one turn", async () => {
+    const first = stream();
+    const second = stream();
+    const replies = [first.response, second.response];
+    served({
+      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats/c1/messages": json([]),
+      "POST /api/v1/chats/c1/stream": () => replies.shift()!(),
+      "POST /api/v1/chats/c1/steer": json(null),
+    });
+    const { resumeSession, steer, steerMark } = await session();
+    const open = await resumeSession();
+    const answered = open.chat.sendMessage({ text: "isolation forests?" });
+    await vi.waitFor(() => expect(sent("POST", "/api/v1/chats/c1/stream")).toHaveLength(1));
+    first.push({ type: "start" });
+    first.push({ type: "start-step" });
+    first.push({ type: "text-start", id: "t0" });
+    first.push({ type: "text-delta", id: "t0", delta: "Isolation " });
+    await vi.waitFor(() => expect(open.chat.messages.at(-1)?.role).toBe("assistant"));
+
+    for (const words of ["path length, not code", "shorter", "with a picture"])
+      await steer(open.chat, words);
+    const [taken, ...unused] = sent("POST", "/api/v1/chats/c1/steer").map(
+      (call) => (call.body as { id: string }).id,
+    );
+    // Under the question, above the answer being written into.
+    expect(open.chat.messages.map((message) => message.role)).toEqual([
+      "user",
+      "user",
+      "user",
+      "user",
+      "assistant",
+    ]);
+    expect(open.chat.messages.map(steerMark)).toEqual([
+      null,
+      "queued",
+      "queued",
+      "queued",
+      null,
+    ]);
+
+    first.push({ type: "data-steer", data: { id: taken }, transient: true });
+    first.push({ type: "text-delta", id: "t0", delta: "forests." });
+    first.push({ type: "text-end", id: "t0" });
+    first.push({ type: "finish-step" });
+    first.push({ type: "data-steer-unused", data: { ids: unused }, transient: true });
+    first.push({ type: "finish" });
+    first.end();
+    await answered;
+
+    await vi.waitFor(() => expect(sent("POST", "/api/v1/chats/c1/stream")).toHaveLength(2));
+    const resent = sent("POST", "/api/v1/chats/c1/stream")[1].body as {
+      messages: UIMessage[];
+    };
+    expect(resent.messages.at(-1)?.parts).toEqual([
+      { type: "text", text: "shorter\n\nwith a picture" },
+    ]);
+    expect(open.chat.messages.filter((message) => steerMark(message) !== null)).toEqual([
+      expect.objectContaining({ metadata: { steer: "taken" } }),
+    ]);
+    second.end();
+  });
+
+  it("puts what a stopped run never read back into the composer, and sends nothing", async () => {
+    const reply = stream();
+    served({
+      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats/c1/messages": json([]),
+      "POST /api/v1/chats/c1/stream": reply.response,
+      "POST /api/v1/chats/c1/steer": json(null),
+    });
+    const { resumeSession, steer } = await session();
+    const { setDraft, storedDraft } = await import("@/lib/chat/stored");
+    const open = await resumeSession();
+    const answered = open.chat.sendMessage({ text: "isolation forests?" });
+    for (const chunk of REPLY.slice(0, 4)) reply.push(chunk);
+    await vi.waitFor(() => expect(open.chat.status).toBe("streaming"));
+    await steer(open.chat, "shorter");
+    setDraft("and a picture");
+
+    await open.chat.stop();
+    // A stubbed response does not hear the abort; a real one ends here.
+    reply.end();
+    await answered;
+
+    await vi.waitFor(() => expect(storedDraft()).toBe("shorter\n\nand a picture"));
+    expect(open.chat.messages.map((message) => message.role)).toEqual([
+      "user",
+      "assistant",
+    ]);
+    expect(sent("POST", "/api/v1/chats/c1/stream")).toHaveLength(1);
   });
 
   it("says nothing about position when the reader is not in a lesson", async () => {

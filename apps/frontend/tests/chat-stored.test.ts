@@ -16,6 +16,7 @@ const BOX = { right: 24, bottom: 80, width: 384, height: 512 };
 const LEFT_BY_U1: StoredChat = {
   panel: "docked",
   ...BOX,
+  column: 0,
   chatId: "c1",
   draft: "half a question",
   // The passages that half a question is about: one unsent message with it.
@@ -52,6 +53,7 @@ describe("what the widget remembers", () => {
     expect(entry()).toEqual({
       panel: "docked",
       ...BOX,
+      column: 0,
       chatId: "c1",
       draft: "why is this true?",
       quotes: "",
@@ -84,6 +86,7 @@ describe("what the widget remembers", () => {
     expect(entry()).toEqual({
       panel: "docked",
       ...BOX,
+      column: 0,
       chatId: "c1",
       draft: "",
       quotes: "",
@@ -124,6 +127,7 @@ describe("what the widget remembers", () => {
     expect(entry()).toEqual({
       panel: "docked",
       ...BOX,
+      column: 0,
       chatId: "",
       draft: "",
       quotes: "",
@@ -142,6 +146,7 @@ describe("what the widget remembers", () => {
     expect(entry()).toEqual({
       panel: "docked",
       ...BOX,
+      column: 0,
       chatId: "",
       draft: "",
       quotes: "",
