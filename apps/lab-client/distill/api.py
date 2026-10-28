@@ -7,7 +7,9 @@ answer with becomes one line telling them what to do about it.
 
 from __future__ import annotations
 
+import json
 import os
+from collections.abc import Iterator
 from typing import Any
 
 import httpx
@@ -26,11 +28,19 @@ HOST_VAR = "DISTILL_API"
 TOKEN_VAR = "DISTILL_TOKEN"
 
 TIMEOUT = 30.0
+# An answer is read as it is written, and between two of its events the tutor
+# may be searching the web or reading a long lesson.
+ANSWER_TIMEOUT = httpx.Timeout(TIMEOUT, read=180.0)
 
 UNREACHABLE = (
     "could not reach distillcourse — check the connection and run the cell again"
 )
 STALE = "the lab was updated — reopen the notebook from the course page"
+# On a question 409 is not the version guard: it is the same chat still
+# answering, from another cell or another kernel.
+BUSY = (
+    "the tutor is still answering in this chat — wait for that answer, then ask again"
+)
 UNPAIRED = "not paired — run distill.login() and approve it from your signed-in browser"
 # A token the server will not take. It outlives the kernel, so the likely
 # reason is that the account ended it: changing the password or signing out
@@ -98,14 +108,39 @@ class Api:
     def submit(self, body: dict[str, Any]) -> dict[str, Any]:
         return self._request("POST", "/labs/submissions", body=body, as_learner=True)
 
+    def new_chat(self, lab: str) -> dict[str, Any]:
+        return self._request("POST", f"/labs/{lab}/chat", as_learner=True)
+
+    def ask(self, lab: str, body: dict[str, Any]) -> Iterator[dict[str, Any]]:
+        """The tutor's answer, one event per `data:` line as the server writes
+        them."""
+        try:
+            with self._client.stream(
+                "POST",
+                _url(f"/labs/{lab}/ask"),
+                json=body,
+                headers=self._bearer(),
+                timeout=ANSWER_TIMEOUT,
+            ) as response:
+                if not response.is_success:
+                    response.read()
+                    busy = response.status_code == httpx.codes.CONFLICT
+                    raise LabError(BUSY if busy else _refusal(response))
+                for line in response.iter_lines():
+                    if line.startswith("data: "):
+                        yield json.loads(line.removeprefix("data: "))
+        except httpx.HTTPError:
+            raise LabError(UNREACHABLE) from None
+
+    def _bearer(self) -> dict[str, str]:
+        if self.token is None:
+            raise LabError(UNPAIRED)
+        return {"Authorization": f"Bearer {self.token}"}
+
     def _request(
         self, method: str, path: str, *, body: Any = None, as_learner: bool = False
     ) -> dict[str, Any]:
-        headers = {}
-        if as_learner:
-            if self.token is None:
-                raise LabError(UNPAIRED)
-            headers["Authorization"] = f"Bearer {self.token}"
+        headers = self._bearer() if as_learner else {}
         try:
             response = self._client.request(
                 method, _url(path), json=body, headers=headers
