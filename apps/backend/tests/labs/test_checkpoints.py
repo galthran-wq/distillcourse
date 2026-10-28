@@ -99,6 +99,16 @@ async def test_a_payload_the_checkpoint_cannot_take_is_a_400(
     assert refused.status_code == 400
 
 
+async def test_a_hold_out_the_size_of_the_largest_lab_s_gets_past_the_size_gate(
+    notebook: AsyncClient,
+) -> None:
+    """fraud-ml's cost-aware lab posts 23,108 scores, about 457 KiB of JSON;
+    this one is refused for its length, not for its size."""
+    refused = await post(notebook, "beat-baseline", [0.123456789012345] * 30_000)
+
+    assert refused.status_code == 400
+
+
 async def test_a_metric_keeps_the_best_score_it_has_ever_seen(
     notebook: AsyncClient, session: AsyncSession, user: User
 ) -> None:
