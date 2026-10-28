@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { LABEL_CLASS } from "./styles";
 
 export interface Target {
   /** What the reader has to achieve, phrased as an instruction. */
@@ -26,7 +27,7 @@ export function TargetList({
 }) {
   return (
     <div className="mb-3 rounded border border-line p-2">
-      <p className="pb-1 text-xs font-medium uppercase tracking-wide text-faint">
+      <p className={`pb-1 ${LABEL_CLASS}`}>
         {title}
       </p>
       <ol className="space-y-1 text-sm" aria-live="polite">

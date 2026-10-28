@@ -35,8 +35,8 @@ if (target !== undefined && target in figures) {
   // so the theme's text colour is injected on the root element.
   const svgPath = resolve(target);
   const src = readFileSync(svgPath, "utf8");
-  const ink = dark ? "#e9e9e7" : "#131312";
-  const paper = dark ? "#131312" : "#fdfdfc";
+  const ink = dark ? "#eef0f2" : "#15171a";
+  const paper = dark ? "#0f1012" : "#ffffff";
   const themed = src.replace(/<svg\b/, `<svg style="color:${ink}"`);
   const outDir = join(appRoot, ".preview");
   mkdirSync(outDir, { recursive: true });
@@ -84,8 +84,8 @@ const markup = renderToStaticMarkup(createElement(component, { frame }));
 // twice — a defect of the harness that reviewers saw as a defect of the figure.
 const katexCss = require.resolve("katex/dist/katex.min.css");
 const tokens = dark
-  ? "--paper:#131312;--panel:#1d1d1b;--ink:#eaeae6;--line:#34342f;"
-  : "--paper:#fdfdfc;--panel:#f4f4f1;--ink:#191918;--line:#d9d9d3;";
+  ? "--paper:#0f1012;--panel:#1a1c20;--ink:#eef0f2;--line:#33373d;"
+  : "--paper:#ffffff;--panel:#f2f3f5;--ink:#15171a;--line:#d5d8dc;";
 
 const html = `<!doctype html>
 <html><head><meta charset="utf-8">
@@ -126,7 +126,7 @@ execFileSync(
 );
 
 // Trim the empty page area around the figure, keep a small margin.
-const paper = dark ? "#131312" : "#fdfdfc";
+const paper = dark ? "#0f1012" : "#ffffff";
 execFileSync("convert", [
   out,
   "-trim",
