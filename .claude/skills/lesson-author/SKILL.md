@@ -75,7 +75,8 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
    Only THEN quarry the research brief for the specific evidence each claim
    needs. The brief is a quarry, not a coverage checklist: a fact no claim
    needs does not enter the prose, however good it is. Then decide the
-   apparatus: which statements become `<Definition>`/`<Theorem>`/`<Proof>`
+   apparatus: which statements become `<Definition>`/`<Theorem>`/`<Lemma>`/
+   `<Proposition>`/`<Corollary>`/`<Proof>`
    (only where genuinely mathematical — L5; for non-mathematical material
    use `<Remark>` and prose), where the worked `<Example>`s and their
    paired in-body exercises go (math overlay), where the `<Demo>` embed

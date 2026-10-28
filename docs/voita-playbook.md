@@ -37,15 +37,17 @@ where that helps, never slop); what we do not adopt is its chattiness.
    recap. If a course needs another course, that is a course-level
    prerequisite entry in course.yaml.
 
-## Callout color roles (constant across all courses)
+## Callout roles (constant across all courses)
 
-- **Rose `<KeyFact>`** — the load-bearing or surprising fact, one sentence.
-  A returning reader scans for rose to recall the lesson's punchlines.
-- **Green `<Task>`** — something the reader does right now (compute this,
+- **`<KeyFact>`** — the load-bearing or surprising fact, one sentence, on
+  the only tinted panel in a lesson. A returning reader scans for the
+  panels to recall the lesson's punchlines.
+- **`<Task>`** — something the reader does right now (compute this,
   drag that, check this), stated as an instruction with an observable.
-- **Amber** — the accent: links, the figure subject, active states.
-- Typed math environments (Definition/Theorem/Example/Remark) keep their
-  existing neutral panels. At most one KeyFact and one Task per section.
+- **Ochre** — the accent: links, the figure subject, active states.
+- Typed math environments (Definition/Theorem/Example/Remark) are set as in
+  a printed book, on rules rather than in boxes. At most one KeyFact and
+  one Task per section.
 
 ## Writing principles (register-neutral; voice stays dry per L9)
 
