@@ -6,14 +6,19 @@ carries and prints what they point at, the person settles every row the
 evidence does not, and `apply` writes the list they signed off.
 """
 
-import json
 import re
 import uuid
 from collections import Counter
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from typing import Any
 
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelMessagesTypeAdapter,
+    ModelRequest,
+    ToolCallPart,
+    UserPromptPart,
+)
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,10 +30,12 @@ from app.models import Chat, Message
 UNDECIDED = "?"
 # What the person writes for a chat that belongs to no course.
 GENERAL = "general"
+# Enough of the first question to tell what it was about, on one line.
+SUBJECT_LENGTH = 200
 
 # The position block the harness puts in a turn's instructions
 # (`harness/context.py`), and a reference as a message writes one — a quoted
-# passage, an `@` mention, a locator the tutor cited.
+# passage or an `@` mention in what the learner wrote.
 _READING = re.compile(rf"They are reading `(lesson:{SLUG}/{SLUG})(?:#{ANCHOR})?`")
 _REFERENCE = re.compile(rf"\[\[((?:lesson|research|concept|course):{SLUG}[^\]]*)\]\]")
 
@@ -56,90 +63,71 @@ class Proposal:
         return "\t".join(" ".join(cell.split()) for cell in cells)
 
 
-def _args(part: dict[str, Any]) -> dict[str, Any]:
-    args = part.get("args")
-    if isinstance(args, str):
-        try:
-            args = json.loads(args)
-        except ValueError:
-            return {}
-    return args if isinstance(args, dict) else {}
-
-
-def _texts(content: object) -> Iterator[str]:
-    if isinstance(content, str):
-        yield content
-    elif isinstance(content, list):
-        yield from (item for item in content if isinstance(item, str))
-
-
-def evidence(payload: dict[str, Any]) -> Iterator[tuple[str, str]]:
+def evidence(message: ModelMessage) -> Iterator[tuple[str, str]]:
     """`(source, course)` for every course one stored message points at.
 
     Tool returns are not read: a search answers across every course, so what
     it found says what the index holds rather than what was asked about.
     """
-    for found in _READING.finditer(payload.get("instructions") or ""):
-        yield "reading", course_of(found[1])
-    for part in payload.get("parts", []):
-        kind = part.get("part_kind")
-        if kind == "user-prompt":
-            for text in _texts(part.get("content")):
-                for found in _REFERENCE.finditer(text):
-                    yield "quoted", course_of(found[1])
-        elif kind == "tool-call" and part.get("tool_name") == "fetch_content":
-            locator = _args(part).get("locator")
+    if isinstance(message, ModelRequest):
+        for found in _READING.finditer(message.instructions or ""):
+            yield "reading", course_of(found[1])
+    for part in message.parts:
+        if isinstance(part, UserPromptPart) and isinstance(part.content, str):
+            for found in _REFERENCE.finditer(part.content):
+                yield "quoted", course_of(found[1])
+        elif isinstance(part, ToolCallPart) and part.tool_name == "fetch_content":
+            locator = part.args_as_dict().get("locator")
             if isinstance(locator, str) and ":" in locator:
                 yield "fetched", course_of(locator)
-        elif kind == "tool-call" and part.get("tool_name") == "search_content":
-            course = _args(part).get("course")
+        elif isinstance(part, ToolCallPart) and part.tool_name == "search_content":
+            course = part.args_as_dict().get("course")
             if isinstance(course, str) and course:
                 yield "searched", course
 
 
-def _subject(payloads: Iterable[dict[str, Any]]) -> str:
-    for payload in payloads:
-        for part in payload.get("parts", []):
-            if part.get("part_kind") == "user-prompt":
-                return next(_texts(part.get("content")), "")[:200]
+def _subject(rows: Sequence[Message], messages: Sequence[ModelMessage]) -> str:
+    # The learner's own first words: a compaction summary or a message the
+    # platform started by itself is stored as a prompt too, under another role.
+    for row, message in zip(rows, messages, strict=True):
+        if row.role != "user":
+            continue
+        for part in message.parts:
+            if isinstance(part, UserPromptPart) and isinstance(part.content, str):
+                return part.content[:SUBJECT_LENGTH]
     return ""
 
 
-def classify(
-    chat_id: uuid.UUID,
-    title: str | None,
-    payloads: list[dict[str, Any]],
-    courses: set[str],
-) -> Proposal:
+def classify(chat: Chat, rows: Sequence[Message], courses: set[str]) -> Proposal:
     """A course only where every pointer the chat carries agrees on one that
     still exists; anything else is left for the person to read."""
-    found = Counter(item for payload in payloads for item in evidence(payload))
+    messages = ModelMessagesTypeAdapter.validate_python(
+        [row.pydantic_ai for row in rows]
+    )
+    found = Counter(item for message in messages for item in evidence(message))
     named = {course for _, course in found}
     course = next(iter(named)) if len(named) == 1 and named <= courses else UNDECIDED
-    return Proposal(chat_id, title, course, found, _subject(payloads))
+    return Proposal(chat.id, chat.title, course, found, _subject(rows, messages))
 
 
 async def propose(session: AsyncSession) -> list[Proposal]:
-    """Every web chat not yet filed. Selected column by column rather than as
-    `Chat`, so it reads a database the column has not been added to yet."""
+    """Every web chat not filed under a course yet."""
     courses = {course.course for course in await structure(session)}
     chats = (
-        await session.execute(
-            select(Chat.id, Chat.title)
-            .where(Chat.kind == "web")
+        await session.scalars(
+            select(Chat)
+            .where(Chat.kind == "web", Chat.course.is_(None))
             .order_by(Chat.created_at)
         )
     ).all()
     proposals = []
-    for chat_id, title in chats:
-        payloads = (
+    for chat in chats:
+        rows = (
             await session.scalars(
-                select(Message.pydantic_ai)
-                .where(Message.chat_id == chat_id)
-                .order_by(Message.id)
+                select(Message).where(Message.chat_id == chat.id).order_by(Message.id)
             )
         ).all()
-        proposals.append(classify(chat_id, title, list(payloads), courses))
+        proposals.append(classify(chat, rows, courses))
     return proposals
 
 
@@ -165,11 +153,17 @@ async def apply(
     unknown = {course for course in filed.values() if course is not None} - courses
     if unknown:
         raise ValueError(f"not a course in the index: {', '.join(sorted(unknown))}")
+    counts: Counter[str] = Counter()
     for chat_id, course in filed.items():
-        await session.execute(
+        # Only a chat still unfiled: one a page or the reader's own "Move to…"
+        # filed since the proposal was printed keeps where it was put.
+        filing = await session.execute(
             update(Chat)
-            .where(Chat.id == chat_id, Chat.kind == "web")
+            .where(Chat.id == chat_id, Chat.kind == "web", Chat.course.is_(None))
             .values(course=course)
+            .returning(Chat.id)
         )
+        if filing.first() is not None:
+            counts[course or GENERAL] += 1
     await session.commit()
-    return Counter(course or GENERAL for course in filed.values())
+    return counts

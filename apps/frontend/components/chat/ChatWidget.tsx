@@ -12,7 +12,7 @@ import { useAuth } from "@/lib/auth/store";
 import { panelVars, usePanelDragging, usePanelFit } from "@/lib/chat/panel-box";
 import { resumeSession, useSession } from "@/lib/chat/session";
 import { collapsePanel, togglePanel, usePanel, usePanelBox } from "@/lib/chat/stored";
-import { LessonsProvider, type Lessons } from "@/lib/content/links";
+import { courseNames, LessonsProvider, type Lessons } from "@/lib/content/links";
 import { SectionsProvider, useLoadedSections } from "@/lib/content/sections";
 import { useExitDelay } from "@/lib/ui/exit";
 import { lockScroll } from "@/lib/ui/scroll-lock";
@@ -21,8 +21,11 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
   const auth = useAuth();
   const session = useSession();
   // The course of the page, from its route — a course page, a lesson, a lab;
-  // null everywhere else. It is what the panel lists and files new chats under.
-  const course = useParams<{ course?: string }>().course ?? null;
+  // null everywhere else. It is what the panel lists and files new chats under,
+  // so a slug the site does not render (a 404 under `/courses/`) is no course:
+  // the backend would refuse to file a chat under it.
+  const routed = useParams<{ course?: string }>().course;
+  const course = routed !== undefined && courseNames(lessons).has(routed) ? routed : null;
   const panel = usePanel();
   // A window can be smaller than the one the box was dragged out in, and can
   // change size under an open panel. What that leaves is drawn rather than

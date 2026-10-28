@@ -100,7 +100,7 @@ async def test_a_course_no_longer_in_the_index_is_not_proposed(
 async def test_the_reviewed_list_files_every_chat_it_names(
     session: AsyncSession, repo: HarnessRepository, chat: Chat
 ) -> None:
-    general = await repo.create_chat(kind="web", course="quant")
+    general = await repo.create_chat(kind="web")
     reviewed = io.StringIO(
         f"{chat.id}\ttitle\tfraud-ml\tevidence\tsubject\n\n"
         f"{general.id}\t\tgeneral\t\t\n"
@@ -112,6 +112,19 @@ async def test_the_reviewed_list_files_every_chat_it_names(
     await session.refresh(general)
     assert (chat.course, general.course) == ("fraud-ml", None)
     assert counts == {"fraud-ml": 1, "general": 1}
+
+
+async def test_a_chat_filed_since_the_proposal_keeps_its_course(
+    session: AsyncSession, repo: HarnessRepository
+) -> None:
+    moved = await repo.create_chat(kind="web", course="quant")
+
+    assert [p.chat_id for p in await filing.propose(session)] == []
+    counts = await filing.apply(session, {moved.id: "fraud-ml"})
+
+    await session.refresh(moved)
+    assert moved.course == "quant"
+    assert counts == {}
 
 
 def test_a_row_nobody_decided_refuses_the_whole_list(chat: Chat) -> None:
