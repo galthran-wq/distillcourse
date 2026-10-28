@@ -130,6 +130,19 @@ uv run python -m app.cli deactivate-user someone@example.com  # revokes sessions
 uv run python -m app.cli activate-user someone@example.com    # opens it again
 ```
 
+Chats are filed under the course of the page they were started on
+(`chats.course`, NULL is "General"). The chats from before that column were
+filed once, by hand: `propose-chat-courses` prints `chat_id, title, proposed
+course, evidence, first question` tab-separated, with `?` wherever the locators
+a chat carries disagree or are absent; a person settles every `?` to a course
+slug or `general`, and `file-chats` applies the settled file — refusing it
+whole while any row is undecided or names a course the index does not carry.
+
+```bash
+uv run python -m app.cli propose-chat-courses > chats.tsv
+uv run python -m app.cli file-chats chats.tsv
+```
+
 ## Running
 
 Everything below assumes `uv` and a reachable Postgres. `docker compose up db`

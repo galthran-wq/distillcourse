@@ -17,6 +17,7 @@ const SUMMARY: ChatSummary = {
   kind: "web",
   model: "moonshotai/kimi-k3",
   title: "what is entropy?",
+  course: "info-theory",
   created_at: "2026-08-07T09:00:00Z",
   last_message_at: "2026-08-07T09:00:00Z",
 };
@@ -24,12 +25,16 @@ const SUMMARY: ChatSummary = {
 /** What the listing route answers with, changed between one call and the next. */
 let listing: ChatSummary[] = [];
 let listings = 0;
+/** The listing URLs asked for, in order. */
+let asked: string[] = [];
 
 function serve(): void {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
-      const body = url.endsWith("/chats/models") ? [] : ((listings += 1), listing);
+      const body = url.endsWith("/chats/models")
+        ? []
+        : ((listings += 1), asked.push(url), listing);
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -41,7 +46,7 @@ function serve(): void {
 const { host, render } = mounted();
 
 /** The panel expanded, so the rail is on screen and its rows can be read. */
-async function panel(): Promise<void> {
+async function panel(expanded = true): Promise<void> {
   const session = {
     summary: SUMMARY,
     chat: new Chat<UIMessage>({ id: SUMMARY.id, messages: [] }),
@@ -50,7 +55,12 @@ async function panel(): Promise<void> {
     render(
       <SectionsProvider value={SECTIONS}>
         <LessonsProvider value={LESSONS}>
-          <ChatPanel session={session} panel={createRef<HTMLElement>()} expanded />
+          <ChatPanel
+            session={session}
+            course="info-theory"
+            panel={createRef<HTMLElement>()}
+            expanded={expanded}
+          />
         </LessonsProvider>
       </SectionsProvider>,
     ),
@@ -67,6 +77,7 @@ function rail(): string[] {
 beforeEach(() => {
   listing = [SUMMARY];
   listings = 0;
+  asked = [];
   serve();
   vi.useFakeTimers({ shouldAdvanceTime: true });
 });
@@ -105,6 +116,23 @@ describe("the listing the panel keeps", () => {
   });
 });
 
+describe("which chats the panel lists", () => {
+  it("docked, only the page's course", async () => {
+    await panel(false);
+
+    expect(asked).toEqual(["/api/v1/chats?course=info-theory"]);
+  });
+
+  it("expanded, every chat, filed in folders with the page's open", async () => {
+    await panel();
+
+    expect(asked).toEqual(["/api/v1/chats"]);
+    expect(host().querySelector("nav section button")?.getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+  });
+});
+
 describe("stopping the tutor", () => {
   it("aborts the stream and tells the backend, which owns the run", async () => {
     const posted: string[] = [];
@@ -137,6 +165,7 @@ describe("stopping the tutor", () => {
           <LessonsProvider value={LESSONS}>
             <ChatPanel
               session={{ summary: SUMMARY, chat }}
+              course="info-theory"
               panel={createRef<HTMLElement>()}
               expanded={false}
             />

@@ -1,5 +1,5 @@
 import { courseTitle } from "@/lib/chat/references";
-import type { Lessons } from "@/lib/content/links";
+import { courseNames, type Lessons } from "@/lib/content/links";
 import { lessonKey, lessonParts, sectionKey } from "@/lib/content/locator";
 import type { LessonSections } from "@/lib/content/site";
 
@@ -121,12 +121,7 @@ export function typingAt(draft: string, caret: number): Typing | null {
 }
 
 function courseRows(typed: string, lessons: Lessons): Mention[] {
-  const named = new Map<string, string>();
-  for (const [key, link] of Object.entries(lessons)) {
-    const path = lessonParts(key);
-    if (path !== null && !named.has(path.course)) named.set(path.course, link.course);
-  }
-  return [...named]
+  return [...courseNames(lessons)]
     .filter(([slug, title]) => matches(typed, slug, title))
     .map(([slug, title]) => ({
       kind: "course" as const,

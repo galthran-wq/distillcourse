@@ -9,6 +9,7 @@ const WEB: ChatSummary = {
   kind: "web",
   model: "moonshotai/kimi-k3",
   title: "why is this true?",
+  course: null,
   created_at: "2026-08-05T10:00:00Z",
   last_message_at: "2026-08-05T10:04:00Z",
 };
@@ -114,39 +115,39 @@ describe("the chat session", () => {
     // Telegram first on purpose: without the filter the widget would resume
     // into the reader's Telegram thread, and this is where that shows.
     served({
-      "GET /api/v1/chats": json([TELEGRAM, WEB]),
+      "GET /api/v1/chats?course=": json([TELEGRAM, WEB]),
       "GET /api/v1/chats/c1/messages": json([]),
     });
     const { resumeSession } = await session();
 
-    const open = await resumeSession();
+    const open = await resumeSession(null);
 
     expect(open.summary.id).toBe("c1");
     expect(sent("POST", "/api/v1/chats")).toHaveLength(0);
   });
 
   it("resumes the chat the reader had open, not the most recent one", async () => {
-    remembered({ chatId: "c1" });
+    remembered({ chats: JSON.stringify({ "": "c1" }) });
     served({
-      "GET /api/v1/chats": json([FRESH, WEB]),
+      "GET /api/v1/chats?course=": json([FRESH, WEB]),
       "GET /api/v1/chats/c1/messages": json([]),
     });
     const { resumeSession } = await session();
 
-    const open = await resumeSession();
+    const open = await resumeSession(null);
 
     expect(open.summary.id).toBe("c1");
   });
 
   it("falls back to the most recent chat when the stored one is gone", async () => {
-    remembered({ chatId: "deleted-since" });
+    remembered({ chats: JSON.stringify({ "": "deleted-since" }) });
     served({
-      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats?course=": json([WEB]),
       "GET /api/v1/chats/c1/messages": json([]),
     });
     const { resumeSession } = await session();
 
-    const open = await resumeSession();
+    const open = await resumeSession(null);
 
     expect(open.summary.id).toBe("c1");
     expect(sent("POST", "/api/v1/chats")).toHaveLength(0);
@@ -154,12 +155,12 @@ describe("the chat session", () => {
 
   it("records the chat it switched to, so the next load comes back to it", async () => {
     served({
-      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats?course=": json([WEB]),
       "GET /api/v1/chats/c1/messages": json([]),
       "GET /api/v1/chats/c2/messages": json([]),
     });
     const { resumeSession, selectSession } = await session();
-    await resumeSession();
+    await resumeSession(null);
 
     await selectSession(FRESH);
 
@@ -167,7 +168,7 @@ describe("the chat session", () => {
       JSON.parse(window.localStorage.getItem("distillcourse.chat") ?? "null"),
     ).toMatchObject({
       panel: "closed",
-      chatId: "c2",
+      chats: JSON.stringify({ "": "c2" }),
       draft: "",
       quotes: "",
       owner: "",
@@ -176,13 +177,13 @@ describe("the chat session", () => {
 
   it("starts one chat, not two, when the widget asks twice before the first answer", async () => {
     served({
-      "GET /api/v1/chats": json([]),
+      "GET /api/v1/chats?course=": json([]),
       "POST /api/v1/chats": json(FRESH),
       "GET /api/v1/chats/c2/messages": json([]),
     });
     const { resumeSession } = await session();
 
-    const [first, second] = await Promise.all([resumeSession(), resumeSession()]);
+    const [first, second] = await Promise.all([resumeSession(null), resumeSession(null)]);
 
     expect(first).toBe(second);
     expect(sent("POST", "/api/v1/chats")).toHaveLength(1);
@@ -190,14 +191,14 @@ describe("the chat session", () => {
 
   it("replays the messages the backend already holds", async () => {
     served({
-      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats?course=": json([WEB]),
       "GET /api/v1/chats/c1/messages": json([
         { id: "m1", role: "user", parts: [{ type: "text", text: "why?" }] },
       ]),
     });
     const { resumeSession } = await session();
 
-    const open = await resumeSession();
+    const open = await resumeSession(null);
 
     expect(open.chat.messages).toHaveLength(1);
   });
@@ -205,12 +206,12 @@ describe("the chat session", () => {
   it("sends the reader's position with the message and streams the answer back", async () => {
     const reply = stream();
     served({
-      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats?course=": json([WEB]),
       "GET /api/v1/chats/c1/messages": json([]),
       "POST /api/v1/chats/c1/stream": reply.response,
     });
     const { resumeSession, setPosition } = await session();
-    const open = await resumeSession();
+    const open = await resumeSession(null);
     setPosition({ course: "info-theory", lesson: "entropy", anchor: "the-average" });
 
     const answered = open.chat.sendMessage({ text: "why is this true?" });
@@ -233,12 +234,12 @@ describe("the chat session", () => {
   it("holds the chat busy until the answer is complete", async () => {
     const reply = stream();
     served({
-      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats?course=": json([WEB]),
       "GET /api/v1/chats/c1/messages": json([]),
       "POST /api/v1/chats/c1/stream": reply.response,
     });
     const { busy, resumeSession } = await session();
-    const open = await resumeSession();
+    const open = await resumeSession(null);
 
     const answered = open.chat.sendMessage({ text: "why is this true?" });
     await vi.waitFor(() => expect(busy(open.chat.status)).toBe(true));
@@ -254,13 +255,13 @@ describe("the chat session", () => {
     const second = stream();
     const replies = [first.response, second.response];
     served({
-      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats?course=": json([WEB]),
       "GET /api/v1/chats/c1/messages": json([]),
       "POST /api/v1/chats/c1/stream": () => replies.shift()!(),
       "POST /api/v1/chats/c1/steer": json(null),
     });
     const { resumeSession, steer, steerMark } = await session();
-    const open = await resumeSession();
+    const open = await resumeSession(null);
     const answered = open.chat.sendMessage({ text: "isolation forests?" });
     await vi.waitFor(() => expect(sent("POST", "/api/v1/chats/c1/stream")).toHaveLength(1));
     first.push({ type: "start" });
@@ -315,14 +316,14 @@ describe("the chat session", () => {
   it("puts what a stopped run never read back into the composer, and sends nothing", async () => {
     const reply = stream();
     served({
-      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats?course=": json([WEB]),
       "GET /api/v1/chats/c1/messages": json([]),
       "POST /api/v1/chats/c1/stream": reply.response,
       "POST /api/v1/chats/c1/steer": json(null),
     });
     const { resumeSession, steer } = await session();
     const { setDraft, storedDraft } = await import("@/lib/chat/stored");
-    const open = await resumeSession();
+    const open = await resumeSession(null);
     const answered = open.chat.sendMessage({ text: "isolation forests?" });
     for (const chunk of REPLY.slice(0, 4)) reply.push(chunk);
     await vi.waitFor(() => expect(open.chat.status).toBe("streaming"));
@@ -345,12 +346,12 @@ describe("the chat session", () => {
   it("says nothing about position when the reader is not in a lesson", async () => {
     const reply = stream();
     served({
-      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats?course=": json([WEB]),
       "GET /api/v1/chats/c1/messages": json([]),
       "POST /api/v1/chats/c1/stream": reply.response,
     });
     const { resumeSession } = await session();
-    const open = await resumeSession();
+    const open = await resumeSession(null);
 
     const answered = open.chat.sendMessage({ text: "what should I read next?" });
     await vi.waitFor(() => expect(sent("POST", "/api/v1/chats/c1/stream")).toHaveLength(1));
@@ -364,13 +365,13 @@ describe("the chat session", () => {
 
   it("clears into a new chat, keeping the model of the one it replaces", async () => {
     served({
-      "GET /api/v1/chats": json([{ ...WEB, model: "anthropic/claude-opus-5" }]),
+      "GET /api/v1/chats?course=": json([{ ...WEB, model: "anthropic/claude-opus-5" }]),
       "GET /api/v1/chats/c1/messages": json([]),
       "POST /api/v1/chats": json(FRESH),
       "GET /api/v1/chats/c2/messages": json([]),
     });
     const { clearSession, resumeSession } = await session();
-    const first = await resumeSession();
+    const first = await resumeSession(null);
 
     const second = await clearSession();
 
@@ -379,48 +380,49 @@ describe("the chat session", () => {
     expect(sent("POST", "/api/v1/chats")[0].body).toEqual({
       kind: "web",
       model: "anthropic/claude-opus-5",
+      course: null,
     });
   });
 
   it("switches to another chat from the list", async () => {
     served({
-      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats?course=": json([WEB]),
       "GET /api/v1/chats/c1/messages": json([]),
       "GET /api/v1/chats/c2/messages": json([]),
     });
     const { resumeSession, selectSession } = await session();
-    await resumeSession();
+    await resumeSession(null);
 
     const other = await selectSession(FRESH);
 
     expect(other.summary.id).toBe("c2");
-    expect(await resumeSession()).toBe(other);
+    expect(await resumeSession(null)).toBe(other);
   });
 
   it("switches model without ending the conversation", async () => {
     served({
-      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats?course=": json([WEB]),
       "GET /api/v1/chats/c1/messages": json([]),
       "PATCH /api/v1/chats/c1": json({ ...WEB, model: "anthropic/claude-opus-5" }),
     });
     const { changeModel, resumeSession } = await session();
-    const open = await resumeSession();
+    const open = await resumeSession(null);
 
     await changeModel("anthropic/claude-opus-5");
 
-    const after = await resumeSession();
+    const after = await resumeSession(null);
     expect(after.summary.model).toBe("anthropic/claude-opus-5");
     expect(after.chat).toBe(open.chat);
   });
 
   it("compacts the chat it has open", async () => {
     served({
-      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats?course=": json([WEB]),
       "GET /api/v1/chats/c1/messages": json([]),
       "POST /api/v1/chats/c1/compact": json({ summary: "entropy, so far" }),
     });
     const { compactSession, resumeSession } = await session();
-    await resumeSession();
+    await resumeSession(null);
 
     await compactSession();
 
@@ -429,16 +431,16 @@ describe("the chat session", () => {
 
   it("takes the title the backend wrote from the first message", async () => {
     served({
-      "GET /api/v1/chats": json([FRESH]),
+      "GET /api/v1/chats?course=": json([FRESH]),
       "GET /api/v1/chats/c2/messages": json([]),
     });
     const { adoptSummary, resumeSession } = await session();
-    const untitled = await resumeSession();
+    const untitled = await resumeSession(null);
     expect(untitled.summary.title).toBeNull();
 
     adoptSummary([{ ...FRESH, title: "why is this true?" }]);
 
-    const titled = await resumeSession();
+    const titled = await resumeSession(null);
     expect(titled.summary.title).toBe("why is this true?");
     expect(titled.chat).toBe(untitled.chat);
   });
@@ -447,48 +449,139 @@ describe("the chat session", () => {
     // The name is not written once: the backend rewrites it as the
     // conversation moves past the question it was named for.
     served({
-      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats?course=": json([WEB]),
       "GET /api/v1/chats/c1/messages": json([]),
     });
     const { adoptSummary, resumeSession } = await session();
-    const open = await resumeSession();
+    const open = await resumeSession(null);
 
     adoptSummary([{ ...WEB, title: "Entropy and cross entropy" }]);
 
-    const renamed = await resumeSession();
+    const renamed = await resumeSession(null);
     expect(renamed.summary.title).toBe("Entropy and cross entropy");
     expect(renamed.chat).toBe(open.chat);
   });
 
   it("leaves the session alone when the title has not changed", async () => {
     served({
-      "GET /api/v1/chats": json([FRESH]),
+      "GET /api/v1/chats?course=": json([FRESH]),
       "GET /api/v1/chats/c2/messages": json([]),
     });
     const { adoptSummary, resumeSession } = await session();
-    const open = await resumeSession();
+    const open = await resumeSession(null);
 
     adoptSummary([{ ...FRESH, last_message_at: "2026-08-05T11:00:00Z" }]);
 
     // A republished session re-renders the panel, which asks for the listing
     // again: a chat whose name has not changed has to leave the store
     // untouched, dated later or not.
-    expect(await resumeSession()).toBe(open);
+    expect(await resumeSession(null)).toBe(open);
   });
 
   it("does not hand the conversation to whoever signs in next", async () => {
     served({
-      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats?course=": json([WEB]),
       "GET /api/v1/chats/c1/messages": json([]),
     });
     const { resumeSession } = await session();
     const { setUser } = await import("@/lib/auth/store");
-    const mine = await resumeSession();
+    const mine = await resumeSession(null);
 
     setUser({ id: "u2", email: "other@example.com", full_name: null, timezone: "UTC" });
 
-    expect(await resumeSession()).not.toBe(mine);
-    expect(sent("GET", "/api/v1/chats")).toHaveLength(2);
+    expect(await resumeSession(null)).not.toBe(mine);
+    expect(sent("GET", "/api/v1/chats?course=")).toHaveLength(2);
+  });
+});
+
+describe("the chat a course's pages open", () => {
+  const FRAUD: ChatSummary = { ...WEB, id: "f1", course: "fraud-ml" };
+  const FRAUD_OLDER: ChatSummary = { ...WEB, id: "f2", course: "fraud-ml" };
+  const QUANT: ChatSummary = { ...WEB, id: "q1", course: "quant" };
+
+  function courses(): void {
+    served({
+      "GET /api/v1/chats?course=fraud-ml": json([FRAUD, FRAUD_OLDER]),
+      "GET /api/v1/chats?course=quant": json([QUANT]),
+      "GET /api/v1/chats/f1/messages": json([]),
+      "GET /api/v1/chats/f2/messages": json([]),
+      "GET /api/v1/chats/q1/messages": json([]),
+      "GET /api/v1/chats/c1/messages": json([]),
+    });
+  }
+
+  it("is the one last open in that course, each course its own", async () => {
+    remembered({ chats: JSON.stringify({ "fraud-ml": "f2", quant: "q1" }) });
+    courses();
+    const { resumeSession } = await session();
+
+    const fraud = await resumeSession("fraud-ml");
+    const quant = await resumeSession("quant");
+    const back = await resumeSession("fraud-ml");
+
+    expect([fraud.summary.id, quant.summary.id, back.summary.id]).toEqual([
+      "f2",
+      "q1",
+      "f2",
+    ]);
+  });
+
+  it("stays the one the reader picked while the course does not change", async () => {
+    courses();
+    const { resumeSession, selectSession } = await session();
+    await resumeSession("fraud-ml");
+
+    const picked = await selectSession(WEB);
+
+    expect(await resumeSession("fraud-ml")).toBe(picked);
+    expect(sent("GET", "/api/v1/chats?course=fraud-ml")).toHaveLength(1);
+  });
+
+  it("is a new chat in that course when it has none", async () => {
+    const created: ChatSummary = { ...FRESH, course: "quant" };
+    served({
+      "GET /api/v1/chats?course=quant": json([]),
+      "POST /api/v1/chats": json(created),
+      "GET /api/v1/chats/c2/messages": json([]),
+    });
+    const { resumeSession } = await session();
+
+    const open = await resumeSession("quant");
+
+    expect(open.summary.course).toBe("quant");
+    expect(sent("POST", "/api/v1/chats")[0].body).toMatchObject({ course: "quant" });
+  });
+
+  it("clears into a new chat in the page's course", async () => {
+    served({
+      "GET /api/v1/chats?course=fraud-ml": json([FRAUD]),
+      "GET /api/v1/chats/f1/messages": json([]),
+      "POST /api/v1/chats": json({ ...FRESH, course: "fraud-ml" }),
+      "GET /api/v1/chats/c2/messages": json([]),
+    });
+    const { clearSession, resumeSession } = await session();
+    await resumeSession("fraud-ml");
+
+    await clearSession();
+
+    expect(sent("POST", "/api/v1/chats")[0].body).toMatchObject({ course: "fraud-ml" });
+  });
+
+  it("moves the open chat by hand and keeps the conversation", async () => {
+    served({
+      "GET /api/v1/chats?course=fraud-ml": json([FRAUD]),
+      "GET /api/v1/chats/f1/messages": json([]),
+      "PATCH /api/v1/chats/f1": json({ ...FRAUD, course: "quant" }),
+    });
+    const { moveChat, resumeSession } = await session();
+    const open = await resumeSession("fraud-ml");
+
+    await moveChat("f1", "quant");
+
+    const after = await resumeSession("fraud-ml");
+    expect(sent("PATCH", "/api/v1/chats/f1")[0].body).toEqual({ course: "quant" });
+    expect(after.summary.course).toBe("quant");
+    expect(after.chat).toBe(open.chat);
   });
 });
 
