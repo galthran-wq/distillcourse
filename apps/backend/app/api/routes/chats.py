@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from pydantic_ai.ui.vercel_ai import VercelAIAdapter
 from pydantic_ai.ui.vercel_ai.request_types import RequestData, UIMessage
 
@@ -14,6 +14,7 @@ from app.harness.agent import tutor
 from app.harness.deps import HarnessDeps
 from app.harness.limits import LimitExceeded
 from app.harness.repository import HarnessRepository
+from app.harness.steering import SteerMessage
 from app.models import Chat
 
 router = APIRouter(prefix="/chats", tags=["chats"])
@@ -47,6 +48,13 @@ class ChatModelUpdate(BaseModel):
 
 class Summary(BaseModel):
     summary: str
+
+
+class Steer(BaseModel):
+    # The client's own id for it: the stream names the steers it took by this,
+    # and the client clears the mark it put on each.
+    id: uuid.UUID
+    text: str = Field(min_length=1)
 
 
 def _current_locator(run_input: RequestData) -> str | None:
@@ -210,3 +218,19 @@ async def stream(
     except runner.RunBusy:
         raise HTTPException(status.HTTP_409_CONFLICT, "this chat has a run in flight")
     return adapter.streaming_response(chunks)
+
+
+@router.post("/{chat_id}/stop", status_code=status.HTTP_204_NO_CONTENT)
+async def stop(chat_id: uuid.UUID, repo: RepositoryDep) -> None:
+    """Cancel the run in flight, server-side: it outlives the client's
+    request, so aborting that changes nothing. Returns once the turn is stored
+    and the chat free."""
+    chat = await _owned_chat(repo, chat_id)
+    await runner.stop(chat.active_run_id)
+
+
+@router.post("/{chat_id}/steer", status_code=status.HTTP_202_ACCEPTED)
+async def steer(chat_id: uuid.UUID, message: Steer, repo: RepositoryDep) -> None:
+    chat = await _owned_chat(repo, chat_id)
+    if not runner.steer(chat.active_run_id, SteerMessage(message.id, message.text)):
+        raise HTTPException(status.HTTP_409_CONFLICT, "no run in flight to steer")

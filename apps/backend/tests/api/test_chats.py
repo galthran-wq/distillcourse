@@ -1,13 +1,16 @@
+import asyncio
 import json
 import uuid
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
 import pytest
 from httpx import AsyncClient
-from pydantic_ai.messages import ModelRequest, UserPromptPart
+from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.ui.vercel_ai.request_types import SubmitMessage
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.api.routes.chats import _current_locator
 from app.core.config import ChatModel, settings
@@ -15,8 +18,8 @@ from app.harness import prompts
 from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
 from app.models import User
-from tests.conftest import settled
-from tests.harness.conftest import compacting
+from tests.conftest import replying, settled
+from tests.harness.conftest import compacting, start
 
 QUESTION = ModelRequest(parts=[UserPromptPart(content="what is entropy?")])
 
@@ -432,3 +435,65 @@ async def test_a_question_with_no_passages_carries_no_fence(
         await settled()
 
     assert "untrusted" not in str((await repo.rows(chat))[0].pydantic_ai)
+
+
+async def test_stop_and_steer_are_refused_on_another_users_chat(
+    signed_in: AsyncClient, session: AsyncSession, other_user: User
+) -> None:
+    theirs = await HarnessRepository(session, other_user.id).create_chat(kind="web")
+    steer = {"id": str(uuid.uuid4()), "text": "shorter"}
+
+    stopped = await signed_in.post(f"/api/v1/chats/{theirs.id}/stop")
+    steered = await signed_in.post(f"/api/v1/chats/{theirs.id}/steer", json=steer)
+
+    assert (stopped.status_code, steered.status_code) == (404, 404)
+
+
+async def test_an_idle_chat_takes_a_stop_and_refuses_a_steer(
+    signed_in: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    """The stop click can race the run's own end, so it is no error; a steer
+    with no run to take it is the client's cue to send it as a turn."""
+    chat = await HarnessRepository(session, user.id).create_chat(kind="web")
+    steer = {"id": str(uuid.uuid4()), "text": "shorter"}
+
+    stopped = await signed_in.post(f"/api/v1/chats/{chat.id}/stop")
+    steered = await signed_in.post(f"/api/v1/chats/{chat.id}/steer", json=steer)
+
+    assert (stopped.status_code, steered.status_code) == (204, 409)
+
+
+async def test_a_running_chat_takes_a_steer_and_a_stop_frees_it(
+    signed_in: AsyncClient,
+    session: AsyncSession,
+    session_factory: async_sessionmaker[AsyncSession],
+    user: User,
+) -> None:
+    repo = HarnessRepository(session, user.id)
+    chat = await repo.create_chat(kind="web")
+    hold = asyncio.Event()
+
+    async def held(
+        _messages: list[ModelMessage], _info: AgentInfo
+    ) -> AsyncIterator[str]:
+        yield "half"
+        await hold.wait()
+
+    with tutor.override(model=FunctionModel(stream_function=held), tools=[]):
+        chunks = await start(session_factory, repo, chat)
+        await anext(chunks)
+        steered = await signed_in.post(
+            f"/api/v1/chats/{chat.id}/steer",
+            json={"id": str(uuid.uuid4()), "text": "shorter"},
+        )
+        stopped = await signed_in.post(f"/api/v1/chats/{chat.id}/stop")
+        await chunks.aclose()
+
+    with replying("go on"):
+        again = await signed_in.post(
+            f"/api/v1/chats/{chat.id}/stream", json=submission(chat.id)
+        )
+        await settled()
+
+    assert (steered.status_code, stopped.status_code) == (202, 204)
+    assert again.status_code == 200

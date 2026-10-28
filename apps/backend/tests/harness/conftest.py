@@ -1,3 +1,5 @@
+import json
+from collections.abc import AsyncGenerator, Sequence
 from typing import Any
 
 import pytest
@@ -10,11 +12,17 @@ from pydantic_ai.messages import (
     ToolReturnPart,
 )
 from pydantic_ai.models.function import AgentInfo, FunctionModel
+from pydantic_ai.ui.vercel_ai import VercelAIAdapter
+from pydantic_ai.ui.vercel_ai.request_types import SubmitMessage, TextUIPart, UIMessage
+from pydantic_ai.ui.vercel_ai.response_types import BaseChunk
 from pydantic_core import to_jsonable_python
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.harness import runner
+from app.harness.agent import tutor
+from app.harness.deps import HarnessDeps
 from app.harness.repository import HarnessRepository
-from app.models import Chat, User
+from app.models import Chat, Message, User
 
 
 @pytest.fixture
@@ -102,3 +110,29 @@ def compacting(summary: str, *memories: dict[str, Any]) -> FunctionModel:
         )
 
     return FunctionModel(turn)
+
+
+def stored(rows: Sequence[Message]) -> str:
+    return json.dumps([row.pydantic_ai for row in rows])
+
+
+async def start(
+    session_factory: async_sessionmaker[AsyncSession],
+    repo: HarnessRepository,
+    chat: Chat,
+    question: str = "what is entropy?",
+    earlier: Sequence[UIMessage] = (),
+) -> AsyncGenerator[BaseChunk]:
+    adapter = VercelAIAdapter[HarnessDeps, str](
+        agent=tutor,
+        run_input=SubmitMessage(
+            id=str(chat.id),
+            messages=[
+                *earlier,
+                UIMessage(id="m1", role="user", parts=[TextUIPart(text=question)]),
+            ],
+        ),
+    )
+    return await runner.start_stream(
+        session_factory=session_factory, repo=repo, chat=chat, adapter=adapter
+    )

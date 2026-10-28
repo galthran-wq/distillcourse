@@ -1,6 +1,8 @@
 from functools import lru_cache
 
-from pydantic_ai import Agent, Tool
+from pydantic_ai import Agent, RunContext, Tool
+from pydantic_ai.capabilities import ProcessHistory
+from pydantic_ai.messages import ModelMessage
 from pydantic_ai.models.openrouter import (
     OpenRouterModel,
     OpenRouterModelSettings,
@@ -41,10 +43,21 @@ _BARRIERS = (
     report_review_outcome,
 )
 
+
+# Async though it awaits nothing: a sync processor is run on a thread, and the
+# queues it reads and writes belong to the event loop.
+async def _steer(
+    ctx: RunContext[HarnessDeps], messages: list[ModelMessage]
+) -> list[ModelMessage]:
+    steering = ctx.deps.steering
+    return messages if steering is None else steering.take(ctx.run_id, messages)
+
+
 tutor = Agent(
     name="tutor",
     deps_type=HarnessDeps,
     tools=[Tool(function, sequential=True) for function in _BARRIERS],
+    capabilities=[ProcessHistory(_steer)],
 )
 
 # Naming a conversation is not the tutor doing anything, and an agent that

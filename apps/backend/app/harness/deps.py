@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from app.harness.repository import HarnessRepository
+from app.harness.steering import Steering
 from app.models import Chat
 from app.telegram.outbox import Outbox
 
@@ -16,3 +17,5 @@ class HarnessDeps:
     # Only a run in the Telegram thread has somewhere to send a message of its
     # own; on the site the answer is the delivery.
     outbox: Outbox | None = None
+    # Only a web run can be written to while it answers.
+    steering: Steering | None = None
