@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -7,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.labs import DAY, _daily_budgets
 from app.core.rate_limit import FixedWindow
-from app.labs import judge
+from app.labs import judge, repository
 from app.models import (
     LabChallenge,
     LabCheckpointState,
@@ -340,6 +341,24 @@ async def test_the_page_sees_every_checkpoint_and_where_the_learner_stands(
         "best_score",
         "feedback",
     }
+
+
+async def test_the_page_sees_no_notebook_paired_before_one_is(
+    signed_in: AsyncClient,
+) -> None:
+    assert (await signed_in.get(PROGRESS)).json()["paired"] is False
+
+
+@pytest.mark.usefixtures("notebook")
+async def test_the_page_sees_a_paired_notebook_until_it_is_revoked(
+    signed_in: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    assert (await signed_in.get(PROGRESS)).json()["paired"] is True
+
+    await repository.revoke_all(session, user.id, now=datetime.now(UTC))
+    await session.commit()
+
+    assert (await signed_in.get(PROGRESS)).json()["paired"] is False
 
 
 async def test_the_page_needs_a_session(client: AsyncClient) -> None:

@@ -119,6 +119,9 @@ class CheckpointProgress(BaseModel):
 
 class Progress(BaseModel):
     checkpoints: list[CheckpointProgress]
+    # Whether any notebook is paired with this account: a lab_tokens row not
+    # revoked. Per account, not per lab — one token answers for every lab.
+    paired: bool
 
 
 # What one attached object may weigh, and how many one question carries — the

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { MDXComponents } from "mdx/types";
-import { getCourse, getCourses } from "@/lib/content/site";
+import { getCourse, getCourses, lessonNumber } from "@/lib/content/site";
 import type { LoadedLesson } from "@/lib/content/load";
 import { courseExtent, minutesOf } from "@/lib/content/extent";
 import { isReadable, readableLessons } from "@/lib/content/visibility";
@@ -78,7 +78,7 @@ function LessonRow({ course, entry }: { course: string; entry: LoadedLesson }) {
   const row = (
     <div className="flex items-center gap-4 py-2.5" title={readable ? undefined : NOT_WRITTEN}>
       <span className="text-[0.8rem] tabular-nums text-faint">
-        {String(entry.index + 1).padStart(2, "0")}
+        {lessonNumber(entry)}
       </span>
       {thumb !== undefined && (
         // The frame is outside the image so the dark theme's inversion of
