@@ -91,9 +91,7 @@ export default function Figure({
         </div>
       )}
       {caption !== undefined && (
-        <figcaption className="mt-2 text-center font-mono text-[0.8rem] tracking-wide text-faint">
-          {caption}
-        </figcaption>
+        <figcaption className="mt-2">{caption}</figcaption>
       )}
     </figure>
   );

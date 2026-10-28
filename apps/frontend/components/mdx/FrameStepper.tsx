@@ -26,7 +26,7 @@ export default function FrameStepper({ frames, alt, caption }: Props) {
         <Button onClick={() => setI(i - 1)} disabled={i === 0} aria-label="Previous step">
           ←
         </Button>
-        <span className="font-mono text-[12px] text-faint">
+        <span className="text-[13px] tabular-nums text-faint">
           {i + 1} / {frames.length}
         </span>
         <Button
@@ -38,9 +38,7 @@ export default function FrameStepper({ frames, alt, caption }: Props) {
         </Button>
       </div>
       {caption !== undefined && (
-        <figcaption className="mt-2 text-center font-mono text-[0.8rem] tracking-wide text-faint">
-          {caption}
-        </figcaption>
+        <figcaption className="mt-2">{caption}</figcaption>
       )}
     </figure>
   );

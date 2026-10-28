@@ -145,7 +145,10 @@ Rules that override defaults:
   whole; nothing assembles it field by field.
 - The site's look is one layer, not per-page decisions: the tokens in
   `apps/frontend/app/globals.css` and the primitives in
-  `apps/frontend/components/ui`. `@theme inline` holds the colors, `--radius-*`
+  `apps/frontend/components/ui`. `@theme inline` holds the colors (`--frame`,
+  the rule environments are drawn with, among them), the two faces
+  (`--font-sans`, Source Sans 3; `--font-mono`, mono only for code and
+  verbatim strings — numbers that must align use `tabular-nums`), `--radius-*`
   and `--shadow-card|popover` — consumed as Tailwind utilities
   (`rounded-sm|md|full`, `shadow-card`), not dereferenceable as CSS variables.
   Motion and elevation are plain `:root` variables, per theme: `--motion-fast`
@@ -153,7 +156,10 @@ Rules that override defaults:
   and `--elevation-popover` reached through the `--shadow-*` utilities, and
   `--field`, the fill in `FIELD_CLASS` — a surface that is itself panel-filled
   overrides it (`[--field:var(--paper)]`) so a field is always one step off
-  what it sits on. The prose blocks in `globals.css` (`.env`, `.callout`,
+  what it sits on. `--fig-filter` (drawn art shown as an `<img>`) and
+  `--photo-filter` (photographs, scans) are plain `:root` variables per theme
+  too, beside motion and elevation: `none` in light; in dark the first
+  inverts, the second only dims. The prose blocks in `globals.css` (`.env`, `.callout`,
   `pre`) are surfaces too and write the surface radius out as `0.5rem`: they
   style markdown, not a class list.
   Anything that reads as a button is `ui/Button` — `solid` for the one primary
@@ -165,7 +171,7 @@ Rules that override defaults:
   box and `FIELD_BOX_INPUT_CLASS` on the control inside it, which leaves the
   caller only geometry (the tutor's composer, whose send button is inside the
   field): the border, the fill and the ring are the box's, and the control
-  hands its ring over. Every mono micro-cap carries `LABEL_CLASS`.
+  hands its ring over. Every micro-cap label (sans small caps) carries `LABEL_CLASS`.
   The chip a referenced passage is shown as carries
   `CHIP_CLASS`; a menu or a preview that hangs open over the page carries
   `POPOVER_CLASS`, plus `MENU_CLASS`/`MENU_ITEM_CLASS` when it is a dropdown,

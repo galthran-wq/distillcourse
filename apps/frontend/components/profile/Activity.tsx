@@ -159,7 +159,7 @@ function Heatmap({
   return (
     <div ref={frame} className="relative flex gap-2">
       <div
-        className="mt-5 grid shrink-0 font-mono text-[9px] leading-none text-faint"
+        className="mt-5 grid shrink-0 text-[10px] leading-none text-faint"
         style={{ gridTemplateRows: `repeat(${DAYS}, ${CELL}px)`, gap: GAP }}
       >
         {WEEKDAYS.map((weekday, index) => (
@@ -178,7 +178,7 @@ function Heatmap({
         className="min-w-0 overflow-x-auto pr-3"
       >
         <div
-          className="mb-1 grid h-4 grid-flow-col font-mono text-[10px] leading-none text-faint"
+          className="mb-1 grid h-4 grid-flow-col text-[11px] leading-none text-faint"
           style={{ gridAutoColumns: `${CELL}px`, gap: GAP }}
         >
           {Array.from({ length: WEEKS }, (_, week) => (
@@ -224,7 +224,7 @@ function Heatmap({
         <span
           ref={tip}
           role="tooltip"
-          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-sm border border-line bg-paper px-2 py-1 font-mono text-[10px] whitespace-nowrap text-soft"
+          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-sm border border-line bg-paper px-2 py-1 text-[11px] whitespace-nowrap tabular-nums text-soft"
           style={{
             // Held inside the frame: the last column's tooltip would otherwise
             // hang off the panel and widen the whole page on a phone.
@@ -241,7 +241,7 @@ function Heatmap({
 
 function Legend() {
   return (
-    <div className="mt-2 flex items-center justify-end gap-1 font-mono text-[10px] text-faint">
+    <div className="mt-2 flex items-center justify-end gap-1 text-[11px] text-faint">
       <span className="mr-1">less</span>
       {Array.from({ length: STEPS }, (_, count) => (
         <span key={count} className="rounded-[2px]" style={swatch(count)} />
@@ -280,7 +280,7 @@ function Feed({
     <>
       {group(feed).map(([date, entries]) => (
         <div key={date} className="mt-5 first:mt-0">
-          <h3 className="mb-1 font-mono text-[11px] text-faint">{day(date)}</h3>
+          <h3 className="mb-1 text-[12px] text-faint">{day(date)}</h3>
           <ul>
             {entries.map((entry) => (
               <LessonRow

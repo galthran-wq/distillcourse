@@ -102,7 +102,7 @@ text. Validator errors on unknown slugs (`ref-target`).
 A passage quoted from a source — the evidence a reading rests on. The
 markdown children are the text (in translation, where the lesson uses one);
 `source` is the locator the reader checks it against — siglum, section,
-translator — set as a mono label under the quote. Where the lesson reads the
+translator — set as a small-caps label under the quote. Where the lesson reads the
 original, put it first inside `<Original lang="de">…</Original>`: on a wide
 screen the original sits beside the translation, on a phone above it.
 `lang` is the original's BCP-47 tag and lives on that block alone, so

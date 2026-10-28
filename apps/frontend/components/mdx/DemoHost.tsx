@@ -28,7 +28,7 @@ export default function DemoHost({ name, caption }: Props) {
       ) : (
         <Suspense
           fallback={
-            <div className="rounded-md border border-line px-5 py-8 text-center font-mono text-sm text-faint">
+            <div className="rounded-md border border-line px-5 py-8 text-center text-sm text-faint">
               loading demo…
             </div>
           }
@@ -37,9 +37,7 @@ export default function DemoHost({ name, caption }: Props) {
         </Suspense>
       )}
       {caption !== undefined && (
-        <figcaption className="mt-2 text-center font-mono text-[0.8rem] tracking-wide text-faint">
-          {caption}
-        </figcaption>
+        <figcaption className="mt-2">{caption}</figcaption>
       )}
     </figure>
   );

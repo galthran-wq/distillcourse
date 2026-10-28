@@ -96,7 +96,7 @@ export function ReorderList<T>({ items, itemKey, itemLabel, renderItem, onReorde
             </button>
             <div className="min-w-0 flex-1">{renderItem(item, i)}</div>
             {cut && (
-              <span className="absolute -bottom-2.5 right-0 bg-panel px-1 font-mono text-[11px] text-accent">
+              <span className="absolute -bottom-2.5 right-0 bg-panel px-1 text-[12px] text-accent">
                 {divider.label}
               </span>
             )}

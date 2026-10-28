@@ -64,8 +64,8 @@ export const FIELD_BOX_INPUT_CLASS = `${FIELD_TEXT} bg-transparent focus:outline
  */
 export const FIELD_LABEL_CLASS = "mb-1 block text-soft";
 
-/** Mono micro-caps: section headings, group labels. */
-export const LABEL_CLASS = "font-mono text-[11px] uppercase tracking-wider text-faint";
+/** Micro-cap labels, sans small caps: section headings, group labels. */
+export const LABEL_CLASS = "text-[11.5px] font-semibold uppercase tracking-[0.08em] text-faint";
 
 /**
  * A boxed message for something the server refused — the auth card's, the

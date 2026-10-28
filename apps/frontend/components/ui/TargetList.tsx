@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { LABEL_CLASS } from "./styles";
 
 export interface Target {
   /** What the reader has to achieve, phrased as an instruction. */
@@ -26,7 +27,7 @@ export function TargetList({
 }) {
   return (
     <div className="mb-3 rounded border border-line p-2">
-      <p className="pb-1 text-xs font-medium uppercase tracking-wide text-faint">
+      <p className={`pb-1 ${LABEL_CLASS}`}>
         {title}
       </p>
       <ol className="space-y-1 text-sm" aria-live="polite">
@@ -36,7 +37,7 @@ export function TargetList({
             <li key={i} className="flex gap-2">
               <span
                 aria-hidden
-                className={`font-mono ${t.met ? "text-accent" : shown ? "text-faint" : "text-faint"}`}
+                className={t.met ? "text-accent" : "text-faint"}
               >
                 {shown ? "✓" : "○"}
               </span>
@@ -46,7 +47,7 @@ export function TargetList({
                   {t.met ? " — met now" : t.latched ? " — met earlier" : " — not met yet"}
                 </span>
                 {t.detail !== undefined && (
-                  <span className="block font-mono text-xs text-faint">{t.detail}</span>
+                  <span className="block text-xs tabular-nums text-faint">{t.detail}</span>
                 )}
               </span>
             </li>
