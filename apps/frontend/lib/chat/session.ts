@@ -1,7 +1,7 @@
 "use client";
 
 import { Chat } from "@ai-sdk/react";
-import { DefaultChatTransport, type ChatStatus, type UIMessage } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import {
   compactChat,
   createChat,
@@ -15,6 +15,7 @@ import { API } from "@/lib/api-base";
 import { errorDetail } from "@/lib/http";
 import { currentLocator } from "@/lib/lesson/position";
 import { takeQuotes } from "@/lib/chat/quote";
+import { settleSteers, steerData } from "@/lib/chat/steer";
 import { rememberChat, storedChatId } from "@/lib/chat/stored";
 import { createStore } from "@/lib/store";
 
@@ -30,25 +31,32 @@ const session = createStore<Session | null>(null);
 
 async function open(summary: ChatSummary): Promise<Session> {
   const messages = await loadMessages(summary.id);
-  const next: Session = {
-    summary,
-    chat: new Chat<UIMessage>({
-      id: summary.id,
-      messages,
-      // The SDK major is pinned to the one pydantic-ai's Vercel adapter is
-      // converted from (v6) — the data stream the backend emits is that
-      // version's wire format.
-      transport: new DefaultChatTransport({
-        api: `${API}/chats/${summary.id}/stream`,
-        credentials: "same-origin",
-        // Resolved per request rather than per chat: the tutor is asked about
-        // the section on screen when send is pressed. Off a lesson page it is
-        // null, which is what the harness expects to hear. The attached
-        // passages go the same way, and are spent by the message carrying them.
-        body: () => ({ currentLocator: currentLocator(), quotes: takeQuotes() }),
-      }),
+  const chat: Chat<UIMessage> = new Chat<UIMessage>({
+    id: summary.id,
+    messages,
+    // On the Chat rather than on `useChat`, which ignores its callbacks when
+    // it is handed one: the stream reports on the messages sent while it
+    // ran, and they are settled when it ends, whether or not a panel is
+    // mounted to watch.
+    onData: (part) => steerData(chat, part),
+    onFinish: ({ isAbort, isError }) =>
+      // After the SDK has let go of the run that just ended: a turn sent
+      // from inside its callback would be started under it.
+      setTimeout(() => settleSteers(chat, isAbort || isError)),
+    // The SDK major is pinned to the one pydantic-ai's Vercel adapter is
+    // converted from (v6) — the data stream the backend emits is that
+    // version's wire format.
+    transport: new DefaultChatTransport({
+      api: `${API}/chats/${summary.id}/stream`,
+      credentials: "same-origin",
+      // Resolved per request rather than per chat: the tutor is asked about
+      // the section on screen when send is pressed. Off a lesson page it is
+      // null, which is what the harness expects to hear. The attached
+      // passages go the same way, and are spent by the message carrying them.
+      body: () => ({ currentLocator: currentLocator(), quotes: takeQuotes() }),
     }),
-  };
+  });
+  const next: Session = { summary, chat };
   session.set(next);
   rememberChat(summary.course, summary.id);
   return next;
@@ -144,10 +152,6 @@ export function adoptSummary(chats: ChatSummary[]): void {
 
 export function useSession(): Session | null {
   return session.use();
-}
-
-export function busy(status: ChatStatus): boolean {
-  return status === "submitted" || status === "streaming";
 }
 
 /** What the backend refused with — the cap, or a run already in flight. */

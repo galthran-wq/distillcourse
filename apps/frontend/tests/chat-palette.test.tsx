@@ -11,7 +11,7 @@ stubResizeObserver();
 stubScrollIntoView();
 
 describe("the command palette", () => {
-  const { host, composer, field, press, options, listed, reloads, sent } = composing();
+  const { host, field, press, options, listed, reloads, sent } = composing();
 
   function send(): HTMLButtonElement {
     const button = host().querySelector<HTMLButtonElement>('[aria-label="Send"]');
@@ -179,15 +179,6 @@ describe("the command palette", () => {
     press("Enter");
 
     expect(sent).toEqual(["/compact"]);
-  });
-
-  it("stays away while the tutor is answering", () => {
-    composer(true);
-
-    type(field(), "/");
-
-    // Nothing can be sent in the middle of a run, a command included.
-    expect(listed()).toEqual([]);
   });
 });
 

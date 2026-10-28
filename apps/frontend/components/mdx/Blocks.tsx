@@ -5,6 +5,7 @@ import {
   type ReactNode,
 } from "react";
 import { LABEL_CLASS } from "@/components/ui/styles";
+import { CONCLUSION_ANCHOR } from "@/lib/content/locator";
 
 /**
  * Textbook environments. Numbering is done with CSS counters (see
@@ -115,14 +116,15 @@ export function KeyFact({ children }: { children: ReactNode }) {
 
 /**
  * The lesson's closing (L10c): what the reader can now do, and the problem
- * left open. Set apart so the end of a long chapter reads as an end, not as
- * one more paragraph; accent, because it is the lesson's own voice rather
- * than one of the role colors.
+ * left open. It is the end of the chapter's prose rather than an aside, so it
+ * is not boxed: a rule and a label are enough to make the end read as an end.
+ * Accent, because it is the lesson's own voice rather than one of the role
+ * colors.
  */
 export function Conclusion({ children }: { children: ReactNode }) {
   return (
-    <section className="callout callout-conclusion">
-      <p className="callout-label">Conclusion</p>
+    <section id={CONCLUSION_ANCHOR} className="conclusion">
+      <p className={`conclusion-label mb-2 ${LABEL_CLASS}`}>Conclusion</p>
       <div className="env-body">{children}</div>
     </section>
   );

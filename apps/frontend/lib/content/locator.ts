@@ -9,6 +9,18 @@ export function lessonKey(courseSlug: string, lessonSlug: string): string {
   return `${LESSON_PREFIX}${courseSlug}/${lessonSlug}`;
 }
 
+/** `<course>/<lesson>`: the lesson key without its corpus, as `GET /progress` names it. */
+export function lessonPath(courseSlug: string, lessonSlug: string): string {
+  return lessonKey(courseSlug, lessonSlug).slice(LESSON_PREFIX.length);
+}
+
+/**
+ * The id `<Conclusion>` renders with. It is a component rather than a heading,
+ * so rehype-slug never assigns it and the content index has to be told it
+ * exists — from here, so the page and the index cannot name it differently.
+ */
+export const CONCLUSION_ANCHOR = "conclusion";
+
 /** A place inside a lesson: the lesson key with the section's anchor on it. */
 export function sectionKey(
   courseSlug: string,

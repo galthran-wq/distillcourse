@@ -18,8 +18,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import QueryableAttribute
 
-from app.content import search
+from app.content import locators, search
 from app.models import Document, Event, LessonProgress, User
 from app.telemetry import schemas
 
@@ -243,6 +244,13 @@ async def recompute(
     )
 
 
+def in_course(lesson: QueryableAttribute[str], course: str) -> ColumnElement[bool]:
+    """A lesson locator column filed under this course."""
+    # autoescape: a `%` in a caller-supplied slug is a LIKE wildcard, and one
+    # course's prefix would match every course.
+    return lesson.startswith(locators.lesson_key(course, ""), autoescape=True)
+
+
 class Reading(BaseModel):
     """What one reader's events add up to on one lesson, as a consumer outside
     telemetry reads it.
@@ -287,11 +295,7 @@ async def of_reader(
     """
     statement = select(LessonProgress).where(LessonProgress.user_id == user_id)
     if course is not None:
-        statement = statement.where(
-            # autoescape: a `%` in a caller-supplied slug is a LIKE wildcard,
-            # and one course's prefix would match every course.
-            LessonProgress.lesson.startswith(f"lesson:{course}/", autoescape=True)
-        )
+        statement = statement.where(in_course(LessonProgress.lesson, course))
     rows = (
         await session.scalars(statement.order_by(LessonProgress.last_seen.desc()))
     ).all()

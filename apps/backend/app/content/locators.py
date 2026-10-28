@@ -56,3 +56,8 @@ def course_of(locator: str) -> str:
     research brief, a concept and the course row itself alike.
     """
     return locator.partition(":")[2].partition("/")[0]
+
+
+def path_of(locator: str) -> str:
+    """Everything after the corpus: `<course>/<slug>[#<anchor>]` for a lesson."""
+    return locator.partition(":")[2]

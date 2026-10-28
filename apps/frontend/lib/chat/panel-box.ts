@@ -7,6 +7,7 @@ import {
   MIN_WIDTH,
   PANEL_MARGIN,
   panelBox,
+  setColumnWidth,
   setPanelBox,
   type PanelBox,
 } from "@/lib/chat/stored";
@@ -165,6 +166,49 @@ export function panelVars(box: PanelBox): CSSProperties {
 }
 
 /**
+ * Follows the pointer that pressed `press`'s handle until it is let go: `move`
+ * gets how far it has gone, `drop` is called once at the release. The panel is
+ * marked as being dragged meanwhile — `globals.css` takes its transitions and
+ * text selection away for as long as that lasts.
+ */
+function track(
+  press: Press<HTMLElement>,
+  move: (dx: number, dy: number) => void,
+  drop: () => void,
+): void {
+  const handle = press.currentTarget;
+  // The press is the start of a drag, not of a selection of the header's text.
+  press.preventDefault();
+  handle.setPointerCapture(press.pointerId);
+  const startX = press.clientX;
+  const startY = press.clientY;
+
+  const drag = (at: PointerEvent): void => move(at.clientX - startX, at.clientY - startY);
+  const release = (): void => {
+    handle.removeEventListener("pointermove", drag);
+    handle.removeEventListener("pointerup", release);
+    handle.removeEventListener("pointercancel", release);
+    dragging.set(false);
+    drop();
+  };
+  // The pointer is captured, so the listeners belong on the handle: a drag that
+  // leaves the panel, or the window, still arrives here.
+  handle.addEventListener("pointermove", drag);
+  handle.addEventListener("pointerup", release);
+  handle.addEventListener("pointercancel", release);
+  dragging.set(true);
+}
+
+/**
+ * Only the main button drags. A right-click opens the context menu over a
+ * captured pointer that is then never released, which would leave the panel
+ * held down with nothing to let go of it.
+ */
+function dragsWith(press: Press<HTMLElement>): boolean {
+  return press.button === 0 && press.isPrimary;
+}
+
+/**
  * Moves or resizes the docked `panel` for as long as the pointer that pressed
  * `grip` is down.
  *
@@ -180,47 +224,77 @@ export function startPanelDrag(
   panel: HTMLElement | null,
   grip: Grip,
 ): void {
-  // Only the main button drags. A right-click opens the context menu over a
-  // captured pointer that is then never released, which would leave the panel
-  // held down with nothing to let go of it.
-  if (press.button !== 0 || !press.isPrimary) return;
-  if (panel === null || !movable()) return;
-  const handle = press.currentTarget;
-  // The press is the start of a drag, not of a selection of the header's text.
-  press.preventDefault();
-  handle.setPointerCapture(press.pointerId);
-
+  if (!dragsWith(press) || panel === null || !movable()) return;
   const view = viewport();
   // What is on screen, which is not what is stored if this window is smaller
   // than the one the box was dragged out in.
   const from = fittedBox(panelBox(), view);
-  const startX = press.clientX;
-  const startY = press.clientY;
   let box = from;
   let moved = false;
 
-  const drag = (at: PointerEvent): void => {
-    moved = true;
-    box = draggedBox(from, grip, at.clientX - startX, at.clientY - startY, view);
-    for (const [name, value] of Object.entries(panelVars(box)))
-      panel.style.setProperty(name, String(value));
-  };
-  const drop = (): void => {
-    handle.removeEventListener("pointermove", drag);
-    handle.removeEventListener("pointerup", drop);
-    handle.removeEventListener("pointercancel", drop);
-    dragging.set(false);
+  track(
+    press,
+    (dx, dy) => {
+      moved = true;
+      box = draggedBox(from, grip, dx, dy, view);
+      for (const [name, value] of Object.entries(panelVars(box)))
+        panel.style.setProperty(name, String(value));
+    },
     // A press that never moved is a click on the header, and the box it would
     // write is `from` — this window's fit rather than a decision the reader
     // made. Storing that is exactly what `usePanelFit` refuses to do: it would
     // spend the box dragged out on a wide screen the first time the panel is
     // touched on a small one, and nothing puts it back.
-    if (moved) setPanelBox(box);
-  };
-  // The pointer is captured, so the listeners belong on the handle: a drag that
-  // leaves the panel, or the window, still arrives here.
-  handle.addEventListener("pointermove", drag);
-  handle.addEventListener("pointerup", drop);
-  handle.addEventListener("pointercancel", drop);
-  dragging.set(true);
+    () => {
+      if (moved) setPanelBox(box);
+    },
+  );
+}
+
+/**
+ * The expanded panel's reading column, in rem: the narrowest it is dragged to,
+ * and how wide it is until it is. Docked it is the panel's to bound, and wider
+ * than any panel the corner has room for.
+ */
+export const MIN_COLUMN_REM = 32;
+export const COLUMN_REM = 56;
+export const DOCKED_COLUMN_REM = 42;
+
+/**
+ * The reading column's width once its edge is dragged by `dx`. It is centred,
+ * so the edge under the pointer and the one across from it both move: the
+ * width changes by twice the drag. `room` is the pane it is centred in, and the
+ * column keeps a rem of it on either side — the transcript's own padding, which
+ * is also what bounds it when the pane is narrower than the width stored.
+ */
+export function draggedColumn(from: number, dx: number, room: number, rem: number): number {
+  return px(from + 2 * dx, MIN_COLUMN_REM * rem, room - 2 * rem);
+}
+
+/**
+ * Resizes the reading `column` for as long as the pointer that pressed its
+ * edge is down — written to `pane`'s `--chat-column`, which the transcript and
+ * the composer both read, while it moves, and stored once, at the release.
+ */
+export function startColumnDrag(
+  press: Press<HTMLElement>,
+  pane: HTMLElement | null,
+  column: HTMLElement | null,
+): void {
+  if (!dragsWith(press) || pane === null || column === null) return;
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+  const from = column.getBoundingClientRect().width;
+  const room = pane.getBoundingClientRect().width;
+  let width = from;
+
+  track(
+    press,
+    (dx) => {
+      width = draggedColumn(from, dx, room, rem);
+      pane.style.setProperty("--chat-column", `${width}px`);
+    },
+    () => {
+      if (width !== from) setColumnWidth(width);
+    },
+  );
 }
