@@ -1,13 +1,13 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, join } from "node:path";
 import { parse } from "yaml";
-import { isRasterFile } from "./images";
+import { isDrawnFile, isRasterFile } from "./images";
 import { listCourseDirs, listLessonDirs } from "./load";
 
 // The page inlines an SVG figure rather than loading it, but the lesson's
 // Markdown twin (./markdown-export) can only link one, so they are served too.
 function isServed(file: string): boolean {
-  return isRasterFile(file) || file.toLowerCase().endsWith(".svg");
+  return isRasterFile(file) || isDrawnFile(file);
 }
 
 /**

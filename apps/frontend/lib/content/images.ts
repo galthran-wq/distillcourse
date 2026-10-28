@@ -198,7 +198,7 @@ export const MIN_FIGURE_WIDTH = 480;
 export const MAX_FIGURE_BYTES = 6_000_000;
 
 /**
- * Public URL of a lesson asset. Raster figures are copied out of the content
+ * Public URL of a lesson asset. Figures (raster and SVG) are copied out of the content
  * tree into `public/course-assets/<course>/<lesson>/` by
  * `scripts/sync-assets.ts` (Next only serves static files from `public`).
  */

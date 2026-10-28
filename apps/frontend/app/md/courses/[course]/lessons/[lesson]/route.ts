@@ -1,4 +1,4 @@
-import { lessonMarkdown, markdownResponse } from "@/lib/content/markdown-export";
+import { lessonMarkdown, markdownResponse } from "@/lib/content/markdown-pages";
 import { getLessonView, readableLessonParams } from "@/lib/content/site";
 
 // Reached as `/courses/<course>/lessons/<lesson>.md` through the rewrite in

@@ -7,18 +7,17 @@ import remarkStringify from "remark-stringify";
 import { visit } from "unist-util-visit";
 import type { Element } from "hast";
 import type { Blockquote, Link, Paragraph, Parent, PhrasingContent, Root, RootContent } from "mdast";
-import { colabUrl } from "../labs/mirror";
 import { assetUrl, slugsFromLessonDir } from "./images";
 import { toHast } from "./index-export";
-import type { LoadedCourse, LoadedLesson } from "./load";
-import { CONCLUSION_ANCHOR } from "./locator";
+import type { LoadedCourse } from "./load";
+import { CONCLUSION_ANCHOR, lessonPage } from "./locator";
 import { stringAttr, type MdxJsxNode } from "./mdx-jsx";
-import { SITE_URL, type LessonView } from "./site";
+import { SITE_URL } from "./site";
 import { isReadable } from "./visibility";
 
 /**
- * The Markdown twin of every course and lesson page (`<page URL>.md`) and the
- * `/llms.txt` index over them: the site as an agent reads it, without React.
+ * A lesson's (or a course introduction's) MDX as plain Markdown, for the
+ * Markdown twins of the site's pages (./markdown-pages).
  *
  * Converted from the MDX source's mdast rather than from rendered HTML, with
  * every component given a plain-Markdown equivalent here. The numbers the page
@@ -28,23 +27,9 @@ import { isReadable } from "./visibility";
  * dropped silently.
  */
 
-export function coursePage(course: string): string {
-  return `/courses/${course}`;
-}
-
-export function lessonPage(course: string, lesson: string): string {
-  return `/courses/${course}/lessons/${lesson}`;
-}
-
 /** The twin of a site page: its absolute URL plus `.md` (the llms.txt convention). */
 export function markdownUrl(page: string): string {
   return `${SITE_URL}${page}.md`;
-}
-
-export function markdownResponse(text: string): Response {
-  return new Response(text, {
-    headers: { "content-type": "text/markdown; charset=utf-8" },
-  });
 }
 
 type Counter = "definition" | "theorem" | "example" | "remark";
@@ -154,14 +139,17 @@ function ended(body: RootContent[], mark: string | undefined): RootContent[] {
   return [...body, paragraph(text(mark))];
 }
 
-/** The place on the page the current node sits under, as a bare link. */
 function here(w: Walk): PhrasingContent {
   const url = `${SITE_URL}${w.page}${w.anchor !== undefined ? `#${w.anchor}` : ""}`;
   return { type: "link", url, children: [text(url)] };
 }
 
-/** A root-relative link made absolute; a link to a course or lesson page goes to its twin. */
-function absolute(url: string): string {
+/**
+ * A link an agent can follow from the text alone: a fragment or a
+ * root-relative path made absolute, and a course or lesson page sent to its twin.
+ */
+function absolute(url: string, w: Walk): string {
+  if (url.startsWith("#")) return `${markdownUrl(w.page)}${url}`;
   if (!url.startsWith("/")) return url;
   const page = /^(\/courses\/[^/#?]+(?:\/lessons\/[^/#?]+)?)(#.*)?$/.exec(url);
   return page === null ? `${SITE_URL}${url}` : `${markdownUrl(page[1])}${page[2] ?? ""}`;
@@ -171,8 +159,19 @@ function convertAll(nodes: RootContent[], w: Walk): RootContent[] {
   return nodes.flatMap((node) => convert(node, w));
 }
 
+// These render as a closed <details>, whose content the browser hides with
+// content-visibility; the style containment that implies scopes every counter
+// stepped inside. What is numbered in one does not move the numbers after it
+// on the page, so it does not here either.
+const FOLDED = new Set(["Proof", "Solution", "Aside"]);
+
 function children(node: Jsx, w: Walk): RootContent[] {
-  return blocks(convertAll(node.children ?? [], w));
+  const saved = FOLDED.has(node.name ?? "")
+    ? { counters: { ...w.counters }, exercise: w.exercise, figure: w.figure }
+    : undefined;
+  const out = blocks(convertAll(node.children ?? [], w));
+  if (saved !== undefined) Object.assign(w, saved);
+  return out;
 }
 
 function convert(node: RootContent, w: Walk): RootContent[] {
@@ -193,7 +192,7 @@ function convert(node: RootContent, w: Walk): RootContent[] {
       }
       break;
     case "link":
-      return [{ ...node, url: absolute(node.url), children: convertAll(node.children, w) as Link["children"] }];
+      return [{ ...node, url: absolute(node.url, w), children: convertAll(node.children, w) as Link["children"] }];
   }
   if ("children" in node) {
     return [{ ...node, children: convertAll((node as Parent).children, w) } as RootContent];
@@ -334,93 +333,4 @@ export function mdxToMarkdown(source: string, at: MarkdownSource): string {
   const tree = parser.parse(source);
   const root: Root = { type: "root", children: blocks(convertAll(tree.children, walk)) };
   return printer.stringify(root).trim();
-}
-
-function lessonLink(course: string, lesson: LoadedLesson): string {
-  return `[${lesson.lesson.title}](${markdownUrl(lessonPage(course, lesson.lesson.slug))})`;
-}
-
-/** Modules as `###` headings over their readable lessons; a module with none is left out. */
-function contents(course: LoadedCourse): string[] {
-  const readable = course.lessons.filter(isReadable);
-  return course.course.modules.flatMap((mod) => {
-    const lessons = readable.filter((l) => l.moduleSlug === mod.slug);
-    if (lessons.length === 0) return [];
-    return [
-      "",
-      `### ${mod.title}`,
-      "",
-      ...lessons.map((l) => `- ${lessonLink(course.course.slug, l)}: ${l.lesson.goal}`),
-    ];
-  });
-}
-
-export function lessonMarkdown({ course, entry, moduleTitle, prev, next }: LessonView): string {
-  const { slug, title, modules } = course.course;
-  const lesson = entry.lesson;
-  const page = lessonPage(slug, lesson.slug);
-  const part = modules.findIndex((m) => m.slug === entry.moduleSlug) + 1;
-  const length = lesson.lab !== undefined ? `~${lesson.lab.est_hours} h` : `~${lesson.est_minutes} min`;
-  const turns = [
-    ...(prev !== undefined ? [`Previous: ${lessonLink(slug, prev)}`] : []),
-    ...(next !== undefined ? [`Next: ${lessonLink(slug, next)}`] : []),
-  ];
-  // The checklist is the lesson's own `lab` block, as LabPanel reads it.
-  const lab =
-    lesson.lab === undefined
-      ? []
-      : [
-          "",
-          `Notebook: ${colabUrl(`${slug}/${lesson.slug}`)}`,
-          "",
-          "Checkpoints:",
-          ...lesson.lab.checkpoints.map(
-            (c) => `- \`${c.id}\` (${c.kind}, ${c.required ? "required" : "optional"}): ${c.text}`,
-          ),
-        ];
-  return [
-    `# ${lesson.title}`,
-    "",
-    `> ${lesson.goal}`,
-    "",
-    `Course: [${title}](${markdownUrl(coursePage(slug))}) · Part ${part}: ${moduleTitle} · ${length}`,
-    `HTML: ${SITE_URL}${page}`,
-    ...(turns.length > 0 ? [turns.join(" · ")] : []),
-    ...lab,
-    "",
-    mdxToMarkdown(entry.mdx as string, { course, dir: entry.dir, page }),
-    "",
-  ].join("\n");
-}
-
-export function courseMarkdown(course: LoadedCourse): string {
-  const page = coursePage(course.course.slug);
-  const intro = course.introMdx ?? course.course.intro;
-  return [
-    `# ${course.course.title}`,
-    "",
-    `> ${course.course.tagline}`,
-    ...(intro !== undefined ? ["", mdxToMarkdown(intro, { course, dir: course.dir, page })] : []),
-    "",
-    "## Contents",
-    ...contents(course),
-    "",
-  ].join("\n");
-}
-
-/** The llmstxt.org index: courses in the home page's order, lessons in course order. */
-export function llmsTxt(courses: LoadedCourse[]): string {
-  return [
-    "# distillcourse",
-    "",
-    "> Short interactive textbook courses on fundamentals: definitions, theorems, worked " +
-      "examples, exercises with full solutions, labs. Interactive models where the subject " +
-      "calls for them, labs where it needs code, and a tutor that has read every page.",
-    "",
-    "Each lesson is available as Markdown at its page URL plus `.md`.",
-    ...courses
-      .filter((c) => c.lessons.some(isReadable))
-      .flatMap((c) => ["", `## ${c.course.title}`, "", c.course.tagline, ...contents(c)]),
-    "",
-  ].join("\n");
 }

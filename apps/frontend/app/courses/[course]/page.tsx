@@ -17,8 +17,8 @@ import MathText from "@/components/mdx/MathText";
 import * as Blocks from "@/components/mdx/Blocks";
 import { assetUrl, isDrawnFile } from "@/lib/content/images";
 import { compileIntro, splitLead } from "@/lib/content/intro";
-import { lessonPath } from "@/lib/content/locator";
-import { coursePage, markdownUrl } from "@/lib/content/markdown-export";
+import { coursePage, lessonPath } from "@/lib/content/locator";
+import { markdownUrl } from "@/lib/content/markdown-export";
 import Lightbox from "@/components/mdx/Lightbox";
 import { LABEL_CLASS } from "@/components/ui/styles";
 

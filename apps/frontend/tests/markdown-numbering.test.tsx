@@ -6,7 +6,7 @@ import * as Blocks from "@/components/mdx/Blocks";
 import DemoHost from "@/components/mdx/DemoHost";
 import Figure, { type FigureProps } from "@/components/mdx/Figure";
 import FigureSequence from "@/components/mdx/FigureSequence";
-import { lessonMarkdown } from "@/lib/content/markdown-export";
+import { lessonMarkdown } from "@/lib/content/markdown-pages";
 import { compileLesson } from "@/lib/content/render";
 import { getLessonView } from "@/lib/content/site";
 import { counterLabels } from "./utils/counters";
@@ -21,9 +21,14 @@ function markdownLabels(md: string): string[] {
 }
 
 describe("numbering", () => {
-  it("matches the page for a lesson with many figures and environments", async () => {
+  // The second holds a captioned figure inside a <Proof>, which the page does
+  // not count past while the proof is closed.
+  it.each([
+    ["information-theory", "entropy-as-average-surprise"],
+    ["classical-ml", "knn-curse"],
+  ])("matches the page for %s/%s", async (course, lesson) => {
     vi.stubEnv("CONTENT_PREVIEW", "1");
-    const view = getLessonView("information-theory", "entropy-as-average-surprise")!;
+    const view = getLessonView(course, lesson)!;
     const { Content } = await compileLesson(view.entry.mdx as string);
     const components = {
       ...Blocks,

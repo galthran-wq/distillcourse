@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Copies sourced raster figures out of the content tree into `public/`:
+ * Copies lesson figures (raster and SVG) out of the content tree into `public/`:
  *
  *   content/courses/<c>/lessons/<l>/figures/x.jpg
  *     -> public/course-assets/<c>/<l>/x.jpg

@@ -39,9 +39,9 @@ import {
   Task,
   Theorem,
 } from "@/components/mdx/Blocks";
-import { lessonKey } from "@/lib/content/locator";
+import { lessonKey, lessonPage } from "@/lib/content/locator";
 import { compileLesson } from "@/lib/content/render";
-import { lessonPage, markdownUrl } from "@/lib/content/markdown-export";
+import { markdownUrl } from "@/lib/content/markdown-export";
 import { getLessonView, lessonNumber, readableLessonParams } from "@/lib/content/site";
 import { isReadable } from "@/lib/content/visibility";
 

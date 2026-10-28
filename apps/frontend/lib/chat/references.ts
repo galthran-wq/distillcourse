@@ -3,6 +3,7 @@ import type { PhrasingContent, Root, Text } from "mdast";
 import { courseNames, type Lessons } from "@/lib/content/links";
 import type { LessonSections } from "@/lib/content/site";
 import {
+  coursePage,
   isSourceLocator,
   parseCourseLocator,
   parseLessonLocator,
@@ -37,7 +38,7 @@ export function linkTo(
   const course = parseCourseLocator(locator);
   if (course !== null) {
     const title = courseTitle(course, lessons);
-    return title === undefined ? null : { url: `/courses/${course}`, text: title };
+    return title === undefined ? null : { url: coursePage(course), text: title };
   }
   const target = parseLessonLocator(locator);
   const link = target === null ? undefined : lessons[target.key];

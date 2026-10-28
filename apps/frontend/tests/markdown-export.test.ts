@@ -7,12 +7,8 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import { visit } from "unist-util-visit";
 import { loadCourse } from "@/lib/content/load";
-import {
-  courseMarkdown,
-  lessonMarkdown,
-  llmsTxt,
-  mdxToMarkdown,
-} from "@/lib/content/markdown-export";
+import { mdxToMarkdown } from "@/lib/content/markdown-export";
+import { courseMarkdown, lessonMarkdown, llmsTxt } from "@/lib/content/markdown-pages";
 import { getCourses, getLessonView, SITE_URL } from "@/lib/content/site";
 import { isReadable } from "@/lib/content/visibility";
 import { wantedAssets } from "@/lib/content/assets";
@@ -168,6 +164,25 @@ describe("mdxToMarkdown", () => {
     );
   });
 
+  it("points a fragment link at the twin's section", () => {
+    expect(md("[above](#setup)")).toBe(`[above](${HTML}.md#setup)`);
+  });
+
+  it("does not count past what a closed proof, solution or aside numbers", () => {
+    const out = md(
+      [
+        '<Figure name="A" alt="a" caption="One." />',
+        '<Proof>\n\n<Figure name="B" alt="b" caption="Inside." />\n\n</Proof>',
+        "<Aside>\n\n<Example>Aside example.</Example>\n\n</Aside>",
+        '<Figure name="C" alt="c" caption="After." />',
+        "<Example>Outside.</Example>",
+      ].join("\n\n"),
+    );
+    expect(out).toContain("*Figure 2. Inside.*");
+    expect(out).toContain("*Figure 2. After.*");
+    expect(out).toContain("**Example 0.1.** Outside.");
+  });
+
   it("keeps math as LaTeX", () => {
     expect(md("Inline $H(X)$.\n\n$$\nH = 1\n$$")).toBe("Inline $H(X)$.\n\n$$\nH = 1\n$$");
   });
@@ -214,9 +229,12 @@ describe("every readable lesson", () => {
       ),
     );
     const courses = getCourses();
+    expect(llmsTxt(courses)).not.toMatch(/\b(planned|drafted)\b/i);
     let lessons = 0;
     for (const course of courses) {
       const outputs = [courseMarkdown(course)];
+      // The intro is prose that may say "planned"; the outline is metadata.
+      expect(outputs[0].split("## Contents")[1]).not.toMatch(/\b(planned|drafted)\b/i);
       for (const entry of course.lessons.filter(isReadable)) {
         outputs.push(lessonMarkdown(getLessonView(course.course.slug, entry.lesson.slug)!));
         lessons++;

@@ -6,7 +6,8 @@ import { join } from "node:path";
  * "Exercise 2", "Figure 3. " — in document order. jsdom computes no counters,
  * so this applies the stylesheet's own counter-reset/counter-increment rules
  * in document order and evaluates the `content` of each matching ::before
- * that names a counter — flat counters, every matching counter rule applied
+ * that names a counter — flat counters except across a closed `details`,
+ * every matching counter rule applied
  * and the last matching `content` taken, which is all the lesson's stylesheet
  * relies on. Needs the jsdom environment.
  */
@@ -25,9 +26,9 @@ export function counterLabels(root: Element): string[] {
       r.style.getPropertyValue("counter-increment") !== "",
   );
   const before = rules.filter((r) => r.selectorText.endsWith("::before"));
-  const counters = new Map<string, number>();
+  let counters = new Map<string, number>();
   const labels: string[] = [];
-  for (const el of [root, ...root.querySelectorAll("*")]) {
+  const walk = (el: Element): void => {
     for (const rule of counting.filter((r) => el.matches(r.selectorText))) {
       const reset = rule.style.getPropertyValue("counter-reset");
       for (const name of reset.split(/\s+/).filter(Boolean)) counters.set(name, 0);
@@ -41,12 +42,20 @@ export function counterLabels(root: Element): string[] {
       .filter(Boolean)
       .at(-1);
     // A section number alone (h2) or a glyph is not a label.
-    if (content === undefined || !content.includes("counter(") || !content.includes('"')) continue;
-    labels.push(
-      [...content.matchAll(/"([^"]*)"|counter\((\w+)\)/g)]
-        .map(([, text, name]) => text ?? String(counters.get(name) ?? 0))
-        .join(""),
-    );
-  }
+    if (content !== undefined && content.includes("counter(") && content.includes('"')) {
+      labels.push(
+        [...content.matchAll(/"([^"]*)"|counter\((\w+)\)/g)]
+          .map(([, text, name]) => text ?? String(counters.get(name) ?? 0))
+          .join(""),
+      );
+    }
+    // A closed <details> hides its content with content-visibility, whose
+    // style containment scopes the counters stepped inside it.
+    const scoped = el.tagName === "DETAILS" && !el.hasAttribute("open");
+    const outside = new Map(counters);
+    for (const child of el.children) walk(child);
+    if (scoped) counters = outside;
+  };
+  walk(root);
   return labels;
 }

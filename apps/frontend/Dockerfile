@@ -13,6 +13,10 @@ WORKDIR /app/apps/frontend
 # Build with --build-arg CONTENT_PREVIEW=0 for the public published-only site.
 ARG CONTENT_PREVIEW=1
 ENV CONTENT_PREVIEW=$CONTENT_PREVIEW
+# The origin the prerendered Markdown twins and their <link rel="alternate">
+# name the site by (lib/content/site.ts); compose passes FRONTEND_HOST.
+ARG SITE_URL=https://distillcourse.com
+ENV SITE_URL=$SITE_URL
 COPY --from=deps /app/apps/frontend/node_modules ./node_modules
 COPY apps/frontend ./
 COPY content /app/content

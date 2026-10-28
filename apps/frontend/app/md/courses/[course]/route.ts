@@ -1,4 +1,4 @@
-import { courseMarkdown, markdownResponse } from "@/lib/content/markdown-export";
+import { courseMarkdown, markdownResponse } from "@/lib/content/markdown-pages";
 import { getCourse, getCourses } from "@/lib/content/site";
 
 // Reached as `/courses/<course>.md` through the rewrite in next.config.ts.

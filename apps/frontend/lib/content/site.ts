@@ -2,7 +2,7 @@ import "server-only";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { loadCourse, listCourseDirs, type LoadedCourse, type LoadedLesson } from "./load";
-import { lessonKey } from "./locator";
+import { lessonKey, lessonPage } from "./locator";
 import { lessonToc } from "./render";
 import type { TocEntry } from "./toc";
 import { isReadable } from "./visibility";
@@ -74,7 +74,7 @@ export function getLessonLinks(): Record<string, LessonLink> {
       links[lessonKey(course.course.slug, entry.lesson.slug)] = {
         title: entry.lesson.title,
         course: course.course.title,
-        href: `/courses/${course.course.slug}/lessons/${entry.lesson.slug}`,
+        href: lessonPage(course.course.slug, entry.lesson.slug),
       };
     }
   }
