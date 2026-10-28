@@ -57,6 +57,27 @@ expected answer is downloaded, and nothing about how far off yours was comes
 back: a wrong answer earns a hint only where the lab's author anticipated that
 particular mistake.
 
+## Asking the tutor
+
+```python
+distill.ask("why is my IV negative?", woe_table)  # objects after the text go with it
+distill.clear_chat()                              # the next question starts a new chat
+```
+
+The tutor is the site's own, in a chat that belongs to this lab: it can read
+your checkpoint standing, each checkpoint's expected output and the lab's
+reference solution, and it decides how much of that to show. Each object is
+sent the way it reads best — a function or class as its source, a DataFrame as
+its shape, dtypes and first rows, an array as its first rows, anything else as
+its `repr` — and so is the traceback of the error your last cell raised, once.
+Each is cut at 20,000 characters, all of them together at 60,000.
+
+In a notebook the answer is Markdown under the cell, growing as it arrives;
+anywhere else it is printed whole at the end. It ends with a link to the same
+chat on the lab's page. The conversation is kept by the server, not the
+kernel: a question after a restart continues the lab's latest chat, and
+`clear_chat()` is the way to start over.
+
 ## Development
 
 Source of truth is `apps/lab-client/` in the monorepo; the mirror's `client/`

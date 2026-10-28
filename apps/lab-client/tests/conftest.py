@@ -35,6 +35,19 @@ DEVICE = {
 }
 TOKEN_ANSWER = {"token": TOKEN}
 
+CHAT_ID = "5b1c3a52-8f0e-4d55-9a49-0d6b1c2e7f10"
+CHAT_URL = f"{HOST}/courses/{LAB.partition('/')[0]}/lessons/{LAB.partition('/')[2]}?chat={CHAT_ID}"
+NEW_CHAT_ID = "9e7d2c41-3b6a-4f88-8c15-2a4e6f0b9d33"
+LAB_CHAT = {"chat_id": NEW_CHAT_ID, "url": CHAT_URL.replace(CHAT_ID, NEW_CHAT_ID)}
+# One answer as the ask endpoint streams it: every kind of event but `error`,
+# which a failed run sends in place of `done`.
+ANSWER: list[dict[str, Any]] = [
+    {"type": "step", "label": "checking surprisal"},
+    {"type": "text", "delta": "The log goes "},
+    {"type": "text", "delta": "the other way round."},
+    {"type": "done", "chat_id": CHAT_ID, "url": CHAT_URL},
+]
+
 INPUTS_CODE = "p = rng.random(4)\ninputs = (p,)\n"
 ATOL = 1e-06
 THRESHOLD = 0.85
@@ -108,6 +121,8 @@ class Server:
         self.polls_before_approval = 0
         self.device_refusal: httpx.Response | None = None
         self._device_polls = 0
+        self.asked: list[dict[str, Any]] = []
+        self.answer_events: list[dict[str, Any]] = deepcopy(ANSWER)
 
     def spec(self, checkpoint: str) -> dict[str, Any]:
         """The public half of one checkpoint, to edit before `open_lab`."""
@@ -134,6 +149,19 @@ class Server:
             return httpx.Response(200, json=TOKEN_ANSWER)
         if request.url.path.endswith("/manifest"):
             return httpx.Response(200, json=self.manifest)
+        if request.url.path.endswith(f"/labs/{LAB}/chat"):
+            self.bearers.append(request.headers.get("authorization"))
+            return httpx.Response(201, json=LAB_CHAT)
+        if request.url.path.endswith(f"/labs/{LAB}/ask"):
+            self.bearers.append(request.headers.get("authorization"))
+            self.asked.append(json.loads(request.content))
+            return httpx.Response(
+                200,
+                headers={"content-type": "text/event-stream"},
+                content="".join(
+                    f"data: {json.dumps(event)}\n\n" for event in self.answer_events
+                ),
+            )
         self.bearers.append(request.headers.get("authorization"))
         self.posted.append(json.loads(request.content))
         return httpx.Response(200, json=self.answer)

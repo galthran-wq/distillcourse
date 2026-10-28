@@ -67,7 +67,9 @@ app/
     repository.py    # pairing codes and tokens; challenges, state, submissions
     verify.py        # what a posted checkpoint is worth: comparison and metrics
     judge.py         # the third kind: a written answer, one model call, a verdict
-    ingest.py        # the build's answer keys into `lab_challenges`
+    ingest.py        # the build's answer keys and solutions into `lab_challenges`/`lab_solutions`
+    chat.py          # distill.ask: a question in, the answer out as four SSE events
+    tools.py         # the lab toolset a lab chat's runs get, and the lab prompt
     schemas.py       # the wire shapes a notebook and the lab page speak
     deps.py          # LabUser — the learner a notebook is calling for
   memory/
@@ -219,7 +221,7 @@ is "why is this true?" about something on screen with nothing selected: a model
 that answers that without reading the section answers blind.
 
 Prompts for a run are assembled from `harness/prompts/`: `base.md`, the medium
-(`web`, `telegram`), then the modules the run kind calls for, then those context
+(`web`, `telegram`, `notebook`), then the modules the run kind calls for, then those context
 blocks. They are content, so `docs/pedagogy.md` governs them the way it
 governs lessons. Blocks carrying text from outside the platform are fenced
 with their provenance, and `base.md` is where the tutor is told that anything
@@ -228,7 +230,7 @@ passes that are not the tutor — `title.md` is the whole prompt of the namer an
 `lab_review.md` the whole prompt of a lab's judge, neither of which sees
 `base.md`; both are loaded by `module()` rather than `assemble()`.
 
-A web chat is named from the learner's first question and named again by
+A web or lab chat is named from the learner's first question and named again by
 `harness/title.py` once `TITLE_REFRESH_MESSAGES` more have gone by: one short
 completion on a toolless agent, over the tail of the conversation, run after
 the client's stream has closed rather than on the learner's reply path. It is
@@ -491,8 +493,8 @@ alternative (answering after the run) turns every slow answer into duplicate
 deliveries, which is the failure the learner would actually notice.
 
 The eternal thread is created by the backend and by nothing else
-(`telegram/thread.py`). The web API opens web chats only and refuses to stream
-into, compact or re-model a telegram chat, because the poller reads any message
+(`telegram/thread.py`). The web API creates web chats only, and refuses to
+stream into, compact or re-model a telegram chat (a lab chat it may continue), because the poller reads any message
 in that thread as the learner's answer to the review it is waiting on.
 
 Serialization is the thread's own claim, which is the only thing both processes
@@ -536,7 +538,9 @@ emptying the table, and leaves corpora the file does not mention alone.
 The optional second argument is the lab build's `labs-dist/private/`, and it
 is the one thing the content ingest loads that is not a `documents` row:
 expected outputs, held-out labels and rubrics go to `lab_challenges` instead,
-because search returns documents and the tutor quotes them. Same command, so a
+because search returns documents and the tutor quotes them, and each lab's
+reference solution to `lab_solutions`, which only a lab chat's tools read.
+Same command, so a
 lab's brief and the challenges it is graded against cannot be one deploy
 apart; an absent or empty directory means the labs were not built and leaves
 the table alone rather than un-verifying every lab on the site.
@@ -563,7 +567,18 @@ everything else: `lab_challenges` (the answer key, per checkpoint),
 GET  /labs/{course}/{lesson}/manifest    # public: what the notebook computes on
 POST /labs/submissions                   # bearer: one attempt at one checkpoint
 GET  /labs/{course}/{lesson}/progress    # cookie: what the lesson page draws
+POST /labs/{course}/{lesson}/ask         # bearer: a question to the tutor, SSE back
+POST /labs/{course}/{lesson}/chat        # bearer: a new lab chat (distill.clear_chat)
 ```
+
+- `ask` runs on the web chat's harness path — claim, daily cap and monthly
+  ceiling (409 and 429 as on the site), storage, naming — in a chat of kind
+  `lab`, the learner's latest in that lab unless the request names one. What
+  is the notebook's is the two ends: the question arrives as text plus
+  attachments, stored above it as fenced blocks, and the answer leaves as
+  `step` / `text` / `done` | `error` events (`wire_shapes.json`). Any run in a
+  lab chat, from the notebook or continued on the site, gets the lab prompt
+  and the lab toolset; no other chat does.
 
 - The manifest is the display half from `documents.metadata.lab` joined with
   `lab_challenges.spec["public"]`, and it is public by construction rather

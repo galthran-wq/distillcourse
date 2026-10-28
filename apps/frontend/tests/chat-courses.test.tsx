@@ -13,6 +13,7 @@ function chat(id: string, course: string | null): ChatSummary {
   return {
     id,
     kind: "web",
+    lab_lesson: null,
     model: "moonshotai/kimi-k3",
     title: `chat ${id}`,
     course,

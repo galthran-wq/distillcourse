@@ -1,6 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import ChatFolders from "@/components/chat/ChatFolders";
 import ChatMenu from "@/components/chat/ChatMenu";
@@ -17,8 +18,8 @@ import {
 import { Button } from "@/components/ui";
 import {
   listModels,
+  siteChats,
   stopChat,
-  webChats,
   type ChatModel,
   type ChatSummary,
 } from "@/lib/chat/api";
@@ -30,7 +31,7 @@ import {
   startPanelDrag,
 } from "@/lib/chat/panel-box";
 import { restoreQuotes, type Quote } from "@/lib/chat/quote";
-import { plain } from "@/lib/chat/references";
+import { linkTo, plain } from "@/lib/chat/references";
 import {
   adoptSummary,
   changeModel,
@@ -96,6 +97,7 @@ export default function ChatPanel({ session, course, panel, expanded }: Props) {
   const column = useColumnWidth();
   const lessons = useLessons();
   const sections = useSections();
+  const router = useRouter();
 
   useDismiss(menu, header, setMenu);
 
@@ -122,7 +124,7 @@ export default function ChatPanel({ session, course, panel, expanded }: Props) {
     // and they are not ordered, so a superseded one must not be what lands.
     let live = true;
     const load = (): void => {
-      webChats(expanded ? undefined : course).then((listed) => {
+      siteChats(expanded ? undefined : course).then((listed) => {
         if (!live) return;
         setChats(listed);
         adoptSummary(listed);
@@ -151,6 +153,16 @@ export default function ChatPanel({ session, course, panel, expanded }: Props) {
     setMenu(false);
     setNotice(null);
     work.then(() => setNotice(done), report);
+  }
+
+  /**
+   * A lab chat is had beside its lab, so choosing one goes to that page — if
+   * the site still renders it; otherwise the reader stays where they are.
+   */
+  function select(chat: ChatSummary): void {
+    run(selectSession(chat));
+    const page = chat.lab_lesson === null ? null : linkTo(chat.lab_lesson, lessons);
+    if (page !== null && page.url !== window.location.pathname) router.push(page.url);
   }
 
   function submit(text: string, quotes: Quote[]): void {
@@ -244,7 +256,7 @@ export default function ChatPanel({ session, course, panel, expanded }: Props) {
             current={session.summary}
             chats={chats}
             expanded={expanded}
-            onSelect={(chat) => run(selectSession(chat))}
+            onSelect={select}
             onNew={() => run(clearSession())}
             onMove={(to) => run(moveChat(session.summary.id, to))}
           />
@@ -270,7 +282,7 @@ export default function ChatPanel({ session, course, panel, expanded }: Props) {
               chats={chats}
               current={session.summary.id}
               course={course}
-              onSelect={(chat) => run(selectSession(chat))}
+              onSelect={select}
             />
           </nav>
         )}

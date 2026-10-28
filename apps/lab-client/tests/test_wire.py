@@ -13,7 +13,15 @@ from pathlib import Path
 from typing import Any
 
 import distill
-from tests.conftest import DEVICE, MANIFEST, TOKEN_ANSWER, Server, verdict
+from tests.conftest import (
+    ANSWER,
+    DEVICE,
+    LAB_CHAT,
+    MANIFEST,
+    TOKEN_ANSWER,
+    Server,
+    verdict,
+)
 
 SHAPES: dict[str, Any] = json.loads(
     (
@@ -45,3 +53,20 @@ def test_the_body_this_client_posts_is_the_one_the_api_takes(paired: Server) -> 
     distill.check("surprisal", lambda p: p)
 
     assert set(paired.posted[0]) == set(SHAPES["submission"])
+
+
+def test_the_answer_the_fake_streams_is_the_one_the_api_streams() -> None:
+    for event in ANSWER:
+        assert set(event) == set(SHAPES["ask_events"][event["type"]])
+    assert set(LAB_CHAT) == set(SHAPES["lab_chat"])
+
+
+def test_the_question_this_client_posts_is_the_one_the_api_takes(
+    paired: Server,
+) -> None:
+    distill.ask("why?", 0.5)
+
+    [asked] = paired.asked
+    assert set(asked) == set(SHAPES["ask"])
+    for attachment in asked["attachments"]:
+        assert set(attachment) == set(SHAPES["attachment"])

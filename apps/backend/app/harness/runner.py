@@ -43,6 +43,7 @@ from app.harness.repository import HarnessRepository, Role
 from app.harness.steering import Steering, SteerMessage, is_steer
 from app.harness.title import retitle
 from app.harness.usage import usage_row
+from app.labs import tools as lab_tools
 from app.memory import repository as memory
 from app.memory.repository import Recollection
 from app.models import Chat
@@ -511,10 +512,11 @@ async def _stream(
     adapter: VercelAIAdapter[HarnessDeps, str],
     history: list[ModelMessage],
     current_locator: str | None,
+    medium: Medium,
     usage: RunUsage,
     queue: asyncio.Queue[BaseChunk | None],
 ) -> tuple[AgentRunResult[str] | None, str | None]:
-    """The agent's part of a web run, chunk by chunk onto the client's queue:
+    """The agent's part of a dialogue run, chunk by chunk onto the client's queue:
     what it completed with, and what it failed with."""
     result: AgentRunResult[str] | None = None
     failure: str | None = None
@@ -523,22 +525,33 @@ async def _stream(
         nonlocal result
         result = completed
 
+    # A lab chat is the same conversation from the notebook and from the site,
+    # so what makes it a lab's — the lab prompt and the lab tools — follows the
+    # chat, not the medium it is continued in.
+    lab = deps.chat.kind == "lab"
     try:
         instructions = assemble(
-            "web", "chat", await context.blocks(repo, current_locator=current_locator)
+            medium,
+            "chat",
+            await context.blocks(
+                repo,
+                current_locator=current_locator,
+                extra=(lab_tools.briefing(deps.chat),) if lab else (),
+            ),
         )
         async for chunk in adapter.run_stream(
             message_history=history,
             deps=deps,
             # The web dialogue is the only run whose client shows a reasoning
             # trace, so it is the only one that asks for one.
-            model=_model(deps.chat, "chat", reasoning=True),
+            model=_model(deps.chat, "chat", reasoning=medium == "web"),
             instructions=instructions,
             run_id=str(run_id),
             # Handed in rather than read off the result, which a stopped run
             # never has: the run counts into this one as it goes.
             usage=usage,
             on_complete=capture,
+            toolsets=[lab_tools.toolset] if lab else None,
         ):
             # The run has made its last request: a steer that has not been taken
             # by now never will be, and goes back to the client ahead of the
@@ -567,6 +580,7 @@ async def _drain(
     adapter: VercelAIAdapter[HarnessDeps, str],
     history: list[ModelMessage],
     current_locator: str | None,
+    medium: Medium,
     queue: asyncio.Queue[BaseChunk | None],
 ) -> None:
     async with session_factory() as session:
@@ -595,6 +609,7 @@ async def _drain(
                             adapter=adapter,
                             history=history,
                             current_locator=current_locator,
+                            medium=medium,
                             usage=usage,
                             queue=queue,
                         )
@@ -665,13 +680,17 @@ async def start_stream(
     chat: Chat,
     adapter: VercelAIAdapter[HarnessDeps, str],
     current_locator: str | None = None,
-    quotes: str | None = None,
+    attached: str | None = None,
+    medium: Medium = "web",
 ) -> AsyncGenerator[BaseChunk]:
     """Start the run and hand back the client's view of it.
 
     The run is a task of its own, with its own session: a client that walks
     away mid-stream stops reading the queue, and the run keeps going to
     completion and persistence anyway.
+
+    `attached` is the block that goes above the learner's words — the passages
+    they referenced on the page, the objects a notebook sent along.
     """
     await check_run_allowed(repo)
     run_id = uuid.uuid4()
@@ -684,8 +703,8 @@ async def start_stream(
     # chat named after that is a chat named after the passage the learner
     # attached rather than after what they asked about it.
     prompt = _prompt_text(user_messages)
-    if quotes is not None:
-        _prefix(user_messages, quotes)
+    if attached is not None:
+        _prefix(user_messages, attached)
     queue: asyncio.Queue[BaseChunk | None] = asyncio.Queue()
     run = _Run(
         steering=Steering(
@@ -699,7 +718,7 @@ async def start_stream(
     _runs[run_id] = run
     try:
         history = await _open_run(
-            repo, chat, run_id, user_messages, "web", "user", prompt
+            repo, chat, run_id, user_messages, medium, "user", prompt
         )
     except BaseException:
         _runs.pop(run_id, None)
@@ -715,6 +734,7 @@ async def start_stream(
             adapter=adapter,
             history=history,
             current_locator=current_locator,
+            medium=medium,
             queue=queue,
         )
     )

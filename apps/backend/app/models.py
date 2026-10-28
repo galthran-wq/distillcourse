@@ -17,6 +17,7 @@ from sqlalchemy import (
     Text,
     Time,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, CITEXT, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -93,9 +94,18 @@ class UserSession(Base):
 
 class Chat(Base):
     __tablename__ = "chats"
-    # The panel lists one course's chats of one reader, newest first.
     __table_args__ = (
+        # The panel lists one course's chats of one reader, newest first.
         Index("ix_chats_user_id_course_created_at", "user_id", "course", "created_at"),
+        # The notebook asks for "this learner's latest chat in this lab" on
+        # every question it sends without a chat id.
+        Index(
+            "ix_chats_user_id_lab_lesson_created_at",
+            "user_id",
+            "lab_lesson",
+            "created_at",
+            postgresql_where=text("kind = 'lab'"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -103,6 +113,9 @@ class Chat(Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     kind: Mapped[str] = mapped_column(String(16))
+    # The lab a `lab` chat belongs to, as its lesson locator; NULL for every
+    # other kind. What the lab tools read and what the site opens it on.
+    lab_lesson: Mapped[str | None] = mapped_column(String(LESSON_LENGTH), default=None)
     model: Mapped[str] = mapped_column(String(128))
     title: Mapped[str | None] = mapped_column(String(60), default=None)
     # The course whose pages list the chat: the one it was started on, until the
@@ -532,6 +545,22 @@ class LabChallenge(Base):
     # carries the version its notebook was generated from, and the two must
     # agree or the reference it would be compared against is not the one the
     # learner computed for.
+    content_version: Mapped[bytes] = mapped_column(LargeBinary)
+
+
+class LabSolution(Base):
+    """A lab's reference solution, `solution.py` as authored, for the tutor to
+    read and quote. One text per lab, so not a field of every checkpoint row.
+
+    Written by `app.labs.ingest` from the build's private artifact like
+    `lab_challenges`, and stamped with the same version: the solution the tutor
+    reads is the one the answer key was captured from.
+    """
+
+    __tablename__ = "lab_solutions"
+
+    lesson: Mapped[str] = mapped_column(String(LESSON_LENGTH), primary_key=True)
+    source: Mapped[str] = mapped_column(Text)
     content_version: Mapped[bytes] = mapped_column(LargeBinary)
 
 

@@ -141,10 +141,12 @@ describe.skipIf(!hasUv)("lab build", () => {
     ]) {
       expect(published).not.toContain(secret);
     }
-    // The private half is the answer key and nothing else: no model answer,
-    // which is the author's own wording, not a grading input.
-    expect(priv).not.toContain("model_answer");
-    expect(priv).not.toContain("any concentration of");
+    // The answer key is the grading inputs and nothing else: no model answer,
+    // which is the author's own wording. It does reach the tutor, as a line of
+    // the reference solution the private half also carries.
+    const key = JSON.stringify(JSON.parse(priv).checkpoints);
+    expect(key).not.toContain("model_answer");
+    expect(key).not.toContain("any concentration of");
   });
 
   it("publishes the inputs but never the outputs", () => {
@@ -267,6 +269,14 @@ describe.skipIf(!hasUv)("lab build", () => {
         [...shapes.private_checkpoint[record.kind as string]].sort(),
       );
     }
+  });
+
+  it("hands the reference solution to the private half, as authored", () => {
+    // The tutor of a lab chat reads it from the API, which reaches content
+    // only through what is ingested — never from content/.
+    expect(JSON.parse(priv).solution).toBe(
+      readFileSync(join(FIXTURE, LAB_DIR, "solution.py"), "utf8"),
+    );
   });
 
   it("retires the artifacts of a lab that no longer exists", () => {

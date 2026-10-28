@@ -7,6 +7,7 @@ import type { StoredChat } from "@/lib/chat/stored";
 const WEB: ChatSummary = {
   id: "c1",
   kind: "web",
+  lab_lesson: null,
   model: "moonshotai/kimi-k3",
   title: "why is this true?",
   course: null,
@@ -14,6 +15,14 @@ const WEB: ChatSummary = {
   last_message_at: "2026-08-05T10:04:00Z",
 };
 const TELEGRAM: ChatSummary = { ...WEB, id: "tg", kind: "telegram", title: null };
+const LAB: ChatSummary = {
+  ...WEB,
+  id: "lab1",
+  kind: "lab",
+  lab_lesson: "lesson:fraud-ml/scorecard-vs-gbm-lab",
+  course: "fraud-ml",
+  title: "why is my IV negative?",
+};
 const FRESH: ChatSummary = { ...WEB, id: "c2", title: null };
 
 type Route = () => Response;
@@ -124,6 +133,47 @@ describe("the chat session", () => {
 
     expect(open.summary.id).toBe("c1");
     expect(sent("POST", "/api/v1/chats")).toHaveLength(0);
+  });
+
+  it("lists the chats a lab notebook asked in beside the panel's own", async () => {
+    served({ "GET /api/v1/chats": json([LAB, TELEGRAM, WEB]) });
+    const { siteChats } = await import("@/lib/chat/api");
+
+    expect((await siteChats()).map((chat) => chat.id)).toEqual(["lab1", "c1"]);
+  });
+
+  it("opens the chat a link names, through the one resume the panel makes", async () => {
+    served({
+      "GET /api/v1/chats?course=fraud-ml": json([LAB]),
+      "GET /api/v1/chats/lab1/messages": json([]),
+    });
+    const { openChat, resumeSession } = await session();
+    const stored = await import("@/lib/chat/stored");
+
+    await openChat("lab1", "fraud-ml");
+    const open = await resumeSession("fraud-ml");
+
+    expect(stored.storedChatId("fraud-ml")).toBe("lab1");
+    expect(JSON.parse(window.localStorage.getItem("distillcourse.chat") ?? "{}").panel).toBe(
+      "docked",
+    );
+    expect(open.summary.id).toBe("lab1");
+  });
+
+  it("switches to the chat a link names when another one is open", async () => {
+    served({
+      "GET /api/v1/chats?course=fraud-ml": json([WEB]),
+      "GET /api/v1/chats": json([WEB, LAB]),
+      "GET /api/v1/chats/c1/messages": json([]),
+      "GET /api/v1/chats/lab1/messages": json([]),
+    });
+    const { openChat, resumeSession } = await session();
+    await resumeSession("fraud-ml");
+
+    await openChat("lab1", "fraud-ml");
+
+    // With a session open for this course, resuming hands back the one open.
+    expect((await resumeSession("fraud-ml")).summary.id).toBe("lab1");
   });
 
   it("resumes the chat the reader had open, not the most recent one", async () => {

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -112,3 +112,58 @@ class CheckpointProgress(BaseModel):
 
 class Progress(BaseModel):
     checkpoints: list[CheckpointProgress]
+
+
+# What one attached object may weigh, and how many one question carries — the
+# client's own caps (`distill.tutor.ATTACHMENT_CHARS`, `ATTACHMENTS`), held here too: a cap only a
+# client keeps is not a cap.
+ATTACHMENT_CHARS = 20_000
+ATTACHMENTS = 16
+QUESTION_CHARS = 8_000
+
+
+class Attachment(BaseModel):
+    """An object from the learner's kernel, as the notebook rendered it."""
+
+    name: Annotated[str, Field(max_length=200)]
+    kind: Literal["function", "table", "array", "value", "error"]
+    text: Annotated[str, Field(max_length=ATTACHMENT_CHARS)]
+
+
+class Ask(BaseModel):
+    """A question asked from the notebook. No chat id continues the learner's
+    latest chat in this lab."""
+
+    text: Annotated[str, Field(min_length=1, max_length=QUESTION_CHARS)]
+    chat_id: uuid.UUID | None = None
+    attachments: Annotated[list[Attachment], Field(max_length=ATTACHMENTS)] = []
+
+
+class LabChat(BaseModel):
+    chat_id: uuid.UUID
+    # Where the chat opens on the site: the lab's lesson page.
+    url: str
+
+
+# The answer to an `Ask`, one of these per `data:` line. Four events and
+# nothing else: a notebook renders a line of steps and a growing answer, and a
+# client that must stay httpx + numpy has no use for the web chat's protocol.
+class StepEvent(BaseModel):
+    type: Literal["step"] = "step"
+    label: str
+
+
+class TextEvent(BaseModel):
+    type: Literal["text"] = "text"
+    delta: str
+
+
+class DoneEvent(BaseModel):
+    type: Literal["done"] = "done"
+    chat_id: uuid.UUID
+    url: str
+
+
+class ErrorEvent(BaseModel):
+    type: Literal["error"] = "error"
+    detail: str

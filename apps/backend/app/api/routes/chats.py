@@ -31,6 +31,9 @@ class ChatSummary(BaseModel):
 
     id: uuid.UUID
     kind: str
+    # The lab a lab chat belongs to, as its lesson locator: the page the site
+    # opens it on.
+    lab_lesson: str | None = None
     model: str
     title: str | None
     course: str | None
@@ -137,15 +140,16 @@ async def _require_course(repo: HarnessRepository, course: str | None) -> None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "unknown course")
 
 
-async def _web_chat(repo: HarnessRepository, chat_id: uuid.UUID) -> Chat:
-    """A chat this API may run in, switch models on, or compact.
+async def _site_chat(repo: HarnessRepository, chat_id: uuid.UUID) -> Chat:
+    """A chat this API may run in, switch models on, or compact: a web chat,
+    or a lab chat continued on the site.
 
     The Telegram thread is none of those: its model is the platform's (system
     runs bill the instance), and a run started into it from the browser closes
     review slots the learner never answered.
     """
     chat = await _owned_chat(repo, chat_id)
-    if chat.kind != "web":
+    if chat.kind == "telegram":
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, "the Telegram thread is driven from Telegram"
         )
@@ -185,7 +189,7 @@ async def create(new: NewChat, repo: RepositoryDep) -> ChatSummary:
 async def update(
     chat_id: uuid.UUID, change: ChatUpdate, repo: RepositoryDep
 ) -> ChatSummary:
-    chat = await _web_chat(repo, chat_id)
+    chat = await _site_chat(repo, chat_id)
     fields = change.model_fields_set
     # Both checked before either is written, so a request refused for one
     # field has not changed the other.
@@ -218,7 +222,7 @@ async def messages(chat_id: uuid.UUID, repo: RepositoryDep) -> list[UIMessage]:
 
 @router.post("/{chat_id}/compact")
 async def compact(chat_id: uuid.UUID, repo: RepositoryDep) -> Summary:
-    chat = await _web_chat(repo, chat_id)
+    chat = await _site_chat(repo, chat_id)
     try:
         return Summary(summary=await runner.compact(repo, chat))
     except runner.RunBusy:
@@ -232,7 +236,7 @@ async def stream(
     repo: RepositoryDep,
     session_factory: SessionFactoryDep,
 ) -> Response:
-    chat = await _web_chat(repo, chat_id)
+    chat = await _site_chat(repo, chat_id)
     try:
         adapter = await VercelAIAdapter[HarnessDeps, str].from_request(
             request, agent=tutor
@@ -246,7 +250,7 @@ async def stream(
             chat=chat,
             adapter=adapter,
             current_locator=_current_locator(adapter.run_input),
-            quotes=_quotes(adapter.run_input),
+            attached=_quotes(adapter.run_input),
         )
     except LimitExceeded as exc:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc))

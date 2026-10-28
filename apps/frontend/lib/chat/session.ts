@@ -8,7 +8,7 @@ import {
   loadMessages,
   setChatCourse,
   setChatModel,
-  webChats,
+  siteChats,
   type ChatSummary,
 } from "@/lib/chat/api";
 import { API } from "@/lib/api-base";
@@ -16,7 +16,7 @@ import { errorDetail } from "@/lib/http";
 import { currentLocator } from "@/lib/lesson/position";
 import { takeQuotes } from "@/lib/chat/quote";
 import { settleSteers, steerData } from "@/lib/chat/steer";
-import { rememberChat, storedChatId } from "@/lib/chat/stored";
+import { openPanel, rememberChat, storedChatId } from "@/lib/chat/stored";
 import { createStore } from "@/lib/store";
 
 export interface Session {
@@ -81,7 +81,7 @@ export function resumeSession(course: string | null): Promise<Session> {
   // create a second chat before the first request came back.
   if (opening?.course === course) return opening.session;
   const bootstrap = (async () => {
-    const chats = await webChats(course);
+    const chats = await siteChats(course);
     // The stored one can be gone — deleted, filed elsewhere, or belonging to
     // whoever was signed in on this browser before — and then the most recent
     // stands in.
@@ -105,6 +105,24 @@ export function resetSession(): void {
 
 export function selectSession(summary: ChatSummary): Promise<Session> {
   return open(summary);
+}
+
+/**
+ * Open the chat a link names — `?chat=<id>`, the way a notebook's answer sends
+ * the reader to the site — as the one open on this page of `course`. With
+ * nothing open yet it is only remembered: the panel opening is what resumes,
+ * and resuming reads the remembered chat, so there is one bootstrap rather
+ * than two racing to set the session.
+ */
+export async function openChat(id: string, course: string | null): Promise<void> {
+  rememberChat(course, id);
+  openPanel();
+  const current = session.get();
+  if (current === null || current.summary.id === id) return;
+  const named = (await siteChats()).find((chat) => chat.id === id);
+  if (named === undefined) return;
+  resumedFor = course;
+  await open(named);
 }
 
 /** `/clear` on the web: a new chat in the page's course, not a marker in this one. */

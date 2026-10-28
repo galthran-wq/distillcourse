@@ -4,6 +4,8 @@ import { ApiError, call } from "@/lib/http";
 export interface ChatSummary {
   id: string;
   kind: string;
+  /** The lab a lab chat belongs to, as its lesson locator; null for any other. */
+  lab_lesson: string | null;
   model: string;
   title: string | null;
   /** The course whose pages list the chat; null for General. */
@@ -20,15 +22,16 @@ export interface ChatModel {
 }
 
 /**
- * The reader's chats with the site, most recently spoken in first: every one
- * of them, or only those of one course — `null` is General's. Telegram threads
- * are left out: the widget cannot render an eternal thread it does not own.
+ * The reader's chats with the site — the panel's own, and the ones a lab
+ * notebook asked in — most recently spoken in first: every one of them, or only
+ * those of one course — `null` is General's. Telegram threads are left out: the
+ * widget cannot render an eternal thread it does not own.
  */
-export async function webChats(course?: string | null): Promise<ChatSummary[]> {
+export async function siteChats(course?: string | null): Promise<ChatSummary[]> {
   const query =
     course === undefined ? "" : `?course=${encodeURIComponent(course ?? "")}`;
   const chats = await call<ChatSummary[]>(`/chats${query}`);
-  return chats.filter((chat) => chat.kind === "web");
+  return chats.filter((chat) => chat.kind !== "telegram");
 }
 
 export function createChat(

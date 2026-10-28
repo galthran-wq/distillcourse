@@ -9,10 +9,15 @@ Everything after that is one call per checkpoint. The server grades and keeps
 the score; this package computes the inputs, canonicalizes what your function
 returned, posts it and prints the verdict. It remembers nothing between
 kernels.
+
+`distill.ask("why is my IV negative?", woe_table)` asks the tutor, with the
+objects named after the question attached; `distill.clear_chat()` starts the
+next question in a fresh conversation.
 """
 
 from __future__ import annotations
 
+import sys
 import time
 import uuid
 from collections.abc import Callable
@@ -21,13 +26,15 @@ from typing import Any
 
 import numpy as np
 
-from distill import api
+from distill import api, tutor
 from distill.canon import canonicalize
 from distill.errors import LabError
 
 __all__ = [
     "LabError",
+    "ask",
     "check",
+    "clear_chat",
     "login",
     "open_lab",
     "submit_predictions",
@@ -49,6 +56,10 @@ class _Lab:
 
 
 _lab: _Lab | None = None
+# The chat the last answer came from. Only a shortcut: a question without one
+# continues the learner's latest chat in the lab, which the server keeps, so a
+# restarted kernel picks the conversation up where it was.
+_chat: str | None = None
 
 
 # How often the kernel asks whether the learner has clicked Approve. The
@@ -90,7 +101,8 @@ def login(code: str | None = None) -> None:
 
 def open_lab(lab: str) -> None:
     """Fetch what `<course>/<lesson>` asks for. Public: no pairing needed."""
-    global _lab
+    global _lab, _chat
+    _chat = None
     manifest = _api.manifest(lab)
     _lab = _Lab(
         lesson=manifest["lesson"],
@@ -138,6 +150,47 @@ def submit_review(checkpoint: str, text: str) -> None:
     """
     _spec(checkpoint, "review")
     _report(checkpoint, _submit(checkpoint, text))
+
+
+def ask(text: str, *objects: Any) -> None:
+    """Ask the tutor about this lab, in this lab's chat.
+
+    Each object is sent along — a function as its source, a table as its shape,
+    dtypes and first rows, an array as its first rows, anything else as its
+    repr — and so is the error your last cell raised, if it raised one.
+    """
+    global _chat
+    lab = _opened()
+    if len(text) > tutor.QUESTION_CHARS:
+        raise LabError(
+            f"a question is at most {tutor.QUESTION_CHARS} characters — "
+            "attach long material as an object instead"
+        )
+    _chat = tutor.show(
+        _api.ask(
+            _path(lab),
+            {
+                "text": text,
+                "chat_id": _chat,
+                "attachments": tutor.attachments(objects),
+            },
+        )
+    )
+    # Sent and answered: the next question must not carry the same error.
+    sys.last_value = None
+
+
+def clear_chat() -> None:
+    """Start a new conversation with the tutor in this lab. The old one is kept,
+    and listed on the site."""
+    global _chat
+    _chat = str(_api.new_chat(_path(_opened()))["chat_id"])
+    print("new chat started")
+
+
+def _path(lab: _Lab) -> str:
+    """`<course>/<lesson>`, the lab as the API's paths name it."""
+    return lab.lesson.removeprefix("lesson:")
 
 
 def _opened() -> _Lab:

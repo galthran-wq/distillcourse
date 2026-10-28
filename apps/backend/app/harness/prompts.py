@@ -1,3 +1,4 @@
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import lru_cache
@@ -15,8 +16,9 @@ QUOTE_LENGTH = 2000
 # (`lib/chat/quote.MAX_QUOTES`): a cap only a client keeps is not a cap.
 QUOTE_COUNT = 8
 QUOTE_SOURCE = "learner-quote"
+ATTACHMENT_SOURCE = "learner-attachment"
 
-Medium = Literal["web", "telegram"]
+Medium = Literal["web", "telegram", "notebook"]
 RunKind = Literal["chat", "review", "proactive", "compact"]
 
 _MODULES: dict[RunKind, tuple[str, ...]] = {
@@ -92,6 +94,21 @@ def learner_quotes(quotes: Sequence[tuple[str, str]]) -> str | None:
         return None
     return "\n\n".join(
         learner_quote(text, locator) for text, locator in quotes[:QUOTE_COUNT]
+    )
+
+
+def learner_attachment(name: str, kind: str, text: str) -> str:
+    """An object a notebook sent with a question, as it enters the message.
+
+    Fenced like a quoted passage: a table's rows or a value's repr is data from
+    wherever the learner loaded it, and an instruction found in it is still
+    data. The code fence inside is one backtick longer than the longest run in
+    the text, so a docstring holding a fence of its own cannot close it early.
+    """
+    longest = max(map(len, re.findall("`+", text)), default=0)
+    fence = "`" * max(3, longest + 1)
+    return untrusted(
+        ATTACHMENT_SOURCE, f"`{name}` ({kind})\n\n{fence}\n{text}\n{fence}"
     )
 
 
