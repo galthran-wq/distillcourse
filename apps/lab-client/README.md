@@ -57,6 +57,17 @@ expected answer is downloaded, and nothing about how far off yours was comes
 back: a wrong answer earns a hint only where the lab's author anticipated that
 particular mistake.
 
+## The review under a check
+
+Every `distill.check(...)` prints its verdict first, then asks for a short
+review of the function you checked and streams it below: for a pass, whether
+anything is worth changing; for a fail, one hint at where to look. It reads
+your function's source (`inspect.getsource`, so a function with no Python
+source is checked but not reviewed) and is written into the lab's chat, so a
+`distill.ask(...)` after it continues from it. A review that cannot be had —
+the tutor is answering in that chat, the service is down — is one line under
+the verdict, which it never changes.
+
 ## Asking the tutor
 
 ```python

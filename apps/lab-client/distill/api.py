@@ -36,8 +36,8 @@ UNREACHABLE = (
     "could not reach distillcourse — check the connection and run the cell again"
 )
 STALE = "the lab was updated — reopen the notebook from the course page"
-# On a question 409 is not the version guard: it is the same chat still
-# answering, from another cell or another kernel.
+# On a question or a review 409 is not the version guard: it is the same chat
+# still answering, from another cell or another kernel.
 BUSY = (
     "the tutor is still answering in this chat — wait for that answer, then ask again"
 )
@@ -50,6 +50,10 @@ REVOKED = (
     "this notebook's pairing has ended — a password change or signing out "
     "everywhere ends one — run distill.login() to pair again"
 )
+
+
+class Busy(LabError):
+    """The lab chat is still answering, from another cell or another kernel."""
 
 
 class Api:
@@ -114,18 +118,26 @@ class Api:
     def ask(self, lab: str, body: dict[str, Any]) -> Iterator[dict[str, Any]]:
         """The tutor's answer, one event per `data:` line as the server writes
         them."""
+        return self._events(f"/labs/{lab}/ask", body)
+
+    def review(self, lab: str, body: dict[str, Any]) -> Iterator[dict[str, Any]]:
+        """The code review of a checked submission, streamed as an answer is."""
+        return self._events(f"/labs/{lab}/review", body)
+
+    def _events(self, path: str, body: dict[str, Any]) -> Iterator[dict[str, Any]]:
         try:
             with self._client.stream(
                 "POST",
-                _url(f"/labs/{lab}/ask"),
+                _url(path),
                 json=body,
                 headers=self._bearer(),
                 timeout=ANSWER_TIMEOUT,
             ) as response:
                 if not response.is_success:
                     response.read()
-                    busy = response.status_code == httpx.codes.CONFLICT
-                    raise LabError(BUSY if busy else _refusal(response))
+                    if response.status_code == httpx.codes.CONFLICT:
+                        raise Busy(BUSY)
+                    raise LabError(_refusal(response))
                 for line in response.iter_lines():
                     if line.startswith("data: "):
                         yield json.loads(line.removeprefix("data: "))

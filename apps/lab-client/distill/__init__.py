@@ -7,7 +7,8 @@
 
 Everything after that is one call per checkpoint. The server grades and keeps
 the score; this package computes the inputs, canonicalizes what your function
-returned, posts it and prints the verdict. It remembers nothing between
+returned, posts it and prints the verdict — and, for `distill.check`, the
+tutor's short review of the function below it. It remembers nothing between
 kernels.
 
 `distill.ask("why is my IV negative?", woe_table)` asks the tutor, with the
@@ -115,11 +116,33 @@ def open_lab(lab: str) -> None:
         print(api.UNPAIRED)
 
 
+REVIEW_UNAVAILABLE = "(review unavailable)"
+REVIEW_SKIPPED = "(review skipped: the tutor is answering)"
+
+
 def check(checkpoint: str, fn: Callable[..., Any]) -> None:
-    """Run `fn` on this checkpoint's inputs and submit what it returned."""
+    """Run `fn` on this checkpoint's inputs and submit what it returned; then,
+    below the verdict, a short review of `fn` from the tutor, written into this
+    lab's chat so `distill.ask` can continue from it."""
     spec = _spec(checkpoint, "exact")
     payload = canonicalize(fn(*_inputs(spec)), float(spec["atol"]))
-    _report(checkpoint, _submit(checkpoint, payload))
+    source = tutor.source(fn)
+    attempt = str(uuid.uuid4())
+    _report(checkpoint, _submit(checkpoint, payload, attempt=attempt, source=source))
+    if source is not None:
+        _review(attempt)
+
+
+def _review(attempt: str) -> None:
+    """The review of a verdict already printed. Nothing about it can reach the
+    verdict, so whatever goes wrong is one line rather than an error."""
+    global _chat
+    try:
+        _chat = tutor.show(_api.review(_path(_opened()), {"submission_id": attempt}))
+    except api.Busy:
+        print(REVIEW_SKIPPED)
+    except LabError:
+        print(REVIEW_UNAVAILABLE)
 
 
 # Scores travel "higher is better", so an error measure travels negated — the
@@ -226,18 +249,26 @@ def _inputs(spec: dict[str, Any]) -> Any:
     return namespace["inputs"]
 
 
-def _submit(checkpoint: str, payload: Any) -> dict[str, Any]:
+def _submit(
+    checkpoint: str,
+    payload: Any,
+    *,
+    attempt: str | None = None,
+    source: str | None = None,
+) -> dict[str, Any]:
     lab = _opened()
     return _api.submit(
         {
             # One id per attempt, minted here because the submissions log is
             # keyed by it. Nothing in this client re-sends one — a cell run
-            # again is a new attempt, and the learner meant it to be.
-            "id": str(uuid.uuid4()),
+            # again is a new attempt, and the learner meant it to be. `check`
+            # mints its own, which its review then names.
+            "id": attempt or str(uuid.uuid4()),
             "lesson": lab.lesson,
             "checkpoint": checkpoint,
             "content_version": lab.content_version,
             "payload": payload,
+            "source": source,
         }
     )
 
