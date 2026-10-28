@@ -160,9 +160,10 @@ Rules that override defaults:
   what it sits on. `--fig-filter` (drawn art shown as an `<img>`) and
   `--photo-filter` (photographs, scans) are plain `:root` variables per theme
   too, beside motion and elevation: `none` in light; in dark the first
-  inverts, the second only dims. The prose blocks in `globals.css` (`.env`, `.callout`,
-  `pre`) are surfaces too and write the surface radius out as `0.5rem`: they
-  style markdown, not a class list.
+  inverts, the second only dims. The prose blocks in `globals.css` that are
+  surfaces (`.callout-keyfact`, `pre`) write the surface radius out as
+  `0.5rem`: they style markdown, not a class list. The textbook environments
+  are not surfaces — rules and run-in heads, set as a printed book sets them.
   Anything that reads as a button is `ui/Button` — `solid` for the one primary
   action a view has, `outline`, `ghost`; menu rows, the switch and the chip —
   a small outlined control, mostly naming a thing rather than doing one — are
@@ -172,8 +173,11 @@ Rules that override defaults:
   box and `FIELD_BOX_INPUT_CLASS` on the control inside it, which leaves the
   caller only geometry (the tutor's composer, whose send button is inside the
   field): the border, the fill and the ring are the box's, and the control
-  hands its ring over. Every micro-cap label (sans small caps) carries `LABEL_CLASS`;
-  a link inside a run of chrome text (not lesson prose) carries `LINK_CLASS`.
+  hands its ring over. Every micro-cap label (sans small caps) carries `LABEL_CLASS`,
+  except the heads of lesson environments and callouts (`.env-head`,
+  `.callout-label`, `.conclusion-label`), which are prose and styled in
+  `globals.css` with the blocks they head; a link inside a run of chrome text
+  (not lesson prose) carries `LINK_CLASS`.
   The chip a referenced passage is shown as carries
   `CHIP_CLASS`; a menu or a preview that hangs open over the page carries
   `POPOVER_CLASS`, plus `MENU_CLASS`/`MENU_ITEM_CLASS` when it is a dropdown,
