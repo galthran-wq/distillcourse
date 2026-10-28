@@ -93,6 +93,10 @@ class UserSession(Base):
 
 class Chat(Base):
     __tablename__ = "chats"
+    # The panel lists one course's chats of one reader, newest first.
+    __table_args__ = (
+        Index("ix_chats_user_id_course_created_at", "user_id", "course", "created_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -101,6 +105,11 @@ class Chat(Base):
     kind: Mapped[str] = mapped_column(String(16))
     model: Mapped[str] = mapped_column(String(128))
     title: Mapped[str | None] = mapped_column(String(60), default=None)
+    # The course whose pages list the chat: the one it was started on, until the
+    # reader files it elsewhere by hand. NULL is "General" — started off every
+    # course, or the Telegram thread. It only decides where the chat is listed;
+    # the tutor's tools still search every course.
+    course: Mapped[str | None] = mapped_column(String(SLUG_LENGTH), default=None)
     # When that title was written. Nothing else says how much of the
     # conversation happened after it, which is what decides when the harness
     # writes a new one. NULL until a first message names the chat. The Telegram

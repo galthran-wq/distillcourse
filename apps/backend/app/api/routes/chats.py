@@ -1,13 +1,15 @@
 import uuid
 from datetime import datetime
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from pydantic import BaseModel, ConfigDict, ValidationError
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from pydantic_ai.ui.vercel_ai import VercelAIAdapter
 from pydantic_ai.ui.vercel_ai.request_types import RequestData, UIMessage
 
 from app.api.deps import RepositoryDep, SessionFactoryDep, get_current_user
 from app.content import locators
+from app.content.structure import structure
 from app.core.config import ChatModel, settings
 from app.harness import prompts, runner
 from app.harness.agent import tutor
@@ -18,6 +20,10 @@ from app.models import Chat
 
 router = APIRouter(prefix="/chats", tags=["chats"])
 
+CourseSlug = Annotated[
+    str | None, Field(pattern=locators.SLUG_PATTERN, max_length=locators.SLUG_LENGTH)
+]
+
 
 class ChatSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -26,6 +32,7 @@ class ChatSummary(BaseModel):
     kind: str
     model: str
     title: str | None
+    course: str | None
     created_at: datetime
     # When the chat was last written in — null for one nobody has said anything
     # in yet, which a chat this API has only just created never has.
@@ -39,10 +46,16 @@ class NewChat(BaseModel):
     # a second one, or a run started into it from the browser, would be counted
     # as an answer to a review nobody was asked.
     model: str | None = None
+    # The course of the page the chat is started on; null off every course.
+    course: CourseSlug = None
 
 
-class ChatModelUpdate(BaseModel):
-    model: str
+class ChatUpdate(BaseModel):
+    """Whichever of the two the request names; a field left out is unchanged,
+    which for `course` is not the same as null (General)."""
+
+    model: str | None = None
+    course: CourseSlug = None
 
 
 class Summary(BaseModel):
@@ -109,6 +122,13 @@ async def _owned_chat(repo: HarnessRepository, chat_id: uuid.UUID) -> Chat:
     return chat
 
 
+async def _require_course(repo: HarnessRepository, course: str | None) -> None:
+    # The index is the only list of courses the service has. A slug it does
+    # not carry would file the chat in a folder no page ever lists.
+    if course is not None and not await structure(repo.session, course):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "unknown course")
+
+
 async def _web_chat(repo: HarnessRepository, chat_id: uuid.UUID) -> Chat:
     """A chat this API may run in, switch models on, or compact.
 
@@ -130,13 +150,17 @@ async def models() -> list[ChatModel]:
 
 
 @router.get("")
-async def index(repo: RepositoryDep) -> list[ChatSummary]:
+async def index(
+    repo: RepositoryDep,
+    course: Annotated[str | None, Query(max_length=locators.SLUG_LENGTH)] = None,
+) -> list[ChatSummary]:
     """The reader's chats, most recently spoken in first — a column of dates
     that does not descend is one nobody can read down. It is also the order
-    the panel resumes from when the chat it had is gone."""
+    the panel resumes from when the chat it had is gone. `course` narrows it to
+    one course's chats; `course=` (empty) to General's."""
     return [
         ChatSummary.model_validate(chat).model_copy(update={"last_message_at": last})
-        for chat, last in await repo.list_chats()
+        for chat, last in await repo.list_chats(course)
     ]
 
 
@@ -144,18 +168,29 @@ async def index(repo: RepositoryDep) -> list[ChatSummary]:
 async def create(new: NewChat, repo: RepositoryDep) -> ChatSummary:
     if new.model is not None and new.model not in settings.chat_model_pool:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "unknown model")
-    chat = await repo.create_chat(kind="web", model=new.model)
+    await _require_course(repo, new.course)
+    chat = await repo.create_chat(kind="web", model=new.model, course=new.course)
     return ChatSummary.model_validate(chat)
 
 
 @router.patch("/{chat_id}")
-async def set_model(
-    chat_id: uuid.UUID, update: ChatModelUpdate, repo: RepositoryDep
+async def update(
+    chat_id: uuid.UUID, change: ChatUpdate, repo: RepositoryDep
 ) -> ChatSummary:
-    if update.model not in settings.chat_model_pool:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "unknown model")
     chat = await _web_chat(repo, chat_id)
-    await repo.set_model(chat, update.model)
+    fields = change.model_fields_set
+    # Both checked before either is written, so a request refused for one
+    # field has not changed the other.
+    if "model" in fields and change.model not in settings.chat_model_pool:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "unknown model")
+    if "course" in fields:
+        await _require_course(repo, change.course)
+    if "model" in fields and change.model is not None:
+        await repo.set_model(chat, change.model)
+    # Filed by hand and only by hand: what the conversation turns to never
+    # moves it.
+    if "course" in fields:
+        await repo.set_course(chat, change.course)
     return ChatSummary.model_validate(chat)
 
 

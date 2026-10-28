@@ -52,12 +52,17 @@ class HarnessRepository:
     user_id: uuid.UUID
 
     async def create_chat(
-        self, *, kind: Literal["web", "telegram"], model: str | None = None
+        self,
+        *,
+        kind: Literal["web", "telegram"],
+        model: str | None = None,
+        course: str | None = None,
     ) -> Chat:
         chat = Chat(
             user_id=self.user_id,
             kind=kind,
             model=model or settings.DEFAULT_CHAT_MODEL,
+            course=course,
         )
         self.session.add(chat)
         await self.session.commit()
@@ -72,9 +77,12 @@ class HarnessRepository:
         )
         return chat
 
-    async def list_chats(self) -> list[tuple[Chat, datetime | None]]:
+    async def list_chats(
+        self, course: str | None = None
+    ) -> list[tuple[Chat, datetime | None]]:
         """Every chat of this learner with the moment it was last written in,
-        most recently used first.
+        most recently used first — or only those filed under `course`, where
+        "" is the chats filed under none.
 
         The date is a maximum over the chat's own messages rather than a column
         kept on it: the listing is the only reader, and a maximum cannot fall
@@ -93,16 +101,25 @@ class HarnessRepository:
             .group_by(Message.chat_id)
             .subquery()
         )
-        rows = await self.session.execute(
+        statement = (
             select(Chat, last.c.at)
             .outerjoin(last, last.c.chat_id == Chat.id)
             .where(Chat.user_id == self.user_id)
             .order_by(func.coalesce(last.c.at, Chat.created_at).desc())
         )
+        if course is not None:
+            statement = statement.where(
+                Chat.course.is_(None) if course == "" else Chat.course == course
+            )
+        rows = await self.session.execute(statement)
         return list(rows.tuples().all())
 
     async def set_model(self, chat: Chat, model: str) -> None:
         chat.model = model
+        await self.session.commit()
+
+    async def set_course(self, chat: Chat, course: str | None) -> None:
+        chat.course = course
         await self.session.commit()
 
     async def claim_run(self, chat: Chat, run_id: uuid.UUID) -> bool:

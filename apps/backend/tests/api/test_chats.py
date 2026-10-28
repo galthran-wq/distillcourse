@@ -10,12 +10,14 @@ from pydantic_ai.ui.vercel_ai.request_types import SubmitMessage
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.chats import _current_locator
+from app.content.ingest import ingest
 from app.core.config import ChatModel, settings
 from app.harness import prompts
 from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
 from app.models import User
 from tests.conftest import settled
+from tests.content.conftest import document, index
 from tests.harness.conftest import compacting
 
 QUESTION = ModelRequest(parts=[UserPromptPart(content="what is entropy?")])
@@ -432,3 +434,139 @@ async def test_a_question_with_no_passages_carries_no_fence(
         await settled()
 
     assert "untrusted" not in str((await repo.rows(chat))[0].pydantic_ai)
+
+
+@pytest.fixture
+async def courses(session: AsyncSession) -> None:
+    """Two courses in the index, which is the only list of them there is."""
+    await ingest(
+        session,
+        index(
+            *(
+                document(
+                    f"course:{slug}",
+                    course_slug=slug,
+                    metadata={"tagline": "t", "modules": []},
+                )
+                for slug in ("fraud-ml", "quant")
+            )
+        ),
+    )
+
+
+async def created(client: AsyncClient, course: str | None) -> dict[str, object]:
+    response = await client.post("/api/v1/chats", json={"course": course})
+    assert response.status_code == 200
+    body: dict[str, object] = response.json()
+    return body
+
+
+async def listed(client: AsyncClient, query: str = "") -> list[object]:
+    return [chat["id"] for chat in (await client.get(f"/api/v1/chats{query}")).json()]
+
+
+@pytest.mark.usefixtures("courses")
+async def test_a_chat_takes_the_course_of_the_page_it_was_started_on(
+    signed_in: AsyncClient,
+) -> None:
+    on_course = await created(signed_in, "fraud-ml")
+    off_course = await created(signed_in, None)
+    defaulted = (await signed_in.post("/api/v1/chats", json={})).json()
+
+    assert on_course["course"] == "fraud-ml"
+    assert off_course["course"] is None
+    assert defaulted["course"] is None
+
+
+@pytest.mark.usefixtures("courses")
+async def test_a_chat_cannot_be_started_in_a_course_the_index_does_not_carry(
+    signed_in: AsyncClient,
+) -> None:
+    unknown = await signed_in.post("/api/v1/chats", json={"course": "astrology"})
+    malformed = await signed_in.post("/api/v1/chats", json={"course": "Not A Slug"})
+
+    assert [unknown.status_code, malformed.status_code] == [422, 422]
+    assert await listed(signed_in) == []
+
+
+@pytest.mark.usefixtures("courses")
+async def test_the_listing_narrows_to_one_course_or_to_general(
+    signed_in: AsyncClient,
+) -> None:
+    fraud = await created(signed_in, "fraud-ml")
+    quant = await created(signed_in, "quant")
+    general = await created(signed_in, None)
+
+    assert await listed(signed_in, "?course=fraud-ml") == [fraud["id"]]
+    assert await listed(signed_in, "?course=") == [general["id"]]
+    assert set(await listed(signed_in)) == {fraud["id"], quant["id"], general["id"]}
+    assert all(
+        "course" in chat for chat in (await signed_in.get("/api/v1/chats")).json()
+    )
+
+
+@pytest.mark.usefixtures("courses")
+async def test_a_chat_is_refiled_by_hand_and_keeps_its_model(
+    signed_in: AsyncClient,
+) -> None:
+    chat = await created(signed_in, "fraud-ml")
+
+    moved = await signed_in.patch(
+        f"/api/v1/chats/{chat['id']}", json={"course": "quant"}
+    )
+    assert moved.status_code == 200
+    assert moved.json()["course"] == "quant"
+    assert moved.json()["model"] == chat["model"]
+    assert await listed(signed_in, "?course=quant") == [chat["id"]]
+    assert await listed(signed_in, "?course=fraud-ml") == []
+
+    to_general = await signed_in.patch(
+        f"/api/v1/chats/{chat['id']}", json={"course": None}
+    )
+    assert to_general.json()["course"] is None
+    assert await listed(signed_in, "?course=") == [chat["id"]]
+
+
+@pytest.mark.usefixtures("courses")
+async def test_a_model_switch_leaves_the_course_where_it_was(
+    signed_in: AsyncClient,
+) -> None:
+    chat = await created(signed_in, "fraud-ml")
+
+    switched = await signed_in.patch(
+        f"/api/v1/chats/{chat['id']}", json={"model": settings.DEFAULT_CHAT_MODEL}
+    )
+
+    assert switched.json()["course"] == "fraud-ml"
+
+
+@pytest.mark.usefixtures("courses")
+async def test_refiling_into_an_unknown_course_changes_nothing(
+    signed_in: AsyncClient,
+) -> None:
+    chat = await created(signed_in, "fraud-ml")
+
+    refused = await signed_in.patch(
+        f"/api/v1/chats/{chat['id']}",
+        json={"course": "astrology", "model": settings.DEFAULT_CHAT_MODEL},
+    )
+
+    assert refused.status_code == 422
+    assert await listed(signed_in, "?course=fraud-ml") == [chat["id"]]
+
+
+@pytest.mark.usefixtures("courses")
+async def test_another_readers_chat_cannot_be_refiled(
+    signed_in: AsyncClient, session: AsyncSession, other_user: User
+) -> None:
+    theirs = await HarnessRepository(session, other_user.id).create_chat(
+        kind="web", course="fraud-ml"
+    )
+
+    response = await signed_in.patch(
+        f"/api/v1/chats/{theirs.id}", json={"course": "quant"}
+    )
+
+    await session.refresh(theirs)
+    assert response.status_code == 404
+    assert theirs.course == "fraud-ml"
