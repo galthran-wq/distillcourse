@@ -187,10 +187,11 @@ describe("the course page", () => {
     auth.status = "anonymous";
     await mount(tree());
 
-    expect(host().innerHTML).toBe("");
+    expect(host().querySelector('[title="Read"]')).toBeNull();
+    expect(host().textContent).not.toContain("read");
   });
 
-  it("draws nothing for an anonymous reader", async () => {
+  it("points an anonymous reader at the first lesson and marks nothing", async () => {
     auth.status = "anonymous";
     stubFetch([]);
 
@@ -198,6 +199,32 @@ describe("the course page", () => {
       <ProgressProvider course="fraud-ml">
         <CourseProgress course="fraud-ml" lessons={LESSONS} />
         <LessonMark lesson="fraud-ml/framing" />
+      </ProgressProvider>,
+    );
+
+    const start = host().querySelector("a");
+    expect(start?.getAttribute("href")).toBe("/courses/fraud-ml/lessons/framing");
+    expect(host().textContent).toBe("Start with: Framing the problem");
+  });
+
+  it("points a signed-in reader who has not started at the first lesson too", async () => {
+    stubFetch([standing("nietzsche/drives", "read", "2026-10-01T10:00:00Z")]);
+
+    await mount(
+      <ProgressProvider course="fraud-ml">
+        <CourseProgress course="fraud-ml" lessons={LESSONS} />
+      </ProgressProvider>,
+    );
+
+    expect(host().textContent).toBe("Start with: Framing the problem");
+  });
+
+  it("has no start line for a course with nothing to read yet", async () => {
+    auth.status = "anonymous";
+
+    await mount(
+      <ProgressProvider course="fraud-ml">
+        <CourseProgress course="fraud-ml" lessons={[]} />
       </ProgressProvider>,
     );
 
