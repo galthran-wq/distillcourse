@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import CourseList, { type CourseCard } from "@/components/progress/CourseList";
 import CourseReadCount from "@/components/progress/CourseReadCount";
 import LessonMark from "@/components/progress/LessonMark";
 import StartHere from "@/components/progress/StartHere";
 import { getProgress, type Standing } from "@/lib/progress/api";
 import { ProgressProvider } from "@/lib/progress/context";
-import { byLesson, courseProgress, startedFirst } from "@/lib/progress/summary";
+import { byLesson, courseProgress } from "@/lib/progress/summary";
 import { mounted } from "./utils/dom";
 import { requestOf, stubFetch } from "./utils/fetch";
 
@@ -31,11 +30,7 @@ function standing(lesson: string, state: Standing["state"], last_seen: string): 
 }
 
 describe("the progress client", () => {
-  it("asks for every course, or for one", async () => {
-    const all = stubFetch([]);
-    await getProgress("");
-    expect(requestOf(all)[0]).toBe("/api/v1/progress");
-
+  it("asks for one course", async () => {
     const one = stubFetch([]);
     await getProgress("fraud-ml");
     expect(requestOf(one)[0]).toBe("/api/v1/progress?course=fraud-ml");
@@ -61,7 +56,6 @@ describe("how far a reader is through a course", () => {
       read: 2,
       total: 3,
       next: LESSONS[1],
-      lastSeen: Date.parse("2026-10-03T10:00:00Z"),
     });
   });
 
@@ -77,70 +71,13 @@ describe("how far a reader is through a course", () => {
     expect(courseProgress("fraud-ml", LESSONS, all)?.next).toBeUndefined();
   });
 
-  it("puts started courses first, most recent first, and leaves the rest in order", () => {
-    const seen: Record<string, number | undefined> = { b: 1, d: 5 };
-    const order = startedFirst(["a", "b", "c", "d"], (course) =>
-      seen[course] === undefined ? null : { read: 0, total: 1, lastSeen: seen[course] },
-    );
-    expect(order).toEqual(["d", "b", "a", "c"]);
-  });
 });
 
 const { host, render } = mounted();
 
-const CARDS: CourseCard[] = [
-  { slug: "nietzsche", title: "Nietzsche", tagline: "Drives.", lessons: [LESSONS[0]] },
-  { slug: "fraud-ml", title: "Fraud ML", tagline: "Anomalies.", lessons: LESSONS },
-];
-
 async function mount(tree: React.ReactNode): Promise<void> {
   await act(async () => render(tree));
 }
-
-describe("the course list", () => {
-  beforeEach(() => {
-    auth.status = "signed-in";
-  });
-
-  it("shows an anonymous reader the list as it is, with no progress and no request", async () => {
-    auth.status = "anonymous";
-    const fetch = stubFetch([]);
-
-    await mount(
-      <ProgressProvider>
-        <CourseList courses={CARDS} />
-      </ProgressProvider>,
-    );
-
-    expect(fetch).not.toHaveBeenCalled();
-    expect([...host().querySelectorAll("li a")].map((a) => a.textContent)).toEqual([
-      "Nietzsche",
-      "Fraud ML",
-    ]);
-    expect(host().textContent).not.toMatch(/read|Continue/);
-  });
-
-  it("lists the reader's courses first, with their count and where to continue", async () => {
-    stubFetch([
-      standing("fraud-ml/framing", "read", "2026-10-03T10:00:00Z"),
-      standing("fraud-ml/density", "started", "2026-10-02T10:00:00Z"),
-    ]);
-
-    await mount(
-      <ProgressProvider>
-        <CourseList courses={CARDS} />
-      </ProgressProvider>,
-    );
-
-    const cards = [...host().querySelectorAll("li")];
-    expect(cards[0].textContent).toContain("Fraud ML");
-    expect(cards[0].textContent).toContain("1 of 3 read");
-    const next = cards[0].querySelector('a[href="/courses/fraud-ml/lessons/density"]');
-    expect(next?.textContent).toBe("Continue: Density scores");
-    // An unstarted course carries nothing extra.
-    expect(cards[1].textContent).not.toMatch(/read|Continue/);
-  });
-});
 
 describe("the course page", () => {
   beforeEach(() => {

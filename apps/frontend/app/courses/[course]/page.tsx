@@ -15,7 +15,7 @@ import Figure from "@/components/mdx/Figure";
 import FigureSequence from "@/components/mdx/FigureSequence";
 import MathText from "@/components/mdx/MathText";
 import * as Blocks from "@/components/mdx/Blocks";
-import { assetUrl, isRasterFile } from "@/lib/content/images";
+import { assetUrl, isDrawnFile } from "@/lib/content/images";
 import { compileIntro, splitLead } from "@/lib/content/intro";
 import { lessonPath } from "@/lib/content/locator";
 import Lightbox from "@/components/mdx/Lightbox";
@@ -67,7 +67,7 @@ function LessonRow({ course, entry }: { course: string; entry: LoadedLesson }) {
     readable && lesson.key_image !== undefined
       ? assetUrl(course, lesson.slug, lesson.key_image)
       : undefined;
-  const drawn = lesson.key_image !== undefined && !isRasterFile(lesson.key_image);
+  const drawn = lesson.key_image !== undefined && isDrawnFile(lesson.key_image);
 
   const row = (
     <div className="flex items-center gap-4 py-2.5" title={readable ? undefined : NOT_WRITTEN}>

@@ -12,14 +12,12 @@ const Context = createContext<Standings | null>(null);
  * One request for every progress mark under it. The pages are prerendered, so
  * the marks arrive after hydration; until then — and for an anonymous reader,
  * always — there is no answer and nothing is drawn.
- *
- * `course` empty asks for every course.
  */
 export function ProgressProvider({
-  course = "",
+  course,
   children,
 }: {
-  course?: string;
+  course: string;
   children: React.ReactNode;
 }) {
   const [standings] = useSignedIn(getProgress, course);
