@@ -139,6 +139,12 @@ marker ("et al.", "handbook") in the lesson body outside `<References>` and
 `<Quote>` (`source-in-prose`, read from `research/sources.yaml`) are
 warnings.
 
+Every readable course and lesson also has a Markdown twin at its page URL
+plus `.md`, indexed by `/llms.txt` (`lib/content/markdown-export.ts`). It is
+converted from the MDX source with the page's own visibility rule and the
+page's own numbering; every component needs a Markdown mapping there, and
+one without fails the export's tests rather than being dropped.
+
 ## Lab lessons
 
 A lab is a lesson of `type: lab` closing a module: a notebook assignment the

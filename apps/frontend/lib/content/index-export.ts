@@ -73,7 +73,7 @@ function pipeline(format: "mdx" | "md") {
     .use(rehypeSlug);
 }
 
-function toHast(source: string, format: "mdx" | "md"): Root {
+export function toHast(source: string, format: "mdx" | "md"): Root {
   const processor = pipeline(format);
   return processor.runSync(processor.parse(source)) as Root;
 }

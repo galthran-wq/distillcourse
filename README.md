@@ -136,7 +136,7 @@ npm run figure -- <Name> [frame] [--dark]   # render a component figure
 npm run image -- check <file>               # sourced-image toolkit: verify,
                                             # fetch, PDF-extract, crop, fit
 npm run preview -- <course> <lesson>        # render a chapter, both themes
-npm run sync-assets  # copy lesson raster figures into the frontend's public/
+npm run sync-assets  # copy lesson figures into the frontend's public/
 npm run export-index # write the search index the backend ingests (index.json)
 npm run build-labs -- [<course> [<lesson>]] [--check]  # execute lab solutions,
                      # write labs-dist/ (public mirror half + private answer key)

@@ -135,6 +135,9 @@ Rules that override defaults:
   own `isReadable`, and chunk anchors come from the site's own rehype-slug —
   if you change how lessons are rendered or which ones render, the export
   follows automatically; if you fork either, search starts lying.
+  The `.md` twins and `/llms.txt` (`lib/content/markdown-export.ts`) use the
+  same `isReadable` and must map every MDX component — a new component is
+  given a Markdown rendering there, or the export throws.
   The one exception is a lab's answer key: the same command also loads
   `labs-dist/private/` (`npm run build-labs`, which `make reindex` runs) into
   `lab_challenges` via `app/labs/ingest.py`, and the lab's `solution.py`

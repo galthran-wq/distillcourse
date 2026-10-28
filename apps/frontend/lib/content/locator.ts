@@ -14,6 +14,16 @@ export function lessonPath(courseSlug: string, lessonSlug: string): string {
   return lessonKey(courseSlug, lessonSlug).slice(LESSON_PREFIX.length);
 }
 
+/** The site path of a course's page. */
+export function coursePage(courseSlug: string): string {
+  return `/courses/${courseSlug}`;
+}
+
+/** The site path of a lesson's page; its Markdown twin is this plus `.md`. */
+export function lessonPage(courseSlug: string, lessonSlug: string): string {
+  return `${coursePage(courseSlug)}/lessons/${lessonSlug}`;
+}
+
 /**
  * The id `<Conclusion>` renders with. It is a component rather than a heading,
  * so rehype-slug never assigns it and the content index has to be told it

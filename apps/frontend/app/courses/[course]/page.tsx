@@ -17,7 +17,8 @@ import MathText from "@/components/mdx/MathText";
 import * as Blocks from "@/components/mdx/Blocks";
 import { assetUrl, isDrawnFile } from "@/lib/content/images";
 import { compileIntro, splitLead } from "@/lib/content/intro";
-import { lessonPath } from "@/lib/content/locator";
+import { coursePage, lessonPath } from "@/lib/content/locator";
+import { markdownUrl } from "@/lib/content/markdown-export";
 import Lightbox from "@/components/mdx/Lightbox";
 import { LABEL_CLASS } from "@/components/ui/styles";
 
@@ -36,8 +37,13 @@ export async function generateMetadata({
 }: {
   params: Promise<Params>;
 }): Promise<Metadata> {
-  const loaded = getCourse((await params).course);
-  return { title: loaded?.course.title, description: loaded?.course.tagline };
+  const { course } = await params;
+  const loaded = getCourse(course);
+  return {
+    title: loaded?.course.title,
+    description: loaded?.course.tagline,
+    alternates: { types: { "text/markdown": markdownUrl(coursePage(course)) } },
+  };
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {

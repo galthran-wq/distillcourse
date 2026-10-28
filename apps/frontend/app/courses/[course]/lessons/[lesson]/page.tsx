@@ -39,9 +39,10 @@ import {
   Task,
   Theorem,
 } from "@/components/mdx/Blocks";
-import { lessonKey } from "@/lib/content/locator";
+import { lessonKey, lessonPage } from "@/lib/content/locator";
 import { compileLesson } from "@/lib/content/render";
-import { getCourses, getLessonView, lessonNumber } from "@/lib/content/site";
+import { markdownUrl } from "@/lib/content/markdown-export";
+import { getLessonView, lessonNumber, readableLessonParams } from "@/lib/content/site";
 import { isReadable } from "@/lib/content/visibility";
 
 interface Params {
@@ -52,12 +53,7 @@ interface Params {
 export const dynamicParams = false;
 
 export function generateStaticParams(): Params[] {
-  return getCourses().flatMap((c) =>
-    c.lessons.filter(isReadable).map((l) => ({
-      course: c.course.slug,
-      lesson: l.lesson.slug,
-    })),
-  );
+  return readableLessonParams();
 }
 
 export async function generateMetadata({
@@ -67,7 +63,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const p = await params;
   const view = getLessonView(p.course, p.lesson);
-  return { title: view?.entry.lesson.title, description: view?.entry.lesson.goal };
+  return {
+    title: view?.entry.lesson.title,
+    description: view?.entry.lesson.goal,
+    alternates: { types: { "text/markdown": markdownUrl(lessonPage(p.course, p.lesson)) } },
+  };
 }
 
 export default async function LessonPage({
