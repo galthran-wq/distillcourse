@@ -196,6 +196,7 @@ const SUMMARY: ChatSummary = {
   kind: "web",
   model: "moonshotai/kimi-k3",
   title: "Entropy",
+  course: null,
   created_at: "2026-08-01T09:00:00Z",
   last_message_at: null,
 };
@@ -214,6 +215,7 @@ describe("the chat menu", () => {
           expanded={false}
           onSelect={() => {}}
           onNew={() => {}}
+          onMove={() => {}}
         />,
       ),
     );

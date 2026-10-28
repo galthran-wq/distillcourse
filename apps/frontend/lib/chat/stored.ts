@@ -19,8 +19,12 @@ export type StoredChat = {
   bottom: number;
   width: number;
   height: number;
-  /** The chat the reader had open, "" for none. It may since have been deleted. */
-  chatId: string;
+  /**
+   * The chat the reader last had open in each course, as JSON — `{course:
+   * chatId}`, General under "". Any of them may since have been deleted or
+   * filed elsewhere.
+   */
+  chats: string;
   /** The message they were in the middle of writing. */
   draft: string;
   /** The passages attached to it, as JSON — the entry holds strings. */
@@ -65,7 +69,7 @@ const stored = createPersistedStore<StoredChat>("distillcourse.chat", {
   bottom: LAUNCHER_CLEARANCE,
   width: MIN_WIDTH,
   height: MIN_HEIGHT,
-  chatId: "",
+  chats: "",
   draft: "",
   quotes: "",
   owner: "",
@@ -160,12 +164,26 @@ export function setStoredQuotes(quotes: string): void {
   stored.set({ quotes });
 }
 
-export function storedChatId(): string {
-  return stored.get().chatId;
+function lastChats(): Record<string, string> {
+  // Written by this file, but storage is the reader's to edit.
+  try {
+    const parsed: unknown = JSON.parse(stored.get().chats);
+    return typeof parsed === "object" && parsed !== null
+      ? (parsed as Record<string, string>)
+      : {};
+  } catch {
+    return {};
+  }
 }
 
-export function rememberChat(chatId: string): void {
-  stored.set({ chatId });
+/** The chat last open in `course` (null: General), "" for none. */
+export function storedChatId(course: string | null): string {
+  const id = lastChats()[course ?? ""];
+  return typeof id === "string" ? id : "";
+}
+
+export function rememberChat(course: string | null, chatId: string): void {
+  stored.set({ chats: JSON.stringify({ ...lastChats(), [course ?? ""]: chatId }) });
 }
 
 /**
@@ -178,5 +196,5 @@ export function rememberChat(chatId: string): void {
  */
 export function claimStored(owner: string): void {
   if (stored.get().owner === owner) return;
-  stored.set({ chatId: "", draft: "", quotes: "", owner });
+  stored.set({ chats: "", draft: "", quotes: "", owner });
 }

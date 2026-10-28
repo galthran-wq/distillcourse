@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import ChatPanel from "@/components/chat/ChatPanel";
 import PanelGrips from "@/components/chat/PanelGrips";
@@ -19,6 +20,9 @@ import { lockScroll } from "@/lib/ui/scroll-lock";
 export default function ChatWidget({ lessons }: { lessons: Lessons }) {
   const auth = useAuth();
   const session = useSession();
+  // The course of the page, from its route — a course page, a lesson, a lab;
+  // null everywhere else. It is what the panel lists and files new chats under.
+  const course = useParams<{ course?: string }>().course ?? null;
   const panel = usePanel();
   // A window can be smaller than the one the box was dragged out in, and can
   // change size under an open panel. What that leaves is drawn rather than
@@ -46,10 +50,12 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
   // their text, and a 24rem by 32rem box holding one line is an empty box.
   const shape = expanded ? "expanded" : auth.status === "signed-in" ? "docked" : "prompt";
 
+  // Also on every move to another course: its pages carry on with the chat
+  // last open in it. The open one is kept while the course stays the same.
   useEffect(() => {
-    if (!open || auth.status !== "signed-in" || session !== null) return;
-    resumeSession().catch(() => setUnreachable(true));
-  }, [open, auth.status, session]);
+    if (!open || auth.status !== "signed-in") return;
+    resumeSession(course).catch(() => setUnreachable(true));
+  }, [open, auth.status, session, course]);
 
   // What Escape does to anything covering the page. It returns the panel to its
   // corner rather than closing it: the conversation was not what was dismissed.
@@ -109,7 +115,12 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
                 to ask it something.
               </p>
             ) : session !== null ? (
-              <ChatPanel session={session} panel={section} expanded={expanded} />
+              <ChatPanel
+                session={session}
+                course={course}
+                panel={section}
+                expanded={expanded}
+              />
             ) : (
               <p className="p-4 text-sm text-faint">
                 {unreachable ? "the tutor is unreachable" : "opening…"}

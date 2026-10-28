@@ -2,7 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import { useEffect, useRef, useState, type RefObject } from "react";
-import ChatList from "@/components/chat/ChatList";
+import ChatFolders from "@/components/chat/ChatFolders";
 import ChatMenu from "@/components/chat/ChatMenu";
 import Composer from "@/components/chat/Composer";
 import Messages from "@/components/chat/Messages";
@@ -25,6 +25,7 @@ import {
   changeModel,
   clearSession,
   compactSession,
+  moveChat,
   selectSession,
   streamFailure,
   type Session,
@@ -37,6 +38,8 @@ import { useDismiss } from "@/lib/ui/dismiss";
 
 interface Props {
   session: Session;
+  /** The page's course; null off every course. */
+  course: string | null;
   /** The panel this is the inside of: what the header drags. */
   panel: RefObject<HTMLElement | null>;
   expanded: boolean;
@@ -64,7 +67,7 @@ function failure(error: unknown): string {
  */
 const STREAM_THROTTLE_MS = 120;
 
-export default function ChatPanel({ session, panel, expanded }: Props) {
+export default function ChatPanel({ session, course, panel, expanded }: Props) {
   const { messages, sendMessage, status, error } = useChat({
     chat: session.chat,
     experimental_throttle: STREAM_THROTTLE_MS,
@@ -94,14 +97,16 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
   // backend rewrites that name as the conversation moves past what it was
   // first called. A settled run is when both may have changed, which is why
   // status is a dependency; `useChat`'s onFinish is no use for it, since the
-  // SDK ignores its callbacks when it is handed a `chat` to drive.
+  // SDK ignores its callbacks when it is handed a `chat` to drive. Docked, the
+  // panel belongs to the page's course and lists only its chats; expanded, it
+  // files every chat in its folder.
   useEffect(() => {
     if (busy(status)) return;
     // Several of these can be in flight — a menu opened while a run settles —
     // and they are not ordered, so a superseded one must not be what lands.
     let live = true;
     const load = (): void => {
-      webChats().then((listed) => {
+      webChats(expanded ? undefined : course).then((listed) => {
         if (!live) return;
         setChats(listed);
         adoptSummary(listed);
@@ -117,7 +122,7 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
       live = false;
       clearTimeout(renamed);
     };
-  }, [expanded, menu, status, session.summary]);
+  }, [expanded, course, menu, status, session.summary]);
 
   // The request took the passages off the composer as it was built, and this
   // one never got through — refused by the cap, or nothing answered at all.
@@ -215,6 +220,7 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
             expanded={expanded}
             onSelect={(chat) => run(selectSession(chat))}
             onNew={() => run(clearSession())}
+            onMove={(to) => run(moveChat(session.summary.id, to))}
           />
         )}
       </header>
@@ -234,10 +240,10 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
               <PlusIcon className="size-3.5" />
               New chat
             </Button>
-            <ChatList
+            <ChatFolders
               chats={chats}
               current={session.summary.id}
-              dated
+              course={course}
               onSelect={(chat) => run(selectSession(chat))}
             />
           </nav>
