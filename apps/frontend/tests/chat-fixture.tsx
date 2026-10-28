@@ -2,6 +2,7 @@ import { act } from "react";
 import { afterEach, beforeEach } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ChatStatus, UIMessage } from "ai";
+import type { ChatSummary } from "@/lib/chat/api";
 import Composer from "@/components/chat/Composer";
 import Messages from "@/components/chat/Messages";
 import { setDraft } from "@/lib/chat/stored";
@@ -43,6 +44,18 @@ export const SECTIONS: LessonSections = {
   "lesson:info-theory/entropy": [
     { depth: 2, id: "the-average", text: "The average surprisal" },
   ],
+};
+
+/** A web chat in a course, as the listing route answers with it. */
+export const CHAT_SUMMARY: ChatSummary = {
+  id: "c1",
+  kind: "web",
+  lab_lesson: null,
+  model: "moonshotai/kimi-k3",
+  title: "why?",
+  course: "info-theory",
+  created_at: "2026-08-07T09:00:00Z",
+  last_message_at: "2026-08-07T09:00:00Z",
 };
 
 /** The conversation these messages are in, where a test does not name one. */

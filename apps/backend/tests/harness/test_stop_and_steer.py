@@ -3,6 +3,7 @@ import uuid
 from collections.abc import AsyncGenerator, AsyncIterator
 
 import pytest
+from logfire.testing import CaptureLogfire
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -244,9 +245,20 @@ async def test_stopping_mid_tool_keeps_the_calls_that_completed(
     assert (await repo.rows(chat))[-1].error is None
 
 
-async def test_stopping_with_nothing_in_flight_does_nothing() -> None:
+async def test_stopping_with_nothing_in_flight_does_nothing(
+    capfire: CaptureLogfire,
+) -> None:
     await runner.stop(None)
-    await runner.stop(uuid.uuid4())
+    assert capfire.exporter.exported_spans_as_dict() == []
+    unknown = uuid.uuid4()
+    await asyncio.wait_for(runner.stop(unknown), timeout=1)
+    [warning] = capfire.exporter.exported_spans_as_dict()
+    assert warning["attributes"]["logfire.msg"] == (
+        "stop for a run this process does not hold"
+    )
+    # logfire's number for `warning`; it exports no public name for it.
+    assert warning["attributes"]["logfire.level_num"] == 13
+    assert warning["attributes"]["run_id"] == str(unknown)
     assert runner._runs == {}
     assert not runner.steer(None, SteerMessage(uuid.uuid4(), STEER))
 
