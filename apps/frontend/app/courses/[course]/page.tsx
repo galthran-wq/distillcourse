@@ -1,24 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { evaluate } from "@mdx-js/mdx";
-import * as runtime from "react/jsx-runtime";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
 import type { MDXComponents } from "mdx/types";
 import { getCourse, getCourses } from "@/lib/content/site";
 import { isReadable, previewMode, readableLessons } from "@/lib/content/visibility";
 import CourseProgress from "@/components/progress/CourseProgress";
 import LessonMark from "@/components/progress/LessonMark";
-import ModuleFolds from "@/components/progress/ModuleFolds";
+import ModuleFolds, { FoldChevron } from "@/components/progress/ModuleFolds";
 import { ProgressProvider } from "@/lib/progress/context";
 import Figure from "@/components/mdx/Figure";
 import FigureSequence from "@/components/mdx/FigureSequence";
 import MathText from "@/components/mdx/MathText";
 import * as Blocks from "@/components/mdx/Blocks";
 import { assetUrl } from "@/lib/content/images";
-import { splitLead } from "@/lib/content/intro";
+import { compileIntro, splitLead } from "@/lib/content/intro";
 import { lessonPath } from "@/lib/content/locator";
 import Lightbox from "@/components/mdx/Lightbox";
 import { LABEL_CLASS } from "@/components/ui/styles";
@@ -40,17 +35,6 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const loaded = getCourse((await params).course);
   return { title: loaded?.course.title, description: loaded?.course.tagline };
-}
-
-type IntroPart = React.ComponentType<{ components?: MDXComponents }>;
-
-async function compileIntro(source: string): Promise<IntroPart> {
-  const compiled = await evaluate(source, {
-    ...runtime,
-    remarkPlugins: [remarkGfm, remarkMath],
-    rehypePlugins: [rehypeKatex],
-  } as Parameters<typeof evaluate>[1]);
-  return compiled.default;
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -136,7 +120,8 @@ export default async function CoursePage({
                   <span className="text-lg font-semibold">{mod.title}</span>
                 </h2>
               ),
-              extent: `${mod.lessons.length} ${mod.lessons.length === 1 ? "lesson" : "lessons"} · ${mod.lessons.reduce((sum, lesson) => sum + lesson.est_minutes, 0)} min`,
+              // A lab's est_minutes is nominal; its row shows est_hours, and so does this sum.
+              extent: `${mod.lessons.length} ${mod.lessons.length === 1 ? "lesson" : "lessons"} · ${mod.lessons.reduce((sum, lesson) => sum + (lesson.lab !== undefined ? lesson.lab.est_hours * 60 : lesson.est_minutes), 0)} min`,
               lessons: (
                 <ol className="mt-2">
                   {mod.lessons.map((lesson) => {
@@ -229,12 +214,7 @@ export default async function CoursePage({
         <details className="fold group/fold border-b border-line py-8">
           <summary className="flex cursor-pointer list-none items-baseline justify-between [&::-webkit-details-marker]:hidden">
             <span className={LABEL_CLASS}>About this course</span>
-            <span
-              aria-hidden
-              className="font-mono text-[11px] text-faint transition-transform duration-(--motion-fast) group-open/fold:rotate-90"
-            >
-              ›
-            </span>
+            <FoldChevron />
           </summary>
           <div className="mt-6 flex flex-col gap-8">
             {course.prerequisites.length > 0 && (
