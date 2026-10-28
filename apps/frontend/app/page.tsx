@@ -44,6 +44,7 @@ export default function Home() {
                     <img
                       src={cover.src}
                       alt=""
+                      loading="lazy"
                       className={`absolute inset-(--pad) h-[calc(100%-2*var(--pad))] w-[calc(100%-2*var(--pad))] ${
                         cover.drawn
                           ? "object-contain [filter:var(--fig-filter)]"
