@@ -24,6 +24,14 @@ const nextConfig: NextConfig = {
         source: "/api/:path*",
         destination: `${process.env.API_ORIGIN ?? "http://localhost:8000"}/api/:path*`,
       },
+      // A page's Markdown twin is its URL plus `.md`; a segment cannot end in
+      // a suffix after its parameter, so the twins live under /md. These run
+      // before the dynamic pages they would otherwise be taken for.
+      { source: "/courses/:course\\.md", destination: "/md/courses/:course" },
+      {
+        source: "/courses/:course/lessons/:lesson\\.md",
+        destination: "/md/courses/:course/lessons/:lesson",
+      },
     ];
   },
   // The dev server is reviewed from the public host, not localhost; without

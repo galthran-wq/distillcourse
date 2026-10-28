@@ -17,6 +17,14 @@ const CONTENT_ROOT =
   process.env.CONTENT_ROOT ?? join(process.cwd(), "..", "..", "content");
 
 /**
+ * The public origin, for what has to name the site absolutely: the Markdown
+ * export's links (an agent reading a `.md` has no page to resolve a relative
+ * one against) and the `<link rel="alternate">` that points at it. Read at
+ * build time, since both are prerendered.
+ */
+export const SITE_URL = (process.env.SITE_URL ?? "https://distillcourse.com").replace(/\/$/, "");
+
+/**
  * Content is immutable within a build process, so the tree is read from disk
  * once per process (React cache() is per-request, which made every generated
  * page re-read everything). Dev skips the memo so MDX edits show on refresh.
@@ -96,6 +104,13 @@ export async function getLessonSections(): Promise<LessonSections> {
     }
   }
   return sections;
+}
+
+/** Every page a lesson has — its HTML and its Markdown twin are generated over the same set. */
+export function readableLessonParams(): { course: string; lesson: string }[] {
+  return getCourses().flatMap((c) =>
+    c.lessons.filter(isReadable).map((l) => ({ course: c.course.slug, lesson: l.lesson.slug })),
+  );
 }
 
 export interface LessonView {

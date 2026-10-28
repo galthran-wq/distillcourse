@@ -4,11 +4,16 @@ import { parse } from "yaml";
 import { isRasterFile } from "./images";
 import { listCourseDirs, listLessonDirs } from "./load";
 
+// The page inlines an SVG figure rather than loading it, but the lesson's
+// Markdown twin (./markdown-export) can only link one, so they are served too.
+function isServed(file: string): boolean {
+  return isRasterFile(file) || file.toLowerCase().endsWith(".svg");
+}
+
 /**
  * Every file `scripts/sync-assets.ts` must have under `publicRoot`, as
- * destination -> source: each lesson's (and the course root's) raster
- * figures, plus the SVGs course.yaml names as a `key_image` or a `cover` —
- * an SVG figure is otherwise inlined into its lesson and never served.
+ * destination -> source: each lesson's (and the course root's) figures, plus
+ * the images course.yaml names as a `key_image` or a `cover`.
  */
 export function wantedAssets(contentRoot: string, publicRoot: string): Map<string, string> {
   const wanted = new Map<string, string>();
@@ -18,7 +23,7 @@ export function wantedAssets(contentRoot: string, publicRoot: string): Map<strin
     const courseFigures = join(courseDir, "figures");
     if (existsSync(courseFigures)) {
       for (const file of readdirSync(courseFigures)) {
-        if (!isRasterFile(file)) continue;
+        if (!isServed(file)) continue;
         wanted.set(
           join(publicRoot, course, "_course", basename(file)),
           join(courseFigures, file),
@@ -30,7 +35,7 @@ export function wantedAssets(contentRoot: string, publicRoot: string): Map<strin
       const figuresDir = join(lessonsDir, lesson, "figures");
       if (!existsSync(figuresDir)) continue;
       for (const file of readdirSync(figuresDir)) {
-        if (!isRasterFile(file)) continue;
+        if (!isServed(file)) continue;
         wanted.set(
           join(publicRoot, course, lesson, basename(file)),
           join(figuresDir, file),

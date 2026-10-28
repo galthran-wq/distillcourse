@@ -56,8 +56,11 @@ export default function RootLayout({
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <footer className="border-t border-line">
-          <div className="mx-auto w-full max-w-7xl px-4 py-4 text-[13px] text-faint sm:px-6">
+          <div className="mx-auto flex w-full max-w-7xl justify-between gap-4 px-4 py-4 text-[13px] text-faint sm:px-6">
             distillcourse
+            <a href="/llms.txt" className="hover:text-accent">
+              For AI agents
+            </a>
           </div>
         </footer>
         {/* In the layout rather than on the lesson page: the conversation
