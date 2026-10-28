@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { act } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { parse, stringify } from "yaml";
 import ModuleFolds, { type ModuleFold } from "@/components/progress/ModuleFolds";
 import { splitLead } from "@/lib/content/intro";
 import type { Standing } from "@/lib/progress/api";
@@ -95,6 +99,7 @@ describe("the module folds", () => {
   const FOLDS: ModuleFold[] = MODULES.map((readable, i) => ({
     slug: `m${i}`,
     readable,
+    planned: readable.length === 0,
     heading: <h2>Module {i + 1}</h2>,
     extent: `${readable.length} lessons`,
     lessons: (
@@ -145,6 +150,28 @@ describe("the module folds", () => {
     expect(summaries[0]).toContain("✓ done");
     expect(summaries[1]).not.toContain("done");
   });
+
+  it("shades a module with nothing written yet, and says nothing about it", async () => {
+    auth.status = "anonymous";
+    stubFetch([]);
+
+    await act(async () =>
+      render(
+        <ProgressProvider course="fraud-ml">
+          <ModuleFolds course="fraud-ml" modules={FOLDS} />
+        </ProgressProvider>,
+      ),
+    );
+
+    const summaries = [...host().querySelectorAll("summary")];
+    expect(summaries.map((s) => s.classList.contains("text-faint"))).toEqual([
+      false,
+      false,
+      true,
+      false,
+    ]);
+    expect(summaries[2].textContent).not.toMatch(/planned|written/i);
+  });
 });
 
 describe("the course introduction's lead", () => {
@@ -169,5 +196,139 @@ describe("the course introduction's lead", () => {
       lead: "One paragraph,\nwrapped over\nthree lines.",
       rest: "",
     });
+  });
+});
+
+/**
+ * The page itself, rendered off a content root of its own: the lint fixture
+ * (a drafted lesson, a planned one, a drafted lab) plus a part whose only
+ * lesson is planned, in preview mode — the mode production runs in, and the
+ * one that used to put each lesson's status on its row. Both have to be set
+ * before the page is imported: the content root is read once, at load.
+ */
+describe("the course page", () => {
+  const root = mkdtempSync(join(tmpdir(), "course-page-"));
+  const dir = join(root, "courses", "lint-course");
+  cpSync(join(__dirname, "fixtures", "lint-course"), dir, { recursive: true });
+  const course = parse(readFileSync(join(dir, "course.yaml"), "utf8"));
+  course.modules.push({
+    slug: "later",
+    title: "Later",
+    outcomes: ["co-surprisal"],
+    lessons: [
+      {
+        ...course.modules[0].lessons[1],
+        slug: "later-on",
+        title: "Later on",
+        est_minutes: 25,
+      },
+    ],
+  });
+  writeFileSync(join(dir, "course.yaml"), stringify(course));
+  process.env.CONTENT_ROOT = root;
+  process.env.CONTENT_PREVIEW = "1";
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  // The first import compiles the page and everything under it, which can
+  // outlast a test's own timeout on a loaded machine.
+  let CoursePage: typeof import("@/app/courses/[course]/page").default;
+  beforeAll(async () => {
+    CoursePage = (await import("@/app/courses/[course]/page")).default;
+  }, 60_000);
+
+  const { host, render } = mounted();
+
+  async function open(): Promise<void> {
+    const page = await CoursePage({ params: Promise.resolve({ course: "lint-course" }) });
+    await act(async () => render(page));
+  }
+
+  const quiet = () => host().querySelector("header p:last-child")!.textContent;
+  const row = (title: string) =>
+    [...host().querySelectorAll("#contents li")].find((li) => li.textContent!.includes(title))!;
+
+  beforeEach(() => {
+    auth.status = "anonymous";
+    stubFetch([]);
+  });
+
+  it("shows no authoring state anywhere", async () => {
+    await open();
+
+    expect(host().textContent).not.toMatch(/drafted|reviewed|published|written|planned/i);
+    expect(host().innerHTML).not.toContain("font-mono");
+  });
+
+  it("leads with the contents, then the introduction and About, then the sources", async () => {
+    await open();
+
+    const blocks = [...host().firstElementChild!.children].map(
+      (el) => el.id || el.tagName.toLowerCase(),
+    );
+    expect(blocks).toEqual(["header", "contents", "about", "section"]);
+    const about = host().querySelector("#about")!;
+    expect(about.firstElementChild!.querySelector(".course-intro")?.textContent).toBe(
+      "Fixture course intro.",
+    );
+    expect(about.lastElementChild!.querySelector("summary")?.textContent).toBe(
+      "About this course",
+    );
+  });
+
+  it("counts every lesson in the quiet line, written or not, and a lab by its hours", async () => {
+    await open();
+
+    // 7 + 8 + 3 h + 25 is 220 minutes.
+    expect(quiet()).toBe("2 parts · 4 lessons · ~4 h · About this course ↓");
+    expect(host().querySelector('header a[href="#about"]')).not.toBeNull();
+  });
+
+  it("shades a lesson that is not written: no link, no picture, a tooltip", async () => {
+    await open();
+
+    const planned = row("Where surprisal leads");
+    expect(planned.querySelector("a")).toBeNull();
+    expect(planned.querySelector("img")).toBeNull();
+    expect(planned.querySelector("[title]")?.getAttribute("title")).toBe("Not written yet");
+    expect(row("Measuring surprise").querySelector("a")?.getAttribute("href")).toBe(
+      "/courses/lint-course/lessons/intro-surprise",
+    );
+  });
+
+  it("shades a part with nothing written in it", async () => {
+    await open();
+
+    const summaries = [...host().querySelectorAll("#contents summary")];
+    expect(summaries.map((s) => s.classList.contains("text-faint"))).toEqual([false, true]);
+  });
+
+  it("puts a drawn thumbnail through the theme's figure filter, on no white ground", async () => {
+    await open();
+
+    const thumb = row("Measuring surprise").querySelector("img")!;
+    expect(thumb.className).toContain("[filter:var(--fig-filter)]");
+    expect(host().innerHTML).not.toContain("bg-white");
+    // And none on a phone, where the title takes the row's width.
+    expect(thumb.parentElement!.className).toContain("max-sm:hidden");
+  });
+
+  it("starts an anonymous reader at the first written lesson", async () => {
+    await open();
+
+    expect(row("Measuring surprise").firstElementChild!.textContent).toBe("Start here");
+    expect(host().textContent).not.toContain("Continue here");
+  });
+
+  it("continues a reader where they left off and counts what they have read", async () => {
+    auth.status = "signed-in";
+    stubFetch([
+      { lesson: "lint-course/intro-surprise", state: "read", last_seen: "2026-10-01T10:00:00Z" },
+    ]);
+
+    await open();
+
+    expect(quiet()).toBe("2 parts · 4 lessons · ~4 h · 1 of 2 read · About this course ↓");
+    expect(row("Lab: surprisal").firstElementChild!.textContent).toBe("Continue here");
+    expect(host().textContent).not.toContain("Start here");
   });
 });
