@@ -7,8 +7,6 @@ export interface CourseProgress {
   total: number;
   /** The first readable lesson in course order not yet read; absent once all are. */
   next?: ReadableLesson;
-  /** Epoch milliseconds of the latest visit to any of its lessons. */
-  lastSeen: number;
 }
 
 export type Standings = Map<string, Standing>;
@@ -33,24 +31,7 @@ export function courseProgress(
     read: seen.filter((standing) => standing.state === "read").length,
     total: lessons.length,
     next: lessons.find((_, i) => mine[i]?.state !== "read"),
-    lastSeen: Math.max(...seen.map((standing) => Date.parse(standing.last_seen))),
   };
-}
-
-/**
- * Started courses first, most recently read first; the rest keep the order
- * they came in.
- */
-export function startedFirst<T>(
-  courses: T[],
-  progressOf: (course: T) => CourseProgress | null,
-): T[] {
-  const started = courses
-    .map((course) => ({ course, progress: progressOf(course) }))
-    .filter((entry) => entry.progress !== null)
-    .sort((a, b) => b.progress!.lastSeen - a.progress!.lastSeen)
-    .map((entry) => entry.course);
-  return [...started, ...courses.filter((course) => !started.includes(course))];
 }
 
 export interface ModuleFolds {

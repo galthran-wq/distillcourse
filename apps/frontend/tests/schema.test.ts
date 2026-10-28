@@ -30,6 +30,19 @@ describe("CourseSchema", () => {
     expect(CourseSchema.safeParse(raw).success).toBe(false);
   });
 
+  it("takes an optional cover naming a lesson and an image", () => {
+    const raw = loadYaml(join(FIXTURES, "course.yaml")) as Record<string, unknown>;
+    expect(CourseSchema.parse(raw).cover).toBeUndefined();
+
+    raw.cover = { lesson: "surprisal", image: "figures/curve.svg" };
+    expect(CourseSchema.parse(raw).cover).toEqual(raw.cover);
+
+    raw.cover = { lesson: "surprisal" };
+    expect(CourseSchema.safeParse(raw).success).toBe(false);
+    raw.cover = { lesson: "Surprisal", image: "figures/curve.svg" };
+    expect(CourseSchema.safeParse(raw).success).toBe(false);
+  });
+
   it("rejects non-kebab-case slugs", () => {
     const raw = loadYaml(join(FIXTURES, "course.yaml")) as { slug: string };
     raw.slug = "Information Theory";

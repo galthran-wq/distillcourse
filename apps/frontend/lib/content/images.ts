@@ -1,5 +1,6 @@
 import { readFileSync, statSync } from "node:fs";
 import { basename, extname } from "node:path";
+import type { LoadedCourse } from "./load";
 
 /**
  * Sourced-image support (docs/figures.md, third figure tier): raster files
@@ -203,6 +204,27 @@ export const MAX_FIGURE_BYTES = 6_000_000;
  */
 export function assetUrl(course: string, lesson: string, file: string): string {
   return `/course-assets/${course}/${lesson}/${basename(file)}`;
+}
+
+/**
+ * The figure the home page shows for a course: its `cover`, else the first
+ * lesson in course order with a `key_image` (planned ones too — the file
+ * exists either way). `drawn` is an SVG, which the theme may invert; anything
+ * else is a photograph or a scan, which it only dims.
+ */
+export function courseCover(
+  loaded: LoadedCourse,
+): { src: string; drawn: boolean } | undefined {
+  const pick =
+    loaded.course.cover ??
+    loaded.lessons
+      .map(({ lesson }) => ({ lesson: lesson.slug, image: lesson.key_image }))
+      .find((candidate) => candidate.image !== undefined);
+  if (pick?.image === undefined) return undefined;
+  return {
+    src: assetUrl(loaded.course.slug, pick.lesson, pick.image),
+    drawn: pick.image.toLowerCase().endsWith(".svg"),
+  };
 }
 
 /** Splits `…/content/courses/<course>/lessons/<lesson>` into its two slugs. */

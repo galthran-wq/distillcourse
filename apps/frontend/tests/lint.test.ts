@@ -244,6 +244,50 @@ describe("lintCourse", () => {
     expect(diags.find((d) => d.rule === "image-credit")?.message).toContain("photo.png");
   });
 
+  describe("cover", () => {
+    function covered(lesson: string, image: string, mutate?: (dir: string) => void): string {
+      return brokenCopy((d) => {
+        rewrite(
+          join(d, "course.yaml"),
+          "intro: Fixture course intro.",
+          `intro: Fixture course intro.\ncover:\n  lesson: ${lesson}\n  image: ${image}`,
+        );
+        mutate?.(d);
+      });
+    }
+
+    function coverErrors(dir: string): string[] {
+      return errors(lintDir(dir))
+        .filter((d) => d.rule === "cover")
+        .map((d) => d.message);
+    }
+
+    it("accepts a figure of one of the course's lessons", () => {
+      expect(lintDir(covered("surprisal-lab", "figures/lab.svg"))).toEqual([]);
+    });
+
+    it("flags a lesson that is not in the course", () => {
+      expect(coverErrors(covered("elsewhere", "figures/lab.svg"))).toEqual([
+        'cover.lesson "elsewhere" is not a lesson of this course',
+      ]);
+    });
+
+    it("flags a file the lesson does not have", () => {
+      expect(coverErrors(covered("intro-surprise", "figures/lab.svg"))).toEqual([
+        'cover.image "figures/lab.svg" does not exist in the lesson directory',
+      ]);
+    });
+
+    it("flags a raster with no credits entry", () => {
+      const dir = covered("intro-surprise", "figures/photo.png", (d) =>
+        writeFileSync(join(d, "lessons/intro-surprise/figures/photo.png"), PNG_1PX),
+      );
+      expect(coverErrors(dir)).toEqual([
+        'cover.image "photo.png" has no credits.yaml entry',
+      ]);
+    });
+  });
+
   it("flags a truncated sourced image (image-broken)", () => {
     const dir = brokenCopy((d) => {
       writeFileSync(
