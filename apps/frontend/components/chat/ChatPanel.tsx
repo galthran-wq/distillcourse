@@ -89,6 +89,7 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
   const title = useRef<HTMLParagraphElement>(null);
   const pane = useRef<HTMLDivElement>(null);
   const reading = useRef<HTMLDivElement>(null);
+  const stopping = useRef<Promise<void>>(Promise.resolve());
   const column = useColumnWidth();
   const lessons = useLessons();
   const sections = useSections();
@@ -157,14 +158,16 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
     // What is actually sent to the backend is still the field the transport
     // takes them out of the composer for; this copy is the widget's own, and
     // the backend has no use for it.
-    void sendMessage({ text, metadata: { quotes } });
+    // After a stop has landed: until then the chat is still claimed by the run
+    // being stopped, and the turn would be refused as one too many.
+    void stopping.current.then(() => sendMessage({ text, metadata: { quotes } }));
   }
 
   // The run is the server's: aborting the request alone stops only the
   // reading of it, so the backend is told as well.
   function halt(): void {
     void stop();
-    stopChat(session.summary.id).catch(report);
+    stopping.current = stopChat(session.summary.id).catch(report);
   }
 
   const line = error === undefined ? notice : streamFailure(error);

@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from collections.abc import AsyncGenerator, Coroutine, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from functools import partial
 from itertools import groupby
 from typing import Any
@@ -67,6 +67,9 @@ class _Run:
     drain: asyncio.Task[None] | None = None
     stream: asyncio.Task[tuple[AgentRunResult[str] | None, str | None]] | None = None
     stopped: bool = False
+    # Set once the turn is stored and the chat free — or once the run failed
+    # to open, which leaves neither to do.
+    over: asyncio.Event = field(default_factory=asyncio.Event)
 
 
 # In-process: the backend is one process, and a run is only ever stopped or
@@ -79,7 +82,9 @@ _runs: dict[uuid.UUID, _Run] = {}
 def _finished(run_id: uuid.UUID, task: asyncio.Task[None]) -> None:
     """A drain that died has nobody to raise to: the request it started under
     returned long ago, so the traceback is only ever seen if it is logged."""
-    _runs.pop(run_id, None)
+    run = _runs.pop(run_id, None)
+    if run is not None:
+        run.over.set()
     if not task.cancelled() and task.exception() is not None:
         logfire.error("the drain of a chat run died", _exc_info=task.exception())
 
@@ -94,8 +99,7 @@ async def stop(run_id: uuid.UUID | None) -> None:
     run.stopped = True
     if run.stream is not None:
         run.stream.cancel()
-    if run.drain is not None:
-        await asyncio.wait([run.drain])
+    await run.over.wait()
 
 
 def steer(run_id: uuid.UUID | None, message: SteerMessage) -> bool:
@@ -298,6 +302,7 @@ async def _close_run(
     *,
     result: AgentRunResult[str] | None,
     unfinished: Sequence[ModelMessage],
+    usage: RunUsage | None,
     failure: str | None,
 ) -> None:
     # The user turn went into the history the run was given, so everything
@@ -305,6 +310,9 @@ async def _close_run(
     # which is what a run that died or was stopped still stores of what the
     # learner already saw.
     produced = result.new_messages() if result is not None else _settled(unfinished)
+    # What an unfinished run spent is spent all the same — the caps and the
+    # ceiling are sums over these rows, and a stop must not be a way past them.
+    spent = result.usage if result is not None else usage
     # A steer is the learner's, stored as theirs between the model messages it
     # came between, and counted like any other message they send.
     turns = [(steer, list(group)) for steer, group in groupby(produced, key=is_steer)]
@@ -315,7 +323,7 @@ async def _close_run(
             messages,
             role="user" if steer else "agent",
             run_id=run_id,
-            usage=usage_row(result.usage) if last and result is not None else None,
+            usage=usage_row(spent) if last and spent is not None else None,
         )
     if failure is not None:
         await repo.fail_run(chat, run_id, failure)
@@ -345,6 +353,7 @@ async def _close_safely(
     *,
     result: AgentRunResult[str] | None,
     unfinished: Sequence[ModelMessage],
+    usage: RunUsage | None,
     failure: str | None,
 ) -> None:
     """Store the turn whatever state the run left behind.
@@ -362,6 +371,7 @@ async def _close_safely(
         run_id,
         result=result,
         unfinished=unfinished,
+        usage=usage,
         failure=failure,
     )
     try:
@@ -409,10 +419,18 @@ async def run(
             ),
             run_id=str(run_id),
         )
-        await _close_run(repo, chat, run_id, result=result, unfinished=(), failure=None)
+        await _close_run(
+            repo, chat, run_id, result=result, unfinished=(), usage=None, failure=None
+        )
     except Exception as exc:
         await _close_safely(
-            repo, chat, run_id, result=None, unfinished=(), failure=str(exc)
+            repo,
+            chat,
+            run_id,
+            result=None,
+            unfinished=(),
+            usage=None,
+            failure=str(exc),
         )
         raise
     finally:
@@ -437,6 +455,30 @@ def _announce_unused(
                 transient=True,
             )
         )
+
+
+async def _store_and_release(
+    repo: HarnessRepository,
+    chat: Chat,
+    run_id: uuid.UUID,
+    *,
+    result: AgentRunResult[str] | None,
+    unfinished: Sequence[ModelMessage],
+    usage: RunUsage,
+    failure: str | None,
+) -> None:
+    await _close_safely(
+        repo,
+        chat,
+        run_id,
+        result=result,
+        unfinished=unfinished,
+        usage=usage,
+        failure=failure,
+    )
+    await _guarded(
+        repo.release_run(chat, run_id), "releasing run {run_id} failed", run_id
+    )
 
 
 def _produced(
@@ -469,6 +511,7 @@ async def _stream(
     adapter: VercelAIAdapter[HarnessDeps, str],
     history: list[ModelMessage],
     current_locator: str | None,
+    usage: RunUsage,
     queue: asyncio.Queue[BaseChunk | None],
 ) -> tuple[AgentRunResult[str] | None, str | None]:
     """The agent's part of a web run, chunk by chunk onto the client's queue:
@@ -492,6 +535,9 @@ async def _stream(
             model=_model(deps.chat, "chat", reasoning=True),
             instructions=instructions,
             run_id=str(run_id),
+            # Handed in rather than read off the result, which a stopped run
+            # never has: the run counts into this one as it goes.
+            usage=usage,
             on_complete=capture,
         ):
             # The run has made its last request: a steer that has not been taken
@@ -538,6 +584,7 @@ async def _drain(
                 current_locator=current_locator,
                 steering=run.steering,
             )
+            usage = RunUsage()
             with capture_run_messages() as messages:
                 try:
                     run.stream = asyncio.create_task(
@@ -548,6 +595,7 @@ async def _drain(
                             adapter=adapter,
                             history=history,
                             current_locator=current_locator,
+                            usage=usage,
                             queue=queue,
                         )
                     )
@@ -563,19 +611,34 @@ async def _drain(
                     # ahead of; nothing is waiting for them on a stopped one,
                     # but the steers still have to be refused from here on.
                     _announce_unused(run.steering, queue)
-                    await _close_safely(
-                        repo,
-                        chat,
-                        run_id,
-                        result=result,
-                        unfinished=_produced(messages, run_id),
-                        failure=failure,
-                    )
-                    await _guarded(
-                        repo.release_run(chat, run_id),
-                        "releasing run {run_id} failed",
-                        run_id,
-                    )
+                    unfinished = _produced(messages, run_id)
+                    if run.stream is not None and run.stream.cancelled():
+                        # A stop can land while a tool's statement is in flight
+                        # on this session, which leaves it unusable — rolling it
+                        # back expires the chat too. The turn is stored and the
+                        # chat freed from a session the stop never touched.
+                        async with session_factory() as clean:
+                            fresh = HarnessRepository(clean, user_id)
+                            await _store_and_release(
+                                fresh,
+                                await fresh.get_chat(chat_id) or chat,
+                                run_id,
+                                result=result,
+                                unfinished=unfinished,
+                                usage=usage,
+                                failure=failure,
+                            )
+                    else:
+                        await _store_and_release(
+                            repo,
+                            chat,
+                            run_id,
+                            result=result,
+                            unfinished=unfinished,
+                            usage=usage,
+                            failure=failure,
+                        )
+                    run.over.set()
         finally:
             # The client is reading this queue and holds the learner's next
             # turn until it ends, so nothing above may be skipped and nothing
@@ -623,7 +686,6 @@ async def start_stream(
     prompt = _prompt_text(user_messages)
     if quotes is not None:
         _prefix(user_messages, quotes)
-    history = await _open_run(repo, chat, run_id, user_messages, "web", "user", prompt)
     queue: asyncio.Queue[BaseChunk | None] = asyncio.Queue()
     run = _Run(
         steering=Steering(
@@ -632,6 +694,17 @@ async def start_stream(
             )
         )
     )
+    # Registered before the chat is claimed: opening can compact the history,
+    # a whole model call, and a stop or a steer sent meanwhile is for this run.
+    _runs[run_id] = run
+    try:
+        history = await _open_run(
+            repo, chat, run_id, user_messages, "web", "user", prompt
+        )
+    except BaseException:
+        _runs.pop(run_id, None)
+        run.over.set()
+        raise
     run.drain = asyncio.create_task(
         _drain(
             session_factory=session_factory,
@@ -645,6 +718,5 @@ async def start_stream(
             queue=queue,
         )
     )
-    _runs[run_id] = run
     run.drain.add_done_callback(partial(_finished, run_id))
     return _relay(queue)

@@ -191,6 +191,9 @@ async def test_stopping_mid_text_keeps_what_was_said_and_frees_the_chat(
     assert [row.error for row in rows] == [None, None]
     assert "half an answer" in stored(rows)
     assert "the rest" not in stored(rows)
+    # Spent all the same: the caps and the ceiling are sums over these rows.
+    usage = rows[-1].usage
+    assert usage is not None and usage["requests"] == 1
     assert await active_run(repo, chat) is None
 
     # The next message continues from the stored half.

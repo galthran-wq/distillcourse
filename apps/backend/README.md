@@ -179,7 +179,8 @@ of their own — the stream stays one-way. The runs in flight are an in-process
 registry (`runner._runs`; the backend is one process). `POST
 /chats/{id}/stop` cancels the agent's part of the run and returns once what it
 had produced — the text streamed so far, the tool calls that completed — is
-stored like the turn of a run that died, unmarked, and the chat is free.
+stored like the turn of a run that died, unmarked and with what it cost,
+and the chat is free.
 `POST /chats/{id}/steer` queues a message for the run: a history processor on
 the tutor (`ProcessHistory`) appends it as a user request before the next model
 request, it is stored as a `user` row between the model messages it came
