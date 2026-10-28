@@ -1,21 +1,19 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { CHIP_CLASS, LABEL_CLASS, buttonClass } from "@/components/ui/styles";
-import { useAuth } from "@/lib/auth/store";
+import HowLabsWork from "@/components/labs/HowLabsWork";
+import { LABEL_CLASS, LINK_CLASS, buttonClass } from "@/components/ui/styles";
+import { useAuth, type AuthState } from "@/lib/auth/store";
 import type { LabCheckpoint, LabSpec } from "@/lib/content/schema";
 import { day } from "@/lib/day";
-import { ApiError } from "@/lib/http";
 import { answered } from "@/lib/load";
 import {
   getLabManifest,
   getLabProgress,
-  issuePairingCode,
   type CheckpointProgress,
   type LabManifest,
   type LabProgress,
-  type PairingCode,
 } from "@/lib/labs/api";
 import { colabUrl } from "@/lib/labs/mirror";
 
@@ -219,7 +217,8 @@ function Checkpoint({
   checkpoint: LabCheckpoint;
   state?: CheckpointProgress;
   target?: Target;
-  /** False for a reader with no progress to show: the rows stand bare. */
+  /** False until there is progress to show — for nobody, or not yet: the rows
+      stand bare rather than claim that nothing was attempted. */
   known: boolean;
 }) {
   const standing = standingOf(checkpoint, state);
@@ -258,143 +257,17 @@ function Checkpoint({
   );
 }
 
-/**
- * The paste fallback for pairing: a code issued here and typed into
- * `distill.login("…")` when the approval link the notebook prints is not an
- * option. One press, and the string on screen to copy.
- */
-function NotebookCode() {
-  const [code, setCode] = useState<PairingCode | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function issue() {
-    setError(null);
-    setCopied(false);
-    try {
-      setCode(await issuePairingCode());
-    } catch (failure) {
-      setError(
-        failure instanceof ApiError ? failure.message : "the server is unreachable",
-      );
-    }
-  }
-
-  return (
-    <>
-      No browser at hand —{" "}
-      <button
-        type="button"
-        onClick={() => void issue()}
-        className="text-accent underline decoration-line underline-offset-2 hover:decoration-accent"
-      >
-        {code === null ? "get a code" : "get a new code"}
-      </button>{" "}
-      and pass it to <code className={CODE}>login(&quot;…&quot;)</code>.
-      {error !== null && (
-        <span role="alert" className="mt-1 block text-accent">
-          {error}
-        </span>
-      )}
-      {code !== null && (
-        <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <button
-            type="button"
-            className={`inline-flex ${CHIP_CLASS} px-2 py-1 font-mono`}
-            onClick={() =>
-              void navigator.clipboard?.writeText(code.code).then(
-                () => setCopied(true),
-                // A browser that refuses the clipboard — an insecure origin, a
-                // denied permission — leaves the code on screen to select by
-                // hand. Claiming it was copied when it was not is the only
-                // real failure available here.
-                () => setCopied(false),
-              )
-            }
-          >
-            {code.code}
-          </button>
-          <span className="text-faint">
-            {copied ? "Copied. " : ""}Expires at{" "}
-            {new Date(code.expires_at).toLocaleTimeString()}.
-          </span>
-        </span>
-      )}
-    </>
-  );
-}
-
-const CODE = "font-mono text-[12px] text-ink";
-
-function Step({ n, verb, children }: { n: number; verb: string; children: ReactNode }) {
-  return (
-    <li className="grid grid-cols-[1.2rem_minmax(0,1fr)]">
-      <span className="font-semibold text-faint">
-        {n}
-      </span>
-      <span>
-        <b className="font-semibold text-ink">{verb}</b> {children}
-      </span>
-    </li>
-  );
-}
-
-/** The steps, said once on the page and folded away until asked for. */
-function HowLabsWork({ signedIn }: { signedIn: boolean }) {
-  return (
-    <details className="group/how ml-auto open:order-3 open:ml-0 open:basis-full max-sm:ml-0 max-sm:basis-full">
-      <summary className="inline-flex cursor-pointer list-none items-center gap-[0.4rem] text-[0.9rem] text-faint transition-colors duration-(--motion-fast) hover:text-accent [&::-webkit-details-marker]:hidden">
-        How labs work
-        <span
-          aria-hidden
-          className="size-[0.38rem] -translate-y-[0.12rem] rotate-45 border-r-[1.5px] border-b-[1.5px] border-current transition-transform duration-(--motion-fast) group-open/how:translate-y-[0.08rem] group-open/how:-rotate-135"
-        />
-      </summary>
-      <ol className="mt-[0.7rem] mb-[0.2rem] grid max-w-[40rem] gap-[0.45rem] text-[0.9rem] leading-[1.5] text-soft">
-        <Step n={1} verb="Open">
-          the notebook in Colab or any Jupyter. Its first cell installs{" "}
-          <code className={CODE}>distill</code> and fetches the data.
-        </Step>
-        <Step n={2} verb="Pair">
-          it once: <code className={CODE}>distill.login()</code> prints a link you
-          approve here.{" "}
-          {signedIn ? (
-            <NotebookCode />
-          ) : (
-            <Link
-              href="/login"
-              className="text-accent underline decoration-line underline-offset-2 hover:decoration-accent"
-            >
-              Sign in to pair
-            </Link>
-          )}
-        </Step>
-        <Step n={3} verb="Check">
-          each piece with <code className={CODE}>distill.check(…)</code>. The verdict
-          prints in the notebook and this list follows; a short review of the code
-          comes after it.
-        </Step>
-        <Step n={4} verb="Ask">
-          the tutor about your code with{" "}
-          <code className={CODE}>distill.ask(&quot;…&quot;, obj)</code>; the
-          conversation stays with this lab.
-        </Step>
-      </ol>
-    </details>
-  );
-}
-
 function Pairing({
   who,
   progress,
 }: {
-  who: "loading" | "anonymous" | "signed-in";
+  who: AuthState["status"];
   progress: LabProgress | null;
 }) {
   if (who === "anonymous") {
     return (
       <span>
-        <Link href="/login" className="text-accent hover:underline">
+        <Link href="/login" className={LINK_CLASS}>
           Sign in
         </Link>{" "}
         to pair a notebook and keep your checkpoints.
@@ -441,7 +314,7 @@ export default function LabPanel({ lab, spec }: { lab: string; spec: LabSpec }) 
           checkpoint={checkpoint}
           state={states.get(checkpoint.id)}
           target={targets.get(checkpoint.id)}
-          known={signedIn}
+          known={progress !== null}
         />
       ))}
     </ol>
@@ -464,12 +337,20 @@ export default function LabPanel({ lab, spec }: { lab: string; spec: LabSpec }) 
           <span>~{spec.est_hours} h in a notebook of your own</span>
           <Pairing who={auth.status} progress={progress} />
         </p>
-        <HowLabsWork signedIn={signedIn} />
+        <HowLabsWork who={auth.status} />
       </div>
 
       {/* Driven from here rather than by the browser: only the reader's own
           press is remembered, never the default the width chose. */}
-      <details open={open} className="mt-[1.2rem]">
+      <details
+        open={open}
+        // The browser can still open it on its own — find-in-page expands a
+        // match inside — and the summary has to say so.
+        onToggle={(event) => {
+          if (event.currentTarget.open !== open) toggle();
+        }}
+        className="mt-[1.2rem]"
+      >
         <summary
           onClick={(event) => {
             event.preventDefault();

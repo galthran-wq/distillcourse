@@ -375,6 +375,8 @@ describe("the lab panel", () => {
     const host = await show();
 
     expect(host.textContent).not.toContain("paired");
+    // Nor about the rows: a reader with passes must not see them unattempted.
+    expect(rows(host)[0]).not.toContain("not attempted");
   });
 
   it("keeps the steps in one fold, closed until asked for", async () => {
