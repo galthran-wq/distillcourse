@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, createRef } from "react";
 import { Chat } from "@ai-sdk/react";
-import type { UIMessage } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ChatPanel, { RENAME_MS } from "@/components/chat/ChatPanel";
 import type { ChatSummary } from "@/lib/chat/api";
@@ -102,5 +102,56 @@ describe("the listing the panel keeps", () => {
     });
 
     expect(listings).toBe(settled + 1);
+  });
+});
+
+describe("stopping the tutor", () => {
+  it("aborts the stream and tells the backend, which owns the run", async () => {
+    const posted: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit = {}) => {
+        if ((init.method ?? "GET") === "POST") posted.push(url);
+        // The answer never comes: the run is in flight until it is stopped.
+        if (url.endsWith("/stream"))
+          return new Promise<Response>((_, reject) =>
+            init.signal?.addEventListener("abort", () =>
+              reject(new DOMException("aborted", "AbortError")),
+            ),
+          );
+        const body = url.endsWith("/chats/models") ? [] : listing;
+        return new Response(init.method === "POST" ? null : JSON.stringify(body), {
+          status: url.endsWith("/stop") ? 204 : 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+    const chat = new Chat<UIMessage>({
+      id: SUMMARY.id,
+      messages: [],
+      transport: new DefaultChatTransport({ api: "/api/v1/chats/c1/stream" }),
+    });
+    await act(async () =>
+      render(
+        <SectionsProvider value={SECTIONS}>
+          <LessonsProvider value={LESSONS}>
+            <ChatPanel
+              session={{ summary: SUMMARY, chat }}
+              panel={createRef<HTMLElement>()}
+              expanded={false}
+            />
+          </LessonsProvider>
+        </SectionsProvider>,
+      ),
+    );
+    await act(async () => {
+      void chat.sendMessage({ text: "why?" });
+    });
+
+    const stop = host().querySelector<HTMLButtonElement>('[aria-label="Stop"]')!;
+    await act(async () => stop.click());
+
+    expect(posted).toContain("/api/v1/chats/c1/stop");
+    await vi.waitFor(() => expect(chat.status).toBe("ready"));
   });
 });

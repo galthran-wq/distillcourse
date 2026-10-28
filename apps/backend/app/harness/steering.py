@@ -31,10 +31,6 @@ class Steering:
     # until then.
     announce: Callable[[SteerMessage], None]
     inbox: asyncio.Queue[SteerMessage] = field(default_factory=asyncio.Queue)
-    # Where this run's own messages begin in the list the agent keeps: the
-    # history it was given is cleaned before the first request, consecutive
-    # requests merged, so it is counted there rather than from what was passed.
-    first_new: int | None = None
     closed: bool = False
 
     def offer(self, message: SteerMessage) -> bool:
@@ -48,8 +44,6 @@ class Steering:
     def take(
         self, run_id: str | None, messages: list[ModelMessage]
     ) -> list[ModelMessage]:
-        if self.first_new is None:
-            self.first_new = len(messages)
         while not self.inbox.empty():
             steer = self.inbox.get_nowait()
             messages.append(

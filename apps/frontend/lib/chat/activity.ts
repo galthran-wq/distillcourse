@@ -1,4 +1,5 @@
 import { getToolName, isToolUIPart, type UIMessage } from "ai";
+import { lessonParts } from "@/lib/content/locator";
 
 type Part = UIMessage["parts"][number];
 
@@ -33,21 +34,22 @@ const TOOLS: Record<string, { done: string; doing: string; noun?: [string, strin
   cancel_reminder: { done: "cancelled a reminder", doing: "cancelling a reminder" },
   mute_proactive: { done: "paused messages", doing: "pausing messages" },
   unmute_proactive: { done: "resumed messages", doing: "resuming messages" },
+  report_review_outcome: { done: "graded the review", doing: "grading the review" },
 };
 
+function spoken(tool: string): string {
+  return tool.replace(/_/g, " ");
+}
+
 function wording(tool: string): { done: string; doing: string; noun?: [string, string] } {
-  const name = tool.replace(/_/g, " ");
-  return TOOLS[tool] ?? { done: name, doing: name };
+  return TOOLS[tool] ?? { done: spoken(tool), doing: spoken(tool) };
 }
 
-/** A locator read as the place it names: its last path segment, no anchor. */
-function place(locator: string): string {
-  return locator.split("#")[0].split("/").at(-1) ?? locator;
-}
-
-function about(tool: string, input: unknown): string {
+function about(input: unknown): string {
   const args = (input ?? {}) as Record<string, unknown>;
-  if (typeof args.locator === "string") return place(args.locator);
+  // A lesson read as the lesson it names; any other locator as written.
+  if (typeof args.locator === "string")
+    return lessonParts(args.locator)?.lesson ?? args.locator;
   const first = Object.values(args).find((value) => typeof value === "string");
   return typeof first === "string" ? first : "";
 }
@@ -85,7 +87,7 @@ export function steps(
         {
           kind: "tool",
           tool,
-          about: about(tool, part.input),
+          about: about(part.input),
           state:
             part.state === "output-available"
               ? "done"
@@ -134,7 +136,7 @@ export function current(all: Step[]): string | null {
 }
 
 export function describe(step: Step & { kind: "tool" }): string {
-  const name = step.tool.replace(/_/g, " ");
+  const name = spoken(step.tool);
   const failed = step.state === "failed" ? " — failed" : "";
   return `${name}${step.about === "" ? "" : `: ${step.about}`}${failed}`;
 }

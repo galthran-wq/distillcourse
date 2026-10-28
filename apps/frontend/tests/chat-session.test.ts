@@ -312,6 +312,36 @@ describe("the chat session", () => {
     second.end();
   });
 
+  it("puts what a stopped run never read back into the composer, and sends nothing", async () => {
+    const reply = stream();
+    served({
+      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats/c1/messages": json([]),
+      "POST /api/v1/chats/c1/stream": reply.response,
+      "POST /api/v1/chats/c1/steer": json(null),
+    });
+    const { resumeSession, steer } = await session();
+    const { setDraft, storedDraft } = await import("@/lib/chat/stored");
+    const open = await resumeSession();
+    const answered = open.chat.sendMessage({ text: "isolation forests?" });
+    for (const chunk of REPLY.slice(0, 4)) reply.push(chunk);
+    await vi.waitFor(() => expect(open.chat.status).toBe("streaming"));
+    await steer(open.chat, "shorter");
+    setDraft("and a picture");
+
+    await open.chat.stop();
+    // A stubbed response does not hear the abort; a real one ends here.
+    reply.end();
+    await answered;
+
+    await vi.waitFor(() => expect(storedDraft()).toBe("shorter\n\nand a picture"));
+    expect(open.chat.messages.map((message) => message.role)).toEqual([
+      "user",
+      "assistant",
+    ]);
+    expect(sent("POST", "/api/v1/chats/c1/stream")).toHaveLength(1);
+  });
+
   it("says nothing about position when the reader is not in a lesson", async () => {
     const reply = stream();
     served({

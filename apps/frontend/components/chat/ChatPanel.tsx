@@ -6,6 +6,7 @@ import ChatList from "@/components/chat/ChatList";
 import ChatMenu from "@/components/chat/ChatMenu";
 import Composer from "@/components/chat/Composer";
 import Messages from "@/components/chat/Messages";
+import { GRIP } from "@/components/chat/PanelGrips";
 import {
   CloseIcon,
   CollapseIcon,
@@ -22,7 +23,12 @@ import {
   type ChatSummary,
 } from "@/lib/chat/api";
 import { parseCommand } from "@/lib/chat/commands";
-import { startColumnDrag, startPanelDrag } from "@/lib/chat/panel-box";
+import {
+  COLUMN_REM,
+  DOCKED_COLUMN_REM,
+  startColumnDrag,
+  startPanelDrag,
+} from "@/lib/chat/panel-box";
 import { restoreQuotes, type Quote } from "@/lib/chat/quote";
 import { plain } from "@/lib/chat/references";
 import {
@@ -82,6 +88,7 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
   const header = useRef<HTMLElement>(null);
   const title = useRef<HTMLParagraphElement>(null);
   const pane = useRef<HTMLDivElement>(null);
+  const reading = useRef<HTMLDivElement>(null);
   const column = useColumnWidth();
   const lessons = useLessons();
   const sections = useSections();
@@ -265,7 +272,11 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
           // it is the panel's to bound; expanded, it is the reader's to drag.
           style={
             {
-              "--chat-column": !expanded ? "42rem" : column > 0 ? `${column}px` : "56rem",
+              "--chat-column": !expanded
+                ? `${DOCKED_COLUMN_REM}rem`
+                : column > 0
+                  ? `${column}px`
+                  : `${COLUMN_REM}rem`,
             } as CSSProperties
           }
           className="relative flex min-w-0 flex-1 flex-col"
@@ -273,13 +284,21 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
           {expanded && (
             <div
               aria-hidden
-              onPointerDown={(press) => startColumnDrag(press, pane.current)}
+              onPointerDown={(press) =>
+                startColumnDrag(press, pane.current, reading.current)
+              }
               // On the column's right edge: the column is centred in this pane
-              // and as wide as it lets it be.
-              className="absolute inset-y-0 left-[calc(50%_+_min(var(--chat-column),_100%_-_2rem)_/_2)] z-10 w-2 -translate-x-1/2 cursor-ew-resize touch-none max-sm:hidden"
+              // and as wide as it lets it be, which is the pane less the
+              // transcript's rem of padding a side (`draggedColumn`).
+              className={`${GRIP} inset-y-0 left-[calc(50%_+_min(var(--chat-column),_100%_-_2rem)_/_2)] w-2 -translate-x-1/2 cursor-ew-resize`}
             />
           )}
-          <Messages messages={messages} chatId={session.summary.id} status={status} />
+          <Messages
+            messages={messages}
+            chatId={session.summary.id}
+            status={status}
+            column={reading}
+          />
           {line !== null && (
             <p role="status" className="px-4 pb-1 text-[13px] text-accent">
               {line}

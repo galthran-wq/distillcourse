@@ -244,6 +244,7 @@ async def test_stopping_mid_tool_keeps_the_calls_that_completed(
 async def test_stopping_with_nothing_in_flight_does_nothing() -> None:
     await runner.stop(None)
     await runner.stop(uuid.uuid4())
+    assert runner._runs == {}
     assert not runner.steer(None, SteerMessage(uuid.uuid4(), STEER))
 
 

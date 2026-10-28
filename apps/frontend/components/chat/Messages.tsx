@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChatStatus, UIMessage } from "ai";
-import { memo, useEffect, useRef } from "react";
+import { memo, useEffect, useRef, type RefObject } from "react";
 import Activity from "@/components/chat/Activity";
 import Markdown from "@/components/chat/Markdown";
 import { QuoteRow, SentQuote } from "@/components/chat/Quotes";
@@ -156,11 +156,14 @@ export default function Messages({
   messages,
   chatId,
   status,
+  column,
 }: {
   messages: UIMessage[];
   /** Which conversation this is. The component is not remounted between two. */
   chatId: string;
   status: ChatStatus;
+  /** The reading column, which the panel resizes. */
+  column?: RefObject<HTMLDivElement | null>;
 }) {
   const view = useRef<HTMLDivElement>(null);
   const following = useRef(true);
@@ -205,7 +208,7 @@ export default function Messages({
       className="flex-1 overflow-y-auto overscroll-contain px-4 py-3"
     >
       {/* The reading column: `ChatPanel` sets how wide, and drags it. */}
-      <div data-chat-column className="mx-auto max-w-(--chat-column)">
+      <div ref={column} className="mx-auto max-w-(--chat-column)">
         <div className="space-y-4">
           {messages.length === 0 && (
             <p className="text-sm text-faint">
