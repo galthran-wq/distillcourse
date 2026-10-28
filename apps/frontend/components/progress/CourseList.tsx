@@ -1,13 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import type { ReadableLesson } from "@/lib/content/visibility";
 import { useProgress } from "@/lib/progress/context";
-import {
-  courseProgress,
-  startedFirst,
-  type ReadableLesson,
-} from "@/lib/progress/summary";
-import { ReadCount } from "./CourseProgress";
+import { courseProgress, startedFirst } from "@/lib/progress/summary";
+import ReadCount from "./ReadCount";
 
 export interface CourseCard {
   slug: string;
@@ -19,13 +16,17 @@ export interface CourseCard {
 /** The course list, the reader's own courses first, each with how far they are. */
 export default function CourseList({ courses }: { courses: CourseCard[] }) {
   const standings = useProgress();
-  const progressOf = (card: CourseCard) =>
-    standings === null ? null : courseProgress(card.slug, card.lessons, standings);
+  const progressOf = new Map(
+    courses.map((card) => [
+      card,
+      standings === null ? null : courseProgress(card.slug, card.lessons, standings),
+    ]),
+  );
 
   return (
     <ul className="flex flex-col gap-3">
-      {startedFirst(courses, progressOf).map((card) => {
-        const progress = progressOf(card);
+      {startedFirst(courses, (card) => progressOf.get(card)!).map((card) => {
+        const progress = progressOf.get(card)!;
         return (
           <li
             key={card.slug}

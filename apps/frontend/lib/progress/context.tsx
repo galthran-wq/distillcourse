@@ -2,9 +2,9 @@
 
 import { createContext, useContext, useMemo } from "react";
 import { useSignedIn } from "@/lib/auth/signed-in";
-import { useAuth } from "@/lib/auth/store";
+import type { ReadableLesson } from "@/lib/content/visibility";
 import { getProgress } from "./api";
-import { byLesson, type Standings } from "./summary";
+import { byLesson, courseProgress, type CourseProgress, type Standings } from "./summary";
 
 const Context = createContext<Standings | null>(null);
 
@@ -22,16 +22,21 @@ export function ProgressProvider({
   course?: string;
   children: React.ReactNode;
 }) {
-  const auth = useAuth();
   const [standings] = useSignedIn(getProgress, course);
-  // Signing out has to take the marks off the page even though the answer
-  // that was loaded is still in hand.
-  const visible = auth.status === "signed-in" ? standings : null;
-  const held = useMemo(() => (visible === null ? null : byLesson(visible)), [visible]);
+  const held = useMemo(() => (standings === null ? null : byLesson(standings)), [standings]);
   return <Context.Provider value={held}>{children}</Context.Provider>;
 }
 
-/** Keyed by `<course>/<slug>`; `null` while there is nothing to show. */
+/** Keyed by `lessonPath`; `null` while there is nothing to show. */
 export function useProgress(): Standings | null {
   return useContext(Context);
+}
+
+/** `null` while there is nothing to show and for a course not started. */
+export function useCourseProgress(
+  course: string,
+  lessons: ReadableLesson[],
+): CourseProgress | null {
+  const standings = useProgress();
+  return standings === null ? null : courseProgress(course, lessons, standings);
 }

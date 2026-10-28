@@ -63,6 +63,10 @@ class Completion(BaseModel):
     passed_required: int
     total_required: int
 
+    @property
+    def done(self) -> bool:
+        return self.passed_required == self.total_required > 0
+
 
 class SubmissionResult(BaseModel):
     passed: bool | None

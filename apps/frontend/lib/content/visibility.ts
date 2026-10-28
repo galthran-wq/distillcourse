@@ -1,4 +1,3 @@
-import type { ReadableLesson } from "../progress/summary";
 import { STATUS_RANK, type LoadedLesson } from "./load";
 
 /**
@@ -22,6 +21,12 @@ export function previewMode(): boolean {
 export function isReadable(lesson: LoadedLesson): boolean {
   const min = previewMode() ? STATUS_RANK.drafted : STATUS_RANK.published;
   return STATUS_RANK[lesson.lesson.status] >= min && lesson.mdx !== undefined;
+}
+
+/** A lesson the reader can open. Planned lessons are never one. */
+export interface ReadableLesson {
+  slug: string;
+  title: string;
 }
 
 /** What a reader can open, in course order: what reading progress counts over. */

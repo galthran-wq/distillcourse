@@ -18,4 +18,4 @@ async def read(
         Query(pattern=locators.SLUG_PATTERN, max_length=locators.SLUG_LENGTH),
     ] = None,
 ) -> list[progress.Standing]:
-    return await progress.of_reader(session, user.id, course=course)
+    return await progress.standings(session, user.id, course=course)

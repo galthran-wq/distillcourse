@@ -17,6 +17,7 @@ import FigureSequence from "@/components/mdx/FigureSequence";
 import MathText from "@/components/mdx/MathText";
 import * as Blocks from "@/components/mdx/Blocks";
 import { assetUrl } from "@/lib/content/images";
+import { lessonPath } from "@/lib/content/locator";
 import Lightbox from "@/components/mdx/Lightbox";
 import { LABEL_CLASS } from "@/components/ui/styles";
 
@@ -247,7 +248,7 @@ export default async function CoursePage({
                                 ? `~${lesson.lab.est_hours} h`
                                 : `${lesson.est_minutes} min`}
                             </span>
-                            <LessonMark lesson={`${course.slug}/${lesson.slug}`} />
+                            <LessonMark lesson={lessonPath(course.slug, lesson.slug)} />
                           </>
                         ) : (
                           <span>planned</span>

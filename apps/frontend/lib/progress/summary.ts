@@ -1,10 +1,6 @@
+import { lessonPath } from "@/lib/content/locator";
+import type { ReadableLesson } from "@/lib/content/visibility";
 import type { Standing } from "./api";
-
-/** A lesson the reader can open, in course order. Planned lessons are never one. */
-export interface ReadableLesson {
-  slug: string;
-  title: string;
-}
 
 export interface CourseProgress {
   read: number;
@@ -30,7 +26,7 @@ export function courseProgress(
   lessons: ReadableLesson[],
   standings: Standings,
 ): CourseProgress | null {
-  const mine = lessons.map((lesson) => standings.get(`${course}/${lesson.slug}`));
+  const mine = lessons.map((lesson) => standings.get(lessonPath(course, lesson.slug)));
   const seen = mine.filter((standing) => standing !== undefined);
   if (seen.length === 0) return null;
   return {

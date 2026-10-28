@@ -9,6 +9,11 @@ export function lessonKey(courseSlug: string, lessonSlug: string): string {
   return `${LESSON_PREFIX}${courseSlug}/${lessonSlug}`;
 }
 
+/** `<course>/<lesson>`: the lesson key without its corpus, as `GET /progress` names it. */
+export function lessonPath(courseSlug: string, lessonSlug: string): string {
+  return lessonKey(courseSlug, lessonSlug).slice(LESSON_PREFIX.length);
+}
+
 /** A place inside a lesson: the lesson key with the section's anchor on it. */
 export function sectionKey(
   courseSlug: string,

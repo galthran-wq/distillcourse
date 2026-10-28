@@ -171,6 +171,25 @@ describe("the course page", () => {
     expect(host().textContent).toContain("1 of 3 read");
   });
 
+  it("takes the marks off when the reader signs out", async () => {
+    stubFetch([standing("fraud-ml/framing", "read", "2026-10-03T10:00:00Z")]);
+    // A fresh element each time: the mocked auth is not a store that notifies,
+    // so the second mount is what tells the tree the reader is gone.
+    const tree = () => (
+      <ProgressProvider course="fraud-ml">
+        <CourseProgress course="fraud-ml" lessons={LESSONS} />
+        <LessonMark lesson="fraud-ml/framing" />
+      </ProgressProvider>
+    );
+    await mount(tree());
+    expect(host().textContent).toContain("1 of 3 read");
+
+    auth.status = "anonymous";
+    await mount(tree());
+
+    expect(host().innerHTML).toBe("");
+  });
+
   it("draws nothing for an anonymous reader", async () => {
     auth.status = "anonymous";
     stubFetch([]);

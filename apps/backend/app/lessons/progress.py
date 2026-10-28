@@ -5,8 +5,9 @@ from typing import Literal
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.content import locators
 from app.labs import repository as labs
-from app.telemetry import progress
+from app.telemetry import progress as reading
 
 
 class Standing(BaseModel):
@@ -21,7 +22,7 @@ class Standing(BaseModel):
     last_seen: datetime
 
 
-async def of_reader(
+async def standings(
     session: AsyncSession, user_id: uuid.UUID, *, course: str | None = None
 ) -> list[Standing]:
     """Every lesson this reader has started, most recently seen first.
@@ -32,10 +33,10 @@ async def of_reader(
     """
     seen: dict[str, datetime] = {}
     read: set[str] = set()
-    for reading in await progress.of_reader(session, user_id, course=course):
-        seen[reading.lesson] = reading.last_seen
-        if reading.completed_at is not None:
-            read.add(reading.lesson)
+    for row in await reading.of_reader(session, user_id, course=course):
+        seen[row.lesson] = row.last_seen
+        if row.completed_at is not None:
+            read.add(row.lesson)
     for lesson, at in (await labs.submitted(session, user_id, course=course)).items():
         seen[lesson] = max(seen.get(lesson, at), at)
     for lesson, done in (await labs.finished(session, user_id, seen)).items():
@@ -46,7 +47,7 @@ async def of_reader(
     return sorted(
         (
             Standing(
-                lesson=lesson.partition(":")[2],
+                lesson=locators.path_of(lesson),
                 state="read" if lesson in read else "started",
                 last_seen=at,
             )

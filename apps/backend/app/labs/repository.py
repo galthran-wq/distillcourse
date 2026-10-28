@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import delete, func, or_, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -259,54 +259,52 @@ def _declared(block: dict[str, Any]) -> Lab:
     )
 
 
-async def labs(session: AsyncSession, lessons: Collection[str]) -> dict[str, Lab]:
-    """What the index says each of these labs asks for, in display order. A
-    lesson that is not a lab is absent.
+async def lab(session: AsyncSession, lesson: str) -> Lab | None:
+    """What the index says this lab asks for, in display order.
 
     The lesson's whole `lab` block is mirrored onto each of its chunks, so the
     first chunk answers for the lesson — the same read `telemetry/progress.py`
     makes for the word count.
     """
-    if not lessons:
-        return {}
-    rows = await session.execute(
-        select(Document.locator, Document.meta["lab"])
-        .where(or_(*(search.chunks_of(lesson) for lesson in lessons)))
+    block: dict[str, Any] | None = await session.scalar(
+        select(Document.meta["lab"])
+        .where(search.chunks_of(lesson))
         .order_by(Document.position)
+        .limit(1)
     )
-    first: dict[str, dict[str, Any] | None] = {}
-    for locator, block in rows:
-        first.setdefault(locator.partition("#")[0], block)
-    return {
-        lesson: _declared(block) for lesson, block in first.items() if block is not None
-    }
-
-
-async def lab(session: AsyncSession, lesson: str) -> Lab | None:
-    return (await labs(session, [lesson])).get(lesson)
+    return None if block is None else _declared(block)
 
 
 async def finished(
     session: AsyncSession, user_id: uuid.UUID, lessons: Collection[str]
 ) -> dict[str, bool]:
     """Which of these lessons are labs, and whether this learner has finished
-    each: every required checkpoint passed — the bar `submit` finishes a lab
-    by, so a lab with nothing required is never finished here either."""
-    declared = await labs(session, lessons)
-    if not declared:
+    each — `lab` and `_completion` for many lessons at once."""
+    # Grouped by the document a chunk belongs to, as `_solutions_total` in
+    # telemetry/progress.py does, with the first chunk answering for each.
+    document = func.split_part(Document.locator, "#", 1)
+    rows = await session.execute(
+        select(document, Document.meta["lab"])
+        .where(document.in_(lessons))
+        .distinct(document)
+        .order_by(document, Document.position)
+    )
+    required = {
+        lesson: _declared(block).required for lesson, block in rows if block is not None
+    }
+    if not required:
         return {}
-    passed: dict[str, set[str]] = {lesson: set() for lesson in declared}
+    passed: dict[str, set[str]] = {lesson: set() for lesson in required}
     for lesson, checkpoint in await session.execute(
         select(LabCheckpointState.lesson, LabCheckpointState.checkpoint).where(
             LabCheckpointState.user_id == user_id,
-            LabCheckpointState.lesson.in_(declared),
+            LabCheckpointState.lesson.in_(required),
             LabCheckpointState.passed_at.is_not(None),
         )
     ):
         passed[lesson].add(checkpoint)
     return {
-        lesson: bool(entry.required) and entry.required <= passed[lesson]
-        for lesson, entry in declared.items()
+        lesson: _tally(ids, passed[lesson]).done for lesson, ids in required.items()
     }
 
 
@@ -462,7 +460,7 @@ async def submit(
     )
     await _record_attempt(session, user_id, posted, verdict, now)
     completion = await _completion(session, user_id, posted.lesson)
-    if verdict.passed and completion.passed_required == completion.total_required > 0:
+    if verdict.passed and completion.done:
         # A lab is a lesson, so finishing one is the completion the rest of the
         # platform already knows: the `lesson_completed` event and the review
         # ladder that subscribes to it. The absence of that event is what makes
@@ -553,13 +551,14 @@ async def _completion(
     session: AsyncSession, user_id: uuid.UUID, lesson: str
 ) -> Completion:
     declared = await lab(session, lesson)
-    required = declared.required if declared is not None else set()
-    passed = await states(session, user_id, lesson)
+    stored = await states(session, user_id, lesson)
+    return _tally(
+        declared.required if declared is not None else set(),
+        {checkpoint for checkpoint, state in stored.items() if state.passed_at},
+    )
+
+
+def _tally(required: set[str], passed: set[str]) -> Completion:
     return Completion(
-        passed_required=sum(
-            1
-            for checkpoint in required
-            if checkpoint in passed and passed[checkpoint].passed_at is not None
-        ),
-        total_required=len(required),
+        passed_required=len(required & passed), total_required=len(required)
     )

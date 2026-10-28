@@ -8,13 +8,15 @@ export default function LessonMark({ lesson }: { lesson: string }) {
   const state = useProgress()?.get(lesson)?.state;
   if (state === undefined) return null;
   return state === "read" ? (
-    <span className={`${LABEL_CLASS} text-accent`} title="Read">
+    <span role="img" aria-label="Read" title="Read" className={`${LABEL_CLASS} text-accent`}>
       ✓
     </span>
   ) : (
     <span
-      className="inline-block size-2 rounded-full border border-accent"
+      role="img"
+      aria-label="Started"
       title="Started"
+      className="inline-block size-2 rounded-full border border-accent"
     />
   );
 }
