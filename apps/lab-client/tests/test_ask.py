@@ -269,3 +269,10 @@ def test_asking_needs_an_open_lab_and_a_pairing() -> None:
         distill.ask("why?")
     with pytest.raises(LabError, match=re.escape(api.UNPAIRED)):
         distill.clear_chat()
+
+
+def test_more_objects_than_the_server_takes_is_refused_here(paired: Server) -> None:
+    with pytest.raises(LabError, match="at most"):
+        distill.ask("too many?", *range(tutor.ATTACHMENTS + 1))
+
+    assert paired.asked == []

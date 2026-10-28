@@ -109,7 +109,7 @@ class Progress(BaseModel):
 
 
 # What one attached object may weigh, and how many one question carries — the
-# client's own caps (`distill.ATTACHMENT_CHARS`), held here too: a cap only a
+# client's own caps (`distill.tutor.ATTACHMENT_CHARS`, `ATTACHMENTS`), held here too: a cap only a
 # client keeps is not a cap.
 ATTACHMENT_CHARS = 20_000
 ATTACHMENTS = 16

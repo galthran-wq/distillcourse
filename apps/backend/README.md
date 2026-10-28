@@ -189,7 +189,7 @@ is "why is this true?" about something on screen with nothing selected: a model
 that answers that without reading the section answers blind.
 
 Prompts for a run are assembled from `harness/prompts/`: `base.md`, the medium
-(`web`, `telegram`), then the modules the run kind calls for, then those context
+(`web`, `telegram`, `notebook`), then the modules the run kind calls for, then those context
 blocks. They are content, so `docs/pedagogy.md` governs them the way it
 governs lessons. Blocks carrying text from outside the platform are fenced
 with their provenance, and `base.md` is where the tutor is told that anything
@@ -198,7 +198,7 @@ passes that are not the tutor — `title.md` is the whole prompt of the namer an
 `lab_review.md` the whole prompt of a lab's judge, neither of which sees
 `base.md`; both are loaded by `module()` rather than `assemble()`.
 
-A web chat is named from the learner's first question and named again by
+A web or lab chat is named from the learner's first question and named again by
 `harness/title.py` once `TITLE_REFRESH_MESSAGES` more have gone by: one short
 completion on a toolless agent, over the tail of the conversation, run after
 the client's stream has closed rather than on the learner's reply path. It is
@@ -461,8 +461,8 @@ alternative (answering after the run) turns every slow answer into duplicate
 deliveries, which is the failure the learner would actually notice.
 
 The eternal thread is created by the backend and by nothing else
-(`telegram/thread.py`). The web API opens web chats only and refuses to stream
-into, compact or re-model a telegram chat, because the poller reads any message
+(`telegram/thread.py`). The web API creates web chats only, and refuses to
+stream into, compact or re-model a telegram chat (a lab chat it may continue), because the poller reads any message
 in that thread as the learner's answer to the review it is waiting on.
 
 Serialization is the thread's own claim, which is the only thing both processes

@@ -1,5 +1,4 @@
 import type { UIMessage } from "ai";
-import { lessonParts } from "@/lib/content/locator";
 import { call } from "@/lib/http";
 
 export interface ChatSummary {
@@ -28,12 +27,6 @@ export interface ChatModel {
 export async function siteChats(): Promise<ChatSummary[]> {
   const chats = await call<ChatSummary[]>("/chats");
   return chats.filter((chat) => chat.kind !== "telegram");
-}
-
-/** The page a chat belongs on: a lab chat's lab, null for any other chat. */
-export function chatPage(chat: ChatSummary): string | null {
-  const parts = chat.lab_lesson === null ? null : lessonParts(chat.lab_lesson);
-  return parts === null ? null : `/courses/${parts.course}/lessons/${parts.lesson}`;
 }
 
 export function createChat(model?: string): Promise<ChatSummary> {

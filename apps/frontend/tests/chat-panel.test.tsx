@@ -121,7 +121,7 @@ describe("a lab chat in the rail", () => {
         ...SUMMARY,
         id: "lab1",
         kind: "lab",
-        lab_lesson: "lesson:fraud-ml/scorecard-vs-gbm-lab",
+        lab_lesson: "lesson:info-theory/entropy",
         title: "why is my IV negative?",
       },
     ];
@@ -132,7 +132,7 @@ describe("a lab chat in the rail", () => {
     );
     await act(async () => row?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 
-    expect(push).toHaveBeenCalledWith("/courses/fraud-ml/lessons/scorecard-vs-gbm-lab");
+    expect(push).toHaveBeenCalledWith("/courses/info-theory/lessons/entropy");
   });
 
   it("leaves a web chat where the reader is", async () => {

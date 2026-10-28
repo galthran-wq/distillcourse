@@ -15,17 +15,11 @@ import {
   PlusIcon,
 } from "@/components/chat/icons";
 import { Button } from "@/components/ui";
-import {
-  chatPage,
-  listModels,
-  siteChats,
-  type ChatModel,
-  type ChatSummary,
-} from "@/lib/chat/api";
+import { listModels, siteChats, type ChatModel, type ChatSummary } from "@/lib/chat/api";
 import { parseCommand } from "@/lib/chat/commands";
 import { startPanelDrag } from "@/lib/chat/panel-box";
 import { restoreQuotes, type Quote } from "@/lib/chat/quote";
-import { plain } from "@/lib/chat/references";
+import { linkTo, plain } from "@/lib/chat/references";
 import {
   adoptSummary,
   busy,
@@ -140,11 +134,14 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
     work.then(() => setNotice(done), report);
   }
 
-  /** A lab chat is had beside its lab, so choosing one goes to that page. */
+  /**
+   * A lab chat is had beside its lab, so choosing one goes to that page — if
+   * the site still renders it; otherwise the reader stays where they are.
+   */
   function select(chat: ChatSummary): void {
     run(selectSession(chat));
-    const page = chatPage(chat);
-    if (page !== null && page !== window.location.pathname) router.push(page);
+    const page = chat.lab_lesson === null ? null : linkTo(chat.lab_lesson, lessons);
+    if (page !== null && page.url !== window.location.pathname) router.push(page.url);
   }
 
   function submit(text: string, quotes: Quote[]): void {

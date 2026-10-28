@@ -112,7 +112,7 @@ async def _owned_chat(repo: HarnessRepository, chat_id: uuid.UUID) -> Chat:
     return chat
 
 
-async def _web_chat(repo: HarnessRepository, chat_id: uuid.UUID) -> Chat:
+async def _site_chat(repo: HarnessRepository, chat_id: uuid.UUID) -> Chat:
     """A chat this API may run in, switch models on, or compact: a web chat,
     or a lab chat continued on the site.
 
@@ -158,7 +158,7 @@ async def set_model(
 ) -> ChatSummary:
     if update.model not in settings.chat_model_pool:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "unknown model")
-    chat = await _web_chat(repo, chat_id)
+    chat = await _site_chat(repo, chat_id)
     await repo.set_model(chat, update.model)
     return ChatSummary.model_validate(chat)
 
@@ -179,7 +179,7 @@ async def messages(chat_id: uuid.UUID, repo: RepositoryDep) -> list[UIMessage]:
 
 @router.post("/{chat_id}/compact")
 async def compact(chat_id: uuid.UUID, repo: RepositoryDep) -> Summary:
-    chat = await _web_chat(repo, chat_id)
+    chat = await _site_chat(repo, chat_id)
     try:
         return Summary(summary=await runner.compact(repo, chat))
     except runner.RunBusy:
@@ -193,7 +193,7 @@ async def stream(
     repo: RepositoryDep,
     session_factory: SessionFactoryDep,
 ) -> Response:
-    chat = await _web_chat(repo, chat_id)
+    chat = await _site_chat(repo, chat_id)
     try:
         adapter = await VercelAIAdapter[HarnessDeps, str].from_request(
             request, agent=tutor

@@ -18,6 +18,8 @@ from distill.errors import LabError
 # holds the first one too; past either, the text is cut and says so.
 ATTACHMENT_CHARS = 20_000
 ATTACHMENTS_CHARS = 60_000
+# How many objects one question carries, the error included; the server's cap.
+ATTACHMENTS = 16
 TRUNCATED = "\n[… truncated]"
 TABLE_ROWS = 5
 TRACEBACK_LINES = 30
@@ -93,6 +95,8 @@ def attachments(objects: Iterable[Any]) -> list[dict[str, str]]:
     error = _last_error()
     if error is not None:
         found.append(error)
+    if len(found) > ATTACHMENTS:
+        raise LabError(f"at most {ATTACHMENTS} objects go with one question")
     left = ATTACHMENTS_CHARS
     for attachment in found:
         attachment["text"] = _cut(attachment["text"], min(ATTACHMENT_CHARS, left))

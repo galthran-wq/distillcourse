@@ -321,8 +321,8 @@ def private_artifact(
     # itself and the inputs a learner computes on must come from the build that
     # captured the outputs they are compared against.
     #
-    # The model answer is left out of both: the judge grades against the rubric
-    # rather than against the author's wording.
+    # The model answer is left out of both answer keys: the judge grades
+    # against the rubric rather than against the author's wording.
     #
     # The reference solution rides along whole, for the tutor of a lab chat to
     # read: the API reaches content only through what is ingested, and this

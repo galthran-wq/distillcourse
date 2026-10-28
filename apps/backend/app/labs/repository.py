@@ -315,6 +315,18 @@ async def standing(
     return Progress(checkpoints=checkpoints)
 
 
+async def last_submitted(
+    session: AsyncSession, user_id: uuid.UUID, lesson: str
+) -> dict[str, datetime]:
+    """When this learner last posted each checkpoint they have attempted."""
+    rows = await session.execute(
+        select(LabSubmission.checkpoint, func.max(LabSubmission.created_at))
+        .where(LabSubmission.user_id == user_id, LabSubmission.lesson == lesson)
+        .group_by(LabSubmission.checkpoint)
+    )
+    return dict(rows.tuples().all())
+
+
 @dataclass(frozen=True)
 class Budget:
     """A day's attempts at one checkpoint, as the caller counts them.

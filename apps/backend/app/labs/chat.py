@@ -7,7 +7,6 @@ Vercel AI request, and the answer leaves as four small events rather than as
 that protocol's stream, which a client limited to httpx + numpy has no use for.
 """
 
-import re
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Callable, Sequence
 from typing import Any
@@ -23,6 +22,7 @@ from pydantic_ai.ui.vercel_ai.response_types import (
 )
 
 from app.core.config import settings
+from app.harness import prompts
 from app.harness.agent import tutor
 from app.harness.deps import HarnessDeps
 from app.labs.schemas import (
@@ -38,7 +38,8 @@ from app.models import Chat
 def url(chat: Chat) -> str:
     """The chat on the site: the lab's lesson page, which opens the chat it is
     named by."""
-    course, _, lesson = (chat.lab_lesson or "").removeprefix("lesson:").partition("/")
+    assert chat.lab_lesson is not None
+    course, _, lesson = chat.lab_lesson.removeprefix("lesson:").partition("/")
     return f"{settings.FRONTEND_HOST}/courses/{course}/lessons/{lesson}?chat={chat.id}"
 
 
@@ -60,21 +61,15 @@ def question(text: str) -> VercelAIAdapter[HarnessDeps, str]:
     )
 
 
-def _fenced(attachment: Attachment) -> str:
-    # One backtick longer than the longest run inside, so a docstring holding a
-    # fence of its own cannot close this one early.
-    longest = max(map(len, re.findall("`+", attachment.text)), default=0)
-    fence = "`" * max(3, longest + 1)
-    return f"`{attachment.name}` ({attachment.kind})\n\n{fence}\n{attachment.text}\n{fence}"
-
-
 def attached(attachments: Sequence[Attachment]) -> str | None:
-    """Every attachment as a fenced block headed by its name and kind, for the
-    top of the learner's message — stored with it, so the site shows the chat
-    the notebook had."""
+    """Every attachment, fenced, for the top of the learner's message — stored
+    with it, so the site shows the chat the notebook had."""
     if not attachments:
         return None
-    return "\n\n".join(map(_fenced, attachments))
+    return "\n\n".join(
+        prompts.learner_attachment(item.name, item.kind, item.text)
+        for item in attachments
+    )
 
 
 def _place(locator: Any) -> str:

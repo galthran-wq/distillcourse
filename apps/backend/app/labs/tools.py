@@ -12,19 +12,16 @@ material the tutor may quote. How much of it to show is the lab prompt's
 business (`lab.md`), not the toolset's.
 """
 
-import uuid
 from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel
 from pydantic_ai import FunctionToolset, RunContext, ToolFailed
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.harness.deps import HarnessDeps
 from app.harness.prompts import ContextBlock, module
 from app.labs import repository
-from app.models import Chat, LabChallenge, LabSolution, LabSubmission
+from app.models import Chat, LabChallenge, LabSolution
 
 
 class CheckpointStanding(BaseModel):
@@ -72,21 +69,6 @@ def _lesson(ctx: RunContext[HarnessDeps]) -> str:
     return lesson
 
 
-async def _last_attempts(
-    session: AsyncSession, user_id: uuid.UUID, lesson: str
-) -> dict[str, LabSubmission]:
-    rows = await session.scalars(
-        select(LabSubmission)
-        .where(
-            LabSubmission.user_id == user_id,
-            LabSubmission.lesson == lesson,
-        )
-        .order_by(LabSubmission.checkpoint, LabSubmission.created_at.desc())
-        .distinct(LabSubmission.checkpoint)
-    )
-    return {row.checkpoint: row for row in rows}
-
-
 @toolset.tool(sequential=True)
 async def get_lab_progress(ctx: RunContext[HarnessDeps]) -> list[CheckpointStanding]:
     """Where the learner stands on each checkpoint of this lab, in the order the
@@ -94,25 +76,24 @@ async def get_lab_progress(ctx: RunContext[HarnessDeps]) -> list[CheckpointStand
     of the last one."""
     repo, lesson = ctx.deps.repo, _lesson(ctx)
     declared = await repository.lab(repo.session, lesson)
-    if declared is None:
+    # The page's own reading of the learner's standing, so the tutor and the
+    # checklist beside it cannot disagree about what has passed.
+    standing = await repository.standing(repo.session, repo.user_id, lesson)
+    if declared is None or standing is None:
         raise ToolFailed("this lab is not in the index")
-    states = await repository.states(repo.session, repo.user_id, lesson)
-    last = await _last_attempts(repo.session, repo.user_id, lesson)
-    standings = []
-    for entry in declared.checkpoints:
-        state, attempt = states.get(entry.id), last.get(entry.id)
-        standings.append(
-            CheckpointStanding(
-                id=entry.id,
-                kind=entry.kind,
-                required=entry.required,
-                passed=state is not None and state.passed_at is not None,
-                attempts=state.attempts if state else 0,
-                last_hint=attempt.verdict.get("hint") if attempt else None,
-                last_submitted_at=attempt.created_at if attempt else None,
-            )
+    last = await repository.last_submitted(repo.session, repo.user_id, lesson)
+    return [
+        CheckpointStanding(
+            id=entry.id,
+            kind=entry.kind,
+            required=entry.required,
+            passed=state.passed_at is not None,
+            attempts=state.attempts,
+            last_hint=state.feedback,
+            last_submitted_at=last.get(entry.id),
         )
-    return standings
+        for entry, state in zip(declared.checkpoints, standing.checkpoints, strict=True)
+    ]
 
 
 @toolset.tool(sequential=True)

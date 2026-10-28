@@ -257,8 +257,10 @@ async def test_attachments_are_stored_above_the_question_as_fenced_blocks(
     prompt = stored.parts[0]
     assert isinstance(prompt, UserPromptPart)
     assert prompt.content == (
-        f"`woe` (function)\n\n````\n{source}\n````\n\n"
-        "`arg2` (value)\n\n```\n0.5\n```\n\n"
+        '<untrusted source="learner-attachment">\n'
+        f"`woe` (function)\n\n````\n{source}\n````\n</untrusted>\n\n"
+        '<untrusted source="learner-attachment">\n'
+        "`arg2` (value)\n\n```\n0.5\n```\n</untrusted>\n\n"
         "why is my IV negative?"
     )
     assert events(response.text)[0] == {
