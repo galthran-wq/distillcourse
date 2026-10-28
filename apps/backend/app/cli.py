@@ -2,7 +2,9 @@ import argparse
 import asyncio
 import getpass
 import logging
+import sys
 from datetime import UTC, datetime
+from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +17,7 @@ from app.core.security import (
     MIN_PASSWORD_LENGTH,
     get_password_hash,
 )
+from app.harness import filing
 from app.labs import repository as labs
 from app.models import User
 from app.telegram import api
@@ -104,6 +107,23 @@ async def set_webhook(url: str) -> None:
     logger.info("telegram will post updates to %s", url)
 
 
+async def propose_chat_courses(session: AsyncSession) -> None:
+    """Print the filing proposal: chat id, title, proposed course, evidence and
+    the first question, tab-separated, for a person to settle and hand back to
+    `file-chats`."""
+    for proposal in await filing.propose(session):
+        sys.stdout.write(proposal.row() + "\n")
+
+
+async def file_chats(session: AsyncSession, path: Path) -> None:
+    try:
+        counts = await filing.apply(session, filing.parse(path.open()))
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    for course, count in counts.most_common():
+        logger.info("%s: %d", course, count)
+
+
 def _prompt_new_password() -> str:
     password = getpass.getpass("new password: ")
     if not MIN_PASSWORD_LENGTH <= len(password) <= MAX_PASSWORD_LENGTH:
@@ -129,6 +149,10 @@ async def _run(arguments: argparse.Namespace) -> None:
             await rebuild_progress(session)
         elif arguments.command == "set-webhook":
             await set_webhook(arguments.url)
+        elif arguments.command == "propose-chat-courses":
+            await propose_chat_courses(session)
+        elif arguments.command == "file-chats":
+            await file_chats(session, arguments.path)
         else:
             raise SystemExit(f"unknown command: {arguments.command}")
     await engine.dispose()
@@ -141,6 +165,8 @@ def main() -> None:
         subcommands.add_parser(name).add_argument("email")
     subcommands.add_parser("rebuild-progress")
     subcommands.add_parser("set-webhook").add_argument("url")
+    subcommands.add_parser("propose-chat-courses")
+    subcommands.add_parser("file-chats").add_argument("path", type=Path)
     asyncio.run(_run(parser.parse_args()))
 
 

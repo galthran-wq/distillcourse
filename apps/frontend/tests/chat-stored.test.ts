@@ -16,7 +16,8 @@ const BOX = { right: 24, bottom: 80, width: 384, height: 512 };
 const LEFT_BY_U1: StoredChat = {
   panel: "docked",
   ...BOX,
-  chatId: "c1",
+  column: 0,
+  chats: '{"fraud-ml":"c1"}',
   draft: "half a question",
   // The passages that half a question is about: one unsent message with it.
   quotes: '[{"text":"the average surprisal","locator":"lesson:c/l#one"}]',
@@ -39,10 +40,12 @@ beforeEach(() => {
 });
 
 describe("what the widget remembers", () => {
-  it("has the panel, the chat and the draft back after a reload", async () => {
+  it("has the panel, each course's chat and the draft back after a reload", async () => {
     const { openPanel, rememberChat, setDraft } = await import("@/lib/chat/stored");
     openPanel();
-    rememberChat("c1");
+    rememberChat("fraud-ml", "c1");
+    rememberChat(null, "c2");
+    rememberChat("fraud-ml", "c3");
     setDraft("why is this true?");
 
     // The reload: the same storage, every module built again out of it.
@@ -52,12 +55,24 @@ describe("what the widget remembers", () => {
     expect(entry()).toEqual({
       panel: "docked",
       ...BOX,
-      chatId: "c1",
+      column: 0,
+      chats: JSON.stringify({ "fraud-ml": "c3", "": "c2" }),
       draft: "why is this true?",
       quotes: "",
       owner: "",
     });
-    expect(storedChatId()).toBe("c1");
+    expect([storedChatId("fraud-ml"), storedChatId(null), storedChatId("quant")]).toEqual(
+      ["c3", "c2", ""],
+    );
+  });
+
+  it("reads remembered chats it cannot parse as none", async () => {
+    remembered({ chats: "{not json" });
+    const { rememberChat, storedChatId } = await import("@/lib/chat/stored");
+
+    expect(storedChatId("fraud-ml")).toBe("");
+    rememberChat("quant", "c1");
+    expect(storedChatId("quant")).toBe("c1");
   });
 
   it("comes back over the page when that is where it was left", async () => {
@@ -79,17 +94,19 @@ describe("what the widget remembers", () => {
 
     togglePanel();
 
-    // It opens rather than closing, the field it never knew is dropped, and
-    // the fields it shares with this version survive.
+    // It opens rather than closing, the fields it never knew are dropped — the
+    // one chat it remembered was no course's — and the fields it shares with
+    // this version survive.
     expect(entry()).toEqual({
       panel: "docked",
       ...BOX,
-      chatId: "c1",
+      column: 0,
+      chats: "",
       draft: "",
       quotes: "",
       owner: "",
     });
-    expect(storedChatId()).toBe("c1");
+    expect(storedChatId(null)).toBe("");
   });
 
   it("reads a panel state it does not know as a shut panel", async () => {
@@ -124,7 +141,8 @@ describe("what the widget remembers", () => {
     expect(entry()).toEqual({
       panel: "docked",
       ...BOX,
-      chatId: "",
+      column: 0,
+      chats: "",
       draft: "",
       quotes: "",
       owner: "",
@@ -142,7 +160,8 @@ describe("what the widget remembers", () => {
     expect(entry()).toEqual({
       panel: "docked",
       ...BOX,
-      chatId: "",
+      column: 0,
+      chats: "",
       draft: "",
       quotes: "",
       owner: "",

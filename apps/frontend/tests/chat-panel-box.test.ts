@@ -349,3 +349,32 @@ describe("the drag itself", () => {
     expect(panelBox()).toEqual(OPENED);
   });
 });
+
+describe("the expanded panel's reading column", () => {
+  const REM = 16;
+
+  it("widens by both edges at once, between 32rem and the pane less a rem a side", async () => {
+    const { draggedColumn } = await load();
+
+    // Centred: the edge under the pointer and the one across both move.
+    expect(draggedColumn(896, 50, 1400, REM)).toBe(996);
+    expect(draggedColumn(896, -9000, 1400, REM)).toBe(32 * REM);
+    expect(draggedColumn(896, 9000, 1400, REM)).toBe(1400 - 2 * REM);
+  });
+
+  it("is the width it was dragged to after a reload", async () => {
+    const { setColumnWidth } = await load();
+    setColumnWidth(1000);
+
+    vi.resetModules();
+    const { useColumnWidth } = await load();
+    let width = 0;
+    const Probe = (): null => {
+      width = useColumnWidth();
+      return null;
+    };
+    act(() => render(createElement(Probe)));
+
+    expect(width).toBe(1000);
+  });
+});

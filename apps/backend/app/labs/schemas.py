@@ -7,8 +7,10 @@ from pydantic import BaseModel, Field
 from app.content import locators
 
 # One float per held-out row and nothing larger: an `exact` payload is at most
-# 64 numbers or a digest, and a `review` one is 4000 characters.
-MAX_SUBMISSION_BYTES = 256 * 1024
+# 64 numbers or a digest, and a `review` one is 4000 characters. A float costs
+# about 20 bytes of JSON, so this holds a 50,000-row hold-out — twice the
+# largest a lab ships (fraud-ml's cost-aware lab, 23,108 card-days).
+MAX_SUBMISSION_BYTES = 1024 * 1024
 
 Lesson = Annotated[str, Field(pattern=rf"^{locators.LESSON.pattern}$")]
 Checkpoint = Annotated[
@@ -62,6 +64,10 @@ class Completion(BaseModel):
 
     passed_required: int
     total_required: int
+
+    @property
+    def done(self) -> bool:
+        return self.passed_required == self.total_required > 0
 
 
 class SubmissionResult(BaseModel):

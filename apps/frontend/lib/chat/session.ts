@@ -1,11 +1,12 @@
 "use client";
 
 import { Chat } from "@ai-sdk/react";
-import { DefaultChatTransport, type ChatStatus, type UIMessage } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import {
   compactChat,
   createChat,
   loadMessages,
+  setChatCourse,
   setChatModel,
   siteChats,
   type ChatSummary,
@@ -14,6 +15,7 @@ import { API } from "@/lib/api-base";
 import { errorDetail } from "@/lib/http";
 import { currentLocator } from "@/lib/lesson/position";
 import { takeQuotes } from "@/lib/chat/quote";
+import { settleSteers, steerData } from "@/lib/chat/steer";
 import { openPanel, rememberChat, storedChatId } from "@/lib/chat/stored";
 import { createStore } from "@/lib/store";
 
@@ -29,53 +31,75 @@ const session = createStore<Session | null>(null);
 
 async function open(summary: ChatSummary): Promise<Session> {
   const messages = await loadMessages(summary.id);
-  const next: Session = {
-    summary,
-    chat: new Chat<UIMessage>({
-      id: summary.id,
-      messages,
-      // The SDK major is pinned to the one pydantic-ai's Vercel adapter is
-      // converted from (v6) — the data stream the backend emits is that
-      // version's wire format.
-      transport: new DefaultChatTransport({
-        api: `${API}/chats/${summary.id}/stream`,
-        credentials: "same-origin",
-        // Resolved per request rather than per chat: the tutor is asked about
-        // the section on screen when send is pressed. Off a lesson page it is
-        // null, which is what the harness expects to hear. The attached
-        // passages go the same way, and are spent by the message carrying them.
-        body: () => ({ currentLocator: currentLocator(), quotes: takeQuotes() }),
-      }),
+  const chat: Chat<UIMessage> = new Chat<UIMessage>({
+    id: summary.id,
+    messages,
+    // On the Chat rather than on `useChat`, which ignores its callbacks when
+    // it is handed one: the stream reports on the messages sent while it
+    // ran, and they are settled when it ends, whether or not a panel is
+    // mounted to watch.
+    onData: (part) => steerData(chat, part),
+    onFinish: ({ isAbort, isError }) =>
+      // After the SDK has let go of the run that just ended: a turn sent
+      // from inside its callback would be started under it.
+      setTimeout(() => settleSteers(chat, isAbort || isError)),
+    // The SDK major is pinned to the one pydantic-ai's Vercel adapter is
+    // converted from (v6) — the data stream the backend emits is that
+    // version's wire format.
+    transport: new DefaultChatTransport({
+      api: `${API}/chats/${summary.id}/stream`,
+      credentials: "same-origin",
+      // Resolved per request rather than per chat: the tutor is asked about
+      // the section on screen when send is pressed. Off a lesson page it is
+      // null, which is what the harness expects to hear. The attached
+      // passages go the same way, and are spent by the message carrying them.
+      body: () => ({ currentLocator: currentLocator(), quotes: takeQuotes() }),
     }),
-  };
+  });
+  const next: Session = { summary, chat };
   session.set(next);
-  rememberChat(summary.id);
+  rememberChat(summary.course, summary.id);
   return next;
 }
 
-let opening: Promise<Session> | null = null;
+// The course the open session was resumed for — the page's, which the chat's
+// own need not be: a chat picked out of another folder, or filed elsewhere, is
+// still the one the reader chose to have open here. `undefined` before any.
+let resumedFor: string | null | undefined;
 
-/** Reopen the chat the reader last had open, or start their first one. */
-export function resumeSession(): Promise<Session> {
+let opening: { course: string | null; session: Promise<Session> } | null = null;
+
+/**
+ * The chat for a page of `course` (null: off every course): the one already
+ * open if it was opened for this course, else the one last open in it, else
+ * a new one there.
+ */
+export function resumeSession(course: string | null): Promise<Session> {
   const current = session.get();
-  if (current !== null) return Promise.resolve(current);
-  // Without a single in-flight bootstrap, a second render would create a
-  // second chat before the first request came back.
-  opening ??= (async () => {
-    const chats = await siteChats();
-    // The stored one can be gone — deleted, or belonging to whoever was
-    // signed in on this browser before — and then the most recent stands in.
-    const last = chats.find((chat) => chat.id === storedChatId());
-    return open(last ?? chats[0] ?? (await createChat()));
+  if (current !== null && resumedFor === course) return Promise.resolve(current);
+  // Without a single in-flight bootstrap per course, a second render would
+  // create a second chat before the first request came back.
+  if (opening?.course === course) return opening.session;
+  const bootstrap = (async () => {
+    const chats = await siteChats(course);
+    // The stored one can be gone — deleted, filed elsewhere, or belonging to
+    // whoever was signed in on this browser before — and then the most recent
+    // stands in.
+    const last = chats.find((chat) => chat.id === storedChatId(course));
+    const summary = last ?? chats[0] ?? (await createChat(course));
+    resumedFor = course;
+    return open(summary);
   })().finally(() => {
-    opening = null;
+    if (opening?.session === bootstrap) opening = null;
   });
-  return opening;
+  opening = { course, session: bootstrap };
+  return bootstrap;
 }
 
 /** The conversation belongs to whoever was signed in when it was opened. */
 export function resetSession(): void {
   opening = null;
+  resumedFor = undefined;
   session.set(null);
 }
 
@@ -85,22 +109,32 @@ export function selectSession(summary: ChatSummary): Promise<Session> {
 
 /**
  * Open the chat a link names — `?chat=<id>`, the way a notebook's answer sends
- * the reader to the site. With nothing open yet it is only remembered: the
- * panel opening is what resumes, and resuming reads the remembered chat, so
- * there is one bootstrap rather than two racing to set the session.
+ * the reader to the site — as the one open on this page of `course`. With
+ * nothing open yet it is only remembered: the panel opening is what resumes,
+ * and resuming reads the remembered chat, so there is one bootstrap rather
+ * than two racing to set the session.
  */
-export async function openChat(id: string): Promise<void> {
-  rememberChat(id);
+export async function openChat(id: string, course: string | null): Promise<void> {
+  rememberChat(course, id);
   openPanel();
   const current = session.get();
   if (current === null || current.summary.id === id) return;
   const named = (await siteChats()).find((chat) => chat.id === id);
-  if (named !== undefined) await open(named);
+  if (named === undefined) return;
+  resumedFor = course;
+  await open(named);
 }
 
-/** `/clear` on the web: a new chat, not a marker in this one. */
+/** `/clear` on the web: a new chat in the page's course, not a marker in this one. */
 export async function clearSession(): Promise<Session> {
-  return open(await createChat(session.get()?.summary.model));
+  return open(await createChat(resumedFor ?? null, session.get()?.summary.model));
+}
+
+/** File a chat under another course (null: General), by the reader's hand. */
+export async function moveChat(id: string, course: string | null): Promise<void> {
+  const summary = await setChatCourse(id, course);
+  const current = session.get();
+  if (current?.summary.id === id) session.set({ summary, chat: current.chat });
 }
 
 export async function compactSession(): Promise<void> {
@@ -136,10 +170,6 @@ export function adoptSummary(chats: ChatSummary[]): void {
 
 export function useSession(): Session | null {
   return session.use();
-}
-
-export function busy(status: ChatStatus): boolean {
-  return status === "submitted" || status === "streaming";
 }
 
 /** What the backend refused with — the cap, or a run already in flight. */

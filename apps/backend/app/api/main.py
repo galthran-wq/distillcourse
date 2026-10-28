@@ -8,6 +8,7 @@ from app.api.routes import (
     lessons,
     memories,
     profile,
+    progress,
     settings,
     telemetry,
 )
@@ -19,6 +20,7 @@ api_router.include_router(chats.router)
 api_router.include_router(telemetry.router)
 api_router.include_router(lessons.router)
 api_router.include_router(profile.router)
+api_router.include_router(progress.router)
 api_router.include_router(settings.router)
 api_router.include_router(memories.router)
 api_router.include_router(labs.router)

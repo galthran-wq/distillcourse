@@ -1,22 +1,27 @@
+import asyncio
 import json
 import uuid
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
 import pytest
 from httpx import AsyncClient
-from pydantic_ai.messages import ModelRequest, UserPromptPart
+from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.ui.vercel_ai.request_types import SubmitMessage
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.api.routes.chats import _current_locator
+from app.content.ingest import ingest
 from app.core.config import ChatModel, settings
 from app.harness import prompts
 from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
 from app.models import User
-from tests.conftest import settled
-from tests.harness.conftest import compacting
+from tests.conftest import replying, settled
+from tests.content.conftest import document, index
+from tests.harness.conftest import compacting, start
 
 QUESTION = ModelRequest(parts=[UserPromptPart(content="what is entropy?")])
 
@@ -432,3 +437,201 @@ async def test_a_question_with_no_passages_carries_no_fence(
         await settled()
 
     assert "untrusted" not in str((await repo.rows(chat))[0].pydantic_ai)
+
+
+@pytest.fixture
+async def courses(session: AsyncSession) -> None:
+    """Two courses in the index, which is the only list of them there is."""
+    await ingest(
+        session,
+        index(
+            *(
+                document(
+                    f"course:{slug}",
+                    course_slug=slug,
+                    metadata={"tagline": "t", "modules": []},
+                )
+                for slug in ("fraud-ml", "quant")
+            )
+        ),
+    )
+
+
+async def created(client: AsyncClient, course: str | None) -> dict[str, object]:
+    response = await client.post("/api/v1/chats", json={"course": course})
+    assert response.status_code == 200
+    body: dict[str, object] = response.json()
+    return body
+
+
+async def listed(client: AsyncClient, query: str = "") -> list[object]:
+    return [chat["id"] for chat in (await client.get(f"/api/v1/chats{query}")).json()]
+
+
+@pytest.mark.usefixtures("courses")
+async def test_a_chat_takes_the_course_of_the_page_it_was_started_on(
+    signed_in: AsyncClient,
+) -> None:
+    on_course = await created(signed_in, "fraud-ml")
+    off_course = await created(signed_in, None)
+    defaulted = (await signed_in.post("/api/v1/chats", json={})).json()
+
+    assert on_course["course"] == "fraud-ml"
+    assert off_course["course"] is None
+    assert defaulted["course"] is None
+
+
+@pytest.mark.usefixtures("courses")
+async def test_a_chat_cannot_be_started_in_a_course_the_index_does_not_carry(
+    signed_in: AsyncClient,
+) -> None:
+    unknown = await signed_in.post("/api/v1/chats", json={"course": "astrology"})
+    malformed = await signed_in.post("/api/v1/chats", json={"course": "Not A Slug"})
+
+    assert [unknown.status_code, malformed.status_code] == [422, 422]
+    assert await listed(signed_in) == []
+
+
+@pytest.mark.usefixtures("courses")
+async def test_the_listing_narrows_to_one_course_or_to_general(
+    signed_in: AsyncClient,
+) -> None:
+    fraud = await created(signed_in, "fraud-ml")
+    quant = await created(signed_in, "quant")
+    general = await created(signed_in, None)
+
+    assert await listed(signed_in, "?course=fraud-ml") == [fraud["id"]]
+    assert await listed(signed_in, "?course=") == [general["id"]]
+    assert set(await listed(signed_in)) == {fraud["id"], quant["id"], general["id"]}
+    assert all(
+        "course" in chat for chat in (await signed_in.get("/api/v1/chats")).json()
+    )
+
+
+@pytest.mark.usefixtures("courses")
+async def test_a_chat_is_refiled_by_hand_and_keeps_its_model(
+    signed_in: AsyncClient,
+) -> None:
+    chat = await created(signed_in, "fraud-ml")
+
+    moved = await signed_in.patch(
+        f"/api/v1/chats/{chat['id']}", json={"course": "quant"}
+    )
+    assert moved.status_code == 200
+    assert moved.json()["course"] == "quant"
+    assert moved.json()["model"] == chat["model"]
+    assert await listed(signed_in, "?course=quant") == [chat["id"]]
+    assert await listed(signed_in, "?course=fraud-ml") == []
+
+    to_general = await signed_in.patch(
+        f"/api/v1/chats/{chat['id']}", json={"course": None}
+    )
+    assert to_general.json()["course"] is None
+    assert await listed(signed_in, "?course=") == [chat["id"]]
+
+
+@pytest.mark.usefixtures("courses")
+async def test_a_model_switch_leaves_the_course_where_it_was(
+    signed_in: AsyncClient,
+) -> None:
+    chat = await created(signed_in, "fraud-ml")
+
+    switched = await signed_in.patch(
+        f"/api/v1/chats/{chat['id']}", json={"model": settings.DEFAULT_CHAT_MODEL}
+    )
+
+    assert switched.json()["course"] == "fraud-ml"
+
+
+@pytest.mark.usefixtures("courses")
+async def test_refiling_into_an_unknown_course_changes_nothing(
+    signed_in: AsyncClient,
+) -> None:
+    chat = await created(signed_in, "fraud-ml")
+
+    refused = await signed_in.patch(
+        f"/api/v1/chats/{chat['id']}",
+        json={"course": "astrology", "model": settings.DEFAULT_CHAT_MODEL},
+    )
+
+    assert refused.status_code == 422
+    assert await listed(signed_in, "?course=fraud-ml") == [chat["id"]]
+
+
+@pytest.mark.usefixtures("courses")
+async def test_another_readers_chat_cannot_be_refiled(
+    signed_in: AsyncClient, session: AsyncSession, other_user: User
+) -> None:
+    theirs = await HarnessRepository(session, other_user.id).create_chat(
+        kind="web", course="fraud-ml"
+    )
+
+    response = await signed_in.patch(
+        f"/api/v1/chats/{theirs.id}", json={"course": "quant"}
+    )
+
+    await session.refresh(theirs)
+    assert response.status_code == 404
+    assert theirs.course == "fraud-ml"
+
+
+async def test_stop_and_steer_are_refused_on_another_users_chat(
+    signed_in: AsyncClient, session: AsyncSession, other_user: User
+) -> None:
+    theirs = await HarnessRepository(session, other_user.id).create_chat(kind="web")
+    steer = {"id": str(uuid.uuid4()), "text": "shorter"}
+
+    stopped = await signed_in.post(f"/api/v1/chats/{theirs.id}/stop")
+    steered = await signed_in.post(f"/api/v1/chats/{theirs.id}/steer", json=steer)
+
+    assert (stopped.status_code, steered.status_code) == (404, 404)
+
+
+async def test_an_idle_chat_takes_a_stop_and_refuses_a_steer(
+    signed_in: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    """The stop click can race the run's own end, so it is no error; a steer
+    with no run to take it is the client's cue to send it as a turn."""
+    chat = await HarnessRepository(session, user.id).create_chat(kind="web")
+    steer = {"id": str(uuid.uuid4()), "text": "shorter"}
+
+    stopped = await signed_in.post(f"/api/v1/chats/{chat.id}/stop")
+    steered = await signed_in.post(f"/api/v1/chats/{chat.id}/steer", json=steer)
+
+    assert (stopped.status_code, steered.status_code) == (204, 409)
+
+
+async def test_a_running_chat_takes_a_steer_and_a_stop_frees_it(
+    signed_in: AsyncClient,
+    session: AsyncSession,
+    session_factory: async_sessionmaker[AsyncSession],
+    user: User,
+) -> None:
+    repo = HarnessRepository(session, user.id)
+    chat = await repo.create_chat(kind="web")
+    hold = asyncio.Event()
+
+    async def held(
+        _messages: list[ModelMessage], _info: AgentInfo
+    ) -> AsyncIterator[str]:
+        yield "half"
+        await hold.wait()
+
+    with tutor.override(model=FunctionModel(stream_function=held), tools=[]):
+        chunks = await start(session_factory, repo, chat)
+        await anext(chunks)
+        steered = await signed_in.post(
+            f"/api/v1/chats/{chat.id}/steer",
+            json={"id": str(uuid.uuid4()), "text": "shorter"},
+        )
+        stopped = await signed_in.post(f"/api/v1/chats/{chat.id}/stop")
+        await chunks.aclose()
+
+    with replying("go on"):
+        again = await signed_in.post(
+            f"/api/v1/chats/{chat.id}/stream", json=submission(chat.id)
+        )
+        await settled()
+
+    assert (steered.status_code, stopped.status_code) == (202, 204)
+    assert again.status_code == 200

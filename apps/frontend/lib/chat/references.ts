@@ -1,9 +1,8 @@
 import { visit } from "unist-util-visit";
 import type { PhrasingContent, Root, Text } from "mdast";
-import type { Lessons } from "@/lib/content/links";
+import { courseNames, type Lessons } from "@/lib/content/links";
 import type { LessonSections } from "@/lib/content/site";
 import {
-  LESSON_PREFIX,
   isSourceLocator,
   parseCourseLocator,
   parseLessonLocator,
@@ -15,11 +14,9 @@ import {
 // message is delivered.
 const REFERENCE = /\[\[([^[\]|\s]+)(?:\|([^[\]]+))?\]\]/g;
 
-// The lesson set is keyed by lesson, so a course is named by any lesson of it.
 // A course with no readable lesson is a course the site does not render.
 export function courseTitle(slug: string, lessons: Lessons): string | undefined {
-  const prefix = `${LESSON_PREFIX}${slug}/`;
-  return Object.entries(lessons).find(([key]) => key.startsWith(prefix))?.[1].course;
+  return courseNames(lessons).get(slug);
 }
 
 /**
