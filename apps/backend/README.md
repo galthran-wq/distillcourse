@@ -102,8 +102,11 @@ reaches Postgres, revocation is a `DELETE`, and `EventSource` — which cannot
 send an `Authorization` header — authenticates over the same cookie for free.
 
 - Expiry slides: 30 days, refreshed on use at most once a day.
-- Signup requires `INVITE_CODE`. Without billing or email verification, open
-  registration would make the tutor harness a free LLM proxy.
+- Signup is open: an email and a password. With no billing and no email
+  verification, what keeps the tutor from being a free LLM proxy is the
+  per-learner daily caps (`DAILY_MESSAGE_CAP`, `WEB_SEARCH_DAILY_CAP`, the lab
+  attempt caps), the per-IP limit on signup and login, and the instance-wide
+  `MONTHLY_COST_CEILING_USD` backed by a spend limit on the OpenRouter key.
 - `users.timezone` is read from the browser at signup and at every login,
   because proactive messages are scheduled against the user's own clock.
 - Password reset and email verification do not exist; the operator resets a

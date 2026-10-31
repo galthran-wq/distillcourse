@@ -23,7 +23,6 @@ def signup_body(**overrides: Any) -> dict[str, Any]:
         "email": random_email(),
         "password": random_password(),
         "timezone": "Europe/Berlin",
-        "invite_code": settings.INVITE_CODE,
     }
     return body | overrides
 

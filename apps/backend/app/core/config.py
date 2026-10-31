@@ -50,10 +50,6 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_DB: str = "distillcourse"
 
-    # Signup is invite-only: without billing or email verification an open
-    # registration turns the tutor harness into a free LLM proxy.
-    INVITE_CODE: str = "local-invite"
-
     LOGFIRE_TOKEN: str | None = None
 
     OPENROUTER_API_KEY: str | None = None
@@ -151,7 +147,7 @@ class Settings(BaseSettings):
         # The defaults above exist so tests and a bare `uv run` work with no
         # environment at all; carrying them into a deployment must be loud.
         if self.ENVIRONMENT != "local":
-            for name in ("POSTGRES_PASSWORD", "INVITE_CODE"):
+            for name in ("POSTGRES_PASSWORD",):
                 if getattr(self, name) == Settings.model_fields[name].default:
                     raise ValueError(
                         f"{name} is still the local default in ENVIRONMENT={self.ENVIRONMENT}"

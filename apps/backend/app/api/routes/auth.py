@@ -1,4 +1,3 @@
-import secrets
 import uuid
 from datetime import UTC, datetime
 from typing import Annotated
@@ -11,7 +10,6 @@ from app import crud
 from app.api.deps import CurrentSession, CurrentUser, SessionDep
 from app.core import sessions
 from app.core.clock import TimezoneName
-from app.core.config import settings
 from app.core.rate_limit import rate_limit
 from app.core.security import (
     MAX_PASSWORD_LENGTH,
@@ -42,7 +40,6 @@ class SignupRequest(BaseModel):
     email: EmailStr
     password: Password
     timezone: TimezoneName
-    invite_code: str
     # Bounded to the column width: a longer value reaches the database as a
     # DataError, which is not the IntegrityError signup knows how to answer.
     full_name: Annotated[str, Field(max_length=255)] | None = None
@@ -66,12 +63,6 @@ class PasswordChange(BaseModel):
 async def signup(
     body: SignupRequest, request: Request, response: Response, session: SessionDep
 ) -> UserPublic:
-    # Bytes, not str: compare_digest rejects str operands that are not pure
-    # ASCII, so a non-ASCII code — sent or configured — would raise TypeError.
-    if not secrets.compare_digest(
-        body.invite_code.encode(), settings.INVITE_CODE.encode()
-    ):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "invalid invite code")
     try:
         user = await crud.create_user(
             session,

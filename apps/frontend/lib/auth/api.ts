@@ -11,7 +11,6 @@ export interface SignupBody {
   email: string;
   password: string;
   timezone: string;
-  invite_code: string;
   full_name?: string;
 }
 
