@@ -1,0 +1,81 @@
+From an edge list to an exposure score and a graph network: union-find for the rings, power iteration for the walk, a normalised adjacency for the layer, all refereed on a 20-node toy before the Bitcoin graph.
+
+The graph module computed its numbers with a few lines of scipy in the
+text: the toy's exposure ranking D, F, E, G, I, its table of degrees,
+triangles and walk counts, and on the Elliptic graph a random forest ahead
+of every graph network. Each of those numbers depends on a line that can
+be wrong without raising an error: which index of the transition matrix
+is the node the walker leaves, whether the restart vector sums to 1,
+whether the self-loop is added before the degree is taken, which nodes the
+loss is averaged over.
+
+Every definition comes from an earlier lesson. The edge weight
+$e^{-\gamma h}$, its horizon and the payment promoted to a node of the
+tripartite graph come from <Ref lesson="fraud-as-a-graph" />. The walk
+counts from powers of the adjacency, the triangles as $(A^3)_{vv}/2$ and
+the toy's feature table come from
+<Ref lesson="neighbourhood-and-centrality" />; union-find from
+<Ref lesson="communities-and-components" />. The column-normalised
+matrix $Q = WS^{-1}$, the walk with restart
+$\xi = \alpha Q\xi + (1-\alpha)e$, its power iteration, the direction of
+the walk on a transfer graph and the one-step score of a payment the graph
+has not seen come from <Ref lesson="guilt-by-association" />. The
+normalised adjacency $\tilde D^{-1/2}(A+I)\tilde D^{-1/2}$, the two-layer
+network, its skip term and the 0.3/0.7 weighted loss come from
+<Ref lesson="graph-neural-networks" />. The Elliptic data, its split into
+steps 1–34 for training and 35–49 for scoring, and the forest that beat
+the graph networks come from <Ref lesson="elliptic-illicit-nodes" />.
+
+You write the tools in numpy and `scipy.sparse`, one checkpoint each: the
+weight and transition matrices of an edge list, in either direction of the
+money; connected components by union-find; the walk with restart; exposure
+on a card graph with decayed weights, with the score of a new payment;
+five egonet columns from powers of the adjacency; the normalised adjacency,
+the forward pass and the weighted loss of a two-layer network with a skip
+term; its gradient, derived by you and refereed in the notebook by finite
+differences; and the training loop, Adam on early time steps, scoring later
+ones. Every checkpoint is first checked locally against the toy's printed
+values. Then the tools run on the Elliptic graph: your union-find finds 49
+components, one per time step, which is why a walk from the known illicit
+nodes can never reach the steps being scored, and your network is compared
+with two forests on held-aside training steps.
+
+The lab runs as a Jupyter notebook — open it in Colab with the button
+above, or in any Jupyter. It needs no GPU. Its Elliptic part downloads the
+three original data files, about 150 MB, on first run (the licence allows
+sharing the files only unchanged, so the lab ships no cut-down copy) and
+trains for a few minutes. Pair the notebook with the code from this page;
+each checkpoint submits your function's outputs for verification, and the
+checklist above tracks what stands. The eight exact checkpoints are the
+required set. The written answer (why a forest on hand-built neighbour
+aggregates beats the network that learns its aggregation) and the open
+task are optional. The open task gives up the 72 aggregate columns and
+asks whether columns you compute from the graph can take their place:
+rank the 16,670 labelled nodes of steps 35–49 from the 93 local columns,
+the graph and the labels of steps 1–34, through a fixed classifier, a
+logistic regression that reaches a ROC-AUC of 0.858 on the local columns
+alone, to above 0.915. The classifier is fixed because a free choice of
+model would decide the grade instead of the graph: boosting on the local
+columns alone reaches about 0.93, and the graph columns add about half a
+point to it. Expect about five hours. When a check goes
+red, the verdict often names the bug — rows normalised instead of columns,
+the raw seed weights used as the restart, the degree taken before the
+self-loop, the gradient sent through a ReLU that was off, the unknown
+nodes counted as licit — so read it before rereading your code.
+
+The Elliptic graph is a set of snapshots, and at step 43 every model of
+the comparison fails at once, because the fraud changed when a dark
+market closed. <Ref lesson="sequence-models-for-transactions" /> starts on
+time as a feature in its own right: the order of an entity's events,
+which a snapshot graph or a fixed window of aggregates loses.
+
+<References>
+1. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015 — Ch. 5, "Social Network Analysis for Fraud Detection": the 20-node sample network (Fig. 5.13) and its neighbourhood metrics, Table 5.12 (the fraud-personalised PageRank ranking D, F, E, G, I) and Table 5.13 (its featurisation), against which the toy checks run.
+2. V. Van Vlasselaer, C. Bravo, O. Caelen, T. Eliassi-Rad, L. Akoglu, M. Snoeck, B. Baesens, "APATE: A novel approach for automated credit card transaction fraud detection using network-based extensions," *Decision Support Systems* 75:38–48, 2015 — Sec. 3.2 (exponentially decayed edge weights, the column-normalised tripartite matrix, power iteration, the update for a new transaction). https://doi.org/10.1016/j.dss.2015.04.013
+3. L. Akoglu, H. Tong, D. Koutra, "Graph-based anomaly detection and description: a survey," *Data Mining and Knowledge Discovery* 29(3):626–688, 2015 (arXiv:1404.4679) — Sec. 5.7 (TrustRank and Anti-TrustRank: distrust propagated backward along incoming links from known bad seeds).
+4. T. N. Kipf, M. Welling, "Semi-Supervised Classification with Graph Convolutional Networks," *ICLR*, 2017 (arXiv:1609.02907) — Sec. 2 (the normalised adjacency with self-loops), Sec. 3 (the two-layer model trained on the labelled nodes).
+5. M. Weber, G. Domeniconi, J. Chen, D. K. I. Weidele, C. Bellei, T. Robinson, C. E. Leiserson, "Anti-Money Laundering in Bitcoin: Experimenting with Graph Convolutional Networks for Financial Forensics," KDD Workshop on Anomaly Detection in Finance, 2019 (arXiv:1908.02591) — Sec. 3 (the data set, the GCN and the Skip-GCN), Sec. 4 (the temporal split, the 0.3/0.7 weighted loss, the forests against the graph networks).
+6. D. P. Kingma, J. Ba, "Adam: A Method for Stochastic Optimization," *ICLR*, 2015 (arXiv:1412.6980) — Algorithm 1 (the update and its bias correction).
+7. Elliptic, "Elliptic Data Set," CC BY-NC-ND 4.0 — the three files `elliptic_txs_features.csv`, `elliptic_txs_edgelist.csv` and `elliptic_txs_classes.csv`, downloaded unchanged by the notebook. https://www.kaggle.com/datasets/ellipticco/elliptic-data-set
+8. CS6890 "Fraud Analytics," IIT Hyderabad, 2023–24, Problem Statement 2 (TrustRank from a file of known bad nodes on a payment graph) and Problem Statement 1 (graph embeddings, a GCN among them, of the same graph); Neo4j GraphAcademy, *Graph Data Science in Practice* (workshop), Module 2 "Community Detection for Fraud", Lessons 4–5 (union-find, weakly connected components over entity-resolution edges). The assignments this lab is modelled on; it replaces TrustRank by the fraud-personalised walk with decay and direction, keeps one graph network and builds it without a framework so that its gradient can be checked, writes the components without a graph database, and has the server verify outputs instead of marking a report. https://github.com/Yp1711/CS6890-Fraud-Analytics-2024
+</References>

@@ -1,0 +1,999 @@
+Before a node's neighbours are used to judge it, one fact has to be checked: do fraudulent nodes actually sit next to other fraudulent nodes in this graph, or next to honest ones? If they do cluster, what numbers about a node's neighbourhood — how many neighbours, how many of them fraudulent, how tightly knit, how central in the whole network — can be handed to an ordinary classifier?
+
+<Ref lesson="fraud-as-a-graph">The previous chapter</Ref> turned a
+transaction log into a graph: accounts or users as nodes, transfers and
+shared identifiers as edges, labels on the nodes that carry them. It ended
+on a claim it could not yet back: fraud is social, by word of mouth or by
+organisation, so <Ref lesson="fraud-as-a-graph" id="two-ways-fraud-is-social">fraud
+should sit close to fraud</Ref>. The classifiers of the supervised module
+take a table, one row per node, so the graph has to become columns.
+
+The first column anyone writes is "how many of this user's neighbours are
+known fraudsters". It is cheap, one pass over the edge list, and it is the
+whole idea of guilt by association in one number. It is also only as good
+as the claim behind it. If fraudsters link to fraudsters, a high count marks
+a suspect. If they mostly link to honest users, the count is high for the
+honest users around a fraudster and zero for the fraudster, and the column
+points the wrong way. The claim has to be tested first, on the labels the
+bank already holds, before any such column is built.
+
+## Does fraud sit next to fraud? A test against chance
+
+Take the twelve users of the <Ref lesson="fraud-as-a-graph"
+id="exercises">previous chapter's last-but-one exercise</Ref>: four known
+fraudsters $F_1$ to $F_4$, eight users $L_1$ to $L_8$ with no fraud on
+record, and fourteen entity-resolution edges between them. Two edges join
+a fraudster to a non-fraudster; the other twelve join two of a kind.
+
+### Counting cross-labelled edges
+
+Two out of fourteen sounds like few, but few compared with what? Call an
+edge *cross-labelled* if its two ends carry different labels. The same <Ref
+lesson="fraud-as-a-graph" id="exercises">exercise</Ref> worked out the
+comparison: with $f$ the fraction of fraudulent nodes and $l = 1 - f$
+the rest, labels that had nothing to do with the edges would make each
+edge cross-labelled with probability $2lf$, one end fraudulent and the
+other not, in either order. Here $2lf = 4/9 \approx 0.44$, about 6.2 of
+the fourteen edges. Two are.
+
+<Figure
+  src="./figures/homophily-test.svg"
+  alt="Twelve users: four amber fraudsters F1 to F4 joined to each other by five edges, a square of four honest users L1 to L4 and a chain of four honest users L5 to L8. Two edges, F4 to L1 and F1 to L5, are thick amber and labelled cross. A side panel reads: observed 2 of 14; expected 14 times 2 times 8/12 times 4/12, about 6.2; one-tailed test z about minus 2.27, p about 0.012"
+  caption="The twelve-user graph. Labels independent of edges would give about six cross-labelled edges; the graph has two."
+/>
+
+Nodes keeping company with their own kind more than independent labels
+would give is called *homophily*. The cross-edge count tests one
+consequence of it: if fraud keeps company with fraud, fewer edges than
+chance join a fraudster to a non-fraudster.
+
+<Definition title="cross-edge test">
+Take two labels, fraudulent and legitimate, with fractions $f$ and
+$l = 1-f$ of the nodes, and $M$ edges. Let $\pi$ be the probability that an
+edge is cross-labelled, estimated by the observed fraction $\hat r$ of
+cross-labelled edges. The *cross-edge test* is the one-tailed test of a
+proportion of
+
+$$
+H_0 : \pi \geq 2lf \quad\text{against}\quad H_1 : \pi < 2lf.
+$$
+
+Rejecting $H_0$ says that fraudulent and legitimate nodes are joined less
+often than independent labels would give.
+</Definition>
+
+<Example title="the test on twelve users">
+Treat the $M = 14$ edges as fourteen draws, each cross-labelled with
+probability $\pi_0 = 2lf = 4/9$ under $H_0$. The observed fraction is
+$\hat r = 2/14 = 0.143$. With the normal approximation to the binomial, the
+standard error under $H_0$ is
+
+$$
+\sqrt{\pi_0(1-\pi_0)/M} = \sqrt{0.444 \times 0.556 / 14} = 0.133,
+$$
+
+so $z = (0.143 - 0.444)/0.133 = -2.27$, and the one-tailed p-value is
+$\Phi(-2.27) \approx 0.012$. The probability of two or fewer cross-labelled
+edges out of fourteen, if the labels were independent of the edges, is
+about one in eighty; at the 5% level $H_0$ is rejected: on the twelve users,
+fraudsters are joined to non-fraudsters less often than chance.
+</Example>
+
+Fourteen draws is small for a normal approximation. The exact binomial
+probability of two or fewer is 0.019, the same verdict.
+
+### What the test assumes
+
+**Edges are not independent draws.** A user with forty edges contributes
+forty draws that all share one label. The test then counts that user's
+label forty times, and a few high-degree users can produce a significant
+result on their own. The check that makes no such assumption shuffles the
+labels over the nodes many times, keeps the edges fixed, and asks how often
+a shuffle gives as few cross-labelled edges as the real labels did
+(the <Ref lesson="neighbourhood-and-centrality" id="exercises">exercise on
+the Elliptic aggregates</Ref> designs one).
+
+**"Legitimate" means "not known as fraud".** On a fraud graph the second
+label is the absence of a label, and an undetected fraudster counts as
+honest. That is <Ref lesson="fraud-detection-system"
+id="silence-read-as-genuine-is-a-decision-not-a-fact">silence read as
+genuine</Ref> again, and it pushes the test the conservative way: a hidden
+fraudster linked to a known one turns a same-label edge into a cross edge.
+
+The test also needs edges between nodes that carry labels. In the bipartite
+card graph no edge joins two cardholders, so it is run on the users joined
+by entity resolution, on the accounts joined by transfers, or on a
+projection that links two cardholders through a shared merchant.
+
+## Two separate questions: dyadicity and heterophilicity
+
+The cross-edge count looks at one kind of edge, fraud to non-fraud, and
+asks whether there are too few. Fraud keeping company with fraud has a
+second side the count never looks at: whether there are too many
+fraud-to-fraud edges. Fraudsters can seek each other out and still trade
+with honest users at close to the usual rate, and then the count sees
+nothing unusual.
+
+### A second toy, and a test that says no
+
+A second toy, used from here on, has twenty nodes and twenty-five edges;
+four nodes, D, E, F and I, are known fraudulent. D, E and F form a closed triangle; I sits among honest
+nodes.
+
+<Figure
+  src="./figures/toy20.svg"
+  alt="A graph of twenty nodes A to T and 25 edges. Nodes D, E, F and I are amber. D, E and F form a triangle on the left, joined to G; A in the centre has six neighbours B, G, H, I, O and T; O leads to P and Q, Q to R and S; I leads to K and N; N, L and M form a triangle at the bottom; H joins A and K; J hangs off K; C hangs off B"
+  caption="The 20-node toy: four fraudulent nodes, three of them in one triangle."
+/>
+
+Run the cross-edge test. Seven of the 25 edges are cross-labelled
+(B–D, D–G, F–G, G–I, A–I, I–K, I–N); with
+$f = 0.2$, $2lf = 0.32$ and eight are expected. The standard error is
+$\sqrt{0.32 \times 0.68/25} = 0.093$, so $z = (0.28 - 0.32)/0.093 = -0.43$,
+a p-value of 0.33, and $H_0$ stands. Yet three of the four
+fraudsters are joined to each other in a triangle. The test missed it
+because it never counts fraud–fraud edges: three of them is far more than
+chance gives, but they are three of 25 and move $\hat r$ only a little.
+
+### The two ratios
+
+The repair splits the edges by kind and compares each kind with its own
+expectation. Write $n_1$ for the number of fraudulent nodes, N for all
+nodes, and $m_{11}$, $m_{10}$, $m_{00}$ for the numbers of fraud–fraud,
+fraud–legitimate and legitimate–legitimate edges, with
+$M = m_{11} + m_{10} + m_{00}$.
+
+If edges were placed between nodes regardless of their labels, each of the
+$N(N-1)/2$ possible pairs would be an edge with the same probability, the
+*connectance*
+
+$$
+p = \frac{2M}{N(N-1)},
+$$
+
+the share of possible edges that exist. There are $n_1(n_1-1)/2$ pairs of
+fraudulent nodes and $n_1(N - n_1)$ mixed pairs, so the expected counts are
+
+$$
+E[m_{11}] = \frac{n_1(n_1 - 1)}{2}\,p, \qquad E[m_{10}] = n_1(N - n_1)\,p.
+$$
+
+<Definition title="dyadicity and heterophilicity">
+The *dyadicity* of a labelled graph is $D = m_{11}/E[m_{11}]$ and its
+*heterophilicity* is $H = m_{10}/E[m_{10}]$. The graph is *dyadic* if
+$D > 1$ (fraud–fraud edges more frequent than chance gives) and
+*anti-dyadic* if $D < 1$; it is *heterophobic* if $H < 1$
+(fraud–legitimate edges less frequent than chance) and *heterophilic* if
+$H > 1$. A graph that is dyadic and heterophobic is *homophilic*; one that
+is anti-dyadic and heterophilic shows *inverse homophily*.
+</Definition>
+
+<Example title="both toys">
+Twelve users: $N = 12$, $M = 14$, $n_1 = 4$, so $p = 28/132 = 0.212$.
+$E[m_{11}] = 6 \times 0.212 = 1.27$ against $m_{11} = 5$, so $D = 3.9$;
+$E[m_{10}] = 32 \times 0.212 = 6.79$ against $m_{10} = 2$, so $H = 0.29$.
+Dyadic and heterophobic: homophilic.
+
+Twenty nodes: $N = 20$, $M = 25$, $n_1 = 4$, so $p = 50/380 = 0.132$.
+$E[m_{11}] = 6 \times 0.132 = 0.79$ against $m_{11} = 3$, so $D = 3.8$;
+$E[m_{10}] = 64 \times 0.132 = 8.42$ against $m_{10} = 7$, so $H = 0.83$.
+Also dyadic and heterophobic, so also homophilic, with $H$ close to 1.
+</Example>
+
+The cross-edge test sees only the second ratio. Divide each toy's observed
+cross fraction by the $2lf$ the test compares it with: $0.143/0.444 = 0.32$
+for the twelve users, against $H = 0.29$, and $0.28/0.32 = 0.88$ for the
+twenty nodes, against $H = 0.83$. The two differ only by a factor
+$N/(N-1)$ (an <Ref lesson="neighbourhood-and-centrality"
+id="exercises">exercise</Ref> derives it), so the test's $H_0$ is in effect
+$H \geq 1$, and rejecting it says the graph is heterophobic.
+
+### Which way a fraudulent neighbour points
+
+The column the chapter started from, a node's number of fraudulent
+neighbours, is evidence of fraud if fraudulent nodes score higher on it
+than legitimate ones. The tempting reading is that $D$ alone decides this,
+since $D$ counts fraudsters linking to fraudsters. But the legitimate
+nodes score on the same column, and their fraudulent neighbours come from
+the fraud–legitimate edges, which $H$ counts. Both ratios enter.
+
+Count the scores on the twenty-node toy. Each fraud–fraud edge gives a
+fraudulent neighbour to both of its ends, so the four fraudulent nodes
+hold $2m_{11} = 6$ fraudulent neighbours between them, 1.5 each. Each
+fraud–legitimate edge gives one to its legitimate end, so the sixteen
+legitimate nodes hold $m_{10} = 7$, 0.44 each. The column points at the
+fraudsters, by more than three to one.
+
+In general the two averages are $2m_{11}/n_1$ and $m_{10}/(N - n_1)$.
+Write the counts through the ratios, $m_{11} = D\,n_1(n_1-1)p/2$ and
+$m_{10} = H\,n_1(N - n_1)p$, and the averages become
+
+$$
+\frac{2m_{11}}{n_1} = D\,(n_1 - 1)\,p, \qquad \frac{m_{10}}{N - n_1} = H\,n_1\,p.
+$$
+
+The connectance $p$ is common to both, so fraudulent nodes have more
+fraudulent neighbours on average exactly when
+
+$$
+D\,(n_1 - 1) > H\,n_1, \qquad\text{that is,}\qquad \frac{D}{H} > \frac{n_1}{n_1 - 1}.
+$$
+
+On the toy, $3.8 \times 3 = 11.4$ against $0.83 \times 4 = 3.3$; times
+$p = 0.132$ these are the 1.5 and 0.44 counted above. The factor
+$n_1/(n_1 - 1)$ is $4/3$ with four fraudsters and close to 1 with
+hundreds, so on a real graph the condition is in effect $D > H$.
+
+<Figure
+  src="./figures/dh-plane.svg"
+  alt="A plane with dyadicity D from 0 to 4.5 on the horizontal axis and heterophilicity H from 0 to 2 on the vertical, dashed lines at D = 1 and H = 1 and a dotted diagonal D = H. Lower right quadrant labelled homophily, dyadic and heterophobic, accounting fraud. Upper left labelled inverse homophily, auction fraud. Upper right noted as fraud nodes having more edges of every kind. Right of the diagonal: a fraudulent neighbour points at fraud. Two amber points: 12 users at D 3.9, H 0.29, and the 20-node toy at D 3.8, H 0.83. A hollow point in the lower left quadrant at D 0.79, H 0.07, labelled anti-dyadic, still right of the diagonal"
+  caption="Both toys lie in the homophilic quadrant. Right of the diagonal D = H, fraudulent nodes have more fraudulent neighbours than legitimate ones, up to the factor n₁/(n₁ − 1)."
+/>
+
+Homophily, $D > 1 > H$,
+puts $D$ above $H$, and the condition holds unless both ratios sit so close
+to 1 that $D/H$ falls short of $n_1/(n_1 - 1)$, a margin that vanishes as
+$n_1$ grows. Inverse homophily, $D < 1 < H$, rules it out: then
+$D(n_1 - 1) < n_1 - 1 < n_1 < H n_1$. The other two quadrants depend on
+which ratio is larger. Take twenty nodes, four of them fraudulent, and 40
+edges, only one of them fraud–fraud and one fraud–legitimate. Then
+$p = 80/380 = 0.21$, $D = 1/1.26 = 0.79$ and $H = 1/13.5 = 0.07$: the
+graph is anti-dyadic, yet the fraudulent nodes average 0.5 fraudulent
+neighbours against 0.06 for the legitimate ones, because $H$ is smaller
+still: the fraudsters almost never touch a legitimate node.
+
+### When fraud avoids fraud
+
+From the previous chapter one would expect every kind of fraud to cluster.
+Online auction fraud does the opposite. A seller who means to take payment
+and ship nothing first needs a good reputation, and reputation comes from
+positive feedback after trades. So fraudsters open extra accounts, the
+*accomplices*, which trade with honest users and look honest. The
+fraudster then trades cheaply with its accomplices to collect feedback,
+and, once the score is high enough, cheats honest buyers. Fraudsters link
+mostly to accomplices and seldom to each other; accomplices link to both
+sides. Labelled as fraudster against everyone else, the graph has $D < 1$
+and $H > 1$: anti-dyadic and heterophilic, inverse homophily.
+
+In accounting, by contrast, an account with suspicious entries tends to
+transact with other suspicious accounts, and the graph is homophilic. By
+the comparison above, the same column, "fraudulent neighbours", is a
+positive signal for the accounting graph and a misleading one for the
+auction graph, where it is highest for the accomplices and zero for the fraudsters themselves (the <Ref
+lesson="neighbourhood-and-centrality" id="exercises">auction exercise</Ref>
+works the case).
+
+<KeyFact>
+Checking homophily is the gate on every column that reads neighbours'
+labels. It runs on the labels the bank already has, before any model is
+fitted, and compares $D(n_1 - 1)$ with $H n_1$: the column points at the
+fraudsters when the first is larger, roughly when $D > H$, and at whoever
+the fraudsters link to when it is not (in the auction graph, the
+honest-looking accomplices).
+</KeyFact>
+
+A classifier fitted on the column could learn a negative weight on its
+own, given enough labelled fraudsters. The propagation methods of <Ref
+lesson="guilt-by-association">a later chapter</Ref> cannot: they push
+suspicion from known fraud to its neighbours by construction, and on an
+inverse-homophilic graph they push it onto the accomplices and honest
+buyers rather than onto the next fraudster.
+
+## One hop: what a node's neighbourhood says
+
+Where the test finds clustering, the cheapest columns describe a node's
+immediate surroundings. Each is computable from the edge list in one or two
+passes, and each answers a different question about the node's one-hop
+world.
+
+### Degree, split by the neighbours' labels
+
+The *degree* of a node is its number of neighbours; in a directed graph,
+the *in-degree* counts edges arriving and the *out-degree* edges leaving.
+Split by the neighbours' labels it becomes two columns, the fraudulent
+degree and the legitimate degree. Node G of the toy has degree 4, of
+which three neighbours, D, F and I, are fraudulent: no node of the
+toy, fraudulent or not, has more fraudulent neighbours.
+
+Degree alone measures activity, and it falls off steeply in real networks:
+most nodes have a handful of neighbours and a few have thousands. A
+merchant with a thousand customers is not suspicious for having them; what
+the split adds is the composition of those neighbours.
+
+### The egonet: triangles and density
+
+A count of neighbours says nothing about whether the neighbours know each
+other. Five accounts that all transact with one another are a tight group;
+five accounts that each deal only with the central one are a hub with
+spokes. Both give the centre degree 4.
+
+<Definition title="egonet">
+The *egonet* of a node, the *ego*, is the subgraph made of the ego, its
+neighbours (the *alters*) and every edge among those nodes, including the
+edges between two alters.
+</Definition>
+
+The edges between alters are what the neighbour set lacks. Each one closes
+a *triangle* with the ego: three nodes all joined to each other. A
+triangle is *fraudulent* if both alters in it are fraudulent, *legitimate*
+if neither is, and *semi-fraudulent* if one is. Finally, the *density* of
+the egonet compares its edges with the most it could have: with N nodes
+and M edges,
+
+$$
+\text{density} = \frac{M}{N(N-1)/2} = \frac{2M}{N(N-1)}.
+$$
+
+It is the connectance of the previous section, measured inside one egonet.
+
+<FigureSequence
+  name="egonet-g"
+  alt="Four frames on node G and its neighbours A, I, F and D. Frame 1: G joined to the four; D, F and I amber; side panel degree 4, fraudulent neighbours 3, legitimate 1. Frame 2: blue edges A–I and D–F added; egonet of 5 nodes and 6 edges. Frame 3: triangle G–D–F shaded amber as fraudulent, triangle G–A–I shaded blue as semi-fraudulent. Frame 4: the four missing alter pairs A–D, A–F, I–D, I–F dashed; density 2 times 6 over 5 times 4 equals 0.6"
+  caption="Node G of the toy, one column at a time: degree by label, the egonet, its triangles, its density."
+/>
+
+<Task>
+Step through the four frames. Before frame 4, count the pairs of alters
+that are not joined, and predict the density from them alone: of the ten
+possible edges among five nodes, how many are present?
+</Task>
+
+<Example title="the egonet of G">
+**Degree.** G has neighbours A, D, F, I: degree 4, fraudulent
+degree 3, legitimate degree 1.
+
+**Egonet.** Among the alters, A–I and D–F are edges; A–D,
+A–F, I–D and I–F are not. The egonet has $N = 5$ nodes and
+$M = 4 + 2 = 6$ edges.
+
+**Triangles.** Each alter edge closes one triangle: G–D–F, whose
+alters are both fraudulent (a fraudulent triangle), and G–A–I, with
+one fraudulent alter (semi-fraudulent).
+
+**Density.** $2 \times 6 / (5 \times 4) = 0.6$.
+</Example>
+
+<Exercise>
+Compute the same four columns for node D: degree by label, the egonet's
+size, the triangles by alter label, and the density.
+
+<Solution>
+D's neighbours are B, E, F, G: degree 4, fraudulent degree 2
+(E, F), legitimate degree 2 (B, G). Among the alters, E–F and
+F–G are edges, and B is joined to none of the others. The egonet has
+5 nodes and $4 + 2 = 6$ edges. Triangles: D–E–F, both alters
+fraudulent (fraudulent); D–F–G, one fraudulent alter
+(semi-fraudulent). Density $2 \times 6/(5 \times 4) = 0.6$. D and G
+have the same density and the same number of triangles; they differ in
+their own label and in the composition of their triangles.
+</Solution>
+</Exercise>
+
+Density read alone misleads at small degree. An egonet with one neighbour
+has two nodes and one edge, density $2/(2 \times 1) = 1$, as dense as a
+triangle; on the toy every leaf (C, J, P, R, S, T) scores 1.
+Density is informative only beside the degree that sets how much room
+there was.
+
+### Link columns for a regression
+
+The quickest way for this information to reach a model is as ordinary
+columns beside the node's own fields, its *intrinsic* features (an
+account's age, a company's sector). Three forms keep different amounts of
+the neighbours' labels. The *count*, the number of neighbours with each
+label, is the degree split above and keeps everything, but it grows with
+the degree. The *binary* indicator, whether any neighbour is fraudulent,
+keeps only whether the fraudulent count is above zero, so a node with one
+fraudulent neighbour among a thousand scores the same as a node whose one
+neighbour is fraudulent. The *mode*, the most frequent label among the
+neighbours, keeps only the majority: where fraud is rare it reads
+"fraudulent" only for a node most of whose neighbours are known fraud,
+like E, F and G on the toy. A logistic
+regression on intrinsic plus link columns is called a *relational logistic
+regression*, and it is the logistic regression of the supervised module
+with a few more inputs.
+
+The three forms are functions of the same counts, so they are strongly
+correlated, and a selection step keeps one or two. They also read labels,
+so they obey the rule of every label-derived feature: the label on a
+neighbour counts only if it <Ref lesson="point-in-time-features"
+id="a-feature-built-from-labels-what-the-bank-knew-that-morning">had arrived
+when the row's prediction was made</Ref>.
+
+## Beyond one hop: walks, distances and position
+
+Every column so far stops at the neighbours. H, J and R have no
+fraudulent neighbour, but H is two steps from I along two different
+routes, J two steps from it through K, and R four steps from the nearest
+fraud. A model that sees only one hop scores the three alike.
+
+### Counting walks with matrix powers
+
+A *walk* of length $k$ is a sequence of $k$ edges, each starting where the
+previous one ended; unlike a path, it may revisit a node. The adjacency
+matrix $A$ of the previous chapter (<Ref lesson="fraud-as-a-graph"
+id="matrix-or-list-what-the-graph-costs-to-store">rows and columns indexed
+by nodes, 1 for an edge</Ref>) already counts walks of length 1: $A_{ij}$
+is the number of one-edge walks from $i$ to $j$. Its powers count longer
+ones.
+
+Take four nodes with edges 1–2, 1–4, 2–4 and 3–4. The entry $(A^2)_{44}$ is
+$\sum_m A_{4m}A_{m4}$, and the term for $m$ is 1 exactly when 4–$m$ and
+$m$–4 are both edges, that is, when $m$ is a neighbour of 4. Node 4 has
+three neighbours, so $(A^2)_{44} = 3$: the walks 4–1–4, 4–2–4 and 4–3–4.
+
+<Figure
+  src="./figures/walks.svg"
+  alt="Left: four nodes, 1 and 2 joined to each other and to 4, and 3 joined to 4; the three edges at node 4 are amber. Right: three 4 by 4 grids labelled A, A squared and A cubed. A has rows 0 1 0 1, 1 0 0 1, 0 0 0 1, 1 1 1 0. A squared has rows 2 1 1 1, 1 2 1 1, 1 1 1 0, 1 1 0 3, with the bottom-right 3 highlighted in amber. A cubed has rows 2 3 1 4, 3 2 1 4, 1 1 0 3, 4 4 3 2. Under the graph: walks of length 2 from 4 back to 4: 4–1–4, 4–2–4, 4–3–4"
+  caption="Each entry of A² sums over the possible middle node. The highlighted 3 is the three ways out of node 4 and back."
+/>
+
+<Proposition title="powers count walks">
+For the adjacency matrix $A$ of a graph and every $k \geq 1$, the entry
+$(A^k)_{ij}$ is the number of walks of length $k$ from node $i$ to node $j$.
+<Proof>
+By induction on $k$. For $k = 1$ it is the definition of $A$. Suppose it
+holds for $k$. Every walk of length $k+1$ from $i$ to $j$ is a walk of
+length $k$ from $i$ to some node $m$, followed by one edge from $m$ to $j$.
+For a fixed $m$ there are $(A^k)_{im}$ such walks if $m$–$j$ is an edge and
+none otherwise, which is $(A^k)_{im} A_{mj}$ in both cases. Summing over
+$m$ gives $\sum_m (A^k)_{im}A_{mj} = (A^{k+1})_{ij}$.
+</Proof>
+</Proposition>
+
+Applied to labels, the proposition turns "how much fraud is within $k$
+steps" into a matrix–vector product. Let $\mathbf{f}$ be the vector with 1
+for each fraudulent node and 0 elsewhere. Then $(A\mathbf{f})_v$ is $v$'s
+fraudulent degree, and $(A^2\mathbf{f})_v$ counts the two-step walks from
+$v$ that end on a fraudulent node. For G it is 5: G–D–E,
+G–D–F, G–F–D, G–F–E and G–A–I. Computed as
+$A(A\mathbf{f})$, two sparse products, it costs two passes over the edge
+list, never the dense matrix $A^2$.
+
+Two cautions come with the count. Walks revisit, so the count grows with
+the degrees along the way and is not a count of distinct routes. And a
+fraudulent node's own label returns to it: $(A^2)_{vv}$ is $v$'s degree,
+so for a fraudulent $v$ the count includes one walk out and back per
+neighbour. On a training row that term is the row's own label inside its
+feature. The column used below subtracts it, keeping only walks that end
+on another fraudulent node.
+
+### Distance to the nearest fraud, and closeness
+
+A walk count mixes how far the fraud is with how many routes lead there.
+Distance separates the first. The *geodesic distance* $d(u, v)$ between
+two nodes is the number of edges on a shortest path between them. On an
+unweighted graph a breadth-first search finds all distances from one node
+in one pass over the edges; started from all fraudulent nodes at once, the
+same search gives every node its distance to the nearest fraud. On the toy
+that is 1 for A, B, G, K and N, 2 for H and J, and 4 for R
+and S. On a weighted graph, Dijkstra's algorithm plays the same role, but
+it needs lengths, where a large number means far; the recency weights of
+the previous chapter mean close, so they are turned into lengths first, for
+instance as $1/w$.
+
+The same distances, taken to every node instead of to the fraud, measure
+how central a node is in the whole graph. The *farness* of $v$ is its mean
+distance to the other $n - 1$ nodes, and its *closeness* is the inverse:
+
+$$
+\operatorname{closeness}(v) = \left( \frac{1}{n-1} \sum_{u \neq v} d(v, u) \right)^{-1}.
+$$
+
+Node A reaches six nodes in one step, seven in two and the remaining six
+in three: farness $(6 + 14 + 18)/19 = 2.0$, closeness 0.50, the highest of
+the toy. Between two components
+the distance is infinite and the closeness would be 0; the convention used
+here, and by most software, computes it within the node's own component.
+
+### Betweenness: the node every route passes through
+
+Closeness rewards a node for being near everything. A different position
+matters for laundering: the account through which money must pass between
+two groups that have no other link. Its degree may be small and its
+closeness unremarkable, but cutting it disconnects the groups.
+
+<Definition title="betweenness">
+Let $g_{jk}$ be the number of shortest paths between nodes $j$ and $k$, and
+$g_{jk}(v)$ the number of those that pass through $v$. The *betweenness*
+of $v$ is
+
+$$
+\operatorname{betweenness}(v) = \sum_{j < k,\; j, k \neq v} \frac{g_{jk}(v)}{g_{jk}},
+$$
+
+the sum, over all pairs of other nodes, of the share of their shortest
+paths that run through $v$.
+</Definition>
+
+<Figure
+  src="./figures/bridge.svg"
+  alt="Three groups of four nodes, each group fully connected, and a single amber node X joined by one amber edge to one member of each group. X is labelled degree 3, betweenness 48: every shortest path between two groups passes through it. A member inside one group, shaded blue, is labelled degree 3, betweenness 0"
+  caption="Two nodes with degree 3. Only X lies on the routes between groups, and betweenness is what separates them."
+/>
+
+In the figure, the 48 is $3 \times 4 \times 4$: each of the three pairs of
+groups has $4 \times 4$ pairs of members, and each of their shortest paths
+goes through $X$. The blue node is on no shortest path between two other
+nodes, because its group-mates reach each other directly.
+
+<Example title="betweenness of Q and O on the toy">
+R and S are joined only to Q, so every path that leaves either of
+them starts with an edge into Q. Pair R with each of the 17 nodes
+outside Q, R and S, and S likewise: $2 \times 17 = 34$ pairs whose
+shortest paths all pass through Q. The pair R–S adds one more, since
+its only path is R–Q–S. Betweenness 35, with a degree of 3.
+
+O joins P, Q, R and S to the other fifteen nodes. Each of the
+$4 \times 15 = 60$ pairs across O passes through it, and so do the three
+pairs P–Q, P–R, P–S on its own side: betweenness 63, against a
+degree of 3.
+</Example>
+
+<Exercise>
+Compute the betweenness of N, whose neighbours are I, L and M.
+
+<Solution>
+L and M are joined to each other and to N, and to nothing else. Every
+shortest path from L or M to the 17 nodes outside L, M and N passes
+through N: $2 \times 17 = 34$ pairs. The pair L–M is joined directly,
+so N gains nothing from it, and no path between two outside nodes enters
+N, since it would have to leave by the same edge. Betweenness 34, the
+toy table's value.
+</Solution>
+</Exercise>
+
+Fractions appear when a pair has several shortest paths. Take the pair A
+and D: two routes of length 2 join them, A–B–D and A–G–D, so B and G
+each lie on one of the two and each collect $1/2$ for the pair. B's whole
+betweenness adds up from three kinds of pair:
+
+- C is joined only to B, so every route from C to the other 18 nodes
+  passes through B: 18 pairs at a full count each, 18.
+- D reaches A, and the nodes that D can reach only through A (H, O,
+  P, Q, R, S, T), by two equally short routes, one through B and one
+  through G: 8 pairs at $1/2$, 4.
+- E reaches the same eight nodes by three shortest routes, E–D–B–A,
+  E–D–G–A and E–F–G–A, only the first through B: 8 pairs at $1/3$,
+  2.67.
+
+The total is $18 + 4 + 2.67 = 24.67$. The same split, applied to the
+other routes of those pairs, gives the remaining fractional values in the
+table below: G 35.3, D 13.8, F 6.2.
+
+A mule account in a laundering chain receives from one group and pays out
+to another, and is a candidate for this profile: small degree, large
+betweenness. It is also the most expensive column here. Betweenness needs
+the shortest paths from every node, one search per node, so on a graph of
+a million nodes it is a million searches; in practice it is estimated from
+searches started at a random sample of nodes, or computed only inside
+small subgraphs. One more centrality, PageRank, ranks nodes by where a
+random walk spends its time; it waits for <Ref
+lesson="guilt-by-association">the chapter on random walks</Ref>, where it
+is aimed at the known fraud.
+
+## Columns nobody lists by hand
+
+Each column so far was chosen by someone who thought it might matter. The
+list is finite and the graph is not, so two moves generate columns
+mechanically: aggregate what the neighbours have, and compare each egonet
+with the egonets of everyone else.
+
+### Recursive aggregates over the neighbours
+
+Take any column a node already has, its degree, its amount sent last week,
+its fraudulent degree, and add the mean, minimum and maximum of that column
+over the node's neighbours. Node A has no unusual fraudulent degree
+itself (1), but the maximum fraudulent degree among its neighbours is 3,
+reached at G: one aggregate carried the information two steps. Repeating
+the step on the new columns reaches three steps, and so on; each round is
+one pass over the edges. Columns that come out nearly identical to an
+existing one are dropped as they appear, or the table grows without
+adding anything.
+
+The <Ref lesson="canonical-datasets"
+id="elliptic-a-graph-whose-labels-come-from-names">Elliptic Bitcoin
+graph</Ref> was published with exactly this construction: next to each
+transaction's 94 local features come 72 aggregated ones, the maximum,
+minimum, standard deviation and correlation coefficients of the
+neighbouring transactions' local features, one hop back and forward.
+
+The aggregates have one weakness, and it is built into the maximum. A
+maximum over three neighbours and a maximum over three hundred are
+different quantities even when no neighbour is unusual.
+
+<Figure
+  src="./figures/aggregate-max.svg"
+  alt="Expected value of an aggregate over k neighbours whose feature is standard normal, against k from 1 to 3,000 on a log scale. The blue line for the expected mean is flat at 0. The amber curve for the expected maximum rises from 0 at k = 1 through 0.85 at k = 3 and 2.51 at k = 100 to about 3.5 at k = 3,000. Note: every neighbour drawn from the same ordinary distribution, nobody unusual"
+  caption="With no unusual neighbour at all, the maximum climbs with the number of neighbours. A tree split on it splits partly on degree."
+/>
+
+If every neighbour's feature is a standard normal draw, the expected
+maximum is 0.85 standard deviations for three neighbours and 2.51 for a
+hundred. A node with a hundred honest neighbours then shows a "maximum
+neighbour amount" that a node with three would reach only with a strongly
+unusual neighbour, and a classifier that splits on the column is partly
+splitting on the degree. The mean does not drift this way, but it hides
+the one unusual neighbour the maximum was there to find. Summaries of a
+set whose size varies from node to node lose information either way, and
+that loss is what a layer that learns its own aggregation is built to
+reduce.
+
+### Egonets against the law the others follow
+
+The second move needs no labels. Compute two egonet columns for every
+node, the number of neighbours $k$ and the number of edges in the egonet
+$M$, and plot one against the other. Since the egonet's edges are the
+$k$ spokes plus one edge per triangle, $M$ lies between $k$ (a *star*: no
+neighbour knows another) and $k(k+1)/2$ (a *clique*: every neighbour knows
+every other).
+
+<Figure
+  src="./figures/egonet-law.svg"
+  alt="Log–log scatter of edges in the egonet against number of neighbours, with blue dots for about 170 nodes following a fitted blue line M proportional to k to the 1.25, between a lower dashed bound star M = k and an upper dashed bound clique M = k(k+1)/2. Two amber outliers: a near-clique with 12 neighbours and 58 edges among them, close to the upper bound, and a near-star with 150 neighbours and 3 edges among them, on the lower bound"
+  caption="An illustrative synthetic graph of about 170 nodes, its law fitted to its own dots. Most egonets lie near one power law between the star and clique bounds; the nodes far from the fitted line are the ones to look at."
+/>
+
+On real graphs most nodes fall near a straight line on log–log axes, a
+power law $M \propto k^{\alpha}$ with $\alpha$ between 1 and 2; the graph
+in the figure is synthetic, built to follow such a law, and the line
+through it, with $\alpha = 1.25$, is fitted to its own dots. On any graph,
+the law is fitted to that graph's nodes, and the distance of a node's
+point from the fitted line is a score. Far below it
+sits a near-star: 150 counterparties who never deal with each other, the
+shape of an account that collects from or pays out to many strangers, a
+fan-in or fan-out of the <Ref lesson="fraud-as-a-graph"
+id="eight-definitions">laundering motifs</Ref>. Far above sits a
+near-clique: twelve accounts that all deal with one another, a closed
+group. The score is "unlike the others", the <Ref
+lesson="anomaly-detection-framing">anomaly score of the previous
+module</Ref>, computed on graph columns instead of transaction fields, and
+it carries the same caution: it ranks unusual shapes, not fraud.
+
+## The feature table, and what a classifier can learn from it
+
+Every column of the chapter, computed for every node of the toy, is one
+table with a row per node. Fraudulent rows are marked F; the 2-hop column
+counts walks ending on another fraudulent node.
+
+| node | label | degree | fraud. nbrs | triangles | density | dist. to fraud | 2-hop walks to fraud | closeness | betweenness |
+|---|---|---|---|---|---|---|---|---|---|
+| A | | 6 | 1 | 1 | 0.33 | 1 | 4 | 0.50 | 104 |
+| B | | 3 | 1 | 0 | 0.50 | 1 | 3 | 0.39 | 24.7 |
+| C | | 1 | 0 | 0 | 1.00 | 2 | 1 | 0.28 | 0 |
+| D | F | 4 | 2 | 2 | 0.60 | 0 | 4 | 0.35 | 13.8 |
+| E | F | 2 | 2 | 1 | 1.00 | 0 | 2 | 0.26 | 0 |
+| F | F | 3 | 2 | 2 | 0.83 | 0 | 4 | 0.33 | 6.2 |
+| G | | 4 | 3 | 2 | 0.60 | 1 | 5 | 0.43 | 35.3 |
+| H | | 2 | 0 | 0 | 0.67 | 2 | 2 | 0.37 | 9 |
+| I | F | 4 | 0 | 1 | 0.50 | 0 | 2 | 0.45 | 65 |
+| J | | 1 | 0 | 0 | 1.00 | 2 | 1 | 0.26 | 0 |
+| K | | 3 | 1 | 0 | 0.50 | 1 | 0 | 0.34 | 20 |
+| L | | 2 | 0 | 1 | 1.00 | 2 | 1 | 0.26 | 0 |
+| M | | 2 | 0 | 1 | 1.00 | 2 | 1 | 0.26 | 0 |
+| N | | 3 | 1 | 1 | 0.67 | 1 | 0 | 0.34 | 34 |
+| O | | 3 | 0 | 0 | 0.50 | 2 | 1 | 0.40 | 63 |
+| P | | 1 | 0 | 0 | 1.00 | 3 | 0 | 0.29 | 0 |
+| Q | | 3 | 0 | 0 | 0.50 | 3 | 0 | 0.31 | 35 |
+| R | | 1 | 0 | 0 | 1.00 | 4 | 0 | 0.24 | 0 |
+| S | | 1 | 0 | 0 | 1.00 | 4 | 0 | 0.24 | 0 |
+| T | | 1 | 0 | 0 | 1.00 | 2 | 1 | 0.34 | 0 |
+
+### Reading the table
+
+**The label-reading columns describe exposure.** D, E and F have two
+fraudulent neighbours each, from their shared triangle. But the row with
+the most fraudulent neighbours, three, and the most two-step walks to
+fraud, five, is G, which is not known as fraud. And I, which is, has
+no fraudulent neighbour at all. A tree split on "fraudulent neighbours
+$\geq 2$" catches D, E, F and G, and misses I.
+
+**The structural columns describe position.** I's row is distinguished
+by its betweenness (65, second only to A) and its closeness (0.45), and
+those columns do not read labels. They also rank A and O above I,
+so they are not a fraud signal by themselves either.
+
+With four positive rows, a random forest learns nothing reliable from this
+table; the toy exists to make each column computable by hand. On a real graph with thousands of labelled
+fraudsters it can learn which combinations of exposure and position go
+with fraud in that graph, at a cost that rises from one pass over the
+edges (degree, link counts, walk counts, aggregates) to one search per
+node (closeness, betweenness). What it cannot learn is anything beyond the
+reach of its columns: the one-hop columns see one hop, the aggregates as
+many hops as rounds were run, and none of them sees the ring that D, E
+and F form as a group.
+
+<KeyFact>
+A node next to fraud looks like fraud in every label-reading column. G is
+either the next fraudster or the next victim, and no column of the table
+can tell which; the investigator who calls G can.
+</KeyFact>
+
+<Conclusion>
+You can now check whether fraud clusters in a labelled graph. The
+cross-edge test compares the cross-labelled edges with the $2lf$ that
+independent labels give, and sees only the heterophilicity $H$; the
+dyadicity $D$ adds the fraud–fraud side. A fraudulent neighbour is
+evidence of fraud when $D(n_1 - 1) > H n_1$, in effect when $D > H$:
+homophily all but assures it, inverse homophily rules it out. You can say
+why the column misleads on an auction graph and works on an accounting
+graph.
+You can compute, for any node, its degree split by label, its egonet's
+triangles and density, its walk counts to fraud from powers of the
+adjacency matrix, its distance to the nearest fraud, its closeness and its
+betweenness, and add recursive aggregates and an egonet-law score; and you
+know what each column tells a classifier and where it misleads: density at
+small degree, the walk count through a node's own label, the maximum
+through the size of the neighbourhood.
+
+Every one of these columns describes one node. A fraud ring is a group,
+and the next problem is to cut a graph of tens of thousands of users
+into groups so that the few containing a known fraudster are where the
+investigators look: <Ref lesson="communities-and-components">communities
+and connected components</Ref>.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+For nodes A, K and N of the toy, compute the degree split by label,
+the triangles classified by alter label, the egonet density, and the
+number of two-step walks that end on a fraudulent node. Check each against
+the table.
+
+<Solution>
+**A.** Neighbours B, G, H, I, O, T: degree 6, fraudulent 1
+(I), legitimate 5. The only edge among them is G–I, so one
+triangle, A–G–I, with one fraudulent alter: semi-fraudulent. Egonet:
+7 nodes, $6 + 1 = 7$ edges, density $14/42 = 0.33$. Two-step walks to
+fraud: through B to D (1), through G to D, F, I (3), through
+H, I, O, T to no fraudulent node: 4.
+
+**K.** Neighbours H, I, J: degree 3, fraudulent 1, legitimate 2. No
+edge among them: no triangle, density $2 \times 3/(4 \times 3) = 0.5$.
+Two-step walks: H's neighbours are A and K, I's are A, G, K,
+N, J's is K; none is fraudulent, so 0, although K touches I
+directly.
+
+**N.** Neighbours I, L, M: degree 3, fraudulent 1, legitimate 2. The
+edge L–M closes the triangle N–L–M, both alters legitimate:
+legitimate triangle. Egonet: 4 nodes, 4 edges, density $8/12 = 0.67$.
+Two-step walks to fraud: 0, for the same reason as K.
+</Solution>
+</Exercise>
+
+<Exercise>
+(a) Show that the number of triangles through a node $v$ is
+$(A^3)_{vv}/2$, and check it for G on the toy, where $(A^3)_{GG} = 4$.
+(b) The cross-edge test expects a fraction $2lf$ of cross-labelled edges;
+$H$ expects $E[m_{10}]/M$. Show that
+$E[m_{10}]/M = 2 n_1 (N - n_1)/(N(N-1))$, compute both for the twelve
+users, and explain where the difference comes from.
+
+<Solution>
+**(a)** By the proposition, $(A^3)_{vv}$ counts walks of length 3 from $v$
+back to $v$: $v$–$a$–$b$–$v$ with $a$, $b$ neighbours of $v$ joined to each
+other. $a \neq v$ and $b \neq v$ because there are no self-loops, and
+$a \neq b$ for the same reason, so every such walk goes round a triangle.
+Each triangle $\{v, a, b\}$ gives exactly two walks, one in each
+direction: $v$–$a$–$b$–$v$ and $v$–$b$–$a$–$v$. Hence triangles $=
+(A^3)_{vv}/2$. For G: $4/2 = 2$, the triangles G–D–F and
+G–A–I.
+
+**(b)** $E[m_{10}] = n_1(N - n_1)p$ with $p = 2M/(N(N-1))$, so
+$E[m_{10}]/M = 2n_1(N - n_1)/(N(N-1))$. Twelve users: $2 \times 4 \times 8
+/(12 \times 11) = 0.485$, an expectation of $6.79$ edges, against
+$2lf = 2 \times \tfrac{8}{12} \times \tfrac{4}{12} = 0.444$ and $6.22$
+edges. The ratio is $N/(N-1)$. The $2lf$ model draws each end's label
+independently, as if with replacement, so it allows both ends of an edge
+to be the same fraudulent node; the pair count draws two distinct nodes,
+and once one end is a fraudster, a fraudster is slightly less likely at
+the other end. The relative difference is $N/(N-1) - 1 = 1/(N-1)$: here
+$1/11$, about 9%, which is $0.04$ per edge and $0.57$ of an edge over all
+fourteen. On a graph of ten thousand nodes it is a hundredth of a percent.
+</Solution>
+</Exercise>
+
+<Exercise>
+In a graph of accounts joined by transfers, one account $h$ has paid
+fifteen others and there are no other edges. Five of the fifteen are known
+mule accounts, ten are not known as fraud, and neither is $h$. (a) Compute
+$m_{11}$, $m_{10}$, $D$, $H$ and the cross-edge test. (b) Compute the
+fraudulent degree and betweenness of $h$ and of each mule. (c) Which
+columns point at $h$, which at the mules, and what does the homophily check
+say about using neighbour labels to find the next mule? What could $h$
+be?
+
+<Solution>
+**(a)** $N = 16$, $M = 15$, $n_1 = 5$. No two fraudsters are joined:
+$m_{11} = 0$. The five fraudster–hub edges are cross-labelled: $m_{10} =
+5$. Connectance $p = 30/240 = 0.125$; $E[m_{11}] = 10 \times 0.125 =
+1.25$, so $D = 0$; $E[m_{10}] = 5 \times 11 \times 0.125 = 6.88$, so
+$H = 0.73$. Cross-edge test: $\hat r = 5/15 = 0.333$ against $2lf = 2
+\times \tfrac{5}{16} \times \tfrac{11}{16} = 0.430$, standard error
+$\sqrt{0.430 \times 0.570/15} = 0.128$, $z = -0.75$, p-value 0.23: $H_0$
+stands.
+
+**(b)** $h$ has fraudulent degree 5 and betweenness
+$\binom{15}{2} = 105$, since every pair of leaves is joined only through
+it. Each mule has degree 1, fraudulent degree 0 and betweenness 0.
+
+**(c)** Both columns point at $h$ and neither at the mules. $D = 0$: no
+mule is joined to another, so a mule's neighbours carry no fraud, and
+$D(n_1 - 1) = 0$ against $H n_1 = 3.6$; no neighbour-label column can
+single out the next mule. $H = 0.73$ makes the
+graph heterophobic, but too weakly for fifteen edges to show; the graph is
+anti-dyadic, so not homophilic, and a propagation from the five known
+mules reaches the ten other payees only through $h$, all ten alike. What
+the columns do find is $h$: an account that has paid five confirmed mules
+among fifteen payees is either the controller who recruits and pays them
+or an honest payer the mules also deal with, such as a casual-work
+employer. Like G on the toy, the columns cannot say which. The homophily
+check asks whether a node's label predicts its neighbours' labels; a
+column can still say something about a node with a different role.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "A node with more fraudulent neighbours is always more
+suspicious." Use this auction graph: known fraudster $F_1$, a fraudster
+$F_2$ not yet detected, accomplices $C_1$, $C_2$, honest users $U_1$ to
+$U_4$; edges $F_1C_1$, $F_1C_2$, $F_2C_1$, $F_2C_2$, $C_1U_1$, $C_1U_2$,
+$C_2U_3$, $C_2U_4$, $U_1U_2$, $U_3U_4$, $F_2U_4$. (a) Rank the unlabelled
+nodes by fraudulent degree. (b) Compute $D$ and $H$ with the true labels,
+fraudsters against everyone else. (c) Find a column that ranks $F_2$
+first, and name which column's sign flips.
+
+<Solution>
+**(a)** Only $F_1$ is known. Fraudulent degree: $C_1$ 1, $C_2$ 1, every
+other node 0, including $F_2$, whose neighbours are $C_1$, $C_2$, $U_4$.
+The column ranks the two accomplices first and puts $F_2$ in a tie with
+the honest users.
+
+**(b)** $N = 8$, $M = 11$, $n_1 = 2$ ($F_1$, $F_2$), $p = 22/56 = 0.393$.
+$m_{11} = 0$ against $E[m_{11}] = 0.39$: $D = 0$. $m_{10} = 5$ ($F_1C_1$,
+$F_1C_2$, $F_2C_1$, $F_2C_2$, $F_2U_4$) against $E[m_{10}] = 2 \times 6
+\times 0.393 = 4.71$: $H = 1.06$. Anti-dyadic and heterophilic: inverse
+homophily.
+
+**(c)** Count two-step walks to $F_1$, $(A^2)_{vF_1}$, the number of
+neighbours $v$ shares with $F_1$, whose neighbours are $C_1$ and $C_2$.
+$F_2$ shares both: 2. $U_1$ and $U_2$ share $C_1$, $U_3$ and $U_4$ share
+$C_2$: 1 each. $C_1$ and $C_2$ share nothing with $F_1$: 0. $F_2$ is first.
+The fraudulent degree, which on a homophilic graph rises with the chance
+of being a fraudster, here is zero for the fraudster and positive for the
+accomplices: its sign flips. The claim fails at "always": it assumes
+$D(n_1 - 1) > H n_1$, that fraudsters have more fraudulent neighbours than
+everyone else. Here $D = 0$ and $H = 1.06$: the fraudsters average 0
+fraudulent neighbours, the other six nodes $5/6 = 0.83$. The auction's
+reputation scheme makes fraudsters trade through intermediaries, so the
+evidence sits two steps away. The
+accomplices that the first column did find are part of the scheme too, but
+they are not the accounts that cheat buyers.
+</Solution>
+</Exercise>
+
+<Exercise>
+On the Elliptic graph, the published aggregates include the maximum of
+each local feature over a transaction's neighbours. Design a check, runnable
+on the released files, of whether the maximum aggregate depends on the
+number of neighbours for reasons that have nothing to do with fraud. State
+the result you expect from the curve in the chapter, what would count as
+agreement, and a corrected column. Then describe how to use the same idea
+(shuffle and recompute) to test homophily without assuming independent
+edges.
+
+<Solution>
+**Design.** Take the licit-labelled transactions only, so that fraud
+cannot drive the result. For one local feature, standardise it over all
+transactions, and for each licit transaction compute the maximum of the
+standardised feature over its neighbours (recomputed from the edge list,
+which also checks the published column). Group transactions by neighbour
+count, 1, 2–3, 4–10, 11–30, 31–100, above 100, and report the median
+maximum per group.
+
+**Expected.** If neighbours' values behaved like independent draws, the
+medians would rise like the expected maximum of the figure: about 0 for
+one neighbour, 0.85 for three, 1.5 for ten, 2.5 for a hundred. Real
+features are skewed and correlated between neighbours, so the levels will
+differ; agreement means a median that rises steadily with the neighbour
+count among licit transactions. A flat median would mean the
+size effect is negligible for that feature.
+
+**Correction.** Replace the maximum by its position against what $k$
+ordinary neighbours give: subtract the median maximum of licit nodes with
+the same neighbour count, or use the share of neighbours above a fixed
+high quantile, which does not grow with $k$. Keep the neighbour count as
+its own column.
+
+**Shuffle test for homophily.** Keep the edges fixed, permute the labels
+over the nodes (the same number of fraudsters, placed at random) a few
+thousand times, and count cross-labelled edges each time. The p-value is
+the share of permutations with as few cross edges as observed. High-degree
+nodes are then handled correctly, because each permutation moves a node's
+label together with all of its edges.
+</Solution>
+</Exercise>
+
+<Exercise>
+On the toy, treat D, E, F and I as known fraud and every other node
+as unknown. (a) For each unknown node, compute the share of its neighbours
+that are fraudulent. (b) Recompute every unknown node's score as the mean
+over its neighbours of: 1 for a known fraudulent neighbour, and the
+neighbour's score from (a) for an unknown one. Report G, A, B, H
+and O after each round, and say what changed and why. (c) What would
+repeating (b) many times do?
+
+<Solution>
+**(a)** G $3/4 = 0.75$; B, K, N $1/3 = 0.33$; A $1/6 = 0.17$;
+every other unknown node 0.
+
+**(b)** G: neighbours A (0.17), D, F, I (1 each):
+$(0.17 + 3)/4 = 0.79$. A: neighbours B 0.33, G 0.75, H 0, I 1,
+O 0, T 0: $2.08/6 = 0.35$. B: A 0.17, C 0, D 1: $0.39$. H:
+A 0.17, K 0.33: $0.25$. O: A 0.17, P 0, Q 0: $0.06$.
+H and O, zero after one round, now carry suspicion from two steps
+away, and A doubles because its neighbour G is itself suspect. After
+round 2 the unknown nodes rank G (0.79), B (0.39), A (0.35), then
+C, J, K and N tied at 0.33 (C and J inherit it from B and
+K), then H (0.25).
+
+**(c)** Each round lets suspicion travel one step further, and the scores
+of nodes far from any fraud rise from zero; without something to anchor
+them, the scores drift toward one common value across a connected graph.
+Round (a) is the relational neighbour classifier, round (b) its
+probabilistic form, and making the repetition converge to something
+useful, by restarting the walk at the known fraud, is the random walk with
+restart of <Ref lesson="guilt-by-association">guilt by
+association</Ref>.
+</Solution>
+</Exercise>
+
+<Exercise>
+Use the toy's labels to score two rankings of all twenty nodes, one by
+fraudulent degree and one by betweenness, with the <Ref
+lesson="alert-budget-metrics" id="what-the-team-sees-at-each-fraud">tie
+convention of average precision</Ref>: a block of tied scores is one cut,
+and every fraud inside it is reached at the precision of the block's end.
+(a) Compute AP for each ranking and compare it with the floor. (b) The
+fraudulent-degree ranking reads labels that are also the ones being
+predicted. Is its AP an honest estimate of how it would rank a ring the
+bank has not yet found?
+
+<Solution>
+**(a)** There are $m = 4$ frauds among $n = 20$ nodes, a floor of
+$m/n = 0.2$.
+
+*Fraudulent degree.* G (3) at rank 1; D, E, F (2) tied in ranks
+2–4; A, B, K, N (1) in ranks 5–8; twelve nodes with 0, I among
+them, in ranks 9–20. The block 2–4 reaches three frauds at precision
+$3/4$; the last block reaches I at $4/20$. AP $= (3 \times 0.75 + 0.2)/4
+= 0.61$.
+
+*Betweenness.* A 104, I 65, O 63, G 35.3, Q 35, N 34, B
+24.7, K 20, D 13.8, H 9, F 6.2, then nine nodes with 0, E among
+them. I at rank 2 (precision $1/2$), D at 9 ($2/9$), F at 11
+($3/11$), E in the block ending at 20 ($4/20$). AP $= (0.5 + 0.222 +
+0.273 + 0.2)/4 = 0.30$.
+
+Fraudulent degree reaches three times the floor; betweenness reaches one
+and a half times it.
+
+**(b)** No. Each of D, E and F scores 2 because the other two are
+known fraud. The score is honest for "one member of a known ring has not
+yet been labelled", since hiding D's own label leaves its count at 2.
+It is not honest for a ring discovered all at once: if D, E and F
+were all unknown, each would have fraudulent degree 0, and the ranking
+would hold one fraud, I, in its zero block. The evaluation has to hide
+the labels the way the bank's knowledge actually grows, for instance by
+masking the labels that arrived after each node's prediction date, the
+point-in-time rule applied to the graph.
+</Solution>
+</Exercise>
+
+<References>
+1. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015 — Ch. 5, "Social Network Analysis for Fraud Detection": pp. 222–227 (is fraud a social phenomenon: the cross-labelled edge fraction $2lf$ and its one-tailed test; dyadicity and heterophilicity with the connectance $p = 2M/(N(N-1))$; the printed dyadicity formula omits the expectation in its denominator, and the 12-node example's p-value is not the one a standard one-proportion z-test gives, so this chapter uses its own worked cases), pp. 227–238 (neighbourhood metrics: degree by label, triangles by alter label, egonet density; the 20-node sample network, Fig. 5.13, from whose degree, triangle, density, closeness and betweenness tables the chapter's toy was reconstructed; mode, count and binary link features for relational logistic regression), pp. 238–246 (centrality: geodesic paths and Dijkstra's algorithm, the graph-theoretic centre, connecting paths by matrix powers with a 4-node example, closeness with unreachable nodes excluded, betweenness between communities), pp. 254–257 (Table 5.13, the featurisation of the 20-node network).
+2. L. Akoglu, H. Tong, D. Koutra, "Graph-Based Anomaly Detection and Description: A Survey," *Data Mining and Knowledge Discovery* 29(3), 2015 — Sec. 2.1.1 (feature-based methods: node, dyad, egonet and group features; egonet features studied in pairs against power laws, with a node's distance from the law as its score; recursive features as mean, minimum and maximum over neighbours, with correlated features pruned), Sec. 5.2 (auction fraud: fraudsters, accomplices and honest users, and the heterophily among neighbouring labels), Sec. 5.3 (accounting fraud: homophily of neighbouring labels). https://arxiv.org/abs/1404.4679
+3. M. Weber, G. Domeniconi, J. Chen, D. K. I. Weidele, C. Bellei, T. Robinson, C. E. Leiserson, "Anti-Money Laundering in Bitcoin: Experimenting with Graph Convolutional Networks for Financial Forensics," *KDD Workshop on Anomaly Detection in Finance*, 2019 — Sec. 2.1.2 (94 local and 72 aggregated features: maximum, minimum, standard deviation and correlation coefficients of neighbouring transactions' local features, one hop backward and forward), Sec. 2.2 (heterogeneous neighbourhood sizes; aggregation carries a loss of information). https://arxiv.org/abs/1908.02591
+4. B. Sanchez-Lengeling, E. Reif, A. Pearce, A. Wiltschko, "A Gentle Introduction to Graph Neural Networks," *Distill*, 2021 — section "Graph convolutions as matrix multiplications, and matrix multiplications as walks on a graph" ($(A^2)_{ij}$ counts walks of length 2; the same holds for $A^k$). https://distill.pub/2021/gnn-intro/
+</References>

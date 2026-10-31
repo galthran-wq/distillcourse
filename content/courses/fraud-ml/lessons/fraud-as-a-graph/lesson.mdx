@@ -1,0 +1,921 @@
+Eight rows of a transfer table look ordinary one at a time; drawn as accounts and arrows, they show money leaving A, passing through C and D and returning to A. Fraud is organised, and a per-row feature cannot see the organisation. How do you turn a transaction log into a graph, what should be a node and an edge, what do shared cards, devices and addresses add, and which shapes in the graph are the laundering patterns investigators look for?
+
+Every score in the course so far judged one row. The features were the
+row's own fields plus <Ref lesson="transaction-aggregates">windows over one
+entity's past</Ref>: how often this card paid in the last day, how much this
+terminal took in the last week. The anomaly scores of the last module went
+further in one direction only, asking how far a payment sits from the
+others, and the ULB file they ran on had <Ref lesson="ulb-unsupervised-scores">no
+cards, accounts or merchants at all</Ref>.
+
+Here are the eight rows. Read row 4 alone: account C pays account D €1,300
+on 20 May, which looks like a business paying a supplier. A history feature for C
+would say it received three transfers in May and sent one, an unremarkable
+month for a small firm. What makes rows 1, 4 and 6 suspicious is that the
+money C sent on came from A and ended up back at A five weeks later, minus a
+cut at each hop. That fact belongs to no single account's history: it is a
+property of three accounts together.
+
+| # | date | from | to | amount (€) |
+|---|---|---|---|---|
+| 1 | 2 May | A | C | 1,400 |
+| 2 | 9 May | B | C | 700 |
+| 3 | 12 May | E | C | 950 |
+| 4 | 20 May | C | D | 1,300 |
+| 5 | 27 May | E | D | 2,300 |
+| 6 | 4 Jun | D | A | 1,200 |
+| 7 | 11 Jun | B | E | 650 |
+| 8 | 19 Jun | E | D | 2,500 |
+
+The obvious repair is more history features: count, for each account, the
+transfers in and out over a month. Those counts see that C collects from
+three senders. They cannot see where the money goes after it leaves C,
+because following it means joining the table to itself once per hop, and the
+number of hops is not known in advance. The <Ref
+lesson="financial-crime-typology" id="why-a-single-transaction-tells-nothing">typology</Ref>
+already placed laundering at the level of the pattern, not the transaction.
+What is missing is an object in which a pattern can be looked for directly.
+
+## Eight rows, one cycle: the transfer log as a directed multigraph
+
+The rows already say who paid whom. The question is what to draw so that
+"who paid whom, and then whom did they pay" becomes something you can read
+off rather than compute with joins.
+
+### Each row is an edge
+
+Make every account a point, and every row an arrow from the payer to the
+payee. Nothing is thrown away: the arrow carries the row's date and amount,
+and the table can be rebuilt from the drawing.
+
+<FigureSequence
+  name="eight-rows"
+  alt="Three frames. Frame 1: the eight-row transfer table beside an empty panel. Frame 2: the same rows drawn as five accounts A to E with eight numbered arrows; E has two arrows to D. Frame 3: rows 1, 4 and 6 and the arrows A to C, C to D and D to A highlighted in amber, with the note 2 May to 4 June, 1,400 out, 1,200 back"
+  caption="The same eight rows as a table and as a graph. The cycle is three rows apart in the table and one closed loop in the drawing."
+/>
+
+<Task>
+Step through the three frames. In frame 2, before looking at frame 3, find
+a path of arrows that starts and ends at the same account and whose dates
+increase along the way. Then check whether B → C → D → A is also such a
+path, and why it is not a cycle.
+</Task>
+
+<Definition title="transaction graph">
+A *graph* $G = (V, E)$ is a set $V$ of nodes and a set $E$ of edges, each
+edge joining two nodes. In the *transaction graph* of a transfer log the
+nodes are accounts and each transfer is a *directed* edge from the payer's
+account to the payee's, carrying the transfer's timestamp and amount. Two
+accounts that transfer money more than once are joined by several parallel
+edges, so the transaction graph is a *directed multigraph*.
+</Definition>
+
+Rows 5 and 8 show why parallel edges stay separate: E paid D twice, on 27
+May and 19 June, for different amounts. Merging them into one arrow labelled
+€4,800 would keep the volume and lose the order, and the order is what the
+next step needs. A laundering label belongs to a transfer, so in this
+graph it sits on an edge; the card fraud label below does too.
+
+### Money that returns: a cycle in time order
+
+A *cycle* is a path of edges that starts and ends at the same node and
+visits no other node twice. Rows 1, 4 and 6 form one, and two more things
+make it look like money going round rather than three unrelated payments:
+the dates increase along it (2 May, 20 May, 4 June), so each hop could have
+paid out what the previous one paid in; and the amounts shrink by about the
+size of a fee (1,400, 1,300, 1,200). A loop whose dates ran backwards could
+not be the same money travelling.
+
+B → C → D → A, the path the Task asked about, is a path in time order too,
+but it ends at A, not at B, so it carries B's money away and never back.
+Whether that is suspicious depends on what B is; the drawing only makes the
+question askable.
+
+<KeyFact>
+A self-join has to be told how many hops to follow before it runs, so "does
+money leaving A come back to A?" becomes one query per guessed cycle length.
+A walk along the arrows needs no such number: it stops when it is back at A
+or out of arrows, however many hops that takes.
+</KeyFact>
+
+## Card payments: a graph with two kinds of node
+
+A card payment also joins two parties, a cardholder and a merchant, so the
+same move applies. The difference is that the two ends are never the same
+kind of thing: a cardholder does not pay another cardholder by card, and a
+merchant does not pay a merchant.
+
+### Cardholders, merchants, and no edge between two of a kind
+
+You have already built one feature that reads across this link. The <Ref
+lesson="point-in-time-features" id="a-feature-built-from-labels-what-the-bank-knew-that-morning">delayed
+terminal risk</Ref> scores a payment by the share of the terminal's other
+payments that turned out to be fraud: it looks from the payment to its
+merchant, and from the merchant to that merchant's other customers. A graph
+lets the look go one step further, from those customers to the other
+merchants they paid. That is the link the <Ref
+lesson="financial-crime-typology" id="card-present-card-not-present">typology</Ref>
+pointed to for card-not-present fraud, where numbers stolen in bulk from one
+merchant's database are spent on thousands of cards whose only common point
+is that merchant.
+
+<Definition title="bipartite graph">
+A graph is *bipartite* if its nodes split into two sets $V_1$ and $V_2$
+such that every edge joins a node of $V_1$ to a node of $V_2$:
+$E \subseteq V_1 \times V_2$. In the card graph $V_1$ holds the
+cardholders, $V_2$ the merchants, and each payment is an edge between its
+cardholder and its merchant.
+</Definition>
+
+"Bipartite" does not mean that the graph falls into two halves. A card
+graph is usually one connected graph; what makes it bipartite is only that
+no edge joins two cardholders or two merchants.
+Two cardholders are related only through a merchant they both used, two
+steps away. The edges are undirected: money always flows from cardholder to
+merchant, so a direction would carry no information.
+
+The toy below has three cardholders $c_1, c_2, c_3$, three merchants
+$m_1, m_2, m_3$ and five payments $p_1, \dots, p_5$, of which $p_1$, by
+$c_1$ at $m_1$, was later confirmed as fraud. The number on each edge is a
+weight that the next section derives from the payment's age; for now, read
+it as "how recent".
+
+<Figure
+  src="./figures/tripartite.svg"
+  alt="Left: a bipartite graph, cardholders c1 to c3 on the left, merchants m1 to m3 on the right, five weighted edges, the edge c1–m1 with weight 0.97 in amber as the fraudulent payment. Right: the same payments drawn as five boxes p1 to p5 between the cardholders and merchants, each box joined to one cardholder and one merchant, p1 in amber"
+  caption="The toy card graph two ways. On the left the fraud label sits on an edge; on the right each payment is a node with exactly one cardholder and one merchant."
+/>
+
+### Matrix or list: what the graph costs to store
+
+To compute on a graph you write it down in one of two ways. The *weight
+matrix* has a row and a column for every node, and the cell $(i, j)$ holds
+the weight of the edge between $i$ and $j$, or 0 if there is none; with
+weights all equal to 1 it is the *adjacency matrix*. The *weight list* has
+one line per edge: from, to, weight.
+
+<Figure
+  src="./figures/adjacency.svg"
+  alt="Left: a 6 by 6 weight matrix for nodes c1 to c3 and m1 to m3, with the five weights 0.97, 0.59, 0.91, 0.17 and 0.70 each appearing twice and the other 26 cells zero. Right: a weight list of five lines, from, to and weight"
+  caption="The toy as a weight matrix and as a weight list. The matrix is symmetric because the edges are undirected, and its two cardholder–cardholder and merchant–merchant blocks are zero because the graph is bipartite."
+/>
+
+Even at six nodes most of the matrix is zero, and the zeros grow with the
+square of the node count. Take a bank with a million cardholders, a hundred
+thousand merchants and a million payments a day. The full matrix has about
+$1.2 \times 10^{12}$ cells; a month of payments is about thirty million
+lines of list. So the list, or a sparse-matrix format that stores only the
+non-zero cells and is a list in disguise, is what runs. The matrix is what
+the mathematics is written in, because the operations of the coming lessons,
+such as "add up the weights of a node's neighbours", are products of the
+matrix with a vector, and a sparse product touches only the stored cells.
+
+For a bipartite graph the matrix has a fixed shape. Order the nodes with
+all cardholders first; write $W$ for the $n_c \times n_m$ block of
+cardholder–merchant weights, with $n_c$ cardholders and $n_m$ merchants.
+Then the full matrix is
+
+$$
+\begin{pmatrix} 0 & W \\ W^\top & 0 \end{pmatrix},
+$$
+
+and $W$ alone, the upper-right $3 \times 3$ block of the toy's matrix,
+holds all the information.
+
+## Time on the edges: weights that fade
+
+A payment made three years ago at a merchant says almost nothing about a
+cardholder today; one made this morning at a merchant that was used by a
+stolen card an hour later says a lot. In a graph where every payment ever
+made is an edge of weight 1, the two count the same, and a merchant
+compromised in 2019 stays linked to every card it ever served.
+
+### Choosing the decay from a horizon
+
+The fix is to let an edge's weight fall with its age. With $h$ the time
+elapsed since the payment, measured at the moment the graph is used, set
+
+$$
+w = e^{-\gamma h},
+$$
+
+with $\gamma > 0$ the *decay constant*. A fresh payment has weight 1, and
+every further $\ln 2 / \gamma$ hours halves it. The constant is a design
+choice with units: $\gamma$ is "per hour" when $h$ is in hours, and the
+same number per minute or per day describes a different graph. The useful
+way to choose it is from a horizon $H$, the age after which a payment
+should hardly count. Asking for weight $\varepsilon$ at age $H$ gives
+$e^{-\gamma H} = \varepsilon$, so
+
+$$
+\gamma = \frac{\ln(1/\varepsilon)}{H}.
+$$
+
+<Example title="the week graph">
+Take $H = 168$ hours (a week) and let "hardly count" mean $\varepsilon = 0.05$,
+one twentieth. Then $\gamma = \ln 20 / 168 = 3.00/168 \approx 0.0178$ per
+hour, and the weight halves every $\ln 2 / 0.0178 \approx 39$ hours.
+
+Score the toy at the moment it is drawn. Payment $p_1$ is 2 hours old, so
+$w = e^{-0.0178 \times 2} = e^{-0.036} \approx 0.97$. The others: $p_2$ at
+30 hours, $e^{-0.53} \approx 0.59$; $p_3$ at 5 hours, $0.91$; $p_4$ at
+100 hours, $e^{-1.78} \approx 0.17$; $p_5$ at 20 hours, $0.70$. These are
+the weights on the edges of the toy.
+</Example>
+
+<Figure
+  src="./figures/decay.svg"
+  alt="Weight against payment age on a log axis from 1 hour to about 3 months, three falling curves: blue for the day horizon, amber for the week horizon, dark for the month horizon. Each curve has a dot at weight 0.5 and a dot at weight 0.05, the latter at 1 day, 1 week and 1 month respectively; the amber half-weight dot is labelled 39 h"
+  caption="Three horizons, three decay constants. Each curve reaches 0.05 at its horizon and half weight at 23% of it."
+/>
+
+No single horizon is right, because frauds move at different speeds: card
+testing runs over minutes, a compromised terminal over weeks. So the graph
+is built several times over the same payments, once per horizon, typically
+a day, a week and a month, and each version yields its own features. The
+cost of the decay is that a payment's weight depends on when you look, so
+the graph is rebuilt on a schedule, and payments whose weight has fallen
+below a floor are dropped, which also keeps the list from growing forever.
+
+<Exercise>
+Redo the example for the day horizon ($H = 24$ hours, $\varepsilon = 0.05$):
+find $\gamma$, then the five weights of the toy. Which edges survive with a
+weight above 0.05, and which two cardholders does the day graph still link?
+
+<Solution>
+$\gamma = \ln 20 / 24 = 3.00/24 \approx 0.125$ per hour, half-life
+$\ln 2/0.125 \approx 5.5$ hours. Weights: $p_1$ (2 h) $e^{-0.25} \approx 0.78$;
+$p_2$ (30 h) $e^{-3.75} \approx 0.02$; $p_3$ (5 h) $e^{-0.625} \approx 0.54$;
+$p_4$ (100 h) $e^{-12.5} \approx 4 \times 10^{-6}$; $p_5$ (20 h)
+$e^{-2.5} \approx 0.08$.
+
+Above 0.05: $p_1$, $p_3$ and, barely, $p_5$. The day graph links $c_1$ and
+$c_2$ through $m_1$ by two recent edges, and that is the link that matters
+for the fraud on $p_1$: $c_2$ paid at the same merchant three hours before
+the stolen card did. $c_3$ hangs on by a weak edge to $m_3$, and $m_3$ no
+longer connects it to $c_2$, because $p_4$ is four days old. The week graph
+of the example keeps all five edges; the horizon decides which cardholders
+count as neighbours.
+</Solution>
+</Exercise>
+
+### Several payments between the same pair
+
+A cardholder who pays at the same café every morning has many payments
+with one merchant. The transfer graph kept such repeats as parallel edges
+because their order mattered; here two things change. The weight matrix
+has one cell per cardholder–merchant pair, so the pair's payments have to
+be combined into one number to be stored in it at all. And the decay has
+already put each payment's recency into its weight, so combining them loses
+less than merging the transfers would have. The bipartite graph therefore
+keeps one edge per pair and adds the weights: $W_{ij} = \sum_k
+e^{-\gamma h_k}$ over the pair's payments $k$. A recent payment adds nearly
+1 and one older than the horizon nearly nothing. That sum is a recency-weighted count, the frequency of the <Ref
+lesson="transaction-aggregates" id="summarising-a-cards-past-recency-frequency-monetary">recency,
+frequency, monetary summaries</Ref> attached to a pair instead of to one
+entity. The rule of every history feature holds here too: the graph used
+to score a payment at time $t$ contains only payments made before $t$.
+
+## Where the label sits: promoting payments to nodes
+
+The fraud label belongs to a payment, which is an edge. For one hop that
+is no obstacle: the delayed terminal risk stands at a merchant and counts
+the labelled edges that touch it. The trouble starts when suspicion should
+travel further, from $p_1$ to $m_1$, from $m_1$ to $c_2$, who paid there
+too, and from $c_2$ to the other merchants $c_2$ paid. Each of those steps
+is, as the matrix section said, a product of the matrix with a vector, and
+the vector has one entry per node: how suspect each cardholder and each
+merchant is at that step. "Payment $p_1$ was fraud" has no entry in that
+vector, so it cannot be where the spreading starts. The walks of <Ref
+lesson="guilt-by-association">a later lesson</Ref> are exactly such
+repeated products.
+
+The obvious move puts the label on an endpoint. Marking $c_1$ fraudulent
+because $p_1$ was gets the victim wrong: the card was stolen, and its other
+payment $p_2$ was the owner's. Marking $m_1$ accuses what may be a perfectly
+honest shop where a stolen number was used once. Each endpoint is only
+partly implicated, and pushing the label onto either one says something the
+bank does not know.
+
+### The tripartite graph
+
+The repair is to make the payment itself a node. Replace each edge
+$c$–$m$ by a new node $p$ and two edges, $c$–$p$ and $p$–$m$, both with the
+old edge's weight. The right half of the toy figure is the result.
+
+<Definition title="tripartite transformation">
+Given a bipartite card graph with cardholders $V_1$, merchants $V_2$ and
+payments as edges, the *tripartite graph* $G = (V_1, V_2, V_3, E)$ has one
+node in $V_3$ per payment and edges
+$E \subseteq (V_1 \times V_3) \cup (V_2 \times V_3)$, such that every
+payment node has exactly one cardholder neighbour and exactly one merchant
+neighbour. Each new edge carries the weight of the payment it came from.
+</Definition>
+
+Write $n_p$ for the number of payments, and $M$ for the
+$(n_c + n_m) \times n_p$ matrix whose row for an entity holds, in the
+column of each of its payments, that payment's weight. No edge joins two
+entities and none joins two payments, so with entities first and payments
+last the full matrix is
+
+$$
+Q_{\text{tri}} = \begin{pmatrix} 0 & M \\ M^\top & 0 \end{pmatrix},
+$$
+
+of size $n_c + n_m + n_p$. It has the block shape of the bipartite matrix,
+because the tripartite graph is itself bipartite: entities on one side,
+payments on the other.
+
+<Example title="the toy's tripartite matrix">
+Order the rows $c_1, c_2, c_3, m_1, m_2, m_3$ and the columns
+$p_1, \dots, p_5$. Payment $p_1$ joins $c_1$ and $m_1$ with weight 0.97, so
+column $p_1$ of $M$ has 0.97 in rows $c_1$ and $m_1$ and zeros elsewhere.
+Column by column:
+
+| | $p_1$ | $p_2$ | $p_3$ | $p_4$ | $p_5$ |
+|---|---|---|---|---|---|
+| $c_1$ | 0.97 | 0.59 | | | |
+| $c_2$ | | | 0.91 | 0.17 | |
+| $c_3$ | | | | | 0.70 |
+| $m_1$ | 0.97 | | 0.91 | | |
+| $m_2$ | | 0.59 | | | |
+| $m_3$ | | | | 0.17 | 0.70 |
+
+Every column has exactly two entries, one in a cardholder row and one in a
+merchant row, which is the definition's condition read off the matrix.
+$Q_{\text{tri}}$ is $11 \times 11$, with $M$ in its upper-right block and
+$M^\top$ in its lower-left.
+</Example>
+
+<Figure
+  src="./figures/q-tri.svg"
+  alt="An 11 by 11 grid with rows and columns c1 to c3, m1 to m3, p1 to p5. The top-left 6 by 6 block and the bottom-right 5 by 5 block are grey and empty; the top-right block M and the bottom-left block M transposed are blue and hold the ten weights; the row and column of p1 and its two entries 0.97 are amber"
+  caption="The toy's tripartite matrix. Only the two blue blocks hold weights, and the fraud label now has a row and a column of its own: p1."
+/>
+
+The label now sits on node $p_1$, and any method that starts from labelled
+nodes can start there. Two prices are paid. Every path between a cardholder
+and a merchant is twice as long, since it now passes through a payment
+node. And the graph has a node per payment, so it is as large as the log
+inside the horizon; the decay of the previous section, which lets old
+payments drop out, is what keeps it bounded.
+
+<KeyFact>
+The tripartite form changes no relation between cardholders and merchants;
+it gives the label its own entry in the vectors a node-based method
+multiplies. Whatever carries the label, a payment, a transfer, a claim, has
+to be a node before suspicion can flow from it more than one hop.
+</KeyFact>
+
+## One person, many accounts: identifiers as nodes
+
+The card graph links people through the merchants they pay. A second kind
+of link matters more for organised fraud. A fraudster who opens ten
+accounts, or buys a hundred stolen card numbers, spreads one operation over
+many nodes, and each of them, young and quiet, looks ordinary. Treating the
+accounts as separate nodes reproduces exactly the view the fraudster wants
+the bank to have.
+
+### What a fraudster has to reuse
+
+The names on the accounts do not help: they are false or borrowed. What
+joins the accounts is whatever is expensive to replace: the phone or laptop
+they log in from, the card numbers they fund the accounts with, the network
+address, the postal address the cards are sent to, the phone number used
+for verification. Each of these is an *identifier*, and the move is to make
+identifiers nodes too.
+
+A peer-to-peer payment service, where users send money to each other, shows
+the shape. Its anonymised data has four kinds of node, User, Card, Device
+and IP, and four kinds of edge: P2P (a transfer from one user to another),
+HAS_CC (a user registered a card), USED (a user logged in from a device) and
+HAS_IP (a user connected from an address). About 33,700 of its roughly
+790,000 nodes are users; more than nine nodes in ten are identifiers. A graph with
+several kinds of node and edge is *heterogeneous*; the bipartite and
+tripartite card graphs are its simplest cases.
+
+<Figure
+  src="./figures/identifiers.svg"
+  alt="Left: a schema with a User node linked by HAS_CC to Card, USED to Device and HAS_IP to IP, and by a P2P arrow to a second User. Right: users U17 and U42, each with its own device, both linked in amber to card 4471, and a dashed amber edge between U17 and U42 labelled added edge: same card"
+  caption="Left, the four kinds of node in a peer-to-peer payment graph. Right, two accounts that share a card become one connected object."
+/>
+
+The same move works far from cards. When a fraudster takes over a phone
+account, the account starts calling numbers its owner never called: the
+fraudster's own family and friends, the same numbers the fraudster's
+previous account called. The contact list is an identifier, and the graph
+of calls links the new account to the old one.
+
+<Aside>
+**Companies that go bankrupt on purpose.** In social-security fraud an
+employer avoids paying contributions by running a company into bankruptcy,
+which discharges its debts, and moving its staff, machinery, address and
+accountant to a newly founded company a few weeks later. The companies
+change; the resources do not. A bipartite graph of companies and the
+resources they use links the new company to the bankrupt one through every
+shared resource, and a web of companies linked in this way, each passing
+its resources on, is called a spider construction.
+</Aside>
+
+### Entity resolution: shared identifiers become edges
+
+Once identifiers are nodes, two users who share one are two steps apart:
+user, card, user. Why add a user–user edge when that path already says
+they share a card? First, a rule can combine conditions no two-step path
+states: "share a card *and* transferred money to each other" joins a fact
+about a card node with a fact about a P2P edge. Second, the operations of
+later lessons, connected components and counts of a user's neighbours, run
+on user–user edges; run through the identifier nodes, they would count
+cards and devices as members of a ring.
+
+<Definition title="entity resolution (in this course)">
+*Entity resolution* is the addition of an edge between two entities, users
+or accounts, whenever they satisfy a rule built from shared identifiers,
+such as "share a card" or "share a card and transferred money to each
+other". Each rule encodes the hypothesis that the two entities are
+controlled by the same person or group.
+</Definition>
+
+The second rule above targets a known scheme. A stolen card is registered on account 1 and used
+to fund it; the money is sent on to account 2; the card's real owner sees
+the charge and disputes it, and the bank reverses it against account 1,
+which by then is empty, because the money left for account 2 before the
+dispute arrived. If accounts 1 and 2 also share that card, one person can
+reach both, and the transfer between them is that scheme's middle step.
+Sharing one identifier can be innocent: a family
+shares a laptop, a couple share a card. Sharing several identifiers at once
+is harder to explain away.
+
+One kind of identifier breaks the idea. A café's Wi-Fi gives the same
+network address to hundreds of customers, and a library computer is used by
+thousands; a rule "same IP" draws an edge between every pair of them and
+merges strangers into one object. How to keep such identifiers from
+swallowing the graph is the subject of <Ref
+lesson="communities-and-components">the lesson on communities and
+components</Ref>; for now it is the reason a graph is not built by adding
+every identifier the log contains.
+
+### Which graph to build
+
+The same data can be drawn in three ways, and each loses something.
+
+| Graph | Nodes | Captures | Loses |
+|---|---|---|---|
+| users only | users; P2P edges | who paid whom | shared cards, devices, addresses |
+| users and identifiers | users, identifiers | shared infrastructure | the transfers |
+| heterogeneous | all of them | both | nothing, at the price of several node and edge types |
+
+The choice follows the question. For "which accounts belong to one
+operator" the identifier graph is the evidence; for "where did the money
+go" only the transfer edges answer; most investigations need both, and drop
+the identifier types, such as IP addresses, that link too many people to
+mean anything.
+
+## The shapes of laundering: eight motifs
+
+With accounts as nodes and transfers as edges, the laundering stages of
+<Ref lesson="financial-crime-typology" id="placement-layering-integration">the
+typology</Ref> leave traces with a geometry: placement collects money,
+layering moves it through intermediaries, integration spends it. The obvious
+detector looks for large transfers, and structuring, splitting a sum below a
+reporting line, was designed to beat it. What survives the splitting is the
+shape: <Ref lesson="financial-crime-typology" id="exercises">the
+structuring diamond</Ref>, one source paying four mules who each pass the
+money to one destination, has small rows and an unmistakable drawing.
+
+### Eight definitions
+
+A *motif* is a small subgraph pattern of money movement. The eight below
+are the shapes AMLworld plants, the <Ref lesson="canonical-datasets"
+id="what-the-world-contains">simulated laundering world</Ref> with complete
+labels, each defined on the directed multigraph with $k \geq 2$:
+
+<Definition title="the eight laundering motifs">
+- **Fan-out**: an account $v$ pays at least $k$ distinct accounts.
+- **Fan-in**: an account $v$ is paid by at least $k$ distinct accounts.
+- **Gather-scatter**: a fan-in and a fan-out at the same account $v$.
+- **Scatter-gather**: a fan-out from $v$ and a fan-in to $u$ whose
+  intermediate accounts are the same set: $v$ pays each intermediate, and
+  each intermediate pays $u$.
+- **Simple cycle**: a path that starts and ends at the same account and
+  visits no other account twice.
+- **Random**: a chain through accounts the same party controls, like a
+  cycle except that the money does not return to its source.
+- **Bipartite**: a set of input accounts pays a set of output accounts.
+- **Stack**: a bipartite motif with a further bipartite layer behind it,
+  so the outputs of the first pay the outputs of the second.
+</Definition>
+
+<Figure
+  src="./figures/motifs.svg"
+  alt="A gallery of eight small directed graphs in two rows: fan-out, fan-in, gather-scatter, scatter-gather; simple cycle, random chain, bipartite, stack. The account where each pattern starts is amber, and each has a one-line definition under it"
+  caption="The eight motifs. The structuring diamond is a scatter-gather; the eight-row example holds a simple cycle."
+/>
+
+Read the eight rows against these definitions. C is a fan-in with $k = 3$
+(A, B and E pay it). E is a fan-out with $k = 2$: it pays C and D, and the
+second payment to D adds an edge but not a distinct payee. B is also a
+fan-out with $k = 2$ (it pays C and E). D is a fan-in with $k = 2$: C pays
+it in row 4 and E in rows 5 and 8, and again the repeat adds no distinct
+payer. Rows 1, 4 and 6 form a simple cycle of length three. Four of the
+five accounts are a fan-in or a fan-out, in eight ordinary-looking rows.
+
+### A shape is evidence only with a clock and an amount
+
+With $k = 2$, almost every account in a bank is a fan-in or a fan-out. An
+employer paying forty salaries is a fan-out; a shop paid by hundreds of
+customers is a fan-in; a household paid by two employers that pays rent,
+groceries and a phone bill is a gather-scatter. The shapes are the vocabulary, not the
+verdict. What separates the laundering version is what happens around the
+shape:
+
+- **Time.** Money passing through is passed on fast. A detector counts a
+  shape only if its edges fall within a window, for instance six hours for
+  a scatter-gather and a day for the others, and only in time order along
+  the path.
+- **Amounts.** An intermediary that forwards nearly all it received, minus
+  a cut, is a conduit; one that receives and spends on unrelated things at
+  unrelated times is a customer.
+- **The accounts.** Intermediaries that are young, have no other activity,
+  or are linked to each other through shared identifiers point to one
+  controller behind the shape.
+
+The window cuts both ways. The cycle in the eight rows took five weeks to
+close; a one-day window never sees it, and a five-week window also sees
+every customer who paid a firm and got a refund. Shape detectors are
+therefore built as features: for each transfer, how many cycles of up to,
+say, ten accounts it closes within the window, whether it is part of a
+scatter-gather, how many distinct accounts its payer paid in the last day.
+They are computed by processing the transfers in time order, so that a
+transfer's features read only earlier transfers, and handed to a classifier
+next to the row's own fields.
+
+<Exercise>
+On the 25th, firm F pays salaries to 40 accounts it has paid every month
+for a year. On the same day account X, opened three weeks ago, receives
+€2,000 to €3,000 from each of six accounts it has never dealt with, all
+within two hours, and within the next hour sends three transfers, totalling
+the six receipts minus 2%, to three accounts abroad. (a) Name the motif at
+F and the motif at X. (b) List the facts beyond the shapes that make X's
+pattern suspicious and F's ordinary, and say for each which feature of a
+detector would record it.
+
+<Solution>
+**(a)** F is a fan-out with $k = 40$. X is a gather-scatter: a fan-in with
+$k = 6$ and a fan-out with $k = 3$ at the same account.
+
+**(b)** *Time*: X's money passes through in about three hours; F's
+salaries are paid from a balance built up over the month. A feature: total
+received in the last six hours against total sent in the same window.
+*Amounts*: X forwards 98% of what it received; F's outflow is unrelated to
+any single inflow. A feature: the ratio of outflow to inflow within the
+window. *History*: F pays the same 40 accounts every month, while X is
+three weeks old and every counterparty is new to it. Features: account age,
+and the share of counterparties never seen before (a <Ref
+lesson="transaction-aggregates">windowed aggregate</Ref> conditioned on the
+counterparty). The shape alone ranks F above X, since 40 payees beat 3; the
+clock, the amounts and the history reverse the order.
+</Solution>
+</Exercise>
+
+### What the shapes miss
+
+Organised laundering produces these shapes, and the shapes still miss most
+of it. In AMLworld, whose labels are complete, only about one laundering
+transaction in five sits in one of the eight shapes; the rest is integration disguised as payroll, supplier
+payments and other ordinary spending, as <Ref lesson="canonical-datasets"
+id="labels-that-follow-the-money">the canonical datasets</Ref> showed. A
+perfect shape detector therefore has recall of about one in five on that
+world, before any false alarm is counted, and the remaining four in five
+have to be found by what the accounts and their neighbours look like.
+
+## What a fraudster cannot fake, and what a graph cannot see
+
+A fraudster can dress each row up: a plausible amount, a usual hour, a
+device that looks like a customer's. If every row can be disguised, why
+should a drawing of the same rows catch anything the rows miss? The graph
+can only win if something about fraud lives between the rows, where the
+disguise does not reach, and that is true for some fraud and not for all.
+
+### Two ways fraud is social
+
+The first way is opportunistic spread, by word of mouth: someone who
+commits a fraud tells acquaintances how, and they try it. The second is
+organisation: a ring needs mules, shell companies, stolen cards and
+devices, and every one of those creates links among its members. Both show
+up as fraud sitting close to fraud in the graph.
+
+### A position in the graph is hard to forge
+
+The graph has a second advantage. A fraudster controls what their own
+accounts look like: the device fingerprint, the login hour, the stated age,
+the amount of each transfer. They cannot see the whole graph of the bank,
+let alone of the payment network, and so cannot shape their position in it
+to look like everyone else's. Laundering imitates legitimate transactions
+as far as it can, and the better the imitation the longer it survives; the
+imitation is easy for a row and hard for a neighbourhood.
+
+Two queries on the peer-to-peer data show what reading a position looks
+like. The first follows paths of five transfers that start and end at known
+fraudulent users; the users in the middle are mostly unflagged, and they
+become the new suspects, since money passed through them on its way between
+two fraudsters. The second asks which flagged users are linked to the same
+card or device; each shared identifier is a candidate for one person behind
+several accounts. Neither query needs a model; both are walks in the graph.
+Neither is yet proof that fraud clusters, either: how often flagged users
+share an identifier means something only against how often unflagged users
+do.
+
+<KeyFact>
+The graph helps exactly where fraud is organised. A lone opportunist with
+one stolen card leaves a single edge and no structure, and the card's own
+history remains the place to find it; a ring leaves links that no member
+can see or remove.
+</KeyFact>
+
+<Conclusion>
+You can now turn a transaction log into a graph and say why each choice is
+made. Transfers become a directed multigraph of accounts, with parallel
+edges kept apart because order matters. Card payments become a bipartite
+graph of cardholders and merchants, stored as a weight list, with weights
+$e^{-\gamma h}$ whose constant is set from a horizon. When the label sits
+on the payment, the payment is promoted to a node, giving the tripartite
+matrix $Q_{\text{tri}}$. Identifiers become nodes, and shared identifiers
+become entity-resolution edges, with the warning that some identifiers link
+everyone. And the eight laundering motifs can be named and read as features
+that need a time window and amounts to mean anything, and that miss most
+laundering by construction.
+
+What is left open is whether fraud actually sits next to fraud in a given
+graph, and what to compute about a node's neighbourhood once it does. <Ref
+lesson="neighbourhood-and-centrality">The next lesson</Ref> tests the first
+with a count of edges between fraudulent and legitimate nodes, and turns the
+second into numbers an ordinary classifier can use.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+A card log within the week horizon ($\gamma = 0.0178$ per hour) has four
+payments: $c_1$ at $m_1$, 12 hours old; $c_1$ at $m_2$, 48 hours old; $c_2$
+at $m_2$, 6 hours old; $c_2$ at $m_2$ again, 72 hours old. Write (a) the
+weight list of the bipartite graph, summing payments of the same pair, (b)
+the $2 \times 2$ block $W$, and (c) the matrix $M$ of the tripartite graph.
+Why does $M$ need no summing?
+
+<Solution>
+Weights: $e^{-0.0178 \times 12} = e^{-0.214} \approx 0.81$;
+$e^{-0.854} \approx 0.43$; $e^{-0.107} \approx 0.90$;
+$e^{-1.28} \approx 0.28$.
+
+**(a)** $(c_1, m_1, 0.81)$, $(c_1, m_2, 0.43)$,
+$(c_2, m_2, 0.90 + 0.28 = 1.18)$.
+
+**(b)** Rows $c_1, c_2$, columns $m_1, m_2$:
+
+$$
+W = \begin{pmatrix} 0.81 & 0.43 \\ 0 & 1.18 \end{pmatrix}.
+$$
+
+**(c)** Rows $c_1, c_2, m_1, m_2$; columns $p_1, \dots, p_4$ in the order
+given:
+
+$$
+M = \begin{pmatrix}
+0.81 & 0.43 & 0 & 0 \\
+0 & 0 & 0.90 & 0.28 \\
+0.81 & 0 & 0 & 0 \\
+0 & 0.43 & 0.90 & 0.28
+\end{pmatrix}.
+$$
+
+Each payment has its own column, so two payments by the same pair are two
+nodes and nothing has to be merged; each column still has exactly two
+non-zero entries. The bipartite graph has one cell per pair, so the pair's
+payments must be combined there, and summing the decayed weights is the
+choice that keeps a recency-weighted count. The tripartite form keeps each
+payment's own weight, at the price of a larger matrix.
+</Solution>
+</Exercise>
+
+<Exercise>
+Let $Q_{\text{tri}} = \begin{pmatrix} 0 & M \\ M^\top & 0 \end{pmatrix}$ as
+in the chapter. (a) Compute $Q_{\text{tri}}^2$ in block form, and show that
+its entity block $MM^\top$ has, for a cardholder $i$ and a merchant $j$,
+the entry $\sum w_p^2$ over the payments $p$ between them, and zero for two
+different cardholders. (b) Show that odd powers of $Q_{\text{tri}}$ have
+zero diagonal blocks and even powers zero off-diagonal blocks, and say what
+that means for a walk that moves along one edge per step.
+
+<Solution>
+**(a)** Block multiplication gives
+
+$$
+Q_{\text{tri}}^2 = \begin{pmatrix} MM^\top & 0 \\ 0 & M^\top M \end{pmatrix}.
+$$
+
+The entry of $MM^\top$ for entities $a$ and $b$ is
+$\sum_p M_{ap} M_{bp}$, a sum over payments that touch both. A payment
+touches exactly one cardholder and one merchant. For a cardholder $i$ and a
+merchant $j$ the sum runs over the payments between them, each contributing
+$w_p \cdot w_p = w_p^2$. For two different cardholders no payment touches
+both, so the entry is 0; the same holds for two merchants. Two steps on the
+tripartite graph are therefore one step of the bipartite graph, with
+squared weights, plus the diagonal terms $\sum_p M_{ap}^2$, which are walks
+that go out to a payment and come back.
+
+**(b)** Induction: $Q_{\text{tri}}$ has the off-diagonal form, the square has
+the diagonal form, and multiplying a diagonal-form matrix by
+$Q_{\text{tri}}$ gives the off-diagonal form again, and vice versa. Entry
+$(a, b)$ of $Q^k$ sums the weighted walks of $k$ steps from $a$ to $b$, so
+after an odd number of steps a walk that started at an entity is always on
+a payment, and after an even number always on an entity. The walk
+alternates between the two sides, and every cardholder–merchant step of the
+bipartite graph takes two steps here. <Ref lesson="guilt-by-association">The
+random walk with restart</Ref> runs on exactly this matrix, starting from
+the fraudulent payment nodes.
+</Solution>
+</Exercise>
+
+<Exercise>
+(a) What graph does $w = e^{-\gamma h}$ produce as $\gamma \to 0$, and as
+$\gamma \to \infty$? Why can neither carry a fraud signal through time?
+(b) A configuration file sets $\gamma = 0.004$ with $h$ in hours, and
+documents it as the graph that "forgets after a week". Compute the weight of
+a week-old payment, the half-life, and the age at which the weight reaches
+0.05. Which horizon does this setting actually implement?
+
+<Solution>
+**(a)** As $\gamma \to 0$ every weight tends to 1: the graph of all
+payments ever made, unweighted. A merchant compromised years ago stays as
+strongly linked as one compromised this morning, so old structure drowns
+the new. As $\gamma \to \infty$ every weight with $h > 0$ tends to 0: the
+graph is empty except for the payment being made now, so there is no
+neighbourhood to read. Both extremes destroy the comparison of recent with
+old that the decay exists to make; any useful $\gamma$ sits between them,
+set by how long a fraud pattern stays active.
+
+**(b)** Week-old: $e^{-0.004 \times 168} = e^{-0.672} \approx 0.51$, half
+the weight of a fresh payment, not "forgotten". Half-life
+$\ln 2/0.004 \approx 173$ hours, about 7.2 days. Weight 0.05 at
+$\ln 20/0.004 \approx 749$ hours, about 31 days. The setting is the month
+graph of the chapter ($\gamma \approx 0.0042$ per hour), off by the units or
+by the horizon. The check costs one line, and a graph whose horizon is four
+times longer than documented gives features that react four times more
+slowly than everyone believes.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "Money returning to its source along a cycle is a strong indicator
+of laundering, so the bank should alert on every transfer that closes a
+cycle of up to ten accounts within a month." Give at least two kinds of
+legitimate cycle, then estimate the precision of the rule for a stream in
+which one transfer in 1,750 is laundering, under the generous assumption
+that a laundering transfer is twenty times as likely as an ordinary one to
+close such a cycle. Name the step in the claim that fails.
+
+<Solution>
+**Legitimate cycles.** A customer pays a firm and receives a refund; a
+person moves savings from an account at one bank to another and back; firms
+in one group pay each other for services and settle the balance; a loan is
+paid out and repaid. With a month's window and ten accounts allowed, a
+large bank holds a very large number of such cycles.
+
+**Precision.** Use the <Ref lesson="economics-of-detection"
+id="bayes-rule-and-why-the-error-rates-cannot-rescue-precision">odds form of
+Bayes' rule</Ref>: posterior odds = likelihood ratio × prior odds. The
+prior odds are $1 : 1{,}749$, the likelihood ratio is 20, so the posterior
+odds are $20 : 1{,}749 \approx 1 : 87$, a precision of about 1.1%. About 99
+alerts in 100 go to cycles of ordinary customers.
+
+**The failing step.** "Strong indicator" was read as "most cycles are
+laundering", which is the statement $P(\text{laundering} \mid \text{cycle})$
+large. What is true at best is that $P(\text{cycle} \mid \text{laundering})$
+is several times $P(\text{cycle} \mid \text{genuine})$, and at a base rate
+of one in 1,750 that ratio cannot carry the precision. The rule also fails
+the other way: most laundering sits in no shape at all, so even its recall
+is bounded. A cycle is a feature to combine with time, amounts and the
+accounts' history, not an alert.
+</Solution>
+</Exercise>
+
+<Exercise>
+In the Kaggle PaySim file, one fraud is two consecutive rows in the same
+hour: a TRANSFER of 21,531.00 from account C2122951913 to C878866926, then a
+CASH_OUT of 21,531.00 from account C820901487 to C70120540. The <Ref
+lesson="paysim-feature-matrix" id="one-fraud-two-rows">PaySim chapter</Ref>
+found that a fraud transfer's receiver keeps a balance of 0 and that the
+cash-out's sender is never the transfer's receiver; that almost every sender
+appears in exactly one row. (a) Draw the four accounts and two transfers as
+a graph. Which of the eight motifs does the fraud form? (b) Design a check,
+runnable on the whole file, that measures how often a fraud transfer's
+receiver later sends money. State the result you expect and what would
+count as agreement. (c) What does the answer mean for using PaySim to test
+a motif detector or a graph feature?
+
+<Solution>
+**(a)** Two disjoint edges: C2122951913 → C878866926 and
+C820901487 → C70120540. No path joins them, so the fraud forms no motif; in
+particular there is no chain transfer → cash-out, since the account that
+received the money is not the one that cashes it out.
+
+**(b)** Take the set of receivers of rows with `type == "TRANSFER"` and
+`isFraud == 1`. For each, look for any later row whose sender
+(`nameOrig`) is that account, at a step greater than the transfer's step.
+Report the share of fraud transfers with at least one such row, and the
+same share for genuine transfers as a reference. Expected: close to 0 for
+fraud, since the receiver never holds the money and the cash-out comes
+from an unrelated account; low for genuine transfers too, since almost
+every account sends exactly once. Agreement: a fraud share of zero or a
+handful of rows out of about 4,100 fraud transfers. A share of a few
+percent would mean the trail can sometimes be followed and the reading of
+the script is wrong.
+
+**(c)** The generator does not route money through accounts: the fraud
+appears as two unconnected rows linked only by their order in the file and
+their equal amounts. A motif detector run on the account graph finds
+nothing to detect, and a graph feature built on it measures the generator's
+bookkeeping, not laundering. Graph methods for money movement need a world
+that moves the money, such as AMLworld, whose laundering is generated as
+transfers along these shapes.
+</Solution>
+</Exercise>
+
+<Exercise>
+Twelve users are linked by entity-resolution edges. Four of them,
+$F_1$ to $F_4$, are known fraudsters; eight, $L_1$ to $L_8$, are not. The
+fourteen edges are $F_1F_2$, $F_1F_3$, $F_2F_3$, $F_3F_4$, $F_2F_4$,
+$F_4L_1$, $F_1L_5$, $L_1L_2$, $L_2L_3$, $L_3L_4$, $L_4L_1$, $L_5L_6$,
+$L_6L_7$, $L_7L_8$. (a) Count the edges that join a fraudster to a
+non-fraudster. (b) Suppose the labels had been handed out at random, so
+that each endpoint of an edge is a fraudster with probability $f = 4/12$
+and not with probability $l = 8/12$, independently. How many of the 14
+edges would you expect to join the two kinds? (c) What does the comparison
+suggest, and what would you need before trusting it?
+
+<Solution>
+**(a)** Two: $F_4L_1$ and $F_1L_5$. Five edges join two fraudsters and
+seven join two non-fraudsters.
+
+**(b)** An edge joins the two kinds if one end is a fraudster and the other
+is not, in either order: probability $2lf = 2 \times \tfrac{2}{3} \times
+\tfrac{1}{3} = \tfrac{4}{9}$. Expected count $14 \times \tfrac{4}{9}
+\approx 6.2$.
+
+**(c)** Two observed against about six expected: fraudsters are linked to
+each other far more than chance would give, so their labels cluster and a
+user's neighbours carry information about the user. Before trusting it you
+need to know whether two against six could arise by chance in a graph this
+small, which is a significance test, and whether the clustering holds in a
+real graph rather than one drawn to show it. This comparison is the
+homophily test that <Ref lesson="neighbourhood-and-centrality">the next
+lesson</Ref> defines and makes into a test, before using a node's
+neighbourhood as a feature.
+</Solution>
+</Exercise>
+
+<Exercise>
+A fraud feature for payment $i$, made at time $t_i$, is read from the
+tripartite week graph: for instance, the summed weight of the fraudulent
+payment nodes two steps from the cardholder. Using <Ref
+lesson="point-in-time-features" id="two-ways-a-training-row-can-know-too-much">point-in-time
+correctness</Ref>, specify the graph from which the training row of $i$ may
+read: which payment nodes it contains, the age $h$ each weight uses, and
+which payment nodes may carry a fraud label. Then name the two ways a
+graph rebuilt once from the final training table leaks.
+
+<Solution>
+**Payment nodes.** Only payments made strictly before $t_i$, with their
+cardholder and merchant nodes; payment $i$ itself may appear as the node
+being scored, but none after it.
+
+**Weights.** Each weight is $e^{-\gamma (t_i - t_p)}$, with $t_p$ the
+time of payment $p$: its age at $t_i$, not at the date the table was
+built. Ages measured at the build date make every payment look older than
+it was when $i$ was scored, and give values the serving path, which
+computes them at $t_i$, never produces.
+
+**Labels.** A payment node may carry a fraud label only if that label had
+arrived by $t_i$: in the course's convention, payments at least $\delta$
+old, whose labels have arrived, plus any feedback label whose arrival time
+is recorded and precedes $t_i$. A fraud confirmed after $t_i$ is unlabelled
+in the graph of row $i$.
+
+**The two leaks.** A graph built once from the final table contains future
+payments, the first leak of the point-in-time lesson, now as edges reaching
+forward from the cardholder; and it labels payments with fraud verdicts
+that had not arrived at $t_i$, the second leak, which inflates exactly the
+features that count fraudulent neighbours. The second is the graph version
+of the naive terminal fraud rate on final labels.
+</Solution>
+</Exercise>
+
+<References>
+1. E. Altman, J. Blanuša, L. von Niederhäusern, B. Egressy, A. Anghel, K. Atasu, "Realistic Synthetic Financial Transactions for Anti-Money Laundering Models," *NeurIPS 2023 Datasets and Benchmarks Track* — Sec. 1 and Fig. 1 (a transfer table and its graph; transaction graphs as directed multigraphs; a cycle through three accounts), Sec. 3.2 and Fig. 2 (the eight laundering patterns and their definitions with $k \geq 2$), Sec. 3.4 (laundering disguised as ordinary payments), Tables 6–8 (pattern sizes and counts; 19,461 of 100,604 laundering transactions in patterns in LI-Large), App. D (graph features computed in time order with six-hour and one-day windows, cycles up to length 10), and the GBT baselines of Sec. 4 (graph features handed to boosted trees; laundering detection as edge classification). https://arxiv.org/abs/2306.16424
+2. V. Van Vlasselaer, C. Bravo, O. Caelen, T. Eliassi-Rad, L. Akoglu, M. Snoeck, B. Baesens, "APATE: A Novel Approach for Automated Credit Card Transaction Fraud Detection Using Network-Based Extensions," *Decision Support Systems* 75, 2015 — Sec. 2.1 (the carefully organised trait: stolen cards used many times, merchants sensitive to fraud), Sec. 3.2.1 (the cardholder–merchant bipartite graph, Eq. 1; exponentially decayed edge weights for short, medium and long term), Sec. 3.2.2 (the edge-to-node transformation, Eq. 3, and the tripartite matrix, Eq. 4). Its decay constants are stated with mixed time units; check each against its horizon before reuse. https://doi.org/10.1016/j.dss.2015.04.013
+3. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015 — Ch. 5, "Social Network Analysis for Fraud Detection": pp. 212–213 (social-security employers refounded after bankruptcy; identity theft in telecommunications and the fraudster's contact list), pp. 214–222 (nodes, directed and undirected edges, multi-edges, weights; the sociogram; adjacency and weight matrices and lists), pp. 266–269 (from unipartite to bipartite graphs, recency-weighted edges, multipartite graphs), pp. 270–271 (spider constructions in the company–resource graph), pp. 276–277 (replacing each card transaction edge by a transaction node so that labelled transactions start the propagation).
+4. Neo4j GraphAcademy, *Graph Data Science in Practice* workshop, Module 2 "Community Detection for Fraud" — Lesson 1 (a peer-to-peer payment dataset with User, Card, Device and IP nodes and P2P, HAS_CC, USED and HAS_IP relationships, about 790,000 nodes and 1.8 million relationships; the workshop states 204,000 users, but its own component run covers 33,732, the count used here; five-hop transfer chains and shared cards or devices between flagged users; monopartite, bipartite and heterogeneous projections) and Lesson 5 (entity-resolution rules encoded as relationships; high-degree identifiers such as café IP addresses and library devices). https://graphacademy.neo4j.com/courses/workshop-gds ; source: https://github.com/neo4j-graphacademy/courses/tree/main/asciidoc/courses/workshop-gds
+5. L. Akoglu, H. Tong, D. Koutra, "Graph-Based Anomaly Detection and Description: A Survey," *Data Mining and Knowledge Discovery* 29(3), 2015 — Sec. 1.1 (why graphs: inter-dependent data, representation, the relational nature of fraud as opportunistic spread or organised collaboration, and robustness because a fraudster lacks a global view of the network), Sec. 2.2.1 (successful laundering imitates legitimate transaction patterns). https://arxiv.org/abs/1404.4679
+6. R. J. Bolton, D. J. Hand, "Statistical Fraud Detection: A Review," *Statistical Science* 17(3), 2002 — Sec. 4 (money laundering: a single transfer is unlikely to look like laundering; detection requires linking potentially related transactions, link analysis; transaction, account, business and ring levels). https://doi.org/10.1214/ss/1042727940
+</References>

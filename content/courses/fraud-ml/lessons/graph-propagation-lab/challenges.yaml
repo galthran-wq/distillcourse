@@ -1,0 +1,705 @@
+checkpoints:
+  sparse-adjacency:
+    kind: exact
+    seed: 4101
+    atol: 1.0e-9
+    inputs_code: |
+      # 40 nodes; 35-39 have no edges, so their columns stay zero. Eight
+      # pairs appear twice and must add. Ages up to 300 hours, week horizon.
+      n = 40
+      edges = rng.integers(0, 35, size=(120, 2))
+      edges = edges[edges[:, 0] != edges[:, 1]]
+      edges = np.r_[edges, edges[:8]]
+      ages = rng.uniform(0, 300, len(edges))
+      inputs = (edges, ages, np.log(20) / 168, n)
+    wrong:
+      - hint: "Normalised the rows. The walker leaves node j, the column index: each column of Q divides by the strength of the node the walk comes from, so every column sums to 1. Dividing rows gives the neighbour average S^-1 W."
+        code: |
+          import numpy as np
+          def f(edges, ages, gamma, n):
+              e = np.asarray(edges); w = np.exp(-gamma * np.asarray(ages))
+              out = []
+              for mode in ("undirected", "with", "against"):
+                  W = np.zeros((n, n))
+                  if mode != "against": np.add.at(W, (e[:, 1], e[:, 0]), w)
+                  if mode != "with": np.add.at(W, (e[:, 0], e[:, 1]), w)
+                  r = W.sum(axis=1, keepdims=True)
+                  out += [W, W / np.where(r > 0, r, 1)]
+              return tuple(out)
+      - hint: "Lost the minus in the decay. An edge weighs exp(-gamma h): old payments weigh less, not more."
+        code: |
+          import numpy as np
+          def f(edges, ages, gamma, n):
+              e = np.asarray(edges); w = np.exp(gamma * np.asarray(ages))
+              out = []
+              for mode in ("undirected", "with", "against"):
+                  W = np.zeros((n, n))
+                  if mode != "against": np.add.at(W, (e[:, 1], e[:, 0]), w)
+                  if mode != "with": np.add.at(W, (e[:, 0], e[:, 1]), w)
+                  s = W.sum(axis=0)
+                  out += [W, W / np.where(s > 0, s, 1)]
+              return tuple(out)
+      - hint: "Every edge weighs 1. The weight of an edge is exp(-gamma h) of its age; without it a payment from last month pulls the walk as hard as one from this morning."
+        code: |
+          import numpy as np
+          def f(edges, ages, gamma, n):
+              e = np.asarray(edges); w = np.ones(len(e))
+              out = []
+              for mode in ("undirected", "with", "against"):
+                  W = np.zeros((n, n))
+                  if mode != "against": np.add.at(W, (e[:, 1], e[:, 0]), w)
+                  if mode != "with": np.add.at(W, (e[:, 0], e[:, 1]), w)
+                  s = W.sum(axis=0)
+                  out += [W, W / np.where(s > 0, s, 1)]
+              return tuple(out)
+      - hint: "A repeated pair kept only its last edge. Two payments between the same pair add their weights; an assignment W[i, j] = w overwrites the first."
+        code: |
+          import numpy as np
+          def f(edges, ages, gamma, n):
+              e = np.asarray(edges); w = np.exp(-gamma * np.asarray(ages))
+              out = []
+              for mode in ("undirected", "with", "against"):
+                  W = np.zeros((n, n))
+                  if mode != "against": W[e[:, 1], e[:, 0]] = w
+                  if mode != "with": W[e[:, 0], e[:, 1]] = w
+                  s = W.sum(axis=0)
+                  out += [W, W / np.where(s > 0, s, 1)]
+              return tuple(out)
+      - hint: "Swapped the two directions. With the money, a walker at src moves to dst, so the weight sits in column src, row dst: W[dst, src]. Against the money it is W[src, dst]."
+        code: |
+          import numpy as np
+          def f(edges, ages, gamma, n):
+              e = np.asarray(edges); w = np.exp(-gamma * np.asarray(ages))
+              out = []
+              for mode in ("undirected", "with", "against"):
+                  W = np.zeros((n, n))
+                  if mode != "with": np.add.at(W, (e[:, 1], e[:, 0]), w)
+                  if mode != "against": np.add.at(W, (e[:, 0], e[:, 1]), w)
+                  s = W.sum(axis=0)
+                  out += [W, W / np.where(s > 0, s, 1)]
+              return tuple(out)
+
+  connected-components:
+    kind: exact
+    seed: 4202
+    atol: 1.0e-9
+    inputs_code: |
+      # 300 nodes in up to 50 rings with members scattered over the index
+      # range, each ring joined by a random tree; edges shuffled and turned
+      # at random. Five more nodes have no edge at all.
+      n = 300
+      group = rng.integers(0, 50, n)
+      edges = []
+      for g in range(50):
+          m = rng.permutation(np.flatnonzero(group == g))
+          for i in range(1, len(m)):
+              edges.append((m[i], m[rng.integers(i)]))
+      edges = np.array(edges)[rng.permutation(len(edges))]
+      flip = rng.random(len(edges)) < 0.5
+      edges[flip] = edges[flip][:, ::-1]
+      inputs = (edges, n + 5)
+    wrong:
+      - hint: "Linked the two nodes instead of their roots. union(a, b) must set the parent of one root to the other root; overwriting parent[a] cuts a off from everything it was already joined to."
+        code: |
+          import numpy as np
+          def f(edges, n):
+              parent = np.arange(n)
+              def find(a):
+                  while parent[a] != a:
+                      a = parent[a]
+                  return a
+              for a, b in np.asarray(edges):
+                  if find(a) != find(b):
+                      parent[max(a, b)] = min(a, b)
+              roots = np.array([find(v) for v in range(n)])
+              first = {}
+              for v in range(n):
+                  first.setdefault(roots[v], v)
+              labels = np.array([first[r] for r in roots])
+              return labels, np.sort(np.bincount(labels)[np.unique(labels)])[::-1]
+      - hint: "Sizes in increasing order. The sizes come largest first."
+        code: |
+          import numpy as np
+          def f(edges, n):
+              parent = np.arange(n)
+              def find(a):
+                  while parent[a] != a:
+                      a = parent[a]
+                  return a
+              for a, b in np.asarray(edges):
+                  ra, rb = find(a), find(b)
+                  if ra != rb:
+                      parent[max(ra, rb)] = min(ra, rb)
+              labels = np.array([find(v) for v in range(n)])
+              return labels, np.sort(np.bincount(labels)[np.unique(labels)])
+      - hint: "Left the isolated nodes out of the sizes. A node with no edge is a component of size 1, and the sizes list every component."
+        code: |
+          import numpy as np
+          def f(edges, n):
+              parent = np.arange(n)
+              def find(a):
+                  while parent[a] != a:
+                      a = parent[a]
+                  return a
+              for a, b in np.asarray(edges):
+                  ra, rb = find(a), find(b)
+                  if ra != rb:
+                      parent[max(ra, rb)] = min(ra, rb)
+              labels = np.array([find(v) for v in range(n)])
+              sizes = np.bincount(labels)[np.unique(labels)]
+              return labels, np.sort(sizes[sizes > 1])[::-1]
+      - hint: "Labelled each node with its root, not with its component's smallest index. Link the larger root under the smaller one, or relabel every component by its smallest member, so the labels can be compared."
+        code: |
+          import numpy as np
+          def f(edges, n):
+              parent = np.arange(n)
+              def find(a):
+                  while parent[a] != a:
+                      a = parent[a]
+                  return a
+              for a, b in np.asarray(edges):
+                  ra, rb = find(a), find(b)
+                  if ra != rb:
+                      parent[ra] = rb
+              labels = np.array([find(v) for v in range(n)])
+              return labels, np.sort(np.bincount(labels)[np.unique(labels)])[::-1]
+
+  restart-walk:
+    kind: exact
+    seed: 4303
+    atol: 1.0e-9
+    inputs_code: |
+      # 50 nodes, a sparse random graph; four seeds with unequal weights that
+      # do not sum to 1; follow probability 0.8.
+      n = 50
+      A = np.triu(rng.random((n, n)) < 0.08, 1).astype(float)
+      A = A + A.T
+      s = A.sum(axis=0)
+      Q = A / np.where(s > 0, s, 1)
+      seeds = np.zeros(n)
+      seeds[[3, 7, 19, 30]] = [3.0, 1.0, 1.0, 0.5]
+      inputs = (Q, seeds, 0.8, 1e-12)
+    wrong:
+      - hint: "Restarted with the raw seed weights. The restart vector e is a probability vector: divide the seeds by their sum, or the scores no longer sum to 1."
+        code: |
+          import numpy as np
+          def f(Q, seeds, alpha=0.85, tol=1e-10, max_steps=1000):
+              e = np.asarray(seeds, float); xi = e.copy()
+              for _ in range(max_steps):
+                  new = alpha * (Q @ xi) + (1 - alpha) * e
+                  if np.abs(new - xi).sum() < tol:
+                      return new
+                  xi = new
+              return xi
+      - hint: "Iterated with Q transposed. Q is already indexed Q[to, from]; Q^T xi averages the neighbours' scores instead of spreading each node's score among them."
+        code: |
+          import numpy as np
+          def f(Q, seeds, alpha=0.85, tol=1e-10, max_steps=1000):
+              e = np.asarray(seeds, float); e = e / e.sum(); xi = e.copy()
+              for _ in range(max_steps):
+                  new = alpha * (Q.T @ xi) + (1 - alpha) * e
+                  if np.abs(new - xi).sum() < tol:
+                      return new
+                  xi = new
+              return xi
+      - hint: "Restarted uniformly. Adding (1 - alpha)/n to every node is PageRank, which ranks the busy nodes; the exposure restarts only at the seeds."
+        code: |
+          import numpy as np
+          def f(Q, seeds, alpha=0.85, tol=1e-10, max_steps=1000):
+              e = np.asarray(seeds, float); e = e / e.sum(); xi = e.copy()
+              for _ in range(max_steps):
+                  new = alpha * (Q @ xi) + (1 - alpha) / len(e)
+                  if np.abs(new - xi).sum() < tol:
+                      return new
+                  xi = new
+              return xi
+      - hint: "Swapped the follow and restart probabilities. alpha multiplies the step along Q and 1 - alpha the jump back to e; swapped, the walker restarts 85% of the time and the scores barely leave the seeds."
+        code: |
+          import numpy as np
+          def f(Q, seeds, alpha=0.85, tol=1e-10, max_steps=1000):
+              e = np.asarray(seeds, float); e = e / e.sum(); xi = e.copy()
+              for _ in range(max_steps):
+                  new = (1 - alpha) * (Q @ xi) + alpha * e
+                  if np.abs(new - xi).sum() < tol:
+                      return new
+                  xi = new
+              return xi
+
+  card-exposure:
+    kind: exact
+    seed: 4404
+    atol: 1.0e-9
+    inputs_code: |
+      # 80 payments, 16 cardholders (14 and 15 never pay), 6 merchants,
+      # two weeks of ages; six frauds confirmed between 0 and 200 hours ago;
+      # ten new payments between cardholders and merchants that have paid
+      # before.
+      P, C, M = 80, 16, 6
+      card = rng.integers(0, C - 2, P)
+      merchant = rng.integers(0, M, P)
+      age = rng.uniform(0, 336, P)
+      restart_age = np.full(P, np.inf)
+      fraud = rng.choice(P, 6, replace=False)
+      restart_age[fraud] = rng.uniform(0, 200, 6)
+      new_card = rng.integers(0, C - 2, 10)
+      new_merchant = rng.integers(0, M, 10)
+      inputs = (card, merchant, age, restart_age, C, M, np.log(20) / 168, new_card, new_merchant)
+    wrong:
+      - hint: "Restarted every confirmed fraud equally. The seed of a fraud is exp(-gamma r), r the hours since it was confirmed: a fraud confirmed this morning restarts the walk more often than one from last week."
+        code: |
+          import numpy as np
+          def f(card, merchant, age, restart_age, C, M, gamma, new_card, new_merchant):
+              P = len(card); n = P + C + M; p = np.arange(P)
+              w = np.exp(-gamma * age); W = np.zeros((n, n))
+              for other in (P + card, P + C + merchant):
+                  np.add.at(W, (p, other), w); np.add.at(W, (other, p), w)
+              s = W.sum(axis=0); Q = W / np.where(s > 0, s, 1)
+              e = np.zeros(n); e[:P] = np.isfinite(restart_age); e /= e.sum(); xi = e.copy()
+              for _ in range(100000):
+                  new = 0.85 * (Q @ xi) + 0.15 * e
+                  if np.abs(new - xi).sum() < 1e-12:
+                      xi = new; break
+                  xi = new
+              c, m = P + new_card, P + C + new_merchant
+              return xi[P:], s[P:], xi[c] / (s[c] + 1) + xi[m] / (s[m] + 1)
+      - hint: "The payment edges weigh 1. Both edges of a payment carry its decayed weight exp(-gamma h), so an old payment links its cardholder and merchant only weakly."
+        code: |
+          import numpy as np
+          def f(card, merchant, age, restart_age, C, M, gamma, new_card, new_merchant):
+              P = len(card); n = P + C + M; p = np.arange(P)
+              w = np.ones(P); W = np.zeros((n, n))
+              for other in (P + card, P + C + merchant):
+                  np.add.at(W, (p, other), w); np.add.at(W, (other, p), w)
+              s = W.sum(axis=0); Q = W / np.where(s > 0, s, 1)
+              e = np.zeros(n); e[:P] = np.exp(-gamma * restart_age); e /= e.sum(); xi = e.copy()
+              for _ in range(100000):
+                  new = 0.85 * (Q @ xi) + 0.15 * e
+                  if np.abs(new - xi).sum() < 1e-12:
+                      xi = new; break
+                  xi = new
+              c, m = P + new_card, P + C + new_merchant
+              return xi[P:], s[P:], xi[c] / (s[c] + 1) + xi[m] / (s[m] + 1)
+      - hint: "Divided by the old strength. The new payment adds an edge of weight 1 to each endpoint, so a walker there reaches it with probability 1/(s + 1), not 1/s."
+        code: |
+          import numpy as np
+          def f(card, merchant, age, restart_age, C, M, gamma, new_card, new_merchant):
+              P = len(card); n = P + C + M; p = np.arange(P)
+              w = np.exp(-gamma * age); W = np.zeros((n, n))
+              for other in (P + card, P + C + merchant):
+                  np.add.at(W, (p, other), w); np.add.at(W, (other, p), w)
+              s = W.sum(axis=0); Q = W / np.where(s > 0, s, 1)
+              e = np.zeros(n); e[:P] = np.exp(-gamma * restart_age); e /= e.sum(); xi = e.copy()
+              for _ in range(100000):
+                  new = 0.85 * (Q @ xi) + 0.15 * e
+                  if np.abs(new - xi).sum() < 1e-12:
+                      xi = new; break
+                  xi = new
+              c, m = P + new_card, P + C + new_merchant
+              return xi[P:], s[P:], xi[c] / s[c] + xi[m] / s[m]
+
+  egonet-features:
+    kind: exact
+    seed: 4505
+    atol: 1.0e-9
+    inputs_code: |
+      # 70 nodes in five dense blocks with sparse links between them, so
+      # there are triangles; about 15% fraudulent.
+      n = 70
+      block = rng.integers(0, 5, n)
+      p = np.where(block[:, None] == block[None, :], 0.3, 0.03)
+      A = np.triu(rng.random((n, n)) < p, 1).astype(float)
+      A = A + A.T
+      fraud = (rng.random(n) < 0.15).astype(float)
+      inputs = (A, fraud)
+    wrong:
+      - hint: "Counted every triangle twice. (A^3)_vv counts each triangle through v once in each direction; the triangles are half of it."
+        code: |
+          import numpy as np
+          def f(A, fraud):
+              A = np.asarray(A, float); f = np.asarray(fraud, float)
+              deg = A.sum(1); A2 = A @ A; A3 = A2 @ A; c3 = np.diag(A3)
+              return np.c_[deg, A @ f, c3, A2 @ f - deg * f, A3 @ f - c3 * f]
+      - hint: "Kept the walks back to v itself. A fraudulent node's walks that return to it put its own label into its own feature; subtract (A^k)_vv f_v from the walk counts."
+        code: |
+          import numpy as np
+          def f(A, fraud):
+              A = np.asarray(A, float); f = np.asarray(fraud, float)
+              deg = A.sum(1); A2 = A @ A; A3 = A2 @ A; c3 = np.diag(A3)
+              return np.c_[deg, A @ f, c3 / 2, A2 @ f, A3 @ f]
+      - hint: "Counted walks with a self-loop at every node. The walks run on A, which has a zero diagonal; A + I lets a walk stand still, which counts shorter walks again."
+        code: |
+          import numpy as np
+          def f(A, fraud):
+              A = np.asarray(A, float); f = np.asarray(fraud, float)
+              deg = A.sum(1); c3 = np.diag(A @ A @ A)
+              B = A + np.eye(len(A)); B2 = B @ B; B3 = B2 @ B
+              return np.c_[deg, A @ f, c3 / 2, B2 @ f - np.diag(B2) * f, B3 @ f - np.diag(B3) * f]
+
+  gcn-forward:
+    kind: exact
+    seed: 4606
+    atol: 1.0e-9
+    inputs_code: |
+      # 30 nodes on a ring (no node without a neighbour) plus random chords;
+      # 6 features, 4 hidden units; 70% of the nodes labelled.
+      n, d, h = 30, 6, 4
+      A = np.triu(rng.random((n, n)) < 0.1, 1).astype(float)
+      A[np.arange(n - 1), np.arange(1, n)] = 1
+      A = A + A.T
+      X = rng.normal(size=(n, d))
+      W0 = rng.normal(0, 0.6, (d, h))
+      w1 = rng.normal(0, 0.6, h)
+      ws = rng.normal(0, 0.3, d)
+      y = (rng.random(n) < 0.3).astype(float)
+      mask = (rng.random(n) < 0.7).astype(float)
+      inputs = (A, X, W0, w1, ws, 0.1, y, mask, (0.3, 0.7))
+    wrong:
+      - hint: "Took the degrees before adding the self-loop. d~ is the degree of A + I, one more than the degree in A."
+        code: |
+          import numpy as np
+          def f(A, X, W0, w1, ws, b, y, mask, cw):
+              At = A + np.eye(len(A)); d = A.sum(1); Ah = At / np.sqrt(np.outer(d, d))
+              H1 = np.maximum(Ah @ X @ W0, 0); z = Ah @ H1 @ w1 + X @ ws + b
+              c = np.where(y == 1, cw[1], cw[0]) * mask
+              return Ah, z, H1, float(np.sum(c * (np.logaddexp(0, z) - y * z)) / c.sum())
+      - hint: "Normalised one side only. D~^-1 (A + I) is the mean over the neighbours; the layer scales both ends of an edge, D~^-1/2 (A + I) D~^-1/2."
+        code: |
+          import numpy as np
+          def f(A, X, W0, w1, ws, b, y, mask, cw):
+              At = A + np.eye(len(A)); d = At.sum(1); Ah = At / d[:, None]
+              H1 = np.maximum(Ah @ X @ W0, 0); z = Ah @ H1 @ w1 + X @ ws + b
+              c = np.where(y == 1, cw[1], cw[0]) * mask
+              return Ah, z, H1, float(np.sum(c * (np.logaddexp(0, z) - y * z)) / c.sum())
+      - hint: "No ReLU on the hidden layer. Without it the two layers collapse into one linear map of A_hat^2 X."
+        code: |
+          import numpy as np
+          def f(A, X, W0, w1, ws, b, y, mask, cw):
+              At = A + np.eye(len(A)); d = At.sum(1); Ah = At / np.sqrt(np.outer(d, d))
+              H1 = Ah @ X @ W0; z = Ah @ H1 @ w1 + X @ ws + b
+              c = np.where(y == 1, cw[1], cw[0]) * mask
+              return Ah, z, H1, float(np.sum(c * (np.logaddexp(0, z) - y * z)) / c.sum())
+      - hint: "Divided the weighted sum by the number of labelled nodes. The loss is a weighted mean: divide by the sum of the same weights, sum(m c_y)."
+        code: |
+          import numpy as np
+          def f(A, X, W0, w1, ws, b, y, mask, cw):
+              At = A + np.eye(len(A)); d = At.sum(1); Ah = At / np.sqrt(np.outer(d, d))
+              H1 = np.maximum(Ah @ X @ W0, 0); z = Ah @ H1 @ w1 + X @ ws + b
+              c = np.where(y == 1, cw[1], cw[0]) * mask
+              return Ah, z, H1, float(np.sum(c * (np.logaddexp(0, z) - y * z)) / mask.sum())
+      - hint: "Every node carries a loss. Only the labelled nodes, mask = 1, enter the sum and its weights."
+        code: |
+          import numpy as np
+          def f(A, X, W0, w1, ws, b, y, mask, cw):
+              At = A + np.eye(len(A)); d = At.sum(1); Ah = At / np.sqrt(np.outer(d, d))
+              H1 = np.maximum(Ah @ X @ W0, 0); z = Ah @ H1 @ w1 + X @ ws + b
+              c = np.where(y == 1, cw[1], cw[0])
+              return Ah, z, H1, float(np.sum(c * (np.logaddexp(0, z) - y * z)) / c.sum())
+
+  gcn-gradient:
+    kind: exact
+    seed: 4707
+    atol: 1.0e-9
+    inputs_code: |
+      # A_hat built here, so this check does not depend on checkpoint 6.
+      n, d, h = 25, 5, 4
+      A = np.triu(rng.random((n, n)) < 0.15, 1).astype(float)
+      A = A + A.T
+      At = A + np.eye(n)
+      dg = At.sum(axis=1)
+      A_hat = At / np.sqrt(np.outer(dg, dg))
+      X = rng.normal(size=(n, d))
+      y = (rng.random(n) < 0.35).astype(float)
+      mask = (rng.random(n) < 0.7).astype(float)
+      inputs = (A_hat, X, y, mask, rng.normal(0, 0.7, (d, h)), rng.normal(0, 0.7, h),
+                rng.normal(0, 0.3, d), -0.2, (0.3, 0.7))
+    wrong:
+      - hint: "The gradient passed through the ReLU everywhere. Where the hidden unit's input was negative its output is the constant 0, and the gradient stops there."
+        code: |
+          import numpy as np
+          def f(Ah, X, y, mask, W0, w1, ws, b, cw):
+              U = Ah @ X @ W0; H1 = np.maximum(U, 0); z = Ah @ H1 @ w1 + X @ ws + b
+              c = np.where(y == 1, cw[1], cw[0]) * mask
+              g = c * (1 / (1 + np.exp(-z)) - y) / c.sum(); gr = Ah.T @ g
+              dU = np.outer(gr, w1)
+              return X.T @ (Ah.T @ dU), H1.T @ gr, X.T @ g, g.sum()
+      - hint: "Dropped A_hat on the way back through the second layer. z = A_hat (H1 w1) + ..., so the gradient reaching H1 w1 is A_hat^T dL/dz, not dL/dz."
+        code: |
+          import numpy as np
+          def f(Ah, X, y, mask, W0, w1, ws, b, cw):
+              U = Ah @ X @ W0; H1 = np.maximum(U, 0); z = Ah @ H1 @ w1 + X @ ws + b
+              c = np.where(y == 1, cw[1], cw[0]) * mask
+              g = c * (1 / (1 + np.exp(-z)) - y) / c.sum(); gr = g
+              dU = np.outer(gr, w1) * (U > 0)
+              return X.T @ (Ah.T @ dU), H1.T @ gr, X.T @ g, g.sum()
+      - hint: "Divided by the number of labelled nodes. The loss divides by sum(m c_y), and so does its gradient."
+        code: |
+          import numpy as np
+          def f(Ah, X, y, mask, W0, w1, ws, b, cw):
+              U = Ah @ X @ W0; H1 = np.maximum(U, 0); z = Ah @ H1 @ w1 + X @ ws + b
+              c = np.where(y == 1, cw[1], cw[0]) * mask
+              g = c * (1 / (1 + np.exp(-z)) - y) / mask.sum(); gr = Ah.T @ g
+              dU = np.outer(gr, w1) * (U > 0)
+              return X.T @ (Ah.T @ dU), H1.T @ gr, X.T @ g, g.sum()
+      - hint: "Left the class weights out of the gradient. Each node's term carries its class weight c_y, in the gradient as in the loss."
+        code: |
+          import numpy as np
+          def f(Ah, X, y, mask, W0, w1, ws, b, cw):
+              U = Ah @ X @ W0; H1 = np.maximum(U, 0); z = Ah @ H1 @ w1 + X @ ws + b
+              c = np.asarray(mask, float)
+              g = c * (1 / (1 + np.exp(-z)) - y) / c.sum(); gr = Ah.T @ g
+              dU = np.outer(gr, w1) * (U > 0)
+              return X.T @ (Ah.T @ dU), H1.T @ gr, X.T @ g, g.sum()
+      - hint: "No gradient for the skip term. X ws enters z directly, so dL/dws = X^T dL/dz."
+        code: |
+          import numpy as np
+          def f(Ah, X, y, mask, W0, w1, ws, b, cw):
+              U = Ah @ X @ W0; H1 = np.maximum(U, 0); z = Ah @ H1 @ w1 + X @ ws + b
+              c = np.where(y == 1, cw[1], cw[0]) * mask
+              g = c * (1 / (1 + np.exp(-z)) - y) / c.sum(); gr = Ah.T @ g
+              dU = np.outer(gr, w1) * (U > 0)
+              return X.T @ (Ah.T @ dU), H1.T @ gr, np.zeros_like(ws), g.sum()
+
+  train-on-time-split:
+    kind: exact
+    seed: 4808
+    atol: 1.0e-7
+    inputs_code: |
+      # Six time steps of 20 nodes, no edge between steps; illicit nodes link
+      # to each other more often and differ in two features. 60% labelled.
+      # Column 0 of X_raw is the time step. Train on steps 1-4.
+      steps, per = 6, 20
+      n = steps * per
+      step = np.repeat(np.arange(1, steps + 1), per)
+      illicit = rng.random(n) < 0.3
+      p = np.where(illicit[:, None] == illicit[None, :], 0.3, 0.03) * (step[:, None] == step[None, :])
+      A = np.triu(rng.random((n, n)) < p, 1).astype(float)
+      A = A + A.T
+      X = rng.normal(size=(n, 4)) + 0.8 * illicit[:, None] * np.array([1.0, -1.0, 0.0, 0.0])
+      y = np.where(rng.random(n) < 0.6, illicit.astype(int), -1)
+      inputs = (A, np.c_[step, X], step, y, 4, 6, 0.05, 40, 3)
+    wrong:
+      - hint: "Kept the time step as a feature. Column 0 of X_raw is the step; a model that reads it learns which steps were illicit, which says nothing about a later step."
+        code: |
+          import numpy as np
+          def train(A, X, step, y, mask, hidden, lr, epochs, seed, cw, correct=True):
+              At = A + np.eye(len(A)); dg = At.sum(1); Ah = At / np.sqrt(np.outer(dg, dg))
+              lab = (y == 1).astype(float); d = X.shape[1]; rng = np.random.default_rng(seed)
+              P = [rng.normal(0, np.sqrt(2 / d), (d, hidden)), rng.normal(0, np.sqrt(1 / hidden), hidden),
+                   np.zeros(d), np.array(0.0)]
+              c = np.where(lab == 1, cw[1], cw[0]) * mask
+              m = [np.zeros_like(q) for q in P]; v = [np.zeros_like(q) for q in P]; losses = []
+              def fwd(P):
+                  U = Ah @ X @ P[0]; H = np.maximum(U, 0)
+                  return U, H, Ah @ H @ P[1] + X @ P[2] + P[3]
+              for t in range(1, epochs + 1):
+                  U, H, z = fwd(P)
+                  losses.append(np.sum(c * (np.logaddexp(0, z) - lab * z)) / c.sum())
+                  g = c * (1 / (1 + np.exp(-z)) - lab) / c.sum(); gr = Ah @ g
+                  G = [X.T @ (Ah @ (np.outer(gr, P[1]) * (U > 0))), H.T @ gr, X.T @ g, g.sum()]
+                  for i in range(4):
+                      m[i] = 0.9 * m[i] + 0.1 * G[i]; v[i] = 0.999 * v[i] + 0.001 * G[i] ** 2
+                      mh, vh = (m[i] / (1 - 0.9 ** t), v[i] / (1 - 0.999 ** t)) if correct else (m[i], v[i])
+                      P[i] = P[i] - lr * mh / (np.sqrt(vh) + 1e-8)
+              return np.exp(-np.logaddexp(0, -fwd(P)[2])), np.array(losses)
+          def f(A, X_raw, step, y, last, hidden, lr, epochs, seed, cw=(0.3, 0.7)):
+              mask = ((y >= 0) & (step <= last)).astype(float)
+              return train(A, X_raw, step, y, mask, hidden, lr, epochs, seed, cw)
+      - hint: "Counted the unknown nodes as licit. A node carries a loss only if it is labelled: y = -1 means nobody knows, and those nodes stay out of the mask."
+        code: |
+          import numpy as np
+          def train(A, X, step, y, mask, hidden, lr, epochs, seed, cw, correct=True):
+              At = A + np.eye(len(A)); dg = At.sum(1); Ah = At / np.sqrt(np.outer(dg, dg))
+              lab = (y == 1).astype(float); d = X.shape[1]; rng = np.random.default_rng(seed)
+              P = [rng.normal(0, np.sqrt(2 / d), (d, hidden)), rng.normal(0, np.sqrt(1 / hidden), hidden),
+                   np.zeros(d), np.array(0.0)]
+              c = np.where(lab == 1, cw[1], cw[0]) * mask
+              m = [np.zeros_like(q) for q in P]; v = [np.zeros_like(q) for q in P]; losses = []
+              def fwd(P):
+                  U = Ah @ X @ P[0]; H = np.maximum(U, 0)
+                  return U, H, Ah @ H @ P[1] + X @ P[2] + P[3]
+              for t in range(1, epochs + 1):
+                  U, H, z = fwd(P)
+                  losses.append(np.sum(c * (np.logaddexp(0, z) - lab * z)) / c.sum())
+                  g = c * (1 / (1 + np.exp(-z)) - lab) / c.sum(); gr = Ah @ g
+                  G = [X.T @ (Ah @ (np.outer(gr, P[1]) * (U > 0))), H.T @ gr, X.T @ g, g.sum()]
+                  for i in range(4):
+                      m[i] = 0.9 * m[i] + 0.1 * G[i]; v[i] = 0.999 * v[i] + 0.001 * G[i] ** 2
+                      mh, vh = (m[i] / (1 - 0.9 ** t), v[i] / (1 - 0.999 ** t)) if correct else (m[i], v[i])
+                      P[i] = P[i] - lr * mh / (np.sqrt(vh) + 1e-8)
+              return np.exp(-np.logaddexp(0, -fwd(P)[2])), np.array(losses)
+          def f(A, X_raw, step, y, last, hidden, lr, epochs, seed, cw=(0.3, 0.7)):
+              mask = (step <= last).astype(float)
+              return train(A, X_raw[:, 1:], step, y, mask, hidden, lr, epochs, seed, cw)
+      - hint: "Trained on the later steps' labels too. Only labelled nodes of steps up to last_train_step carry the loss; the later steps are the ones being scored."
+        code: |
+          import numpy as np
+          def train(A, X, step, y, mask, hidden, lr, epochs, seed, cw, correct=True):
+              At = A + np.eye(len(A)); dg = At.sum(1); Ah = At / np.sqrt(np.outer(dg, dg))
+              lab = (y == 1).astype(float); d = X.shape[1]; rng = np.random.default_rng(seed)
+              P = [rng.normal(0, np.sqrt(2 / d), (d, hidden)), rng.normal(0, np.sqrt(1 / hidden), hidden),
+                   np.zeros(d), np.array(0.0)]
+              c = np.where(lab == 1, cw[1], cw[0]) * mask
+              m = [np.zeros_like(q) for q in P]; v = [np.zeros_like(q) for q in P]; losses = []
+              def fwd(P):
+                  U = Ah @ X @ P[0]; H = np.maximum(U, 0)
+                  return U, H, Ah @ H @ P[1] + X @ P[2] + P[3]
+              for t in range(1, epochs + 1):
+                  U, H, z = fwd(P)
+                  losses.append(np.sum(c * (np.logaddexp(0, z) - lab * z)) / c.sum())
+                  g = c * (1 / (1 + np.exp(-z)) - lab) / c.sum(); gr = Ah @ g
+                  G = [X.T @ (Ah @ (np.outer(gr, P[1]) * (U > 0))), H.T @ gr, X.T @ g, g.sum()]
+                  for i in range(4):
+                      m[i] = 0.9 * m[i] + 0.1 * G[i]; v[i] = 0.999 * v[i] + 0.001 * G[i] ** 2
+                      mh, vh = (m[i] / (1 - 0.9 ** t), v[i] / (1 - 0.999 ** t)) if correct else (m[i], v[i])
+                      P[i] = P[i] - lr * mh / (np.sqrt(vh) + 1e-8)
+              return np.exp(-np.logaddexp(0, -fwd(P)[2])), np.array(losses)
+          def f(A, X_raw, step, y, last, hidden, lr, epochs, seed, cw=(0.3, 0.7)):
+              mask = (y >= 0).astype(float)
+              return train(A, X_raw[:, 1:], step, y, mask, hidden, lr, epochs, seed, cw)
+      - hint: "Adam without the bias correction. Divide m by 1 - 0.9^t and v by 1 - 0.999^t before the step; without it the first steps are about three times eta."
+        code: |
+          import numpy as np
+          def train(A, X, step, y, mask, hidden, lr, epochs, seed, cw, correct=True):
+              At = A + np.eye(len(A)); dg = At.sum(1); Ah = At / np.sqrt(np.outer(dg, dg))
+              lab = (y == 1).astype(float); d = X.shape[1]; rng = np.random.default_rng(seed)
+              P = [rng.normal(0, np.sqrt(2 / d), (d, hidden)), rng.normal(0, np.sqrt(1 / hidden), hidden),
+                   np.zeros(d), np.array(0.0)]
+              c = np.where(lab == 1, cw[1], cw[0]) * mask
+              m = [np.zeros_like(q) for q in P]; v = [np.zeros_like(q) for q in P]; losses = []
+              def fwd(P):
+                  U = Ah @ X @ P[0]; H = np.maximum(U, 0)
+                  return U, H, Ah @ H @ P[1] + X @ P[2] + P[3]
+              for t in range(1, epochs + 1):
+                  U, H, z = fwd(P)
+                  losses.append(np.sum(c * (np.logaddexp(0, z) - lab * z)) / c.sum())
+                  g = c * (1 / (1 + np.exp(-z)) - lab) / c.sum(); gr = Ah @ g
+                  G = [X.T @ (Ah @ (np.outer(gr, P[1]) * (U > 0))), H.T @ gr, X.T @ g, g.sum()]
+                  for i in range(4):
+                      m[i] = 0.9 * m[i] + 0.1 * G[i]; v[i] = 0.999 * v[i] + 0.001 * G[i] ** 2
+                      mh, vh = (m[i] / (1 - 0.9 ** t), v[i] / (1 - 0.999 ** t)) if correct else (m[i], v[i])
+                      P[i] = P[i] - lr * mh / (np.sqrt(vh) + 1e-8)
+              return np.exp(-np.logaddexp(0, -fwd(P)[2])), np.array(losses)
+          def f(A, X_raw, step, y, last, hidden, lr, epochs, seed, cw=(0.3, 0.7)):
+              mask = ((y >= 0) & (step <= last)).astype(float)
+              return train(A, X_raw[:, 1:], step, y, mask, hidden, lr, epochs, seed, cw, correct=False)
+      - hint: "Recorded the loss after the update. losses[t-1] is the loss at the parameters the epoch starts from, before its step; the first entry is the loss of the starting parameters."
+        code: |
+          import numpy as np
+          def f(A, X_raw, step, y, last, hidden, lr, epochs, seed, cw=(0.3, 0.7)):
+              X = X_raw[:, 1:]; mask = ((y >= 0) & (step <= last)).astype(float)
+              At = A + np.eye(len(A)); dg = At.sum(1); Ah = At / np.sqrt(np.outer(dg, dg))
+              lab = (y == 1).astype(float); d = X.shape[1]; rng = np.random.default_rng(seed)
+              W0 = rng.normal(0, np.sqrt(2 / d), (d, hidden))
+              w1 = rng.normal(0, np.sqrt(1 / hidden), hidden)
+              P = [W0, w1, np.zeros(d), np.array(0.0)]
+              c = np.where(lab == 1, cw[1], cw[0]) * mask
+              m = [np.zeros_like(q) for q in P]; v = [np.zeros_like(q) for q in P]; losses = []
+              def fwd(P):
+                  U = Ah @ X @ P[0]; H = np.maximum(U, 0)
+                  return U, H, Ah @ H @ P[1] + X @ P[2] + P[3]
+              loss = lambda z: np.sum(c * (np.logaddexp(0, z) - lab * z)) / c.sum()
+              for t in range(1, epochs + 1):
+                  U, H, z = fwd(P)
+                  if not True:
+                      losses.append(loss(z))
+                  g = c * (1 / (1 + np.exp(-z)) - lab) / c.sum(); gr = Ah @ g
+                  G = [X.T @ (Ah @ (np.outer(gr, P[1]) * (U > 0))), H.T @ gr, X.T @ g, g.sum()]
+                  for i in range(4):
+                      m[i] = 0.9 * m[i] + 0.1 * G[i]; v[i] = 0.999 * v[i] + 0.001 * G[i] ** 2
+                      P[i] = P[i] - lr * (m[i] / (1 - 0.9 ** t)) / (np.sqrt(v[i] / (1 - 0.999 ** t)) + 1e-8)
+                  if True:
+                      losses.append(loss(fwd(P)[2]))
+              return np.exp(-np.logaddexp(0, -fwd(P)[2])), np.array(losses)
+      - hint: "Drew w1 before W0. From one generator the order of the draws decides which numbers each parameter gets: W0 first, then w1."
+        code: |
+          import numpy as np
+          def f(A, X_raw, step, y, last, hidden, lr, epochs, seed, cw=(0.3, 0.7)):
+              X = X_raw[:, 1:]; mask = ((y >= 0) & (step <= last)).astype(float)
+              At = A + np.eye(len(A)); dg = At.sum(1); Ah = At / np.sqrt(np.outer(dg, dg))
+              lab = (y == 1).astype(float); d = X.shape[1]; rng = np.random.default_rng(seed)
+              w1 = rng.normal(0, np.sqrt(1 / hidden), hidden)
+              W0 = rng.normal(0, np.sqrt(2 / d), (d, hidden))
+              P = [W0, w1, np.zeros(d), np.array(0.0)]
+              c = np.where(lab == 1, cw[1], cw[0]) * mask
+              m = [np.zeros_like(q) for q in P]; v = [np.zeros_like(q) for q in P]; losses = []
+              def fwd(P):
+                  U = Ah @ X @ P[0]; H = np.maximum(U, 0)
+                  return U, H, Ah @ H @ P[1] + X @ P[2] + P[3]
+              loss = lambda z: np.sum(c * (np.logaddexp(0, z) - lab * z)) / c.sum()
+              for t in range(1, epochs + 1):
+                  U, H, z = fwd(P)
+                  if not False:
+                      losses.append(loss(z))
+                  g = c * (1 / (1 + np.exp(-z)) - lab) / c.sum(); gr = Ah @ g
+                  G = [X.T @ (Ah @ (np.outer(gr, P[1]) * (U > 0))), H.T @ gr, X.T @ g, g.sum()]
+                  for i in range(4):
+                      m[i] = 0.9 * m[i] + 0.1 * G[i]; v[i] = 0.999 * v[i] + 0.001 * G[i] ** 2
+                      P[i] = P[i] - lr * (m[i] / (1 - 0.9 ** t)) / (np.sqrt(v[i] / (1 - 0.999 ** t)) + 1e-8)
+                  if False:
+                      losses.append(loss(fwd(P)[2]))
+              return np.exp(-np.logaddexp(0, -fwd(P)[2])), np.array(losses)
+      - hint: "Used the variance as the scale. rng.normal takes the standard deviation: W0 has variance 2/d, so its scale is sqrt(2/d), and w1's is sqrt(1/hidden)."
+        code: |
+          import numpy as np
+          def f(A, X_raw, step, y, last, hidden, lr, epochs, seed, cw=(0.3, 0.7)):
+              X = X_raw[:, 1:]; mask = ((y >= 0) & (step <= last)).astype(float)
+              At = A + np.eye(len(A)); dg = At.sum(1); Ah = At / np.sqrt(np.outer(dg, dg))
+              lab = (y == 1).astype(float); d = X.shape[1]; rng = np.random.default_rng(seed)
+              W0 = rng.normal(0, 2 / d, (d, hidden))
+              w1 = rng.normal(0, 1 / hidden, hidden)
+              P = [W0, w1, np.zeros(d), np.array(0.0)]
+              c = np.where(lab == 1, cw[1], cw[0]) * mask
+              m = [np.zeros_like(q) for q in P]; v = [np.zeros_like(q) for q in P]; losses = []
+              def fwd(P):
+                  U = Ah @ X @ P[0]; H = np.maximum(U, 0)
+                  return U, H, Ah @ H @ P[1] + X @ P[2] + P[3]
+              loss = lambda z: np.sum(c * (np.logaddexp(0, z) - lab * z)) / c.sum()
+              for t in range(1, epochs + 1):
+                  U, H, z = fwd(P)
+                  if not False:
+                      losses.append(loss(z))
+                  g = c * (1 / (1 + np.exp(-z)) - lab) / c.sum(); gr = Ah @ g
+                  G = [X.T @ (Ah @ (np.outer(gr, P[1]) * (U > 0))), H.T @ gr, X.T @ g, g.sum()]
+                  for i in range(4):
+                      m[i] = 0.9 * m[i] + 0.1 * G[i]; v[i] = 0.999 * v[i] + 0.001 * G[i] ** 2
+                      P[i] = P[i] - lr * (m[i] / (1 - 0.9 ** t)) / (np.sqrt(v[i] / (1 - 0.999 ** t)) + 1e-8)
+                  if False:
+                      losses.append(loss(fwd(P)[2]))
+              return np.exp(-np.logaddexp(0, -fwd(P)[2])), np.array(losses)
+
+  why-rf-wins:
+    kind: review
+    rubric: |
+      Pass if the answer makes BOTH of these points:
+      (1) the 72 aggregate columns are themselves one round of message
+      passing / a fixed neighbourhood aggregation (gather the neighbours'
+      columns, aggregate with max/min/std/correlation), so the forest
+      already sees the one-hop neighbourhood the GCN layer would compute;
+      (2) the GCN ends in a logistic regression (one linear score through a
+      sigmoid/softmax) on its hidden layer and skip term, while a forest
+      splits columns at thresholds and combines them non-linearly, which
+      suits these tabular columns better.
+      A further point that strengthens but is not required: the normalised
+      sum dilutes a few suspicious neighbours among many, where a max keeps
+      them.
+      Fail if the answer says only that the GCN underfits, is too small, or
+      needs more training or tuning, without naming what the aggregates are
+      and what the output layer is. Fail if it claims the graph carries no
+      information. Do not grade style or length.
+
+  rank-the-test-steps:
+    kind: metric
+    metric: roc_auc
+    threshold: 0.915
+    labels_code: |
+      # Build time only. The test labels are read from the original files
+      # the solution downloaded into the cache; nothing derived from them is
+      # stored in the repository (the licence forbids sharing a derivative).
+      import os
+      from pathlib import Path
+      import pandas as pd
+      d = Path(os.environ.get("ELLIPTIC_DIR", Path.home() / ".cache" / "distill" / "elliptic"))
+      step = pd.read_csv(d / "elliptic_txs_features.csv.zip", header=None, usecols=[1])[1].to_numpy()
+      cls = pd.read_csv(d / "elliptic_txs_classes.csv.zip", dtype=str)["class"].to_numpy()
+      keep = (step >= 35) & (cls != "unknown")
+      labels = (cls[keep] == "1").astype(float)

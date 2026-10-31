@@ -1,0 +1,1061 @@
+A cardholder has never been flagged, but three of the shops they paid at were used by cards later confirmed stolen. How much suspicion should flow from the confirmed frauds across the graph to this cardholder, how far, and how fast should it fade with time — computed for a million nodes before the next payment arrives?
+
+<Ref lesson="communities-and-components">The previous chapter</Ref> ended
+on what a connected component cannot do: it labels every member alike,
+and it says nothing about users joined to fraud by ordinary payments
+rather than by ring rules. The cardholder above is such a user. They
+share no card, no device and no address with anyone flagged. All they
+share is three shops.
+
+In the card graph that link is a path. The fraud label sits on a payment
+node, as in <Ref lesson="fraud-as-a-graph" id="the-tripartite-graph">the
+tripartite form</Ref>, so the route from a stolen card's payment to our
+cardholder runs payment → shop → the cardholder's own payment →
+cardholder: three edges. The one-hop column "fraudulent neighbours" of
+<Ref lesson="neighbourhood-and-centrality"
+id="degree-split-by-the-neighbours-labels">the neighbourhood
+chapter</Ref> scores this cardholder zero, because its only neighbours
+are its own payments and none of them is fraud. Walk counts $A^k\mathbf{f}$
+reach three edges and further, but they grow with the number of
+neighbours along the way: in <Ref lesson="communities-and-components"
+id="exercises">the last exercise on walk counts</Ref>, U3 outranked U1
+only because it had more neighbours to walk through.
+
+So the opening asks for a score with five properties. It should take
+paths of every length into account and trust short ones more. It should
+not reward a node merely for being busy, whether the busy node lies on
+the path or at its end. Old payments and old labels
+should count less than fresh ones. It must be computable for every node
+of a graph of a million cardholders in one night. And it must give a
+value for a payment that arrives after that night's computation, within
+the authorisation deadline.
+
+## One hop with weights: the relational neighbour classifier
+
+Start with the shortest path. The obvious rule looks one hop out and
+asks what share of a node's links lead to fraud. You computed it on the
+20-node toy in <Ref lesson="neighbourhood-and-centrality"
+id="exercises">an exercise of the neighbourhood chapter</Ref>, where G
+scored 3 of 4 and A 1 of 6. With weights on the edges it reads as
+follows.
+
+<Definition title="relational neighbour classifier">
+For a node $v$ with neighbours $N(v)$, edge weights $w_{vu}$ and known
+labels $y_u$, the *relational neighbour* estimate is
+
+$$
+P(\text{fraud} \mid v) = \frac{1}{Z} \sum_{u \in N(v),\; y_u = \text{fraud}} w_{vu},
+$$
+
+with $Z$ the total weight of $v$'s labelled neighbours. When every node
+not known as fraud counts as legitimate, $Z$ is the strength
+$s_v = \sum_{u} w_{vu}$, the weighted degree of <Ref
+lesson="communities-and-components" id="counting-edge-ends">the
+modularity section</Ref>.
+</Definition>
+
+With unit weights the rule is a fraction. A node with two fraudulent and
+three legitimate neighbours scores $(1 + 1)/(1 + 1 + 1 + 1 + 1) = 2/5$.
+With the decayed weights of <Ref lesson="fraud-as-a-graph"
+id="choosing-the-decay-from-a-horizon">the first graph chapter</Ref>, a
+link made this morning counts nearly 1 and a link from three weeks ago
+nearly nothing, so the same five neighbours can score very differently.
+
+<Exercise>
+The same node's two fraudulent links have weights 0.9 and 0.1; its three
+legitimate links have weights 0.2, 0.2 and 0.1. Compute
+$P(\text{fraud} \mid v)$ and say what the weights changed.
+
+<Solution>
+Fraud weight $0.9 + 0.1 = 1.0$; total $1.0 + 0.5 = 1.5$;
+$P = 1.0/1.5 = 0.67$, against $0.40$ with unit weights. The legitimate
+links are old, so they count little, and the recent fraudulent link
+dominates. The decay turns "two of five" into "most of what this node did
+lately".
+</Solution>
+</Exercise>
+
+### Neighbours that carry probabilities instead of labels
+
+The labelled rule ignores every neighbour with no label, and in a fraud
+graph that is almost every neighbour. The repair is to let each neighbour
+contribute its own estimated probability, which can come from the
+supervised model of the earlier modules scoring the neighbour on its own
+columns:
+
+$$
+P(\text{fraud} \mid v) = \frac{1}{Z} \sum_{u \in N(v)} w_{vu}\, P(\text{fraud} \mid u), \qquad Z = s_v .
+$$
+
+This is the *probabilistic relational neighbour* rule. A node whose five
+neighbours carry probabilities 0.25, 0.20, 0.80, 0.10 and 0.90 at unit
+weights scores $2.25/5 = 0.45$.
+
+<FigureSequence
+  name="neighbour"
+  alt="Two frames of one node marked with a question mark and five neighbours on unit-weight edges. Frame 1: two neighbours filled amber and marked fraud, three outlined and marked legit; the panel reads fraud weight 2, legit weight 3, Z = 5, P(fraud) = 2/5 = 0.40. Frame 2: the same five neighbours shaded by their fraud probabilities 0.25, 0.20, 0.80, 0.10, 0.90; the panel reads 0.25 + 0.20 + 0.80 + 0.10 + 0.90 = 2.25, Z = 5, P(fraud) = 0.45"
+  caption="One hop, two rules. The second lets an unlabelled neighbour pass on what is known about it."
+/>
+
+Both rules push suspicion from fraud onto whatever fraud links to. That
+is only right where a fraudulent neighbour is evidence of fraud, which
+<Ref lesson="neighbourhood-and-centrality"
+id="which-way-a-fraudulent-neighbour-points">the homophily gate</Ref>
+checks: fraud nodes must have more fraudulent neighbours on average than
+legitimate nodes, roughly dyadicity above heterophilicity. On an auction
+graph, where fraudsters trade with accomplices, both rules raise the
+accomplices and the honest buyers, and no setting of the rule can turn
+that around.
+
+### Repeating the rule: collective inference
+
+The probabilistic rule needs the neighbours' probabilities, and those
+depend on the neighbours' own neighbours. So the rule is repeated: score
+every unknown node from its neighbours' current scores, then do it
+again. The exercise on the toy ran two rounds; H, zero after the first,
+scored 0.25 after the second, because suspicion had arrived from two
+steps away. Updating linked unknown nodes from one another until their
+estimates settle is called *collective inference*.
+
+Run to the end, plain repetition fails. Every round replaces a node's
+score by an average of its neighbours', the known fraud nodes stay
+fixed at 1, and nothing else is fixed. Averages of numbers that are at
+most 1 and pulled toward 1 at the fraud nodes creep up everywhere: on a
+connected graph every unknown node converges to 1, which says that
+everyone near anyone is a fraudster. What the repetition lacks is a
+discount for distance, a rule by which suspicion weakens with every hop.
+
+## Following a walk: PageRank and why it ranks the busy
+
+The discount by distance already appeared once: in the walk-count
+exercise of the previous chapter, a path of length $k$ was weighted by
+$\beta^k$. Busy nodes broke it in two places. On the way, every node
+multiplies the walks through it by its number of neighbours, so the sum
+converges only for $\beta$ below $1/\lambda_{\max}$, and $\lambda_{\max}$
+is set by the busiest nodes. A hub joined to 400 users who touch nothing
+else has $\lambda_{\max} = 20$ (put 20 on the hub and 1 on each user: one
+product with $A$ gives the hub 400 and each user 20), so $\beta$ must fall
+below 0.05, and the discount meant to choose the reach is chosen by one
+hub. At the end of the path, U3 outranked U1 because it had more
+neighbours. A walker that divides what it carries among the neighbours
+of the node it leaves removes the first defect. The second it leaves in
+place, as the five users will show.
+
+### A walker who follows edges and sometimes restarts
+
+Put a walker on the graph. Standing at node $j$, it moves to neighbour
+$i$ with probability proportional to the edge's weight:
+
+$$
+Q_{ij} = \frac{w_{ij}}{s_j}, \qquad \text{that is} \qquad Q = W S^{-1},
+$$
+
+with $W$ the weight matrix of entries $w_{ij}$ and $S$ the diagonal
+matrix of the strengths. Every column of $Q$ sums to 1, since it divides the weights at $j$ by
+their total; $Q$ is the *column-normalised* weight matrix, and the column
+index is where the walker comes from. A walker at G, with four neighbours
+of weight 1, goes to A, D, F or I with probability $1/4$ each. If $x$
+holds the probability of standing at each node, one step later it is
+$Qx$: the step divides each node's probability among its neighbours, so
+a busy node hands on small shares.
+
+Then add a restart. At every step the walker follows an edge with
+probability $\alpha$; with probability $1 - \alpha$ it jumps to a node
+drawn from a fixed *restart vector* $e$, whose entries are non-negative
+and sum to 1. The share of time the walker spends at each node settles
+to a vector $\xi$ that one more step leaves unchanged:
+
+$$
+\xi = \alpha Q \xi + (1 - \alpha)\, e .
+$$
+
+<Definition title="random walk with restart; PageRank">
+For a column-normalised weight matrix $Q$, a follow probability
+$0 < \alpha < 1$ and a restart vector $e$, the *random walk with
+restart* score is the solution $\xi$ of
+$\xi = \alpha Q \xi + (1 - \alpha) e$. With $e$ uniform, $e_v = 1/n$ for
+all $n$ nodes, $\xi$ is the *PageRank* of the graph, first used to rank
+web pages linked by hyperlinks. The conventional follow probability is
+$\alpha = 0.85$.
+</Definition>
+
+Substituting the equation into itself shows what the score adds up:
+
+$$
+\xi = (1-\alpha)\, e + \alpha Q \big((1-\alpha) e + \alpha Q \xi\big) = \dots = (1 - \alpha) \sum_{k=0}^{\infty} \alpha^k Q^k e .
+$$
+
+$Q^k e$ is where a walker started from $e$ stands after $k$ steps, and
+$\alpha^k$ is the chance that it made $k$ steps without restarting. The
+score of a node is therefore a sum over paths of every length from the
+restart nodes, with weight $\alpha^k$ for length $k$, and every step of
+a path divided by the strength of the node it leaves. Because the
+columns of $Q$ sum to 1, every $Q^k e$ is again a probability vector: a
+busy node on the way splits what it receives instead of multiplying it.
+The sum therefore converges for every $\alpha < 1$ on every graph, the
+scores add up to 1 however large the hubs, and $\alpha$ can be chosen
+for reach alone.
+
+### What the division leaves: the endpoint's own strength
+
+Take the five users of the walk-count exercise, edges U1–U2, U1–U3,
+U2–U3, U3–U4 and U4–U5, restart at the flagged U2, $\alpha = 0.85$. The
+walk settles at U2 0.322, U3 0.282, U1 0.217, U4 0.125 and U5 0.053,
+summing to 1. U3 still outranks U1, by more than the walk counts had it
+(0.282 against 0.217, where the $\beta$-sum gave 0.67 against 0.62).
+
+The reason is the endpoint's own doors. U2 has two neighbours and hands
+U1 and U3 equal halves of whatever it holds; what separates them is
+what arrives through their other edges. U1 has one more door, from U3.
+U3 has two, from U1 and from U4, and a node with more edges is entered
+more often. Dividing each score by the node's strength undoes that:
+U1 $0.217/2 = 0.108$, U3 $0.282/3 = 0.094$, and the order reverses. Per
+link, U1 is the more exposed: both its neighbours are U2 and a
+neighbour of U2, while one of U3's three, U4, leads away from U2.
+
+So the walk removes the growth through busy intermediate nodes, but its
+score is still multiplied by the strength of the node it lands on. The
+Remark on spreading and averaging, once the exposure score is defined,
+shows the multiplication is exact, $\xi = S p$; $p = S^{-1}\xi$ is the
+per-link reading to use when the endpoint's busyness must be removed.
+
+### Plain PageRank ranks by degree
+
+With a uniform restart the walker starts anywhere, and the labels never
+enter. What is left to rank by is the shape of the graph, and on an
+undirected graph that is the endpoint strength of the five users with
+nothing beside it: activity.
+
+<Proposition title="the walk without restart lands on the strengths">
+On an undirected weighted graph with total edge weight $M$, the vector
+$\pi_v = s_v / 2M$ satisfies $Q\pi = \pi$: it is the stationary
+distribution of the walk without restart ($\alpha = 1$), and on a
+connected graph it is the only one.
+
+<Proof>
+$(Q\pi)_i = \sum_j \frac{w_{ij}}{s_j}\cdot\frac{s_j}{2M} =
+\frac{1}{2M}\sum_j w_{ij} = \frac{s_i}{2M} = \pi_i$, using
+$w_{ij} = w_{ji}$. The strengths sum to $2M$, so $\pi$ is a probability
+vector. That it is the only one is taken here without proof: on a
+connected graph the walker can get from any node to any other, and that
+is what leaves the walk a single stationary vector.
+</Proof>
+</Proposition>
+
+At $\alpha = 0.85$ the uniform restart pulls the scores a little toward
+equal, but not far. On the 20-node toy, plain PageRank puts A first, the
+node of degree 6, and its correlation with degree is 0.97. Node Q comes
+second with degree 3, because two leaves send it everything they
+receive. The four fraud nodes D, E, F and I are scattered through the
+ranking according to their degrees.
+
+<Figure
+  src="./figures/degree-scatter.svg"
+  alt="Scatter of score against degree for the 20 toy nodes. Blue dots, uniform restart, rise steadily with degree from about 0.02 at degree 1 to 0.108 for A at degree 6. Amber dots, restart at the four fraud nodes, do not follow degree: D 0.169, F 0.145, E 0.114 at degree 2, G 0.109, I 0.094, while A at degree 6 sits at 0.088 and most degree-1 nodes near zero"
+  caption="With a uniform restart the score is a degree count with extra steps; restarted at the frauds it follows where the frauds are."
+/>
+
+<KeyFact>
+Plain PageRank measures activity, not suspicion: without restart it is
+exactly each node's share of the edge weight, so on a card graph the
+busiest merchant ranks first whatever its labels.
+</KeyFact>
+
+## Restarting at the known fraud: the exposure score
+
+The restart vector is the one place where the labels can enter. Put all
+of it on the known fraud: with $\mathbf{f}$ the fraud indicator vector
+and $|\mathbf{f}|$ the number of fraud nodes, $e = \mathbf{f}/|\mathbf{f}|$.
+The walker now starts only at fraud and returns there whenever it
+restarts.
+
+<Definition title="exposure score">
+The *exposure score* of a node is its random-walk-with-restart score
+when the restart vector is spread over the known fraud nodes:
+$\xi = \alpha Q \xi + (1 - \alpha)\,\mathbf{f}/|\mathbf{f}|$. It is the
+long-run share of time a walker that restarts at fraud spends at the
+node.
+</Definition>
+
+On the toy, with the restart on D, E, F and I, the ranking becomes D
+(0.169), F (0.145), E (0.114), G (0.109), I (0.094), then A (0.088). The
+three nodes of the fraud triangle lead. Then comes G, which is not known
+as fraud, ahead of I, which is.
+
+<Figure
+  src="./figures/plain-vs-fraud.svg"
+  alt="Two copies of the 20-node toy side by side, discs sized by score. Left, blue, uniform restart: the largest discs are A, Q, I, D and G, the hubs. Right, amber, restart at D, E, F, I: the largest discs are D, F, E, G and I, the fraud triangle and the node G joined to three of the four frauds; Q, R and S nearly vanish"
+  caption="The same walk, two restart vectors. Moving the restart from everywhere to the known fraud turns a measure of activity into a measure of exposure."
+/>
+
+### Why G outranks I
+
+G has four neighbours, three of them restart nodes. Every step from D, F
+or I hands G a quarter, a third and a quarter of their current
+probability, and those three are where the walker returns most often. I
+is a restart node, but none of its four neighbours is: the probability
+it receives at each restart leaves at rate $\alpha$ toward A, G, K and
+N, and comes back mainly through G. Exposure measures the fraud a node
+sits among, and G sits among more of it than I does; whether G is the
+next fraudster or the next victim, as <Ref
+lesson="neighbourhood-and-centrality" id="reading-the-table">the feature
+table</Ref> already warned, the score cannot say.
+
+Inside the triangle the order D, F, E is the order of the degrees, 4, 3
+and 2. That is no accident.
+
+<Remark title="spreading versus averaging">
+The relational neighbour rule averages: $p_v = \frac{1}{s_v}\sum_u
+w_{vu} p_u$, or $p = S^{-1} W p$, a row-normalised step. The walk
+spreads: $\xi = W S^{-1} \xi$, a column-normalised step. Writing
+$\xi = S p$, that is $\xi_v = s_v p_v$, turns the walk with restart into
+$p = \alpha S^{-1} W p + (1 - \alpha) S^{-1} e$: an average of the neighbours' $p$ plus a
+restart term. So the exposure of a node is an averaged suspicion
+multiplied by its strength. Among nodes equally surrounded by fraud, the
+busier one collects more of the walk; $p$ is the score with the
+endpoint's busyness removed, the one that put U1 above U3. Divided by degree, the toy's
+triangle reads E (0.057), F (0.048), D (0.042): per link, E is the most
+exposed.
+</Remark>
+
+### Which way to walk on a transfer graph
+
+On the card graph an edge has no direction, because money always flows
+from cardholder to merchant. On a graph of transfers between accounts it
+has one, and the walk can follow it either way. Restart at a confirmed
+mule and walk along the edges, and the score lands on whom the mule
+paid. Walk against them, along incoming transfers, and it lands on who
+fed the mule, which is where the organisers and the next mules usually
+are. The second direction is the one laundering investigations want;
+in matrix terms it is the same equation with the weight matrix
+transposed.
+
+<Figure
+  src="./figures/direction.svg"
+  alt="A chain of accounts X to Y to Z, with Z, filled amber, labelled confirmed mule, and Z paying out to U and V. An amber dashed arc runs back from Z over Y to X, labelled against the money: who fed Z. A blue dashed arc runs from Z toward V, labelled with the money: whom Z paid"
+  caption="On a directed graph the restart is placed once; the direction of the walk decides whether suspicion reaches the senders or the receivers."
+/>
+
+## Computing it for a million nodes: power iteration
+
+The definition says what $\xi$ is. Computing it for every node of a card
+graph, every night, is a separate problem.
+
+### Not by inverting a matrix
+
+The equation is linear, $(I - \alpha Q)\xi = (1 - \alpha) e$, so
+$\xi = (1 - \alpha)(I - \alpha Q)^{-1} e$. For a million nodes,
+$I - \alpha Q$ is a $10^6 \times 10^6$ matrix. $Q$ itself is
+<Ref lesson="fraud-as-a-graph"
+id="matrix-or-list-what-the-graph-costs-to-store">sparse</Ref>, one
+entry per edge end, but the inverse of a sparse matrix of a connected
+graph is dense: $10^{12}$ numbers, eight terabytes in double precision,
+before any arithmetic.
+
+### One sparse product per step
+
+Instead, start from the restart vector and apply the equation's right
+side again and again:
+
+$$
+\xi^{(0)} = e, \qquad \xi^{(k+1)} = \alpha Q \xi^{(k)} + (1 - \alpha)\, e .
+$$
+
+This is *power iteration*. Each step is one product of the sparse $Q$
+with a vector, a single pass over the edge list.
+
+<Example title="the first step on the toy">
+Start with $\xi^{(0)} = 0.25$ at each of D, E, F, I and 0 elsewhere.
+
+**G** (not a restart node) receives from its fraud neighbours D
+(degree 4), F (degree 3) and I (degree 4):
+$0.85\,(0.25/4 + 0.25/3 + 0.25/4) = 0.85 \times 0.208 = 0.177$.
+
+**D** receives from E (degree 2) and F (degree 3), and gets its restart
+share: $0.85\,(0.25/2 + 0.25/3) + 0.15 \times 0.25 = 0.177 + 0.0375 =
+0.215$.
+
+After one step G already stands at 0.177, third behind D and F.
+</Example>
+
+<Exercise>
+Compute $\xi^{(1)}$ for E, I and A, and explain why I falls from 0.25 to
+far below G.
+
+<Solution>
+**E**: neighbours D (degree 4) and F (degree 3):
+$0.85\,(0.25/4 + 0.25/3) + 0.0375 = 0.85 \times 0.146 + 0.0375 = 0.162$.
+
+**I**: its neighbours A, G, K, N hold nothing at step 0, so only the
+restart share is left: $0.15 \times 0.25 = 0.0375$.
+
+**A**: one neighbour holds anything, I (degree 4):
+$0.85 \times 0.25/4 = 0.053$.
+
+I falls because everything it held moved to its four neighbours, none of
+which sent anything back yet. It recovers over the next steps as
+probability returns through G and A, and settles at 0.094.
+</Solution>
+</Exercise>
+
+<FigureSequence
+  name="walk"
+  alt="Five frames of the 20-node toy with amber discs sized by score and the four fraud nodes D, E, F, I ringed. Frame 1, start: equal discs on D, E, F, I. Frame 2, after one step: G, D and F largest, discs appear on A, B, K, N, I small. Frame 3, after two steps: mass returns to E and I, H appears. Frame 4, after five steps: the order D, F, E, G, A, I. Frame 5, converged: D 0.169, F 0.145, E 0.114, G 0.109, I 0.094, A 0.088, B 0.064, K 0.040, change in the step 0.000002. A side panel lists the top eight and the change made by the step"
+  caption="Power iteration on the toy: the ranking forms within a few steps, and the step size falls by roughly the factor α each time."
+/>
+
+<Task>
+Step through the frames and watch I. After one step it holds only its
+restart share, 0.0375. Before frame 3, predict whether two steps bring
+it back nearer 0.25 or leave it nearer 0.04, counting what G and A
+received in step one; frame 3 shows 0.113, and frame 5 the settled
+0.094.
+</Task>
+
+<Demo
+  name="RestartWalkPropagator"
+  caption="The 20-node toy with the restart nodes you choose: each step runs ξ ← αQξ + (1−α)e once at α = 0.85, starting from ξ = e, and the discs are sized by ξ."
+/>
+
+<Task>
+With the four frauds D, E, F, I as seeds, step until the top six stop
+changing order, and name the unflagged node that sits above a flagged
+one. Then keep only two of the four flagged nodes as seeds and find a
+pair that puts I above G. (Answers: from step 6 the order is D, F, E, G,
+I, A, so G outranks I; D with I, E with I and F with I each put I above
+G, and no pair from the triangle D, E, F does: where the restart sits
+decides the ranking, not degree alone.)
+</Task>
+
+Why does it converge, and how fast? The difference from the fixed point
+obeys $\xi^{(k+1)} - \xi = \alpha Q(\xi^{(k)} - \xi)$, and a
+column-normalised $Q$ never increases the sum of absolute values of a
+vector. Each step therefore shrinks the distance to $\xi$ by at least
+the factor $\alpha$, whatever the graph, and the fixed point is unique.
+On the toy the change per step falls from 0.78 at the first step to
+0.0016 at the twentieth and $2 \times 10^{-6}$ at the fiftieth.
+
+```python
+import numpy as np
+import scipy.sparse as sp
+
+def exposure(W, seeds, alpha=0.85, tol=1e-9, max_steps=200):
+    s = np.asarray(W.sum(axis=0)).ravel()
+    Q = W @ sp.diags(1.0 / np.where(s > 0, s, 1))  # an isolated node keeps a zero column
+    e = seeds / seeds.sum()
+    xi = e.copy()
+    for _ in range(max_steps):
+        new = alpha * (Q @ xi) + (1 - alpha) * e
+        if np.abs(new - xi).sum() < tol:
+            return new
+        xi = new
+    return xi
+```
+
+On the toy this stops at the 85th step, the first whose change falls
+below the tolerance. A month of card payments is tens of millions of
+edges; at a pass over the edge list per step and about ninety steps,
+the computation fits in a night with room for several graphs.
+
+<KeyFact>
+The exposure score costs one pass over the edge list per step, and every
+step cuts the remaining error by the factor $\alpha$; $\alpha$ sets both
+how far suspicion travels and how many steps the computation needs.
+</KeyFact>
+
+## Labels on payments, weights that fade: the card graph
+
+The toy put labels on nodes and gave every edge weight 1. A card graph
+has its labels on payments and its edges age. Both were prepared in the
+first graph chapter: the payment became a node of <Ref
+lesson="fraud-as-a-graph" id="the-tripartite-graph">the tripartite
+matrix</Ref> $Q_{\text{tri}}$, and every edge carries the weight
+$e^{-\gamma h}$ of <Ref lesson="fraud-as-a-graph"
+id="choosing-the-decay-from-a-horizon">its age</Ref>. Two changes turn
+the walk into a card-fraud score.
+
+**The walk runs on the tripartite graph.** Normalise the columns of
+$Q_{\text{tri}}$ and use it as $Q$. A payment node has exactly one
+cardholder and one merchant neighbour, so the walker alternates: entity,
+payment, entity, payment. A cardholder's exposure is what reaches it
+through its own payments from the merchants where fraud happened.
+
+**The restart sits on confirmed fraud payments, weighted by age.** Entry
+$i$ of the restart vector is $e^{-\gamma h_i}$ if payment $i$ is a
+confirmed fraud, with $h_i$ the time since it was confirmed, and 0 for
+every other node; the vector is then normalised to sum to 1. A fraud
+confirmed this morning restarts the walk more often than one confirmed
+three weeks ago.
+
+<Example title="the card toy, week graph">
+Take the five payments of the first graph chapter with their week
+weights: $p_1$ ($c_1$–$m_1$, 0.97, fraud), $p_2$ ($c_1$–$m_2$, 0.59),
+$p_3$ ($c_2$–$m_1$, 0.91), $p_4$ ($c_2$–$m_3$, 0.17), $p_5$
+($c_3$–$m_3$, 0.70). One fraud, so the restart vector is 1 at $p_1$.
+
+**Step 1.** $p_1$ has two edges of equal weight, so it hands
+$0.85 \times 1/2 = 0.425$ to each of $c_1$ and $m_1$, and keeps the
+restart share 0.15.
+
+**Step 2.** $m_1$ has strength $0.97 + 0.91 = 1.88$, so it passes
+$0.91/1.88$ of what it holds to $p_3$, the payment of $c_2$:
+$0.85 \times 0.425 \times 0.484 = 0.175$. Suspicion has reached the
+payment of a cardholder who never touched the stolen card.
+
+**Converged.** $p_1$ 0.324, $m_1$ 0.186, $c_1$ 0.175, $p_3$ 0.114,
+$p_2$ 0.088, $c_2$ 0.052, $m_2$ 0.037, and the far corner $p_4$,
+$m_3$, $p_5$, $c_3$ between 0.003 and 0.008.
+</Example>
+
+<FigureSequence
+  name="tripartite"
+  alt="Four frames of the card toy drawn in three columns, cardholders c1 to c3, payments p1 to p5, merchants m1 to m3, edges labelled with their week weights. Frame 1: all mass on p1, ringed amber as confirmed fraud. Frame 2: after one step c1 and m1 hold 0.425 each, p1 0.150. Frame 3: after two steps p1 0.561, p3 0.175, p2 0.137, c1 and m1 0.064. Frame 4: converged values p1 0.324, m1 0.186, c1 0.175, p3 0.114, p2 0.088, c2 0.052, m2 0.037, p4 0.008, p5 0.007, m3 0.006, c3 0.003"
+  caption="On the tripartite graph the walk alternates between entities and payments; c2 is exposed through the merchant it shares with the stolen card."
+/>
+
+<Exercise>
+Compute $\xi^{(2)}$ for $p_2$ and for $p_1$ in the card toy, from
+$\xi^{(1)}$ ($c_1 = m_1 = 0.425$, $p_1 = 0.15$). The strength of $c_1$
+is $0.97 + 0.59 = 1.56$.
+
+<Solution>
+**$p_2$**: its neighbours are $c_1$ and $m_2$, and only $c_1$ holds
+anything. $c_1$ passes $0.59/1.56 = 0.378$ of its 0.425 to $p_2$:
+$0.85 \times 0.425 \times 0.378 = 0.137$.
+
+**$p_1$**: from $c_1$ the share $0.97/1.56 = 0.622$, from $m_1$ the share
+$0.97/1.88 = 0.516$: $0.85\,(0.425 \times 0.622 + 0.425 \times 0.516) =
+0.85 \times 0.484 = 0.411$, plus the restart 0.15: 0.561. Most of the
+mass that left $p_1$ comes straight back, because $c_1$ and $m_1$ each
+have only one or two other places to send it.
+</Solution>
+</Exercise>
+
+The opening's cardholder is $c_2$ in miniature: never flagged, one shop
+in common with a stolen card, exposure 0.052, about 18 times that of
+$c_3$, who shares nothing with it. With three such shops the three paths
+add.
+
+### Three horizons, nine columns, computed at midnight
+
+Frauds move at different speeds, which is why the first graph chapter
+built the graph three times, with horizons of a day, a week and a month.
+The walk runs once on each, and each run scores every cardholder,
+merchant and payment. That gives nine columns per payment: the exposure
+of its cardholder, of its merchant, and of the payment itself, at three
+horizons.
+
+The scores are recomputed every night at midnight and read during the
+next day. Like every label-derived feature they obey <Ref
+lesson="point-in-time-features"
+id="two-ways-a-training-row-can-know-too-much">the point-in-time
+rule</Ref>: tonight's restart vector may hold only the frauds whose
+confirmation has arrived by tonight, and a training row reads the scores
+of the night before it, never a later night's.
+
+One property of the numbers matters when they become columns. The
+exposure scores of a graph sum to 1, so as the graph grows each score
+shrinks, and a value means different things on nights with different
+numbers of nodes. Multiplying by the night's node count, so that 1 means
+average exposure, keeps a column comparable from one night to the next.
+The score is a ranking of nodes on one night, not a probability of
+fraud.
+
+## A payment the graph has not seen: the local update
+
+At 10:14 cardholder $c_3$ pays at merchant $m_1$ for the first time. The
+pair has no payment in last night's graph, so the payment has no
+exposure, and rerunning the walk on a graph of a million nodes inside
+the <Ref lesson="fraud-detection-system"
+id="the-deadline-splits-the-work-in-two">authorisation deadline</Ref> is
+out of the question.
+
+What the walk would do with the new payment can be read off its
+columns. Add a payment node $p_6$ with edges of weight 1 to $c_3$ and
+$m_1$, the weight of a payment made now. The strength of $c_3$ rises
+from $s_{c_3}$ to $s_{c_3} + 1$, so a walker at $c_3$ now moves to $p_6$
+with probability $1/(s_{c_3} + 1)$; likewise at $m_1$. One step of the
+walk from last night's scores therefore brings $p_6$
+
+$$
+\xi_{p_6} \approx \frac{\xi_{c_3}}{s_{c_3} + 1} + \frac{\xi_{m_1}}{s_{m_1} + 1},
+$$
+
+where the factor $\alpha$ has been dropped because it is the same for
+every new payment and changes no ranking. The new payment absorbs a
+share of each endpoint's exposure, and the share is larger for an
+endpoint with few other payments.
+
+<Example title="the 10:14 payment">
+From the converged card toy: $\xi_{c_3} = 0.0028$, $s_{c_3} = 0.70$;
+$\xi_{m_1} = 0.186$, $s_{m_1} = 1.88$.
+
+$$
+\xi_{p_6} \approx \frac{0.0028}{1.70} + \frac{0.186}{2.88} = 0.0017 + 0.065 = 0.066 .
+$$
+
+Rerunning the whole walk with $p_6$ in the graph gives 0.075. The local
+rule ranks the payment in the right neighbourhood, between $p_2$ (0.088)
+and the far corner, almost all of it from the merchant.
+</Example>
+
+<Figure
+  src="./figures/cold-start.svg"
+  alt="Cardholder c3 with exposure 0.0028 and strength 0.70 on the left, merchant m1 with exposure 0.186 and strength 1.88 on the right, joined through a dashed amber payment node p6 by two dashed edges of weight 1. Above: 0.0028/(0.70 + 1) + 0.186/(1.88 + 1) = 0.0017 + 0.065 = 0.066. Below: recomputing the whole walk with p6 added gives 0.075"
+  caption="Two lookups and two divisions score a payment the night's graph never saw."
+/>
+
+<Exercise>
+At 10:20, $c_2$ pays at $m_2$ for the first time. Using
+$\xi_{c_2} = 0.052$, $s_{c_2} = 1.08$, $\xi_{m_2} = 0.037$,
+$s_{m_2} = 0.59$, compute the local score and say which endpoint
+contributes more, and why.
+
+<Solution>
+$0.052/2.08 + 0.037/1.59 = 0.025 + 0.023 = 0.048$. The two contribute
+about equally: $c_2$ is more exposed, but $m_2$ has less strength, so a
+larger share of its exposure goes to the new payment. The score sits
+below the 10:14 payment's 0.066, because neither endpoint is the
+merchant where the stolen card paid.
+</Solution>
+</Exercise>
+
+Two cases complete the rule. If the pair has paid each other before, the
+payment takes the score of their most recent payment: that payment node
+sits between the same two endpoints, so last night's walk has already
+scored a node in the place the new one would take. If the cardholder or the merchant is new to the
+graph, its exposure is 0: nothing has reached it yet.
+
+## What the exposure adds to a detector
+
+The exposure score is never used alone. Its nine values become columns
+beside the history features of <Ref lesson="transaction-aggregates"
+id="summarising-a-cards-past-recency-frequency-monetary">the feature
+module</Ref>, and the question is what they add there.
+
+### Five weeks of a card issuer
+
+The measurement comes from about 3.3 million card payments of a large
+Belgian issuer over five consecutive weeks, about 48,000 of them fraud
+(about 1 in 70), each labelled by investigators within two weeks.
+Payments refused for ordinary reasons (wrong PIN, input errors) and the
+few above €5,000 were removed. The first two weeks served only to build
+history and exposure columns for the next two, which were the training
+set (2.2 million payments); the fifth week, about 500,000 payments, was
+the test set, scored out of time. The model was a random forest of 500
+trees, each tree grown on all the training frauds and twice as many
+genuine payments drawn at random. The columns: 9 exposure scores, 60
+recency, frequency and monetary aggregates, and a few customer and
+location fields. The score reported is ROC-AUC on the test week.
+
+<Figure
+  src="./figures/ablation.svg"
+  alt="Horizontal bars of test-week ROC-AUC on an axis from 0.90 to 1.00: network exposure only (9 columns) 0.920 in amber; recency, frequency, monetary plus customer data 0.953 in blue; the same plus country, currency and averages 0.955 in blue; all columns 0.986 in grey. A note: the axis starts at 0.90; correlation between the network columns and the rest at most 0.1"
+  caption="Nine exposure columns alone rank worse than the history columns, and lift them by three points of AUC when added: they carry what the history does not."
+/>
+
+The nine exposure columns alone reach 0.920; the history and customer
+columns 0.953; all together 0.986. No exposure column correlates with
+any other column by more than 0.1. The exposure is weaker than the
+history on its own and almost unrelated to it, which is why adding it
+helps: it measures where a payment sits, the history measures what the
+card did.
+
+Read with <Ref lesson="alert-budget-metrics"
+id="how-much-of-the-curve-a-hundred-alerts-can-reach">this course's
+metrics</Ref>, the numbers say less than they seem to. ROC-AUC averages
+over false-positive rates a team of a hundred calls a day never reaches.
+At the experiment's other reported point, 1% false positives, the forest
+finds 87% of the frauds, but 1% of a week of 500,000 payments is about
+700 genuine alerts a day. The test is out of time with no delay block,
+the split <Ref lesson="delayed-labels-prequential" id="exercises">the
+delay exercise</Ref> took apart: weeks 3 and 4 were trained on with
+labels that would only arrive during or after the test week. And the
+setup does not say whether each night's restart vector held only labels
+confirmed by then. The result shows that the graph carries signal
+the history does not; it does not say how many more compromised cards
+the team would find in its hundred.
+
+### What the signs say
+
+A logistic regression fitted on the same columns gives the direction of
+each. The month-horizon exposures of the cardholder and of the payment
+come out positive: more exposure, more fraud. The month-horizon exposure
+of the merchant comes out negative. The Remark on spreading suggests one
+reading, offered as a reading and not shown: a month of walk mass
+collects at merchants in proportion to their strength, so a merchant's
+long-horizon exposure measures in part how busy and established it is,
+and the fraud signal it carries is already in the payment's own score.
+
+### Anticipating and forgiving
+
+A propagation of the same kind, built for social-security fraud, runs on
+a bipartite graph of companies and their resources: employees,
+suppliers, accountants, machinery. Companies in a fraudulent set-up go
+bankrupt to escape their contributions and pass their resources on to
+new companies; the confirmed fraudulent companies are the restart nodes,
+and edge weights fall with the age of each company–resource link.
+
+<Figure src="./figures/gotcha-exposure-anticipating-forgiving.png" alt="Scatter of resources' exposure scores (0 to 1) against the number of fraudulent companies they were linked to (0 to 8), on social-security fraud data. Scores rise with the count along a fitted line (R² = 0.87). At zero links an ellipse marks resources scoring up to about 0.25 above the trend, labelled anticipating effect; at one link an ellipse marks low scores below the line, labelled forgiving effect. A horizontal line near 0.1 separates high-risk from low-risk." caption="Exposure against direct fraudulent links: it rises with them, with outliers above the trend (anticipating) and below it (forgiving)." float="right" width="m" />
+
+Plotting each resource's exposure against the number of fraudulent
+companies it was linked to shows the two effects that make the walk more
+than a count. Some resources score high although they were never linked
+to a fraudulent company: fraud is close in the graph and approaching,
+the *anticipating* effect. Some resources that were linked to fraud
+score low, because the link is old and the decay has worn it down, the
+*forgiving* effect. A count of fraudulent neighbours shows neither.
+
+That system was evaluated the way this course evaluates: trained at one
+date, scored at the next, and judged by how many of the 100 top-ranked
+companies, the number the inspectors could visit, turned out to be
+fraudulent. Over three years, a model on the companies' own columns
+found 24, 19 and 13 frauds in its top 100; with the network columns
+added, 44, 37 and 44.
+
+<KeyFact>
+Exposure enters a detector as columns beside the history features, and
+it pays because it is almost uncorrelated with them; its own value is a
+ranking of one night's graph, never a probability of fraud.
+</KeyFact>
+
+## ★ Other collective inference procedures
+
+The random walk with restart is one member of a family of procedures
+that score linked unknown nodes jointly. Four others are common, and
+each starts from a local model that scores every node on its own
+columns.
+
+**Iterative classification** assigns each unknown node the most
+probable label from the local model, then repeatedly refits a
+<Ref lesson="neighbourhood-and-centrality"
+id="link-columns-for-a-regression">relational logistic regression</Ref>
+on link columns (count, binary, mode of the neighbours' current labels)
+and reassigns hard labels until they stop changing.
+
+**Relaxation labelling** does the same with probabilities instead of
+hard labels: each round recomputes every unknown node's probability from
+its neighbours' current probabilities, the repeated probabilistic
+relational neighbour rule of this chapter.
+
+**Gibbs sampling** draws a label for every unknown node from its current
+probability, recomputes the probabilities from the drawn labels, draws
+again, and so on. The first rounds, the *burn-in*, are discarded; the
+final estimate is the share of later rounds in which a node was drawn as
+fraud.
+
+**Loopy belief propagation** passes messages along edges: each node
+tells each neighbour how likely each class is for it, given everything
+else it has heard, and a node's belief is the normalised product of its
+incoming messages.
+
+Exact joint inference over a graph's labels is NP-hard; these procedures
+are approximations that cost a pass over the edges per round. None of
+them is guaranteed to converge, and the order in which nodes are updated
+can change the result. The random walk with restart is the exception on
+that count, because each step contracts by $\alpha$.
+
+<Conclusion>
+You can now answer the opening's three questions with one equation. How
+much suspicion flows to a node is its share of a walk that restarts at
+the confirmed frauds, $\xi = \alpha Q \xi + (1 - \alpha) e$, a sum over
+paths of every length weighted by $\alpha^k$ and divided at every step
+by the strength of the node it leaves, so a busy node on the way cannot
+multiply it. The share still grows with the node's own strength (U3 0.282
+above U1 0.217); $p = S^{-1}\xi$, suspicion per unit of strength, removes
+that (U1 0.108 above U3 0.094). How far is set by $\alpha$. How
+fast it fades is set by the decayed edge weights and the decayed restart
+weights of each horizon. You can say why the uniform restart of plain
+PageRank only measures activity, compute the walk by power iteration at
+a pass over the edges per step, run it on the tripartite card graph to
+get nine columns a night, and score a payment the night's graph never
+saw by the local update. On the toy, G, never flagged, outranks I, a
+known fraud; on real card data the nine columns are weak alone and
+useful beside the history.
+
+Every step of this walk applies a fixed rule: average the neighbours
+with weights set by the graph, add the node's own restart term, repeat.
+Nothing in it is learned from the labels, so it cannot learn that on an
+auction graph the neighbours of fraud are accomplices. The next problem
+is a step whose weights are learned: <Ref
+lesson="graph-neural-networks">graph convolutional networks</Ref>.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+A graph has four nodes and edges a–b, b–c, c–d and b–d, all of weight 1;
+a is the only known fraud. With $\alpha = 0.85$ and $\xi^{(0)} = e$, run
+three steps of power iteration by hand and give the ranking after each.
+The converged scores are a 0.256, b 0.375, c and d 0.185 each. What does
+the ranking after each step tell you about stopping early?
+
+<Solution>
+Degrees: a 1, b 3, c 2, d 2. The restart vector is 1 at a.
+
+**Step 1.** a: no neighbour holds anything, so only the restart share:
+$0.15$. b: from a (degree 1): $0.85 \times 1 = 0.85$. c, d: 0. Ranking
+b, a, then c and d.
+
+**Step 2.** a: from b, $0.85 \times 0.85/3 + 0.15 = 0.241 + 0.15 =
+0.391$. b: from a, c, d: $0.85\,(0.15 + 0 + 0) = 0.128$. c: from b and d,
+$0.85\,(0.85/3 + 0) = 0.241$; d the same. Ranking a, c = d, b.
+
+**Step 3.** a: $0.85 \times 0.128/3 + 0.15 = 0.186$. b:
+$0.85\,(0.391 + 0.241/2 + 0.241/2) = 0.537$. c:
+$0.85\,(0.128/3 + 0.241/2) = 0.139$; d the same. Ranking b, a, c = d.
+
+The ranking flips between steps 1, 2 and 3 because mass sloshes back and
+forth between a and b. Only the converged order, b above a, is the
+score; a ranking read after a fixed small number of steps can be an
+artefact of where the mass happens to be. Stop on the size of the
+change, not on a step count. Note also the converged order: b, the hub
+next to the fraud, outranks the fraud itself, for the reason G
+outranked I.
+</Solution>
+</Exercise>
+
+<Exercise>
+Push the follow probability to its limits on the toy with the restart
+at D, E, F, I. (a) What does $\xi$ become as $\alpha \to 0$, and as
+$\alpha \to 1$? Why is neither a fraud score? (b) At $\alpha = 0.5$ the
+order of G and I is reversed. Explain the direction of the change.
+(c) A new horizon graph has no confirmed fraud yet. What does the
+iteration return, and what should the column hold?
+
+<Solution>
+**(a)** As $\alpha \to 0$ the walker always restarts: $\xi = e$, 0.25 at
+each known fraud and 0 everywhere else. The score is the label
+restated, and G scores 0. As $\alpha \to 1$ the walker never restarts,
+and by the Proposition its time-share tends to $s_v/2M$, whatever the
+restart vector: the labels drop out and the score is degree again (at
+$\alpha = 0.999$ the toy's top node is A). The restart is what carries
+the labels, and the follow step is what carries the graph; each limit
+throws one of them away. The iteration also slows as $\alpha \to 1$,
+since the error shrinks only by $\alpha$ per step.
+
+**(b)** With $\alpha = 0.5$ a walker restarts every other step on
+average, so probability stays close to the restart nodes, and the score
+of I, a restart node, is propped up by its own restart share. G
+receives only what travels one step, which halves. Larger $\alpha$ lets
+the walk travel, so a node surrounded by fraud gains on a fraud node
+surrounded by none. $\alpha$ is therefore a choice about reach, to be
+selected like any other setting on validation folds.
+
+**(c)** The restart vector is $\mathbf{0}/0$, undefined. Run with
+$e = 0$, the iteration gives $\xi = 0$ for every node. A zero would tell
+a model "no exposure", which is false: there is no information. The
+column should be missing for that night, and the model must handle a
+missing value, as with the <Ref lesson="behavioural-profiles"
+id="how-much-history-the-arc-needs">periodic flag without enough
+history</Ref>.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "A merchant with a high exposure score is a fraudulent
+merchant." Name each step that fails, using the card toy, where $m_1$
+has the highest merchant exposure (0.186).
+
+<Solution>
+**The score measures position, not conduct.** $m_1$ is exposed because a
+stolen card paid there once. A merchant where stolen numbers are used is
+usually a victim of the scheme or simply a popular place to spend them;
+a terminal where numbers were skimmed is compromised, not complicit.
+Nothing in the walk distinguishes these.
+
+**The score grows with strength.** By the Remark, $\xi_v = s_v p_v$: the
+walk's mass at a node is an averaged suspicion times its strength. A
+large merchant collects mass from every fraud payment made there, and
+in a month a large merchant sees some. Divided by strength, $m_1$'s
+$0.186/1.88 = 0.099$ is below $c_1$'s $0.175/1.56 = 0.112$.
+
+**The fitted sign says the opposite.** On the issuer's data the
+month-horizon merchant exposure enters a logistic regression with a
+negative coefficient: with the other columns held fixed, payments at
+highly exposed merchants were less likely fraud.
+
+**What the score is evidence of:** fraud has passed through this
+merchant recently, so its next payments and the cards that pay there
+deserve a higher rank. It is a column for scoring payments and cards,
+and a reason to look at the merchant, not a verdict on it.
+</Solution>
+</Exercise>
+
+<Exercise>
+(a) From $\xi^{(0)} = e$, show that
+$\xi^{(k)} = (1 - \alpha)\sum_{j=0}^{k-1} \alpha^j Q^j e + \alpha^k Q^k e$,
+and that $\lVert \xi^{(k)} - \xi \rVert_1 \le 2\alpha^k$, where
+$\lVert x \rVert_1 = \sum_v |x_v|$. (b) How many steps guarantee an
+error below $10^{-6}$ at $\alpha = 0.85$? (c) The code stops when the
+change in one step falls below a tolerance. Show that
+$\lVert \xi^{(k)} - \xi \rVert_1 \le \frac{\alpha}{1-\alpha}
+\lVert \xi^{(k)} - \xi^{(k-1)} \rVert_1$, so that the stopping rule
+controls the error.
+
+<Solution>
+**(a)** Induction. For $k = 0$ the sum is empty and the formula gives
+$e$. If it holds for $k$, then
+$\xi^{(k+1)} = \alpha Q \xi^{(k)} + (1-\alpha) e =
+(1-\alpha)\sum_{j=0}^{k-1}\alpha^{j+1}Q^{j+1}e + \alpha^{k+1}Q^{k+1}e +
+(1-\alpha)e$, and the first and last terms make the sum up to $j = k$.
+
+For the bound, subtract the fixed-point equation from the step:
+$\xi^{(k+1)} - \xi = \alpha Q(\xi^{(k)} - \xi)$. For any vector $x$,
+$\lVert Qx \rVert_1 = \sum_i |\sum_j Q_{ij}x_j| \le \sum_j |x_j|
+\sum_i Q_{ij} = \lVert x \rVert_1$, because the columns of $Q$ sum to 1.
+So the error shrinks by at least $\alpha$ per step:
+$\lVert \xi^{(k)} - \xi\rVert_1 \le \alpha^k \lVert e - \xi \rVert_1$.
+Both $e$ and $\xi$ are probability vectors, so their distance is at most
+2.
+
+**(b)** $2 \times 0.85^k < 10^{-6}$ needs
+$k > \ln(2 \times 10^6)/\ln(1/0.85) = 14.5/0.163 = 89.3$: 90 steps,
+whatever the size of the graph. On a graph of 30 million edges that is
+90 passes over the edge list.
+
+**(c)** By the triangle inequality and the contraction,
+$\lVert \xi^{(k)} - \xi \rVert_1 = \lVert \alpha Q(\xi^{(k-1)} - \xi)
+\rVert_1 \le \alpha\lVert \xi^{(k-1)} - \xi^{(k)} \rVert_1 +
+\alpha\lVert \xi^{(k)} - \xi \rVert_1$, so
+$(1-\alpha)\lVert \xi^{(k)} - \xi\rVert_1 \le \alpha \lVert \xi^{(k)} -
+\xi^{(k-1)}\rVert_1$. At $\alpha = 0.85$ the error is at most 5.7 times
+the last change: stopping at a change of $10^{-9}$ leaves an error below
+$6 \times 10^{-9}$. The move that transfers: a contraction lets the
+observable step size certify the unobservable error.
+</Solution>
+</Exercise>
+
+<Exercise>
+On the <Ref lesson="canonical-datasets"
+id="elliptic-a-graph-whose-labels-come-from-names">Elliptic graph</Ref>,
+a colleague proposes to restart a walk at the illicit transactions of
+time steps 1 to 34, walk against the coin flow, and score the
+transactions of step 35, measuring average precision against step 35's
+labels with in-degree as the baseline. (a) What in the structure of the
+data set makes this design impossible as stated? (b) Design an
+experiment the data can support that asks whether the walk adds signal
+beyond degree, and say what it does and does not measure. (c) State the
+result that would count as "the graph adds signal".
+
+<Solution>
+**(a)** Each time step is a separate connected component, and no edge
+joins two steps. A walk started at step-34 nodes can never reach a
+step-35 node: every step-35 score would be zero. Graph features on this
+data set see only the neighbourhood inside one snapshot.
+
+**(b)** Work inside each test step. For each step $t$ from 35 to 49,
+split its labelled illicit nodes at random into a seed half and a held-out
+half; restart the walk on the seed half, walking against the coin flow
+(the transposed matrix), so the score lands on transactions that fed the
+seeds. Score every node of the step except the seeds, and compute AP over
+the held-out illicit nodes against the licit ones (unknown nodes left out,
+since unknown is not licit). Repeat with several random splits and report
+mean and spread per step. Baselines: in-degree and out-degree of each
+node, and the same walk with a uniform restart, which isolates what the
+labels add over the shape. Repeat the walk with the edges in their own
+direction to see which direction carries the signal.
+
+What it measures: whether, given half of a snapshot's illicit labels,
+the graph points at the other half. What it does not: deployment, where
+a new snapshot arrives with no labels at all, since its labels are
+attributions made long afterwards. The design is a ceiling on what
+propagation could do, not an estimate of it.
+
+**(c)** The walk's AP clearly above both the base rate of the scored
+nodes (the floor) and the degree baselines, by more than the spread
+across random splits, on most of the fifteen steps, and in particular
+on the steps after the dark-market closure at step 43, where the local
+features failed. If the walk only matches in-degree, the graph's
+contribution is its shape, which a degree column already gives.
+</Solution>
+</Exercise>
+
+<Exercise>
+Write one power-iteration step $\xi \leftarrow \alpha Q \xi + (1 -
+\alpha) e$ in the form $H' = \sigma(\hat{A} H W_1 + X W_2)$, where $H$
+and $H'$ are matrices with one row per node, $X$ holds each node's own
+input, $\hat{A}$ is a fixed normalised matrix and $W_1$, $W_2$ are
+weight matrices. Then say what changes if $H$ has many columns, $W_1$
+and $W_2$ are learned from labels, $\sigma$ is a nonlinearity, and only
+two such steps are stacked.
+
+<Solution>
+Take $H = \xi$ and $X = e$ as single columns, $\hat{A} = Q$,
+$W_1 = (\alpha)$ and $W_2 = (1 - \alpha)$, both $1 \times 1$, and
+$\sigma$ the identity: $H' = Q H \alpha + e(1 - \alpha)$, exactly the
+step. The term $\hat{A} H W_1$ gathers the neighbours, and the term
+$X W_2$ is the node's own input, carried past the aggregation.
+
+With many columns, learned weights and a nonlinearity, the same shape is
+a layer of a graph network with a skip connection: each node's new
+representation mixes a normalised sum of its neighbours'
+representations with its own features, in proportions fitted to the
+labels instead of fixed at 0.85 and 0.15. Three things change. The
+weights can be negative, so the layer can learn that on an inverse
+homophilic graph fraud's neighbours are less suspect, which the walk
+cannot. The inputs can be every column of the node, not only a restart
+indicator. And two layers see two hops, where power iteration runs to
+convergence over ninety. That layer is the subject of <Ref
+lesson="graph-neural-networks">graph convolutional networks</Ref>.
+</Solution>
+</Exercise>
+
+<Exercise>
+A bank confirms frauds with a delay of $\delta = 7$ days, and builds
+each night's restart vector, as the point-in-time rule requires, only
+from confirmations that have arrived. Edges older than their horizon
+are dropped from each graph (day, week, month). Merchant $m$ is
+compromised on day 0, with fraud payments on days 0, 1 and 2, each
+confirmed 7 days after it happened; cardholder $c$ paid at $m$ on day 1
+and nowhere near any other fraud. (a) On which night does $c$ first
+have nonzero exposure in each of the three graphs? (b) Which horizon
+does the delay hollow out, and in general? (c) Where do short-horizon
+graphs get their seeds in practice, and what does that imply about
+them?
+
+<Solution>
+**(a)** The day-0 fraud is confirmed on day 7, so no restart vector
+holds any of $m$'s frauds before night 7. On night 7 the fraud payment
+of day 0 is 7 days old.
+
+*Day graph:* only edges from the last day survive, and on night 7 both
+the fraud payment (day 0) and $c$'s payment (day 1) are long gone. The
+fraud payments of days 1 and 2 are confirmed on nights 8 and 9, when
+they are 7 days old. $c$ never gets day-graph exposure from $m$.
+
+*Week graph:* on night 7 the day-0 fraud payment sits at the edge of
+the horizon and $c$'s day-1 payment is 6 days old; on night 8 the day-1
+fraud payment is seeded and $c$'s payment is 7 days old. $c$ is exposed
+on nights 7 and 8 at most, through edges near the horizon's floor, and
+then drops out.
+
+*Month graph:* from night 7, and for the next three weeks or so, while
+$c$'s payment and the fraud payments are younger than a month.
+
+**(b)** Any horizon no longer than $\delta$ is emptied: its seeds are
+older than the graph remembers. With $\delta = 7$ the day graph has no
+seeds from slow confirmations at all, and the week graph keeps them for
+a day or two. In general a graph whose horizon $H$ is at most $\delta$
+can be seeded only by confirmations faster than $H$.
+
+**(c)** From the fast labels: the cards the investigators called after
+an alert, confirmed the same day (<Ref lesson="fraud-detection-system"
+id="investigators-fast-labels-on-the-alerted-cards">the fast
+feedback</Ref>). Those are the cards yesterday's model chose to alert,
+so the short-horizon exposure spreads suspicion from the model's own
+picks, and fraud the model missed seeds nothing until its slow
+confirmation arrives, by which time the short graphs have forgotten it.
+That loop, in which the model selects the labels that feed its own
+features, is <Ref lesson="alert-feedback-selection-bias">selection bias
+from alert feedback</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015 — Ch. 5, pp. 233–235 (relational neighbour and probabilistic relational neighbour classifiers, the 2/5 and 0.45 examples), pp. 246–251 (collective inference; PageRank with the random surfer, column-normalised matrix and restart vector, power iteration instead of inversion, the fraud-personalised restart vector, the toy-network table with D, F, E ranked first and G above I), pp. 251–253 (Gibbs sampling with burn-in, iterative classification, relaxation labelling, loopy belief propagation), pp. 270–277 (propagation on a company–resource graph for social-security fraud, temporal weighting, the anticipating and forgiving effects, the top-100 table, and the transfer of the method to card payments through transaction nodes).
+2. V. Van Vlasselaer, C. Bravo, O. Caelen, T. Eliassi-Rad, L. Akoglu, M. Snoeck, B. Baesens, "APATE: A novel approach for automated credit card transaction fraud detection using network-based extensions," *Decision Support Systems* 75:38–48, 2015 — Sec. 3.2.1 (time-decayed bipartite graph), Sec. 3.2.2 (propagation equation with $\alpha = 0.85$, the tripartite transformation and the time-weighted restart vector on confirmed fraud transactions, power iteration), Sec. 3.2.3 (nine exposure features at three horizons, nightly recomputation, the local update for a new cardholder–merchant pair), Sec. 4 (3.3M transactions, five weeks, out-of-time test week), Tables 3–5 and Fig. 6 (random forest AUC 0.986, results at 1% false positives, the column-subset comparison 0.920 / 0.953 / 0.955 / 0.986, correlation at most 0.1, signs of the exposure columns). https://doi.org/10.1016/j.dss.2015.04.013
+3. L. Akoglu, H. Tong, D. Koutra, "Graph-based anomaly detection and description: a survey," *Data Mining and Knowledge Discovery* 29(3):626–688, 2015 (arXiv:1404.4679) — Sec. 2.1.1 (random walks, stationary distribution proportional to degree on undirected graphs, personalised PageRank as random walk with restart), Sec. 2.2.3 (relational classification, local and global methods, NP-hard exact inference, no convergence guarantee), Sec. 5.7 (TrustRank and Anti-TrustRank: distrust propagated backward along incoming links from known bad seeds).
+4. L. Page, S. Brin, R. Motwani, T. Winograd, "The PageRank citation ranking: bringing order to the web," Stanford InfoLab Technical Report 1999-66, 1999 — the random surfer, the damping factor and the personalised restart vector.
+5. H. Tong, C. Faloutsos, J.-Y. Pan, "Fast random walk with restart and its applications," *Proc. IEEE International Conference on Data Mining (ICDM)*, 2006 — the random walk with restart as a proximity score and its computation by iteration rather than inversion.
+</References>

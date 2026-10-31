@@ -110,4 +110,6 @@ export const demos: Record<
   RankingBudgetExplorer: () => import("./fraud-ml/RankingBudgetExplorer"),
   CircularMeanClock: () => import("./fraud-ml/CircularMeanClock"),
   IsolationSplitter: () => import("./fraud-ml/IsolationSplitter"),
+  IdentifierDegreeCap: () => import("./fraud-ml/IdentifierDegreeCap"),
+  RestartWalkPropagator: () => import("./fraud-ml/RestartWalkPropagator"),
 };

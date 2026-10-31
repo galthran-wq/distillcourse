@@ -1,0 +1,1109 @@
+Hand-built neighbourhood features summarise a node's neighbours with fixed statistics — counts, means, maxima — chosen in advance. Could a network learn which summary of the neighbourhood matters, the way a convolution learns which summary of nearby pixels matters, and what does one layer of such a network compute?
+
+The fixed summaries have a known flaw. <Ref lesson="neighbourhood-and-centrality" id="recursive-aggregates-over-the-neighbours">The recursive aggregates</Ref>
+of the neighbourhood chapter take the maximum, minimum or mean of a
+column over a node's neighbours, and the maximum grows with the number
+of neighbours even when nobody is unusual: 0.85 standard deviations
+expected over three honest neighbours, 2.51 over a hundred. A tree that
+splits on "maximum neighbour amount" is partly splitting on degree, and
+the mean, which does not drift, hides the one unusual neighbour the
+maximum was there to find. <Ref lesson="canonical-datasets"
+id="elliptic-a-graph-whose-labels-come-from-names">The Elliptic
+graph</Ref>, the Bitcoin transaction graph whose 166 columns are 94 that
+describe the transaction itself and 72 that summarise the same
+quantities over its neighbours, ships those 72 already built, each
+chosen by someone who guessed it might matter.
+
+The exposure score of <Ref lesson="guilt-by-association">the previous
+chapter</Ref> learns nothing either. At every step of the walk a node
+keeps a share $1 - \alpha$ of its restart value and takes a share
+$\alpha$ from its neighbours, each neighbour handing on its score in
+parts the graph's edge weights set. Both the shares and the parts are
+fixed before any label is seen, and no label can change them. On <Ref
+lesson="neighbourhood-and-centrality" id="when-fraud-avoids-fraud">an
+auction graph</Ref>, where fraudsters trade with honest-looking
+accomplice accounts and seldom with each other, the walk therefore
+pushes suspicion onto the accomplices.
+
+Images had the same problem: which summary of a pixel's surroundings
+tells a cat from a dog? A *convolution* answers it by learning the
+summary. A 3×3 filter is nine weights, one for each position relative
+to the pixel (above-left, above, above-right, and so on). The filter
+multiplies the nine pixel values around a pixel by the nine weights and
+adds them up, and the same nine weights are applied at every pixel of
+the image. Training sets the nine weights, so the summary computed is
+whichever one the labels reward. The one-dimensional version, one set
+of weights slid over neighbouring payments, is the convolutional row of
+<Ref lesson="worldline-model-comparison"
+id="three-rows-that-read-the-cards-past">the eight-family
+comparison</Ref>. The question is what this construction becomes on a
+payment graph, where a node has three neighbours or three thousand, in
+no order.
+
+## A convolution needs positions; a graph has none
+
+The filter's nine weights are indexed by position: the weight for "the
+pixel above" exists because every pixel has a pixel above it. Before
+borrowing the idea, check what a graph offers in place of positions.
+
+### An image is a graph whose every node has the same eight neighbours
+
+Draw each pixel of a 5×5 image as a node and join it to the pixels
+around it. Every pixel not on the border has exactly eight neighbours,
+and they come in a fixed arrangement, so "the neighbour above" is
+well defined. Number the pixels row by row and the adjacency matrix is
+banded: pixel 13, the centre, is joined to 7, 8, 9, 12, 14, 17, 18 and
+19, so its row has ones in three short runs near the diagonal.
+
+<Figure
+  src="./figures/grid.svg"
+  alt="Three views of the same 5 by 5 image. Left: the pixel grid, centre pixel 13 amber, its eight neighbours shaded blue, each cell of the 3 by 3 block marked with a filter weight w1 to w9. Centre: the same pixels drawn as 25 nodes joined to their horizontal, vertical and diagonal neighbours, node 13 amber with its eight edges in blue. Right: the 25 by 25 adjacency matrix with entries only in a band around the diagonal; row 13 is outlined in amber, with ones at columns 7, 8, 9, 12, 14, 17, 18, 19"
+  caption="An image is a graph in which every inner node has eight neighbours in fixed positions, so each neighbour can be given its own weight."
+/>
+
+A payment graph has none of that regularity. A cardholder has paid at
+four merchants, a merchant has been paid by 3,000 cardholders, and
+neither list has an order: no merchant is "the one above". A weight per
+neighbour position has nothing to attach to.
+
+### Why the adjacency matrix cannot be the input
+
+The obvious way round is to feed the whole adjacency matrix to a
+network, the way an image's pixel array is fed to one. Two things break.
+
+**The size.** The adjacency matrix of $n$ nodes has $n^2$ cells. <Ref
+lesson="fraud-as-a-graph"
+id="matrix-or-list-what-the-graph-costs-to-store">The first graph
+chapter</Ref> priced a month of card payments at about $10^{12}$ cells,
+almost all zero, against about 30 million lines of an edge list.
+
+**The order.** The matrix depends on how the nodes were numbered. Take
+the four-node graph of <Ref lesson="neighbourhood-and-centrality"
+id="counting-walks-with-matrix-powers">the walk-count section</Ref>,
+edges 1–2, 1–4, 2–4 and 3–4. Its four nodes can be numbered in
+$4! = 24$ ways; because swapping nodes 1 and 2 leaves the graph
+unchanged, those 24 numberings give 12 different matrices, all of the
+same graph. A network that reads a matrix cell by cell has no reason to
+give the 12 the same output. It would have to learn, from data, that
+they are one graph, and for $n$ nodes there can be up to $n!$ of them.
+
+<Figure
+  src="./figures/orderings.svg"
+  alt="Left: four nodes with edges 1–2, 1–4, 2–4 and 3–4. Right: three 4 by 4 adjacency matrices of this graph under three numberings of the nodes, labelled order 1, 2, 3, 4; order 3, 1, 4, 2; and order 4, 2, 3, 1. The three grids have their ones in different cells. A note under them: 24 numberings, 12 different matrices, one graph"
+  caption="One graph, three of its twelve adjacency matrices. A model must give all of them the same answer."
+/>
+
+Whatever a graph layer computes for node $v$ must therefore come out the
+same however the nodes are numbered, and must accept any number of
+neighbours.
+
+### Functions of a set: sum, mean and maximum
+
+Both conditions say the layer may treat a node's neighbours only as a
+set: a collection with no order and any size.
+
+<Definition title="permutation-invariant aggregation">
+An *aggregation* maps a finite set of vectors $\{h_u : u \in N(v)\}$,
+of any size and with the same vector allowed more than once, to one vector of the same length, and is *permutation
+invariant* if its value does not depend on the order in which the
+vectors are listed. The sum $\sum_u h_u$, the mean
+$\frac{1}{|N(v)|}\sum_u h_u$ and the coordinate-wise maximum are the
+three standard choices.
+</Definition>
+
+Each of the three, applied to the raw values, forgets something. Give
+every neighbour one number, its fraud probability from a local model,
+and compare neighbourhoods:
+
+| neighbourhood | sum | mean | max | what it is |
+|---|---|---|---|---|
+| $\{0.9\}$ | 0.9 | 0.9 | 0.9 | one suspect neighbour |
+| $\{0.9, 0.9, 0.9\}$ | 2.7 | 0.9 | 0.9 | three suspect neighbours |
+| $\{0.9, 0.1\}$ | 1.0 | 0.5 | 0.9 | one suspect among two |
+| $\{0.5, 0.5\}$ | 1.0 | 0.5 | 0.5 | two half-suspect |
+
+The mean and the maximum cannot tell one suspect neighbour from three:
+they do not see how many. The sum and the mean cannot tell
+$\{0.9, 0.1\}$ from $\{0.5, 0.5\}$: they do not see whether the
+suspicion sits in one neighbour. The maximum sees that, and loses the
+count. The sum keeps the count, which is why it grows with degree like
+the walk counts did; the mean is size-free, which is why it hides a
+single outlier. Applied to raw values, none of the three keeps
+everything.
+
+<Exercise>
+(a) Find a pair of neighbourhoods that the sum and the maximum both
+tell apart but the mean does not. (b) A neighbourhood of 3,000 honest
+cardholders with probabilities around 0.01 and one of 30 cardholders
+with probabilities around 0.5: which aggregation scores the first
+higher, and why is that the wrong order for an investigator?
+
+<Solution>
+**(a)** Take $\{0.4\}$ and $\{0.8, 0.0\}$: sums 0.4 and 0.8, maxima 0.4
+and 0.8, means both 0.4. The mean loses the count and the spread at
+once.
+
+**(b)** The sum: about $3{,}000 \times 0.01 = 30$ against
+$30 \times 0.5 = 15$. A busy merchant's honest crowd outweighs a small
+group of suspects, the degree effect again. The mean ranks the second
+first (0.5 against 0.01), and so does the maximum.
+</Solution>
+</Exercise>
+
+### A learned transform before the aggregation
+
+The table aggregates the raw scores. A layer need not: it can first
+pass each neighbour's value through a function, the same function for
+every neighbour so that the order still does not matter, and aggregate
+the results. If that function is learned, which of the table's blind
+spots survive it?
+
+Take $f(h) = \max(0, h - 0.7)/0.2$, one ReLU unit. It gives a neighbour
+at 0.9 the value 1 and a neighbour at 0.5 or below the value 0, so the
+sum of $f$ over the neighbours counts the suspect ones: 1 for
+$\{0.9, 0.1\}$, 0 for $\{0.5, 0.5\}$, 3 for $\{0.9, 0.9, 0.9\}$. The
+sum of the transformed values now sees where the suspicion sits, which
+the sum of raw values could not. With several transforms side by side
+the sum can tell any two neighbourhoods apart: the sums of
+$1, h, h^2, \dots, h^m$ fix the number of neighbours and then their
+values, for every neighbourhood of at most $m$.
+
+The mean and the maximum keep one blind spot whatever the transform.
+The mean of $f$ over $\{a\}$ is $f(a)$, and over $\{a, a\}$ it is
+$(f(a) + f(a))/2 = f(a)$: it sees the proportions of a neighbourhood,
+never how many neighbours carry them, so $\{0.9, 0.1\}$ and
+$\{0.9, 0.9, 0.1, 0.1\}$ are the same to it. A second copy of a value
+never changes a maximum either: with several transforms the maximum can
+report which values occur among the neighbours, never how often. On raw
+values it is blinder still and sees only the largest.
+
+Where the learned weights sit therefore matters. Weights applied to
+each neighbour before a sum let the labels choose what the sum counts;
+weights applied only after the aggregation work on what it has already
+merged and cannot separate it again.
+
+<KeyFact>
+A graph layer may combine a node's neighbours only through an
+order-free aggregation. A learned transform applied to each neighbour
+before a sum recovers what the raw sum loses; no transform makes the
+mean see how many neighbours there are ($\{a\}$ and $\{a, a\}$ have the
+same mean), or the maximum see how often a value occurs.
+</KeyFact>
+
+## Message passing: gather, aggregate, update
+
+With an order-free aggregation in hand, the convolution can be rebuilt
+for graphs. The baseline comes first, because the question is what the
+graph adds.
+
+### The network that ignores the graph
+
+The simplest graph network applies one feed-forward network to every
+node's own feature vector, the same weights for every node, and uses
+the edges for nothing. For classifying nodes it is exactly the network
+of <Ref lesson="neural-tabular-detectors"
+id="one-output-unit-read-as-pfraud">the network chapter</Ref>, with a
+transaction's or an account's features as inputs. Any graph network
+has to beat it to justify the edges.
+
+### One layer of message passing
+
+Write $h_v$ for node $v$'s current vector, at first its feature vector.
+A *message-passing* layer computes a new vector for every node in three
+steps:
+
+1. **Gather** the current vectors of $v$'s neighbours, $\{h_u : u \in N(v)\}$.
+2. **Aggregate** them with an order-free function, such as the sum or
+   the mean.
+3. **Update**: compute $v$'s new vector from its own vector and the
+   aggregate, through a learned transformation (a weight matrix and a
+   nonlinearity).
+
+The convolution's three steps are the same: gather the pixels around
+the centre, combine them, pass the result on. What changes is the
+middle step. The filter combines its neighbours with one weight per
+position; the graph layer, having no positions, uses one aggregation for
+all neighbours, and puts the learned weights before or after it, on the
+vectors instead of on the positions.
+
+<FigureSequence
+  name="passing"
+  alt="Four frames of the 20-node toy network. Frame 1, gather: node G amber, its neighbours A, D, F and I blue, each with a three-cell vector strip beside it and an arrow to G. Frame 2, aggregate: the four neighbour strips are averaged into one blue strip m_G at G, the weight 1/4 written on each of the four edges, beside G's own amber strip h_G; a note: the mean gives every neighbour 1/4, whatever its own degree. Frame 3, update: G's own strip and the aggregate are combined, multiplied by a weight matrix W and passed through ReLU, giving G's new strip h prime, drawn amber. Frame 4, a second layer: the twelve nodes within two steps of G (A, B, D, E, F, H, I, K, N, O, T and G itself) shaded amber, the other eight grey; a note: after two layers G's vector depends on 12 of the 20 nodes, after three on 18"
+  caption="Gather, aggregate, update; a second layer repeats the three steps on the new vectors, and G hears from two steps away."
+/>
+
+<Task>
+Step to frame 4 and, before reading the note, count the nodes whose
+features can reach G after two layers, using the edges you can see.
+Then name the two nodes that remain out of reach after three layers.
+(Answer: 12 of 20 after two; R and S, four steps away through O and Q,
+after three.)
+</Task>
+
+### Each layer reaches one hop further
+
+After one layer, $v$'s vector depends on its own features and its
+neighbours'. A second layer aggregates the new vectors, each of which
+already holds its own neighbours, so $v$ now depends on every node
+within two steps. The set of nodes whose features can influence $v$'s
+vector is called its *receptive field*, the name the convolution uses
+for the pixels that can affect one output. With $L$ layers it is the
+ball of radius $L$ around $v$.
+
+The recursive aggregates reached one hop further per round in the same
+way. The difference is in what is applied at each round: there, a fixed
+maximum or mean chosen by a person; here, a transformation whose
+weights the labels set.
+
+## One graph convolutional layer, in matrix form
+
+The three steps are a recipe. Written for every node at once, they
+become a matrix product, which is also how they are computed.
+
+### Sum aggregation is a sparse matrix product
+
+Stack the node vectors as the rows of a matrix $H$, one row per node,
+one column per feature; at the input, $H = X$, the feature matrix.
+(This $H$ is unrelated to the heterophilicity of the neighbourhood
+chapter.) Row $v$ of $AH$ is
+
+$$
+(AH)_v = \sum_u A_{vu}\, h_u = \sum_{u \in N(v)} h_u ,
+$$
+
+because $A_{vu}$ is 1 exactly for $v$'s neighbours. So $AH$ is sum
+aggregation for every node at once, and like <Ref
+lesson="neighbourhood-and-centrality"
+id="counting-walks-with-matrix-powers">the walk counts</Ref> it costs
+one pass over the edge list. Two such products, $A(AH)$, sum over walks
+of length 2, which is the two-hop receptive field in matrix form.
+
+Plain $AH$ has two defects. It leaves out $v$'s own vector, since
+$A_{vv} = 0$; adding the identity, $\tilde{A} = A + I$, puts it back,
+and each node now counts itself among its neighbours. And it is a sum,
+so a merchant with 3,000 neighbours gets a row about a thousand times
+the size of a cardholder's with three. That is the scale problem of
+<Ref lesson="neural-tabular-detectors"
+id="scaling-the-inputs-trees-compare-networks-multiply">the network
+chapter</Ref> moved into the graph: one learning rate cannot suit
+inputs whose sizes differ a thousandfold.
+
+### Dividing by degree, at both ends of the edge
+
+The obvious repair divides each row by its size. Let $\tilde{d}_v$ be
+$v$'s degree plus one (the self-loop) and $\tilde{D}$ the diagonal
+matrix of the $\tilde{d}_v$; this $\tilde{D}$ is the degree matrix,
+unrelated to dyadicity and to the toy's node D. Then
+$\tilde{D}^{-1}\tilde{A}H$ replaces the sum by the mean over $v$ and its
+neighbours, and every node receives a vector of ordinary size. It is the
+row division of <Ref lesson="guilt-by-association"
+id="why-g-outranks-i">the relational neighbour rule</Ref>, which
+averaged the labels of a node's neighbours.
+
+The mean repairs the receiving end of the edge and ignores the sending
+end: a neighbour counts the same whatever its own degree. A cardholder
+who paid at one small shop and at one merchant of 3,000 customers gives
+the two the same share of its attention. But the busy merchant is the
+neighbour of everyone, so its vector says little about any one of them;
+on the identifier graph of <Ref lesson="communities-and-components"
+id="the-high-degree-identifier">the communities chapter</Ref>, the café
+IP shared by 400 users was exactly such a neighbour. A neighbour should
+count for less the more neighbours it has, which is the column division
+of the walk in the previous chapter: each node handed on its value in shares
+divided by its own strength.
+
+### Five ways to weight an edge, tried on one hub
+
+Which of the two divisions to use, or how to combine them, can be
+settled on a single star: a merchant joined to 3,000 cardholders who
+have no other neighbour, each cardholder carrying the same value $x$.
+With self-loops the merchant has $\tilde{d} = 3{,}001$ and each
+cardholder $\tilde{d} = 2$. Two numbers decide: what the merchant
+receives from its cardholders, which should not be a thousand times what
+a small merchant receives, and the weight at which a cardholder hears
+the merchant, which should be small.
+
+| weight on the edge from sender $u$ to receiver $v$ | merchant receives | cardholder hears merchant at |
+|---|---|---|
+| 1 (the sum) | $3{,}000x$ | 1 |
+| $1/\tilde{d}_v$, receiver's degree (the mean) | $\approx x$ | $1/2$ |
+| $1/\tilde{d}_u$, sender's degree (the walk's division) | $1{,}500x$ | $1/3{,}001$ |
+| $1/(\tilde{d}_v\tilde{d}_u)$, both degrees | $\approx x/2$ | $1/6{,}002$ |
+| $1/\sqrt{\tilde{d}_v\tilde{d}_u}$, square root of both | $\approx 39x$ | $0.013$ |
+
+Each one-sided division repairs one end and breaks the other. The mean
+keeps the merchant's total ordinary but lets the merchant set half of
+every cardholder's vector. Dividing by the sender's degree quiets the
+merchant at its cardholders, but the merchant's own total is back at
+$1{,}500x$, the scale problem again. Dividing fully by both degrees
+quiets the merchant at both ends and loses the count: a merchant with
+three such cardholders receives $3x/(2 \cdot 4) \approx 0.38x$, one with
+3,000 receives $0.50x$, so, like the mean in the aggregation table, it
+can hardly tell three neighbours from three thousand.
+
+The square root lands between keeping the count and keeping the scale.
+The merchant's total grows with the square root of its degree: three
+cardholders give $3x/\sqrt{8} \approx 1.06x$, 3,000 give
+$3{,}000x/\sqrt{6{,}002} \approx 38.7x$, so a thousandfold difference in
+degree arrives as about a 36-fold difference in size, the count still visible
+on a compressed scale. A cardholder hears the merchant at
+$1/\sqrt{2 \cdot 3{,}001} \approx 0.013$, nearly as little as under the
+sender's division. Nothing forces exactly the square root; it is the
+compromise the standard layer makes.
+
+<Definition title="graph convolutional layer">
+With $\tilde{A} = A + I$, $\tilde{d}_v = \sum_u \tilde{A}_{vu}$ and
+$\tilde{D} = \operatorname{diag}(\tilde{d}_v)$, the *normalised
+adjacency* is
+
+$$
+\hat{A} = \tilde{D}^{-1/2}\,\tilde{A}\,\tilde{D}^{-1/2},
+\qquad \hat{A}_{vu} = \frac{\tilde{A}_{vu}}{\sqrt{\tilde{d}_v\,\tilde{d}_u}} ,
+$$
+
+and a *graph convolutional (GCN) layer* maps the node matrix $H$ to
+
+$$
+H' = \sigma\big(\hat{A}\, H\, W\big),
+$$
+
+with $W$ a learned weight matrix (input width × output width) and
+$\sigma$ a nonlinearity, usually the ReLU, $\max(0, \cdot)$.
+</Definition>
+
+### What the square root does to repeated layers
+
+A network stacks layers, so the matrix is applied again and again, and
+how its powers behave matters as much as one product. The square-root
+weight is the same in both directions of an edge,
+$\hat{A}_{vu} = \hat{A}_{uv}$: $\hat{A}$ is symmetric, and a symmetric
+matrix has only real eigenvalues. That is what turns a bound on the
+size of an eigenvalue into an interval: a real number of size at most 1
+lies in $[-1, 1]$, a complex one need not lie on the real line at all.
+
+<Proposition title="the normalised adjacency has no eigenvalue above 1">
+Every eigenvalue of $\hat{A}$ lies in $[-1, 1]$, and the vector with
+entries $\sqrt{\tilde{d}_v}$ is an eigenvector with eigenvalue 1.
+
+<Proof>
+$\hat{A}$ is symmetric, so its eigenvalues are real, and it remains to
+bound their size. Write $P = \tilde{D}^{-1}\tilde{A}$, the mean over
+closed neighbourhoods; its rows are non-negative and sum to 1. Then
+$\hat{A} = \tilde{D}^{1/2} P \tilde{D}^{-1/2}$, so $\hat{A}$ and $P$
+have the same eigenvalues. If $Px = \lambda x$ and $x_i$ is the entry
+of largest absolute value, $|\lambda|\,|x_i| = |\sum_j P_{ij} x_j| \le
+\sum_j P_{ij} |x_i| = |x_i|$, so $|\lambda| \le 1$. Finally
+$\hat{A}\sqrt{\tilde{d}} = \tilde{D}^{-1/2}\tilde{A}\mathbf{1} =
+\tilde{D}^{-1/2}\tilde{d} = \sqrt{\tilde{d}}$, since the rows of
+$\tilde{A}$ sum to the $\tilde{d}_v$.
+</Proof>
+</Proposition>
+
+With no eigenvalue above 1 in size, powers of $\hat{A}$ do not blow up,
+as powers of $A$ do on a graph with hubs. With an eigenvalue of exactly
+1 they do not die out either, as powers of the full division
+$\tilde{D}^{-1}\tilde{A}\tilde{D}^{-1}$ do: once every node has a
+neighbour, every $\tilde{d}_u \ge 2$, each row of that matrix sums to at
+most $\frac{1}{\tilde{d}_v} \cdot \tilde{d}_v \cdot \frac{1}{2} =
+\frac{1}{2}$, and each layer at least halves what passes through it.
+
+### One layer on four accounts
+
+<Example title="a GCN layer on the four-node graph">
+Read the four-node graph as accounts joined by transfers. Each account
+has two standardised features: $x_1$, the share of incoming money it
+forwards within a day, and $x_2$, its age. Account 3 forwards nearly
+everything and is new; account 4, the hub, is its only counterpart.
+
+$$
+X = \begin{pmatrix} -0.5 & 1.0 \\ -0.5 & 0.5 \\ 2.0 & -1.5 \\ 0.5 & -0.5 \end{pmatrix},
+\qquad
+W = \begin{pmatrix} 1 & 0 \\ -1 & 1 \end{pmatrix}.
+$$
+
+The first column of $W$ computes $x_1 - x_2$, "forwards fast and is
+young"; the second passes the age on. These are weights training might
+set; here they are given.
+
+**Degrees with self-loops:** $\tilde{d} = (3, 3, 2, 4)$.
+
+**Normalised adjacency:** $\hat{A}_{vv} = 1/\tilde{d}_v$ and, for each
+edge, $1/\sqrt{\tilde{d}_v \tilde{d}_u}$:
+
+$$
+\hat{A} = \begin{pmatrix}
+0.333 & 0.333 & 0 & 0.289 \\
+0.333 & 0.333 & 0 & 0.289 \\
+0 & 0 & 0.500 & 0.354 \\
+0.289 & 0.289 & 0.354 & 0.250
+\end{pmatrix}.
+$$
+
+**Each account's own message**, $XW$, one row per account:
+$(-1.5, 1.0)$, $(-1.0, 0.5)$, $(3.5, -1.5)$, $(1.0, -0.5)$.
+
+**Aggregate**, row by row of $\hat{A}(XW)$. Account 3 takes half of
+its own message and 0.354 of the hub's:
+$0.5 \times 3.5 + 0.354 \times 1.0 = 2.104$ on the first channel and
+$0.5 \times (-1.5) + 0.354 \times (-0.5) = -0.927$ on the second. The
+hub takes 0.354 of account 3's message, 0.289 of each of accounts 1
+and 2, and a quarter of its own:
+$0.289\,(-1.5 - 1.0) + 0.354 \times 3.5 + 0.25 \times 1.0 = 0.766$, and
+$-0.222$ on the second channel.
+
+**Update** with the ReLU: account 3 becomes $(2.10, 0)$, the hub
+$(0.77, 0)$. The hub's own first channel was 1.0; in its new 0.77,
+its own message contributes 0.25, account 3's 1.24 and the two old
+accounts' $-0.72$.
+</Example>
+
+<Figure
+  src="./figures/layer-grids.svg"
+  alt="Four cell grids in a row joined by multiplication signs: the 4 by 4 normalised adjacency with entries 0.333, 0.289, 0.500, 0.354 and 0.250 and empty cells for absent edges; the 4 by 2 feature matrix X; the 2 by 2 weight matrix W with entries 1, 0, minus 1, 1; and after an arrow labelled ReLU the 4 by 2 output with rows 0 and 0.36, 0 and 0.36, 2.10 and 0, 0.77 and 0. The row of account 3 is outlined amber in the adjacency and in the output. Above the adjacency a note: diagonal 1 over d tilde v; off-diagonal 1 over the square root of d tilde v times d tilde u"
+  caption="One layer: the graph supplies the left matrix, training supplies W, and each output row is a degree-weighted blend of the transformed rows of the node and its neighbours."
+/>
+
+<Exercise>
+Compute the outputs of accounts 1 and 2 from the same $\hat{A}$, $X$
+and $W$. Why are they equal, although the two accounts differ in age?
+
+<Solution>
+Account 1: $0.333\,(-1.5) + 0.333\,(-1.0) + 0.289 \times 1.0 = -0.545$
+on the first channel, ReLU 0; $0.333 \times 1.0 + 0.333 \times 0.5 +
+0.289 \times (-0.5) = 0.356$ on the second. Account 2's row of
+$\hat{A}$ is the same: $0.333$ for account 1, $0.333$ for itself,
+$0.289$ for the hub. So both get $(0, 0.356)$.
+
+They are equal because the two accounts have the same closed
+neighbourhood, $\{1, 2, 4\}$, with the same degrees, and each gives its
+own message exactly the weight it gives the other's. The layer has
+averaged the two accounts into one; account 1's extra age (1.0 against
+0.5) is gone. A node's own features enter only through the self-loop,
+at weight $1/\tilde{d}_v$, which is what the skip connection below is
+for.
+</Solution>
+</Exercise>
+
+### What is learned, and what is fixed
+
+A two-layer network for node classification stacks two such layers
+and ends in a softmax over the classes:
+
+$$
+\text{output} = \operatorname{softmax}\Big(\hat{A}\;\operatorname{ReLU}\big(\hat{A} X W^{(0)}\big)\; W^{(1)}\Big).
+$$
+
+The learned objects are $W^{(0)}$, of size (features × hidden width),
+and $W^{(1)}$, of size (hidden width × classes). Nothing else is
+learned. $\hat{A}$ is the graph, fixed before training; it decides how
+neighbours are weighted, and $W^{(0)}$ and $W^{(1)}$ decide what is
+passed: which combination of features each neighbour contributes, and
+how the combined result is read. That is the answer to the opening's
+question: the layer learns which features of the neighbourhood matter,
+not how they are summarised.
+
+The parameter count does not depend on the graph. With 166 features, a
+hidden width of 100 and two classes, $W^{(0)}$ and $W^{(1)}$ hold
+$166 \times 100 + 100 \times 2 = 16{,}800$ numbers, the same for a
+graph of a thousand nodes or a million.
+
+<KeyFact>
+In a GCN layer the graph fixes how neighbours are combined and
+training fixes only what is combined; one layer is a degree-weighted
+blend of linear functions of the neighbours' features, so a maximum, or
+a count of suspicious neighbours, can be approximated only through the
+ReLU between layers.
+</KeyFact>
+
+## Logistic regression as one setting: the skip connection
+
+The exercise on accounts 1 and 2 showed a cost of the layer. A node's
+own vector enters only through the self-loop, at weight
+$1/\tilde{d}_v$: a quarter for the hub, $1/3{,}001$ for a merchant with
+3,000 neighbours. Where a node's own features are what separates fraud,
+the layer dilutes them among its neighbours', and a GCN can then do
+worse than the network that ignores the graph, worse even than a
+logistic regression on the node's own features.
+
+The repair is to give the node's own features a route to the output that
+does not pass through the aggregation. The *Skip-GCN* adds a term that
+reads $X$ directly:
+
+$$
+\text{output} = \operatorname{softmax}\Big(\hat{A}\;\operatorname{ReLU}\big(\hat{A} X W^{(0)}\big)\; W^{(1)} \;+\; X \tilde{W}\Big),
+$$
+
+with $\tilde{W}$ a learned matrix of size (features × classes). Set
+$W^{(0)} = W^{(1)} = 0$. The first term vanishes and the output is
+$\operatorname{softmax}(X\tilde{W})$. With two classes the softmax of
+two scores $z_0, z_1$ is the sigmoid of $z_1 - z_0$, the identity used
+for <Ref lesson="neural-tabular-detectors"
+id="-imbalance-levers-inside-the-loss">two-output wrappers in the
+network chapter</Ref>, so this is the ordinary logistic regression on
+the node's own features, and every such logistic regression is one
+setting of the Skip-GCN.
+
+<Figure
+  src="./figures/skip-gcn.svg"
+  alt="Two panels of the same wiring. Left, Skip-GCN: X enters a box labelled A hat X W0 then ReLU, giving H1; H1 enters a box labelled A hat H1 W1; a bypass arrow carries X to a box labelled X W tilde; the two outputs meet at a plus sign and pass to softmax. Right, the same diagram with the two graph boxes greyed and crossed with W0 = W1 = 0, leaving only X to X W tilde to softmax, labelled logistic regression on the node's own features"
+  caption="The bypass makes logistic regression on the node's own features one setting of the network; the graph term is added on top of it."
+/>
+
+The bypass is one matrix from features to class scores, a linear map,
+so what the Skip-GCN contains is the logistic regression, not the
+baseline network with its hidden layer: no choice of $\tilde{W}$
+reproduces a hidden layer's ReLU units. A bypass through a hidden layer
+of its own would contain that network too; the Skip-GCN measured below
+uses the linear one.
+
+Containing a model is a statement about what the network can represent,
+not about what training finds. Training does not start at the logistic
+regression: $W^{(0)}$, $W^{(1)}$ and $\tilde{W}$ start at small random
+values and are fitted together, and on few labelled nodes they can
+settle on a setting that scores worse than a logistic regression fitted
+alone; and a setting that fits the training weeks better can still lose
+on a test week. What the skip
+removes is the forced dilution: the node's own features no longer have
+to pass through its neighbourhood to reach the output.
+
+The skip connection also completes <Ref lesson="guilt-by-association"
+id="exercises">the previous chapter's second-to-last exercise</Ref>:
+one step of the walk, $\xi \leftarrow Q\xi\,\alpha + e\,(1-\alpha)$,
+with $Q$ the walk's column-normalised weight matrix and $e$ the restart
+vector, is a graph term plus a term in each node's own input, each
+multiplied by a weight. That is the shape of the Skip-GCN's score, a graph term plus
+$X\tilde{W}$, with the weights frozen at
+$\alpha$ and $1 - \alpha$. The Skip-GCN learns them, and learned
+weights can be negative. On an inverse-homophilic graph, where <Ref
+lesson="neighbourhood-and-centrality" id="when-fraud-avoids-fraud">the
+neighbourhood chapter</Ref> found fraudsters linked to accomplices
+rather than to each other, the network can learn that a suspicious
+neighbourhood lowers the score; the walk cannot.
+
+## How deep: two layers, and why more layers blur
+
+Two layers see two hops: on the cardholder–merchant graph, a
+cardholder's merchants and those merchants' other cardholders, the
+reach at which a card that shares a compromised terminal with stolen
+cards shows up. A third and fourth layer would reach
+further. From the receptive field one would expect each added layer to
+help, since it adds information; on graphs the opposite tends to happen.
+
+### Repeated averaging forgets the node
+
+Strip the layers of their weights and nonlinearities and $L$ layers
+compute $\hat{A}^L X$. By the Proposition, $\hat{A}$ has eigenvalue 1
+with eigenvector $\sqrt{\tilde{d}}$, and on a connected graph with
+self-loops every other eigenvalue is strictly smaller than 1 in size
+(stated here without proof). Because $\hat{A}$ is symmetric, each
+column of $X$ splits into components along perpendicular eigenvectors,
+and each multiplication scales each component by its eigenvalue: every
+component except the one along $\sqrt{\tilde{d}}$ shrinks, so
+
+$$
+\hat{A}^L X \;\longrightarrow\; \frac{\sqrt{\tilde{d}}\;\sqrt{\tilde{d}}^{\top} X}{\sum_u \tilde{d}_u}
+\qquad (L \to \infty):
+$$
+
+row $v$ of the limit is $\sqrt{\tilde{d}_v}$ times one vector shared by
+every node. Each node's features have been averaged with everyone
+else's until only its degree is left. On the four accounts the second
+eigenvalue is 0.56, so the differences shrink by about half per layer.
+
+<Figure
+  src="./figures/smoothing.svg"
+  alt="Line chart of the first channel of A hat to the power L times X, divided by the square root of d tilde, for the four accounts, against the number of layers L from 0 to 16. Account 3, amber, starts at 1.41 and falls to 0.83, 0.55, 0.39, 0.29; account 4 starts at 0.25; accounts 1 and 2 start at minus 0.29 and coincide from L = 1. All four lines meet at 0.175 by about L = 12. A dashed line marks L = 2"
+  caption="Repeated averaging on the four accounts: after a dozen layers every account carries the same value per unit of square-root degree, and account 3's signal is gone."
+/>
+
+Real layers have weights and ReLUs between the products, so the limit
+is a tendency rather than an outcome: the weights can partly undo the
+averaging, but every added layer hands them inputs averaged once more.
+The usual practice is to start at two layers and add one only if
+validation folds say so.
+
+### Reaching further without more layers
+
+Two layers cannot see a laundering cycle of six hops. Two additions
+reach further without stacking layers. A *global node*, joined to every
+node, gives each node a two-step route to every other: whatever the
+global node gathers in one layer, every node receives in the next. And
+*attention* replaces the fixed weight $1/\sqrt{\tilde{d}_v\tilde{d}_u}$
+by a learned one: a score computed from the pair of vectors
+$(h_v, h_u)$, normalised over $v$'s neighbours by a softmax. The weights
+then depend on the neighbours' features, so the layer can attend to the
+one suspicious neighbour among three thousand, and because the score
+is computed per pair, the result is still order-free.
+
+## Training on a graph: labels, masks and sampled neighbourhoods
+
+A GCN is trained like the network of the earlier module, by gradient
+steps on cross-entropy, with three differences that come from the
+graph.
+
+### Which nodes carry a loss
+
+Every node takes part in the forward pass, as a neighbour if not as a
+target, but only labelled nodes carry a loss. On Elliptic that is 23%
+of the nodes (2% illicit, 21% licit); the 77% unknown are aggregated
+over and never scored, because unknown is not licit. The illicit class
+is rare among the labelled, so the loss is weighted, <Ref
+lesson="neural-tabular-detectors" id="-imbalance-levers-inside-the-loss">a
+class weight inside the cross-entropy</Ref>; the Elliptic GCN below
+used weights 0.3 for licit and 0.7 for illicit, a ratio of about 2.3,
+mild by the standard of <Ref lesson="imbalance-techniques-revisited"
+id="the-ratio-is-a-hyperparameter-chosen-by-the-metric-that-decides">the
+imbalance chapter</Ref>.
+
+The graph a training row sees must obey <Ref
+lesson="point-in-time-features"
+id="two-ways-a-training-row-can-know-too-much">the point-in-time
+rule</Ref> like any feature: edges that existed and features as they
+were at the node's moment. A neighbour's features are inputs, so a
+neighbour's later behaviour must not leak in.
+
+### A model that transfers to graphs it has not seen
+
+Elliptic's 49 time steps are separate graphs: no edge joins two steps.
+A model trained on steps 1 to 34 must score the nodes of steps 35 to 49,
+which it has never seen in any graph. A GCN can, because its parameters
+are the weight matrices, which apply to any node of any graph; nothing
+in it belongs to a particular node. Such a model is called *inductive*.
+A model that learns something per node, such as an embedding row for
+every node like the terminal table of <Ref
+lesson="neural-tabular-detectors"
+id="an-embedding-is-a-linear-layer-on-the-one-hot-input">the network
+chapter</Ref>, is *transductive*: it scores only nodes it was trained
+with, and a new node gets the untrained "unknown" row.
+
+### Mini-batches of sampled neighbourhoods
+
+An Elliptic step holds 1,000 to 8,000 nodes, and the whole step fits in
+one batch. A month of a card issuer's graph does not, and a mini-batch
+of nodes is not a mini-batch of independent rows: to compute two layers
+for a node, the batch must hold its two-hop neighbourhood. A cardholder
+who paid at a merchant with 50,000 customers has a two-hop neighbourhood
+of at least 50,000 cardholders, and a batch of such nodes can be most of
+the graph.
+
+The standard repair samples. Pick a batch of *core* nodes; for each,
+keep at most a fixed number of its neighbours, and for each of those a
+fixed number of theirs; run the layers on this sampled sub-graph. The
+outer nodes have incomplete neighbourhoods, so their outputs are wrong,
+and the loss is computed only on the core nodes, whose two-hop
+receptive field the sample contains (in sampled form). The sample also
+caps the cost of a hub: a merchant's 50,000 customers enter a batch as
+at most the fixed number drawn.
+
+<Figure
+  src="./figures/sampling.svg"
+  alt="A graph of about thirty grey nodes. Three amber core nodes sit in the middle; from each, two blue edges go to sampled first-hop neighbours, and from each of those, two lighter blue edges to sampled second-hop neighbours. A hub on the right with many grey edges has only two of them drawn in blue. Unsampled nodes and edges are dashed grey. A legend: amber, core nodes, carry the loss; blue, sampled neighbourhood, used in the forward pass only; grey dashed, left out of this batch"
+  caption="A batch is a sampled two-hop sub-graph around a few core nodes; only the core nodes, whose neighbourhoods the sample contains, enter the loss."
+/>
+
+<Exercise>
+A two-layer GCN is trained with at most 10 sampled neighbours per hop
+and batches of 512 core nodes. (a) At most how many nodes does one
+batch hold? (b) How many would a single core node at the 50,000-customer
+merchant need without sampling, if it is a cardholder who paid there,
+on the cardholder–merchant graph? (c) Why is the loss not computed on the sampled first-hop nodes
+too?
+
+<Solution>
+**(a)** Each core node brings at most $1 + 10 + 10 \times 10 = 111$
+nodes, so a batch holds at most $512 \times 111 = 56{,}832$, fewer where
+neighbourhoods overlap.
+
+**(b)** One hop reaches the cardholder's merchants, two hops their
+customers: at least the merchant's 50,000 cardholders, for one core
+node.
+
+**(c)** A first-hop node's second layer needs its own neighbours'
+first-layer vectors, which need their neighbours: two hops beyond it,
+three beyond the core. The sample stops two hops from the core, so the
+first-hop node's output is computed from a truncated neighbourhood, and
+a loss on it would train the network on outputs it would never produce
+at scoring time.
+</Solution>
+</Exercise>
+
+## When a graph network beats hand-built neighbour features
+
+Everything above says what a GCN can compute. Whether it should replace
+the hand-built aggregates is a question for measurement, and two public
+datasets have been used to answer it.
+
+### The Elliptic comparison
+
+The setup, on <Ref lesson="canonical-datasets"
+id="elliptic-a-graph-whose-labels-come-from-names">the Elliptic
+graph</Ref>: train on time steps 1 to 34, test on steps 35 to 49, so
+every model is scored forward in time on graphs it has not seen; only
+labelled nodes are trained on and scored. Logistic regression (library
+defaults), a random forest (50 trees) and a feed-forward network (one
+hidden layer of 50 units, Adam at 0.001, 200 epochs) are each trained
+twice: on the 94 local features alone, and on all 166, the local ones
+plus the 72 hand-built one-hop aggregates. The GCN has two layers of
+hidden width 100, trained for 1,000 epochs with Adam at 0.001 and the
+0.3/0.7 weighted cross-entropy; the Skip-GCN adds the bypass.
+*EvolveGCN* is a GCN whose weights change with time: it keeps one
+weight matrix per time step and lets a second network compute each
+step's weights from the previous step's. The score is the F1 of the illicit class: precision and recall of the
+illicit predictions at each model's default decision, combined by their
+harmonic mean. Like every threshold metric it judges <Ref
+lesson="alert-budget-metrics"
+id="a-threshold-metric-judges-a-cut-nobody-chose">one cut nobody
+chose</Ref>; no spread over repeated runs is reported.
+
+| illicit F1, test steps 35–49 | local features (94) | local + aggregates (166) |
+|---|---|---|
+| logistic regression | 0.457 | 0.481 |
+| feed-forward network | 0.649 | 0.653 |
+| random forest | 0.694 | **0.788** |
+| GCN | | 0.628 |
+| Skip-GCN | | 0.705 |
+| EvolveGCN | | 0.720 |
+
+### Reading the table
+
+From "the GCN sees the graph and the others do not" one would expect
+the graph network on top. The table shows the opposite, in three steps.
+
+**The plain GCN loses to the network without the graph** (0.628
+against 0.649 and 0.653). This is the dilution of the exercise on
+accounts 1 and 2. Its precision equals the Skip-GCN's (0.812 for both);
+its recall is lower (0.512 against 0.623), which is what passing every
+node's features through its neighbourhood would do if it blurred illicit
+transactions into their licit neighbours.
+
+**The skip term repairs it** (0.705), lifting the GCN above both
+feed-forward networks and above the forest on local features (0.694).
+That the bypass helps this much says the transaction's own features
+carried most of the signal.
+
+<Figure
+  src="./figures/elliptic-f1.svg"
+  alt="Horizontal bars of illicit-class F1 on the Elliptic test steps 35 to 49, axis from 0 to 1. Grey bars, local features only: logistic regression 0.457, network 0.649, random forest 0.694. Blue bars, local plus the 72 hand-built aggregates: logistic regression 0.481, network 0.653, random forest 0.788. Amber bars, graph networks: GCN 0.628, Skip-GCN 0.705, EvolveGCN 0.720. A note: single reported results, no spread over runs"
+  caption="The forest on hand-built aggregates leads; the plain GCN falls below the network that ignores the graph, and the skip term lifts it above every other model except that forest and EvolveGCN."
+/>
+
+**The forest on hand-built aggregates wins** (0.788). It has one hop of
+the graph through the 72 columns, and it cuts strong, unevenly scaled
+inputs with thresholds, which the <Ref lesson="neural-tabular-detectors"
+id="a-tie-on-the-simulator-a-loss-below-the-top-on-real-data">network
+chapter</Ref> found trees do better than networks on engineered tables.
+A GCN ends in a softmax over a weighted sum of its last hidden vectors,
+a logistic regression on features it learned; a forest ends in
+thresholds on the features it was given, and here those features were
+already the neighbourhood summaries. The aggregates helped every model,
+so the graph carries signal; on this data the hand-built route used it
+better.
+
+Two further results bear on how to use a GCN rather than whether. The
+hidden vectors of the trained GCN, its *node embeddings*, concatenated
+to the features as extra columns, raised logistic regression from 0.481
+to 0.533 and the forest from 0.788 to 0.796: the GCN as a feature
+builder for another model. And EvolveGCN, whose weights follow the time
+steps, reached 0.720 against the Skip-GCN's 0.705. With no
+spread reported, gains of a point or two are not established;
+<Ref lesson="elliptic-illicit-nodes">the Elliptic chapter</Ref> reads
+these numbers against the dataset's time structure.
+
+### A synthetic world with complete labels
+
+The second measurement runs on <Ref lesson="canonical-datasets"
+id="amlworld-complete-labels-no-bank-has">AMLworld</Ref>, the generated
+banking world whose laundering labels are complete. There the label
+sits on transactions, which are edges, so the graph networks classify
+edges from the vectors of the two accounts they join. Data were split
+60/20/20 in time; the score is again the F1 of the laundering class.
+On one side, boosted trees from two libraries (LightGBM and XGBoost) on transaction features
+plus graph features computed beforehand by a preprocessor: account
+statistics and counts of cycles and other <Ref
+lesson="fraud-as-a-graph" id="eight-definitions">laundering
+shapes</Ref>. On the other, graph networks with no hand-built graph
+features, two layers of width 64, trained on sampled neighbourhoods of
+up to 100 accounts at each hop. The strongest, PNA, aggregates with
+several functions at once (sum, mean, maximum, spread), scaled by
+degree. A sum after a learned transform could in principle see
+everything, but only if training finds the transform; PNA hands the
+next layer the counts, the proportions and the extremes side by side
+instead.
+
+| laundering F1 (%) | HI-Small | LI-Small | HI-Medium | LI-Medium |
+|---|---|---|---|---|
+| PNA, no hand features | 56.8 | 16.5 | 59.7 | 27.7 |
+| LightGBM + graph features | 62.9 | 20.8 | 59.5 | 20.9 |
+| XGBoost + graph features | 63.2 | 27.3 | 65.7 | 28.2 |
+
+(HI and LI are the higher- and lower-illicit-ratio worlds; Small and
+Medium their sizes.) Without any of the cycle counts and statistics the
+trees were handed, the graph network is level with LightGBM on
+HI-Medium and ahead of it on LI-Medium, behind both on the two Small
+worlds, and behind XGBoost on all four. It paid in compute: the
+graph-network experiments, tuning included, took about 1,000 GPU hours,
+and the two largest worlds got no graph-network result at all because
+training them needed more.
+
+<KeyFact>
+The two measurements agree. Where good neighbourhood features have been
+built, the best tree ensemble on them is the bar a graph network has
+not cleared. A graph network earns its place where those features do
+not exist yet: on a new graph, a new kind of edge, or a typology whose
+shape nobody has written down, it learns a usable summary from the
+labels without someone guessing the columns first, and its embeddings
+can be handed to the trees as extra columns.
+</KeyFact>
+
+<Conclusion>
+You can now say what one layer of a graph network computes:
+$H' = \sigma(\hat{A}HW)$, a sum over each node and its neighbours with
+every edge weighted by $1/\sqrt{\tilde{d}_v\tilde{d}_u}$, followed by a
+learned linear map and a nonlinearity. You can derive why it must
+aggregate over sets (no positions, a dozen matrices for one four-node
+graph), why it divides at both ends of an edge and by the square root
+(sums grow with degree, hubs are uninformative neighbours, and full
+division loses the count), why the skip term makes logistic
+regression one of its settings, why stacking more layers blurs
+rather than helps (repeated averaging leaves only degree), and how it is trained when the
+graph does not fit in a batch. On Elliptic the forest on hand-built
+aggregates (0.788) beat the Skip-GCN (0.705); the graph network's case
+is where nobody has built the aggregates.
+
+The Elliptic table leaves three questions open: what in the 166
+features lets the forest win, what the illicit-class F1 hides that a
+score over both classes does not, and why every model fails after the
+43rd time step, when a dark market closed. <Ref
+lesson="elliptic-illicit-nodes">Illicit-node classification on the
+Elliptic graph</Ref> takes the dataset, the split and the metric apart
+to answer them.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+Push the normalisation to its edges. (a) A node has no neighbours.
+What is its row of $\hat{A}$, and what does a GCN layer compute for it?
+What would the formula do without the self-loop? (b) Two merchants,
+each of whose cardholders paid nowhere else: a busy one with 3,000
+cardholders, of whom 30 carry a suspicion score of 1 and the rest 0,
+and a small one with 3 cardholders, all three scored 1. Both merchants
+carry 0 themselves. Compute what each merchant receives under the sum,
+the mean over the closed neighbourhood and $\hat{A}$, and say which
+merchant each ranks as more exposed.
+
+<Solution>
+**(a)** $\tilde{d}_v = 1$, so its row of $\hat{A}$ has a single 1 on
+the diagonal: the layer computes $\sigma(x_v W)$, a feed-forward layer
+on its own features. Without the self-loop its degree is 0, $A_{v\cdot}$
+is all zeros and $D^{-1/2}$ divides by zero; even with the division
+defined as 0, its row would be zero and its own features would never
+reach the output. The self-loop guarantees $\tilde{d}_v \ge 1$ and that
+every node hears itself.
+
+**(b)** With self-loops the busy merchant has $\tilde{d} = 3{,}001$,
+the small one $\tilde{d} = 4$, every cardholder $\tilde{d} = 2$.
+
+| | busy merchant | small merchant |
+|---|---|---|
+| sum | 30 | 3 |
+| mean | $30/3{,}001 \approx 0.010$ | $3/4 = 0.75$ |
+| $\hat{A}$ | $30/\sqrt{2 \cdot 3{,}001} \approx 0.39$ | $3/\sqrt{2 \cdot 4} \approx 1.06$ |
+
+The sum ranks the busy merchant first: thirty suspects outnumber three,
+although they are 1% of its customers against 100%. The mean ranks the
+small merchant first and leaves the busy merchant's thirty suspects
+almost invisible at 0.010. $\hat{A}$ ranks the small
+merchant first too, but the busy merchant's thirty still register at
+about a third of the small merchant's value: the count survives on a
+compressed scale. The move that transfers:
+check every normalisation at a leaf and at a hub before trusting it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "A four-layer GCN sees four hops and the two-layer model only
+two, so with the same training data the four-layer model can only do
+better." Use the four accounts, and name the step of the argument that
+fails.
+
+<Solution>
+**The step that fails** is "more information in the receptive field
+means more information in the output". The layer does not keep its
+inputs side by side; it averages them. Without weights and ReLUs, four
+layers compute $\hat{A}^4 X$, and the averaging shrinks every component
+of $X$ except the one along $\sqrt{\tilde{d}}$ by the corresponding
+eigenvalue, once per layer.
+
+On the four accounts the first channel per unit of
+$\sqrt{\tilde{d}_v}$ is $(-0.29, -0.29, 1.41, 0.25)$ at the input,
+$(0.02, 0.02, 0.55, 0.22)$ after two layers and
+$(0.13, 0.13, 0.29, 0.19)$ after four: account 3's lead over accounts 1
+and 2 falls from 1.70 to 0.53 to 0.17, and the limit, reached by about
+twelve layers, is 0.175 for all four. What the extra layers add is
+mostly the same global average for everyone.
+
+**Why "can only do better" is false even with learned weights:** the
+four-layer model has more parameters fitted to the same labels, its
+own-node signal passes through four rounds of mixing, and the
+optimiser must undo the smoothing with its weights. A model that
+contains the two-layer model as a special case would need layers 3 and
+4 to act as the identity, and a GCN layer cannot: $\hat{A}$ is applied
+whatever $W$ is. That is one reason skip connections are added in
+deeper graph networks.
+</Solution>
+</Exercise>
+
+<Exercise>
+(a) Show that a two-layer GCN with the identity in place of the ReLU
+computes $\operatorname{softmax}(\hat{A}^2 X W^{(0)} W^{(1)})$, and that
+this is a logistic regression on the two-hop-smoothed features
+$\hat{A}^2 X$. How many free parameters does it really have, with 166
+features, hidden width 100 and two classes? (b) Compute $\hat{A}^2 X$
+for account 3 from $\hat{A}$ and $X$ of the worked example. (c) What
+does the ReLU between the layers add that the linear model cannot
+represent?
+
+<Solution>
+**(a)** With $\sigma$ the identity, the first layer gives
+$\hat{A}XW^{(0)}$ and the second $\hat{A}(\hat{A}XW^{(0)})W^{(1)} =
+\hat{A}^2 X (W^{(0)}W^{(1)})$, by associativity. Write
+$V = W^{(0)}W^{(1)}$, a (166 × 2) matrix: the model is
+$\operatorname{softmax}(\tilde{X}V)$ with $\tilde{X} = \hat{A}^2X$, a
+logistic regression on fixed, precomputed features. It stores
+$16{,}800$ numbers, but every $V$ it can reach is a 166 × 2 matrix,
+and every 166 × 2 matrix is reachable (take $W^{(0)}$ with $V$ in its
+first two columns and $W^{(1)}$ picking them out), so it has
+$166 \times 2 = 332$ effective parameters. With two classes only the
+difference of the two columns matters, 166 numbers.
+
+**(b)** Row 3 of $\hat{A}^2$ is $(0.102, 0.102, 0.375, 0.265)$, so
+the first feature is
+$0.102(-0.5) + 0.102(-0.5) + 0.375(2.0) + 0.265(0.5) = 0.781$ and the
+second $0.102(1.0) + 0.102(0.5) + 0.375(-1.5) + 0.265(-0.5) = -0.542$.
+
+**(c)** With the ReLU, the second layer aggregates
+$\operatorname{ReLU}(\hat{A}XW^{(0)})$: a nonlinear function of each
+neighbour's smoothed features, summed. That can count neighbours above
+a level (a hidden unit that is positive only when a neighbour's
+smoothed score exceeds a threshold, then summed), which no linear map
+of $\hat{A}^2X$ can. Without it, the "graph network" is feature
+engineering by $\hat{A}^2$ followed by a logistic regression.
+</Solution>
+</Exercise>
+
+<Exercise>
+The bank's graph is the auction graph of <Ref
+lesson="neighbourhood-and-centrality" id="exercises">the neighbourhood
+chapter's exercise</Ref>: two fraudsters, accomplices that trade with
+them, honest users; dyadicity $D = 0$ and heterophilicity
+$H = 1.06$ with $n_1 = 2$ fraud nodes. The label marks only the
+fraudsters. A Skip-GCN is trained whose inputs include a local model's
+score, high for the fraudsters. (a) Use the homophily gate to decide
+which way the aggregated neighbour score points. (b) What sign should
+training give the weight that reads the aggregated score, and could
+the exposure walk represent the same thing? (c) What changes if the
+label also marks the accomplices?
+
+<Solution>
+**(a)** The gate compares $D(n_1 - 1)$, which tracks how many fraud
+neighbours a fraud node has, with $H n_1$, which tracks how many a
+legitimate node has. Here $D(n_1 - 1) = 0$ and $H n_1 = 2.12$: fraud
+nodes have no fraudulent neighbour, while legitimate nodes, the
+accomplices, do (the chapter's count gave 0 against 0.83 on average).
+A high aggregated neighbour score points at the accomplices, away from
+the fraudsters.
+
+**(b)** Negative, with the node's own score carrying a positive weight
+through the bypass: among nodes with similar own scores, a suspicious
+neighbourhood marks an accomplice, which the label calls legitimate.
+The exposure walk cannot: its weights are $\alpha > 0$ and the
+entries of $Q$, all non-negative, so suspicion only ever flows outward
+with a plus sign, and it ranks the accomplices high.
+
+**(c)** With accomplices labelled as fraud, a fraud node's neighbours
+are now partly fraud too, the graph is no longer anti-dyadic for the
+label, and the weight on the aggregated score turns positive. The sign
+a GCN learns is a property of the label as much as of the graph; the
+gate must be run on the label the model is trained on.
+</Solution>
+</Exercise>
+
+<Exercise>
+Design the experiment that checks whether a GCN's node embeddings help
+a logistic regression on Elliptic. (a) Specify three logistic
+regressions, the split, the inputs, how the embeddings are obtained
+without leaking test labels, and the score. (b) The Elliptic
+comparison reported 0.457 for logistic regression on the local features
+alone and 0.543 with the embeddings added (0.533 on all 166 features
+plus the embeddings). What would count as reproducing "embeddings help
+logistic regression", and what extra measurement would you add before
+believing a gap of that size?
+
+<Solution>
+**(a)** Split: train on steps 1–34, test on 35–49, labelled nodes only
+in the loss and in the score. Models: logistic regression on the 94
+local features; on the 166 local plus aggregated features; on the 94
+local features plus the GCN's hidden vectors (width 100). The GCN is
+trained on steps 1–34 only, with the 0.3/0.7 weighted loss; its
+embeddings for the test steps are computed by a forward pass on each
+test step's graph with the trained weights, which the inductive model
+allows and which uses no test label. Standardise every input with
+training-step statistics. Score: illicit-class F1 at the default
+decision, as in the chapter, and average precision of the illicit
+class beside it, since F1 judges a single cut.
+
+**(b)** Reproduction means the same order (local + embeddings above
+local alone, and above local + aggregates, which was 0.481) with a gap
+of the reported size, roughly 0.08 to 0.09 in F1. Before believing it:
+repeat the GCN training with several seeds, since the embeddings depend
+on the GCN's random start, and report the spread of the logistic
+regression's F1 across seeds; and report the F1 per test step, since
+fifteen steps of very different illicit shares, and the collapse after
+step 43, can carry a pooled gap. A gap smaller than the seed spread is
+not a finding.
+</Solution>
+</Exercise>
+
+<Exercise>
+A test set of labelled nodes holds one illicit node in ten. A
+classifier calls every node licit. (a) Compute its accuracy and the F1
+of the illicit class. (b) *Micro-averaged* F1 pools the true positives,
+false positives and false negatives of both classes before computing
+precision and recall. Show that for a single-label classifier it equals
+accuracy, and compute it here. (c) Every model in the Elliptic
+comparison had a micro-averaged F1 between 0.92 and 0.99. What does
+(b) say about reading those numbers?
+
+<Solution>
+**(a)** Accuracy 0.9. It predicts no illicit node, so illicit recall is
+0 and illicit precision is undefined (0 of 0), conventionally 0: F1 is
+0.
+
+**(b)** Each node gets one predicted class. A correct prediction is a
+true positive for its class; a wrong one is a false positive for the
+predicted class and a false negative for the true class. Pooled over
+both classes, TP = number correct, FP = FN = number wrong, so micro
+precision = micro recall = correct / all = accuracy, and so is their
+harmonic mean. Here it is 0.9.
+
+**(c)** A micro-averaged F1 of 0.92 sits just above what calling
+everything licit scores on a test set with a tenth illicit; the range
+0.92–0.99 is mostly the licit majority. The illicit-class F1 (0.46 to
+0.80 for the same models) is the number that separates them. This is
+the accuracy trap of a rare class in graph form, and <Ref
+lesson="elliptic-illicit-nodes">the Elliptic chapter</Ref> takes it
+apart on the actual test steps.
+</Solution>
+</Exercise>
+
+<References>
+1. B. Sanchez-Lengeling, E. Reif, A. Pearce, A. B. Wiltschko, "A Gentle Introduction to Graph Neural Networks," *Distill*, 2021, https://doi.org/10.23915/distill.00033 — sections "Images as graphs" (the pixel grid and its banded adjacency), "The challenges of using graphs in machine learning" (adjacency matrices are not permutation invariant; adjacency lists), "The simplest GNN" and "Passing messages between parts of the graph" (gather, aggregate, update; k layers reach k steps), "Adding global representations" (the global node), "Sampling graphs and batching in GNNs" (sampled neighbourhoods, masked loss), "Comparing aggregation operations" (sum, mean and max and the neighbourhoods each cannot tell apart), "Graph convolutions as matrix multiplications" ($AX$ as sum aggregation, $A^k$ counting walks), "Graph attention networks".
+2. T. N. Kipf, M. Welling, "Semi-Supervised Classification with Graph Convolutional Networks," *ICLR*, 2017 (arXiv:1609.02907) — Sec. 2 (the layer $\sigma(\tilde{D}^{-1/2}\tilde{A}\tilde{D}^{-1/2}HW)$, the self-loops and the symmetric normalisation), Sec. 3 (the two-layer model with a softmax output trained on the labelled nodes).
+3. M. Weber, G. Domeniconi, J. Chen, D. K. I. Weidele, C. Bellei, T. Robinson, C. E. Leiserson, "Anti-Money Laundering in Bitcoin: Experimenting with Graph Convolutional Networks for Financial Forensics," KDD Workshop on Anomaly Detection in Finance, 2019 (arXiv:1908.02591) — Sec. 2.2 (hand-built aggregates lose information under neighbourhoods of different sizes), Sec. 3.2 (GCN layer, two-layer model, Skip-GCN and its reduction to logistic regression), Sec. 3.3 (EvolveGCN), Sec. 4 and Tables 1–2 (temporal split, hyperparameters, weighted cross-entropy 0.3/0.7, illicit-class results), Sec. 5 (why the random forest outperforms the GCN; node embeddings as forest inputs).
+4. W. L. Hamilton, R. Ying, J. Leskovec, "Inductive Representation Learning on Large Graphs," *NeurIPS*, 2017 (arXiv:1706.02216) — inductive versus transductive node representations; sampling a fixed number of neighbours per hop for mini-batch training.
+5. K. Xu, W. Hu, J. Leskovec, S. Jegelka, "How Powerful are Graph Neural Networks?," *ICLR*, 2019 (arXiv:1810.00826) — Sec. 5 (what sum, mean and max aggregation can and cannot distinguish).
+6. Q. Li, Z. Han, X.-M. Wu, "Deeper Insights into Graph Convolutional Networks for Semi-Supervised Learning," *AAAI*, 2018 (arXiv:1801.07606) — the GCN layer as repeated smoothing and the loss of node information as layers are stacked.
+7. A. Pareja, G. Domeniconi, J. Chen, T. Ma, T. Suzumura, H. Kanezashi, T. Kaler, T. B. Schardl, C. E. Leiserson, "EvolveGCN: Evolving Graph Convolutional Networks for Dynamic Graphs," *AAAI*, 2020 (arXiv:1902.10191) — GCN weights updated across time steps by a recurrent network.
+8. E. Altman, J. Blanuša, L. von Niederhäusern, B. Egressy, A. Anghel, K. Atasu, "Realistic Synthetic Financial Transactions for Anti-Money Laundering Models," *NeurIPS Datasets and Benchmarks*, 2023 (arXiv:2306.16424) — Sec. 4 and Table 2 (GIN, GIN with edge updates and PNA against boosted trees with graph-feature preprocessing, temporal 60/20/20 split, minority-class F1, neighbourhood sampling), App. E (two layers of width 64, about 1,000 GPU hours).
+</References>

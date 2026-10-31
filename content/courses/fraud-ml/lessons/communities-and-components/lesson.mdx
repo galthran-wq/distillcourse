@@ -1,0 +1,1042 @@
+A payment network has about 34,000 users and a few hundred known fraudsters. Investigators cannot look at every user, and a fraud ring is a group, not a node. How do you cut the graph into groups so that the few groups containing a known fraudster are where to look, and how do you then draw rings whose membership an auditor can check line by line?
+
+<Ref lesson="neighbourhood-and-centrality">The previous chapter</Ref>
+ended with a table of columns, one row per node: degree split by label,
+triangles, walk counts, distance to fraud, betweenness. Every column
+describes one node, and none of them sees that D, E and F of its toy
+form a ring. The investigators' questions are about groups: which
+accounts act together, and who else belongs with a fraudster already
+caught.
+
+Two different jobs hide in those questions. The first is to narrow the
+search: find the few groups where a known fraudster sits, so that a team
+which can work about <Ref lesson="fraud-detection-system"
+id="ranking-then-cutting-at-the-capacity">a hundred cases a day</Ref> looks there
+first. A wrong group costs some wasted calls. The second is to assign
+rings: produce a list "these seven users are one ring" that a bank will
+act on, defend in a dispute, and reproduce next month. A wrong group
+there freezes an innocent customer's account, and the bank must be able
+to say why each name is on the list.
+
+The obvious first move is to take each flagged user and list their
+neighbours. That gives a set of suspects per fraudster, one hop deep,
+overlapping, and with no boundary: a ring of seven whose members are
+three hops apart is cut into pieces, and a fraudster who paid a large
+shop pulls in the shop's thousand customers. What is missing is a
+definition of "a group" that a computer can apply to the whole graph,
+and each of the two jobs needs its own.
+
+## Cutting a graph: what makes a split good
+
+The simplest definition of a group says what a group is not: it is not
+connected much to the rest. Split the nodes into two sides and count what
+runs between them.
+
+### The cheapest cut isolates one account
+
+Take seven accounts and a month of transfers between them; the number
+on an edge counts transfers between the two accounts, and is the edge's
+weight. A, B and C transfer 20 times among themselves, D, E and F 27
+times. G deals only with F, three times. Between the two sides run C–D
+(3 transfers) and B–E (1).
+
+<Definition title="cut">
+For a split of the nodes into two sides $S$ and $T$, the *cut*
+$\operatorname{Cut}(S, T)$ is the total weight of the edges with one end
+in $S$ and the other in $T$. The *MinCut* split is the one with the
+smallest cut.
+</Definition>
+
+The split everyone sees, $\{A, B, C\}$ against $\{D, E, F, G\}$, cuts
+$3 + 1 = 4$ transfers. MinCut prefers something else: cutting G off
+alone crosses only its 3 transfers with F. The cheapest way to separate
+a graph is to detach its quietest node, and a group of one account is no
+group.
+
+### Pricing the cut by what it leaves on each side
+
+The repair is to make a lopsided split pay. Two ways to do it divide by
+the size of each side, measured either in nodes or in the weight inside
+it. Write $\operatorname{in}(S)$ for the total weight of the edges with
+both ends in $S$.
+
+$$
+\operatorname{RatioCut}(S, T) = \operatorname{Cut}(S, T)\left(\frac{1}{|S|} + \frac{1}{|T|}\right),
+\qquad
+\operatorname{MinMaxCut}(S, T) = \operatorname{Cut}(S, T)\left(\frac{1}{\operatorname{in}(S)} + \frac{1}{\operatorname{in}(T)}\right).
+$$
+
+Detaching G costs a RatioCut of $3 \times (1/1 + 1/6) = 3.5$, while
+the two trading groups cost $4 \times (1/3 + 1/4) = 7/3$. With
+MinMaxCut, G alone has nothing inside it, $\operatorname{in}(\{G\}) = 0$,
+and the term $1/0$ makes the split infinitely expensive; the two groups
+cost $4 \times (1/20 + 1/30) = 1/3$. Checked against every one of the 63
+ways to split seven nodes into two sides, both criteria pick
+$\{A, B, C\}$ against $\{D, E, F, G\}$.
+
+<FigureSequence
+  name="cuts"
+  alt="Four frames on a weighted graph of seven accounts. Frame 1: A, B, C joined by edges of weight 8, 6, 6; D, E, F by three edges of weight 9; G joined to F by weight 3; C–D weight 3 and B–E weight 1 between the sides. Frame 2: a dashed amber line cuts G off, crossing weight 3, labelled the cheapest cut. Frame 3: a dashed line between C and D crosses the two between-side edges; a table gives Cut, RatioCut and MinMaxCut for G against the rest (3, 3.5, infinity) and for ABC against DEFG (4, 7/3, 1/3). Frame 4: ABC shaded amber and DEFG shaded blue, with the modularity calculation Q = (40/108 − (44/108)²) + (60/108 − (64/108)²) = 0.41"
+  caption="One graph, four ways to judge a split. Only the cut alone prefers to detach the quiet account G."
+/>
+
+<Task>
+Step through the frames. Before frame 3, compute the RatioCut of the
+split that puts G with A, B and C, against D, E and F: it crosses the
+weight 4 between the groups plus G's 3. It should come out near 4.1,
+worse than both splits in the table.
+</Task>
+
+Both criteria still need the number of groups fixed in advance: they
+judge a split into two. A payment graph of 34,000 users does not say
+whether it holds two groups or ten thousand, and splitting it in two,
+then each half in two, and so on, needs a rule for when to stop. What is
+missing is one number that judges a split into any number of groups.
+
+## Modularity: the share inside, against a random baseline
+
+"Most of the weight lies inside the groups" sounds like the right test,
+and it fails at once: put every node in one group and all of the weight
+is inside. The share inside has to be compared with the share that
+would fall inside the same groups if the edges had nothing to do with
+them. The <Ref lesson="neighbourhood-and-centrality"
+id="the-two-ratios">dyadicity of the previous chapter</Ref> made the
+same move for labels, comparing fraud–fraud edges with what chance gives.
+
+### Counting edge ends
+
+Every edge has two ends. The toy's total weight is $M = 54$, so it has
+108 weighted edge ends. The *strength* $s_v$ of a node is the total
+weight at it, its weighted degree: A has $8 + 6 = 14$, G has 3, and the
+seven strengths add up to 108. For a group $C$:
+
+- $e_{CC}$ is the share of edge ends that belong to edges inside $C$:
+  $2\operatorname{in}(C)/2M$. For $\{A, B, C\}$, $40/108$.
+- $a_C$ is the share of edge ends that sit at nodes of $C$, its
+  strength over $2M$. For $\{A, B, C\}$, $(14 + 15 + 15)/108 = 44/108$.
+
+If each edge end were attached to a node at random, with probability
+proportional to the node's strength, an edge would have both ends in $C$
+with probability $a_C \times a_C$. So $a_C^2$ is the share of weight that
+would fall inside $C$ by chance, given only how active its members are.
+
+<Definition title="modularity">
+For a partition of a graph with total edge weight $M$ into groups
+$C_1, \dots, C_k$, the *modularity* is
+
+$$
+Q = \sum_{i=1}^{k} \left( e_{ii} - a_i^2 \right),
+$$
+
+where $e_{ii}$ is the share of edge ends inside $C_i$ and $a_i$ the share
+of edge ends at nodes of $C_i$. A group of a partition with high $Q$ is
+called a *community*, and finding such a partition is *community
+detection*.
+</Definition>
+
+<Example title="modularity of the two trading groups">
+$\{A, B, C\}$: $e = 40/108 = 0.370$, $a = 44/108 = 0.407$, term
+$0.370 - 0.166 = 0.204$.
+
+$\{D, E, F, G\}$: inside weight $27 + 3 = 30$, so $e = 60/108 = 0.556$;
+strength $21 + 19 + 21 + 3 = 64$, so $a = 0.593$, term
+$0.556 - 0.351 = 0.204$.
+
+$Q = 0.204 + 0.204 = 0.41$. Every one of the 877 partitions of seven
+nodes scores lower.
+</Example>
+
+<Exercise>
+Compute $Q$ for the partition $\{A, B, C\}$, $\{D, E, F\}$, $\{G\}$, and
+say why detaching G lowers it.
+
+<Solution>
+$\{A, B, C\}$ is unchanged: 0.204. $\{D, E, F\}$: inside weight 27, so
+$e = 54/108 = 0.5$; strength $21 + 19 + 21 = 61$, $a = 0.565$, term
+$0.5 - 0.319 = 0.181$. $\{G\}$: nothing inside, $e = 0$, $a = 3/108$,
+term $-0.0008$. $Q = 0.204 + 0.181 - 0.001 = 0.385$. Detaching G moves
+its 3 transfers with F from inside to between ($e$ falls by $6/108$),
+while the chance baseline falls only by a little, because G is a quiet
+node. Unlike MinCut, modularity charges for cutting off a node that
+belongs.
+</Solution>
+</Exercise>
+
+Two boundary cases show what the baseline does. One group holding every
+node has $e = 1$ and $a = 1$, so $Q = 0$: nothing is gained over chance.
+Every node alone has $e_{ii} = 0$ for every group, so $Q$ is negative
+($-0.16$ on the toy). A partition earns a positive $Q$ only by putting
+more weight inside its groups than the members' activity alone would.
+
+## Louvain: climbing modularity one move at a time
+
+Modularity says which of two partitions is better. Finding the best one
+is another matter: seven nodes already have 877 partitions, and the
+count grows faster than exponentially.
+
+An older method attacks from the top. The betweenness of an edge,
+defined like the <Ref lesson="neighbourhood-and-centrality"
+id="betweenness-the-node-every-route-passes-through">betweenness of a
+node</Ref>, counts the shortest paths running through it, and the few
+edges between communities carry most of them. The *Girvan–Newman*
+algorithm removes the edge with the highest betweenness, recomputes, and
+repeats, and modularity picks the best of the splits it passes through.
+It finds good
+splits, but every round recomputes shortest paths from every node: on a
+graph of a million edges that is a million rounds of a million searches.
+
+### The gain of one move
+
+The method used on large graphs, *Louvain*, climbs from the bottom
+instead. It needs only one number: how much $Q$ changes when two groups
+are merged, a single node joining a group being the smallest case.
+
+<Proposition title="the gain of a merge">
+In a graph of total weight $M$, let $X$ and $Y$ be two groups of a
+partition with strengths $s_X$ and $s_Y$, joined by edges of total
+weight $w_{XY}$. Merging them changes the modularity by
+
+$$
+\Delta Q = \frac{w_{XY}}{M} - \frac{s_X\, s_Y}{2M^2}.
+$$
+
+<Proof>
+Only the terms of $X$ and $Y$ change. The inside share of the merged
+group gains the ends of the edges between $X$ and $Y$: $2w_{XY}/2M =
+w_{XY}/M$. Its strength share is $a_X + a_Y$, and
+$(a_X + a_Y)^2 - a_X^2 - a_Y^2 = 2a_X a_Y = 2 s_X s_Y/(2M)^2 =
+s_X s_Y/(2M^2)$, which is subtracted.
+</Proof>
+</Proposition>
+
+The first term is the weight between the two; the second is the weight
+chance would put between two groups that active. A merge pays when the
+groups trade more with each other than their activity alone explains.
+
+A node that already sits in a community has to leave it before it can
+join another, and leaving is the merge run backwards: it changes $Q$ by
+minus the gain of merging the node with the rest of its community. The
+gain of a move is therefore the gain of joining the new community minus
+the gain of staying with the old one.
+
+<Example title="where C goes">
+Suppose A and B have already joined, and C, alone, weighs its options;
+$M = 54$, $s_C = 15$.
+
+**Into $\{A, B\}$:** $w = 6 + 6 = 12$, $s_{\{A,B\}} = 14 + 15 = 29$:
+$\Delta Q = 12/54 - 29 \times 15/(2 \times 54^2) = 0.222 - 0.075 =
++0.148$.
+
+**Into $\{D\}$:** $w = 3$, $s_D = 21$: $\Delta Q = 3/54 - 21 \times
+15/5{,}832 = 0.056 - 0.054 = +0.002$.
+
+Both moves raise $Q$; C takes the larger and joins A and B.
+</Example>
+
+### Two phases, repeated
+
+Louvain starts with every node as its own community and runs two phases.
+
+**Phase 1, local moves.** Visit the nodes one at a time. Each node
+computes, for each neighbouring community, the gain of joining it minus
+the gain of staying, moves to the best one if that difference is
+positive, and otherwise stays. Repeat the
+passes until a full pass moves nobody.
+
+**Phase 2, aggregation.** Replace each community by one node. Its
+internal weight becomes a self-loop, and the weights between communities
+are summed into single edges. Then run phase 1 on this smaller graph.
+
+Each repetition of the pair is a *level*, and the levels form a
+hierarchy: small tight communities at level 1, merged into larger ones
+at level 2, and so on until no move raises $Q$.
+
+<FigureSequence
+  name="louvain"
+  alt="Four frames on the seven-account graph. Frame 1: all accounts separate, Q = −0.16, A moves to B for +0.112. Frame 2: A and B shaded amber; C highlighted with two arrows, into A and B with gain +0.148 and into D with gain +0.002. Frame 3: ABC amber and DEFG blue, G having joined D, E, F for +0.024, Q = 0.41. Frame 4: two super-nodes, ABC with a self-loop of 20 and DEFG with a self-loop of 30, joined by an edge of 4; merging them would change Q by −0.41, so the algorithm stops"
+  caption="Louvain on the toy, visiting A to G in order: one pass of moves finds the two groups, and aggregation finds nothing more to merge."
+/>
+
+<Task>
+Before frame 3, compute the gain for G of joining $\{D, E, F\}$: G has
+3 transfers into it, strength 3, and the community's strength is 61. It
+should be small but positive, about $+0.024$.
+</Task>
+
+<Exercise>
+In the same first pass, D is visited after C has joined A and B. Compute
+the gain for D of joining $\{A, B, C\}$, of joining $\{E\}$, and of
+joining $\{F\}$, and say which it takes.
+
+<Solution>
+$s_D = 21$, $M = 54$, $2M^2 = 5{,}832$.
+Into $\{A, B, C\}$: $w = 3$, strength 44: $3/54 - 44 \times 21/5{,}832 =
+0.056 - 0.158 = -0.103$.
+Into $\{E\}$: $w = 9$, $s_E = 19$: $9/54 - 19 \times 21/5{,}832 = 0.167 -
+0.068 = +0.098$.
+Into $\{F\}$: $w = 9$, $s_F = 21$: $0.167 - 0.076 = +0.091$.
+D joins E: the weight is the same, and E is the less active partner, so
+chance explains less of the link. Joining the group across the cut would
+lower $Q$, even though D has 3 transfers there.
+</Solution>
+</Exercise>
+
+Each move is a sum over one node's edges, so a pass costs about one
+sweep of the edge list, and the graph shrinks at every level. That is
+why Louvain handles graphs of millions of nodes in minutes. The price is
+that it climbs: it stops where no single move helps, which need not be
+the highest $Q$ there is, and where it stops can depend on the order in
+which nodes are visited. On the toy every one of the 5,040 visiting
+orders ends in the same two groups; on a graph with many near-ties two
+runs can put a borderline account in different communities, and the
+numbers that name the communities differ from run to run even when the
+membership does not.
+
+## Narrowing the search on a peer-to-peer graph
+
+The <Ref lesson="fraud-as-a-graph"
+id="what-a-fraudster-has-to-reuse">peer-to-peer payment graph of the
+first graph chapter</Ref> has users who send each other money, the cards
+they register, the devices they log in from and the network addresses
+they connect from: about 33,700 users in a graph of roughly 790,000 nodes,
+the rest being cards, devices and addresses. About 0.7% of the users, 241 of them,
+are flagged as fraudsters, each after at least one card chargeback (a
+payment reversed because the cardholder disputed it).
+
+### The run
+
+Louvain is run on users, cards and devices, with transfers, card
+registrations and device logins as edges. Network addresses are left
+out: a few of them are shared by so many users that they would tie
+unrelated people together. The result is about 11,500 communities, with
+modularity about 0.98. About 200 of them, 1.7%, contain at least one
+flagged user.
+
+<Figure
+  src="./figures/search-funnel.svg"
+  alt="Four boxes left to right: about 33,700 users in a graph of about 790,000 nodes; about 11,500 communities of users, cards and devices with Q about 0.98; about 200 communities that hold a flagged user, 1.7% of them, in amber; the unflagged members of those 200, the queue, in amber. A note: 98% of the communities are set aside, not 98% of the users"
+  caption="One run turns the whole graph into a short list of communities, ranked and handed to the investigators."
+/>
+
+The investigators now have a list instead of a graph. They rank the 200
+by the number of flagged members, which favours large rings, and by the
+share of members flagged, which favours tight ones. Inside a top
+community, the users not yet flagged are the targets: each is an
+accomplice, a mule, a victim, or a bystander, and finding out which is
+the call.
+
+### What the two numbers say
+
+The 98% is a share of communities, not of users. Communities differ in
+size, and the 200 that hold a flagged user may well be among the larger
+ones, so the share of users set aside is smaller by an amount the run
+does not report. It is still the right kind of cut for this job: a
+fraudster whose community holds no other flagged user is not missed,
+because their community is on the list; what drops away are the
+thousands of communities nobody has any reason to look at.
+
+The modularity of 0.98 is the other number to read carefully. A
+community's $e_{ii} - a_i^2$ approaches $e_{ii}$ when the community is a
+small slice of the graph, so a graph that falls apart into thousands of
+small pieces with few edges between them scores close to 1 under almost
+any partition that follows the pieces (<Ref
+lesson="communities-and-components" id="exercises">an exercise</Ref>
+derives the bound). A payment graph in which most users register their
+own cards, use their own devices and pay a handful of people is nearly a
+set of islands, and a $Q$ of 0.98 is what such a graph gives under the
+partition along its islands, rings or no rings.
+
+<KeyFact>
+Modularity contains no label. A $Q$ near 1 says the graph splits cleanly
+into dense pieces; it says nothing about whether any piece is a fraud
+ring, and on a fragmented graph it is high for almost any sensible split.
+</KeyFact>
+
+## Why a community is not a ring
+
+For narrowing a search Louvain is cheap and good enough. For the second
+job, a list of ring members the bank will act on, three of its
+properties disqualify it, and none of them is a bug in the
+implementation.
+
+### Small cells disappear in large graphs
+
+From the gain of a merge, two communities joined by weight $w_{XY}$
+are worth merging exactly when
+
+$$
+w_{XY} > \frac{s_X\, s_Y}{2M}.
+$$
+
+The right side shrinks as the whole graph grows. Take a cell of three
+accounts that transfer among themselves (three edges, so with one edge
+out its strength is $s_X = 7$) and one edge to a neighbouring community
+with 20 internal edges ($s_Y = 41$). In a graph of 100 edges the
+threshold is $7 \times 41/200 = 1.4$: one edge is below it, and the cell
+stays a community of its own. Embed the same cell and the same
+neighbour in a graph of a million edges and the threshold is
+$287/2{,}000{,}000$: the single edge clears it, and maximising $Q$ merges
+the cell into its neighbour.
+
+<Figure
+  src="./figures/resolution-limit.svg"
+  alt="Two panels showing the same triangle of three amber accounts joined by one amber edge to a neighbouring group with 20 edges. Left, whole graph of 100 edges: two separate boxes, merge gain 1/100 − 7 × 41/(2 × 100²) = −0.004, kept apart. Right, whole graph of 1,000,000 edges: one box around both, merge gain 10⁻⁶ − 7 × 41/(2 × 10¹²) greater than 0, swallowed"
+  caption="Nothing about the cell changed; only the graph around it grew. The baseline term shrinks with the square of the graph's size."
+/>
+
+This is the *resolution limit* of modularity: two groups joined by a
+single edge are merged whenever the product of their strengths is below
+$2M$, so two groups of equal strength are merged whenever each is below
+$\sqrt{2M}$, about 1,400 in a graph of a million edges. It is a property of
+$Q$, so every algorithm that maximises $Q$ inherits it. A three-person
+cell in a million-edge graph is precisely the group the investigators
+want, and it is exactly what the community will not show as a group:
+it shows up inside a larger community, mixed with whoever it trades with.
+
+### A run is not a record
+
+A ring list is evidence. It is filed with a case, challenged by a
+customer's lawyer, compared with the list from the month before, and fed
+to systems that key their records on the ring's identifier. All of
+that needs a membership and a name that stay put, and Louvain's
+<Ref lesson="communities-and-components" id="two-phases-repeated">move
+with the visiting order</Ref>. A user who is in community 179,061 today
+and in another community after a rerun with the same data has no stable
+answer to "which ring are they in?"
+
+### Density is not a reason
+
+Ask why two users share a community and the only true answer is that
+moving either of them out would lower $Q$. That sentence cannot be
+checked by an auditor, and it groups by density, not by any pattern of
+fraud: a fraudster and the honest buyers they cheated trade with each
+other and land in one community together. What the second job needs is
+a group defined by a rule a person can state, applied the same way every
+time.
+
+## Connected components: groups defined by a path
+
+The strictest such rule ignores density altogether: two users belong
+together if any chain of edges leads from one to the other.
+
+<Definition title="connected component">
+Two nodes are *connected* if a path joins them. A *connected component*
+is a maximal set of nodes any two of which are connected. In a directed
+graph, components that ignore edge direction are called *weakly
+connected components*.
+</Definition>
+
+"Connected" is an equivalence relation: every node is connected to
+itself, the relation is symmetric, and two paths that meet chain into
+one. Its classes are the components, so the partition into components
+is unique. There is no objective to maximise, no tie to break and
+nothing for a visiting order to change, and the reason two users share a
+component is a list of edges anyone can follow.
+
+Run on the raw graph, the rule is useless. An identifier shared by
+hundreds of strangers, like the <Ref lesson="fraud-as-a-graph"
+id="entity-resolution-shared-identifiers-become-edges">café's network
+address</Ref> that gives one address to every customer, puts all of
+them into one component, together with everyone each of them is
+connected to; one popular payee does the same with everyone who paid
+them. Components only mean something when the edges do.
+
+### Union-find
+
+The components can be computed without ever following a path, by
+reading the edges once in any order and keeping, for every node, a
+pointer to another node of its group.
+
+- **make-set**: every node starts as its own group, pointing at itself;
+  a node that points at itself is a *root*.
+- **find(x)**: follow the pointers from x until a root; the root names
+  x's group.
+- **union(x, y)**: find both roots; if they differ, point one at the
+  other.
+
+```python
+parent = {}
+
+def find(x):
+    parent.setdefault(x, x)
+    while parent[x] != x:
+        parent[x] = parent[parent[x]]  # point at the grandparent: later finds are shorter
+        x = parent[x]
+    return x
+
+def union(x, y):
+    rx, ry = find(x), find(y)
+    if rx != ry:
+        parent[max(rx, ry)] = min(rx, ry)  # the smaller id stays the root
+
+for u, v in edges:
+    union(u, v)
+```
+
+Because the larger root is always pointed at the smaller, the root of
+every group is the smallest id in it. Each component is then named by
+its smallest member, whatever order the edges arrived in: a stable
+identifier, which is what the case files need.
+
+<FigureSequence
+  name="union-find"
+  alt="Four frames on nine users U1 to U9, U2 and U7 amber as flagged, with an edge list on the right: U1–U2, U2–U3, U1–U3, U6–U7, U7–U8, U6–U8. Frame 1: nine separate roots. Frame 2: after the first two edges, U2 and U3 point at U1. Frame 3: U1–U3 finds the same root on both sides and changes nothing. Frame 4: after all six edges, U7 and U8 point at U6; roots U1, U4, U5, U6, U9; components U1 U2 U3, U6 U7 U8, and three users alone"
+  caption="Union-find on six edges: two unions per group, one redundant edge per group, and every root the smallest id in its component."
+/>
+
+<Task>
+Step through the frames, and before frame 3 predict what union(U1, U3)
+does. Then check frame 4 against the definition: is every pair inside
+$\{U6, U7, U8\}$ joined by a path, and is no path leaving it?
+</Task>
+
+<Proposition title="the order of the edges does not matter">
+After union-find has read every edge of a graph, in any order,
+$\operatorname{find}(u) = \operatorname{find}(v)$ exactly when $u$ and
+$v$ lie in the same connected component.
+
+<Proof>
+The invariant: after any prefix of the edges, two nodes share a root
+exactly when a path made of the edges read so far joins them. It holds
+at the start, when nothing is joined and every node is its own root.
+Reading edge $u$–$v$ either finds one root on both sides, and then a
+path already joined them and the new edge joins nothing new; or it
+merges the two groups, and every node of one is now joined to every
+node of the other through $u$–$v$, while no other pair gains a path.
+After the last edge, "joined by a path of edges read so far" is "in the
+same component", which does not mention the order.
+</Proof>
+</Proposition>
+
+<Exercise>
+Read the same six edges in the order U6–U8, U7–U8, U2–U3, U1–U3, U6–U7,
+U1–U2, and record every pointer set. Which edges are redundant this
+time, and are the final roots the same?
+
+<Solution>
+U6–U8: roots U6, U8 differ, U8 → U6. U7–U8: find(U7) = U7, find(U8) = U6,
+so U7 → U6. U2–U3: U3 → U2. U1–U3: find(U1) = U1, find(U3) = U2, so
+U2 → U1. U6–U7: both finds return U6, redundant. U1–U2: find(U2)
+follows U2 → U1, both U1, redundant. Final roots U1, U4, U5, U6, U9, the
+same components with the same names. The redundant edges are now U6–U7
+and U1–U2 instead of U1–U3 and U6–U8: which edges close a cycle depends
+on the order, the components do not.
+</Solution>
+</Exercise>
+
+### Cost and change
+
+Each union is two finds, and with the pointer shortening in `find`
+a find costs a small constant on average. Production code also attaches
+the smaller group under the larger, which keeps the pointer chains short
+but no longer leaves the smallest id at the root; it names each
+component by its smallest member in one more pass after the run, so the
+names stay stable. Union-find therefore runs in
+close to one pass over the edge list; on the peer-to-peer users below it
+takes milliseconds.
+
+Edges also arrive over time. A new edge is one more union, so components
+can be updated without starting again, keeping yesterday's roots as the
+starting point. A removed edge is different: a card unregistered or a
+rule tightened can split a component in two, and pointers only ever
+merge, so union-find cannot undo a union. When edges are removed the
+components are recomputed from scratch, which at this cost is cheap. A
+weight threshold, keeping only edges above some weight before the run,
+is the same kind of choice as which edges to draw at all.
+
+## Drawing the edges so that the components are rings
+
+Components on a graph mean "joined by any chain of these edges". So the
+edges have to carry the hypothesis: an edge between two users should
+exist only where the data says they are probably one person or one
+operation. That is <Ref lesson="fraud-as-a-graph"
+id="entity-resolution-shared-identifiers-become-edges">entity
+resolution</Ref>, the addition of an edge between two users who satisfy
+a rule built from shared identifiers, and the component algorithm is
+then run on those edges alone.
+
+### Rule 1: a transfer between users who share a card
+
+The first rule comes straight from what the flagged users have in
+common, a chargeback: draw an edge between two users if one sent money
+to the other and both have registered the same card. That is the middle
+step of the <Ref lesson="fraud-as-a-graph"
+id="entity-resolution-shared-identifiers-become-edges">chargeback
+scheme</Ref> the first graph chapter described: a
+stolen card funds account 1, the money moves to account 2 before the
+dispute arrives, and the reversal hits an empty account. On the
+peer-to-peer graph the rule draws 6,240 edges.
+
+### The high-degree identifier
+
+The second rule wants users who share identifiers more broadly: cards,
+devices, network addresses. <Ref lesson="fraud-as-a-graph"
+id="entity-resolution-shared-identifiers-become-edges">Sharing several
+identifiers is harder to explain away than sharing one</Ref>, and a
+café's network address, shared by every customer, joins strangers. For
+components such an identifier does more than add noise. Kept, it joins
+every pair of its users, and since one edge between two components
+merges them whole, a single busy identifier merges every ring any of
+its users belongs to, together with everyone those rings touch. It need not be innocent to do this, only shared for reasons that
+have nothing to do with one operation; a library computer qualifies, and
+so does a card number stolen and sold to many buyers at once.
+
+What separates those identifiers from a ring's shared card is how many
+users they serve. So count, for every identifier, the users attached to
+it (its *degree* in the user–identifier graph, the degree of the
+previous chapter taken at an identifier node), and ignore identifiers
+above a cap when drawing edges.
+
+<Figure
+  src="./figures/identifier-cap.svg"
+  alt="Two panels with the same nine users U1 to U9 on top, U2 and U7 amber as flagged, and seven identifiers below with their user counts: card k1 (3), devices d1 (2) and d2 (2), card k2 (2), device d3 (3), library PC d4 (60), café IP p1 (400). Left: every identifier links its users, with the blue lines of d4 and p1 reaching across; result, one component holding both flagged users, three honest users and 449 more. Right: d4 and p1 greyed and dashed as dropped for having more than 10 users; result, components U1 U2 U3 and U6 U7 U8, with U4, U5, U9 alone"
+  caption="Two identifiers out of seven decide the picture. With them, one component holds both rings and everyone at the café; without them, each ring stands alone."
+/>
+
+The cap can fail in both directions. Set it too high and the café and
+the library merge rings with their customers: every customer of the
+café or the library lands in a ring's component and is labelled. Set
+it too low and the identifiers that
+join a real ring disappear too: a card used by three members of a ring
+is a degree-3 identifier, and a cap of 2 discards it.
+
+<Demo
+  name="IdentifierDegreeCap"
+  caption="The figure's nine users and seven identifiers. Two users are joined when they share an identifier used by at most the cap; the counter gives the unflagged users who share a component with a flagged one."
+/>
+
+<Task>
+Start from the cap 10 preset, then move the slider. Find the range of caps for
+which the two rings come out exactly as $\{U1, U2, U3\}$ and
+$\{U6, U7, U8\}$; then find the cap at which U8 is the first ring member
+to fall out, and the cap at which U4, U5 and U9 join a ring. (Answers:
+from 3 to 59; at 2, since d3 has degree 3; at 60, through the library
+PC.)
+</Task>
+
+### Rule 2: several shared identifiers, one of them rare
+
+The second rule combines both conditions: draw an edge between two users
+if they share at least one card or device used by at most ten accounts
+in all, and share more than two identifiers in total, counting cards,
+devices and network addresses. The rare card or device is what ties
+them; the extra identifiers make a coincidence unlikely. A café address
+can still count toward the total, but it can never create an edge on
+its own. On the peer-to-peer graph the rule draws 5,316 edges.
+
+The same reasoning works far from payments. An insurer whose claimant A
+shares a home address, a car, a bank account and a phone number with
+claimant B treats the two as one person: four identifiers at once, each
+used by few people, are hard to share innocently.
+
+### Components on the resolution edges alone
+
+Union-find runs on the 33,732 users with only the 11,556 rule edges;
+transfers, card registrations and device logins are left out. Two users
+share a component only if a chain of rule edges joins them, so a
+component is a set of users that the two rules, applied transitively,
+say are one operation.
+
+<Figure
+  src="./figures/component-sizes.svg"
+  alt="Bar chart on a log scale of the number of components by size: 24,283 of size 1 in blue; 3,165 of size 2, 481 of size 3, 151 of size 4, 61 of size 5 and 62 of size 6 to 175 in amber; the largest has 175 users. Note: 452 users share a component with a flagged user, 241 flagged (118 of them alone in their component) and 211 not yet flagged"
+  caption="Most users are joined to nobody by the rules. The groups that remain are mostly pairs and triples, and one has 175 members."
+/>
+
+There are 28,203 components. Most, 24,283, are single users the rules
+joined to no one; 3,165 are pairs, 481 triples, and 62 have six or more
+members, the largest 175. The labelling step marks every user who shares
+a component with a flagged user as a fraud risk. That gives 452 users:
+the 241 flagged ones, of whom 118 sit alone in their component, and 211
+users nobody had flagged.
+
+The 118 matter as much as the 211. Almost half the known fraudsters
+share no rule edge with anyone: their fraud, as far as these two rules
+can see, was not organised, or was organised through identifiers the
+rules do not use. Components find the rings the rules describe and
+nothing else.
+
+### What an auditor reads
+
+Every member of a component is there because of a chain of rule edges,
+and each edge is a sentence: "U17 sent money to U42, and both registered
+card 4471" or "U305 and U2210 share device 8812, used by three accounts
+in all, and also card 6090 and a network address". The explanation of a
+ring is the list of edges along a *spanning tree* of the component, a
+set of its edges that joins every member with no cycle; the unions that
+were not redundant during the run are one such set. One line per edge, every line
+checkable against the raw records. Rerun next month on the same data and
+the same rules give the same components under the same names.
+
+<KeyFact>
+Union-find is the simplest algorithm in this chapter; what makes
+a component a ring is the edge rules and the identifier cap, which are
+the analyst's hypothesis written as data. Change a rule and the rings
+change; keep the rules and they never do.
+</KeyFact>
+
+## Checking the rings without labels
+
+The 211 cannot be checked against labels: if the bank knew which users
+were fraudsters, it would not need the rings. What can be checked is a
+consequence of the hypothesis. If the rules found accounts used to move
+money ahead of chargebacks, those accounts should carry a large share of
+the money, far more than their numbers.
+
+### The volume test
+
+The 211 are 0.63% of the users. Transfers that involve one of them as
+sender or receiver add up to 12.7% of all the money transferred on the
+service. They also carry 65% of the money that flagged accounts sent to
+or received from unflagged ones: most of the known fraudsters' money
+moved through the users the rings added.
+
+How large is 12.7%? A set of users chosen at random touches a transfer
+if either of its two ends is in the set, so a random 0.63% of the users
+touches about $1 - (1 - 0.0063)^2 \approx 1.3\%$ of transfers, and about
+that share of the money if amounts do not depend on who sends them. The
+211 touch about ten times that.
+
+### What the test does not show
+
+A random set is a weak baseline. Users who transfer a lot also register
+more cards, use more devices and connect from more addresses, so they
+share more identifiers and are more likely to be joined by rule 2 to
+someone, flagged or not. Part of the ten-fold excess could come from
+the rules favouring active users rather than from fraud. The sharper
+comparison draws random sets of 211 users matched on activity, and
+asks how often a matched set touches 12.7% (<Ref
+lesson="communities-and-components" id="exercises">an exercise</Ref>
+designs it).
+
+Even a clean volume test proves no individual guilty. A FraudRisk label
+says that a chain of rule edges joins this user to a user with a
+chargeback; it is a reason to call, not a verdict, and the chain
+itself rests on settings, the cap of ten and the demand of more than two
+shared identifiers, that were chosen rather than measured.
+
+<KeyFact>
+Without labels, a ring is validated by a quantity its hypothesis
+predicts, here money, and against a baseline that shares the rings'
+selection bias, not against a random draw. The result orders the calls;
+it decides nothing about any one user.
+</KeyFact>
+
+## The method: explore, hypothesise, encode, resolve, label, validate
+
+Where did rule 1 come from? Looking inside the top Louvain communities
+shows flagged users sending money to unflagged users who share their
+cards. The two algorithms are therefore steps of one procedure, with the
+analyst's rules between them: the density-based one finds what to look
+at, the observation becomes a hypothesis, the hypothesis becomes edges,
+and the deterministic one turns the edges into rings.
+
+<Figure
+  src="./figures/method-loop.svg"
+  alt="Six boxes in a loop. Explore: Louvain, about 200 communities with a flagged user. Hypothesise: shared card plus transfer equals one controller. Encode, amber: entity-resolution edges, 6,240 plus 5,316. Resolve, amber: union-find components, 28,203. Label: components with a flag, 211 new FraudRisk users. Validate: share of P2P amount, 12.7% for 0.6% of users. A dashed blue arrow from validate back to hypothesise: tune the cap, add rules"
+  caption="The density-based algorithm explores; the deterministic one assigns; the analyst's rules sit between them."
+/>
+
+The loop closes from validation back to the rules, and it is where the
+cap of ten and the demand of more than two shared identifiers come from:
+they are settings of the loop, not facts about fraud. A bank adds rules
+(same device and same address; transfers in quick succession), weights
+edges by the number of shared identifiers and thresholds them, and moves
+the cap, judging each change by what it labels and what investigators
+confirm. Every version produces a different but reproducible set of
+rings, and the rules that produced it are written down with it.
+
+<Conclusion>
+You can now cut a graph two ways and say which job each cut does. A
+plain cut prefers to detach the quietest node; RatioCut and MinMaxCut
+pay for lopsided splits; modularity $Q = \sum_i (e_{ii} - a_i^2)$
+compares the share of weight inside each group with what the members'
+activity alone would put there, and scores the toy's two trading groups
+0.41. You can run Louvain's moves by hand with the merge gain
+$\Delta Q = w_{XY}/M - s_X s_Y/(2M^2)$, and say why its output narrows a search (one
+run sets aside 98% of the peer-to-peer graph's communities) but cannot
+assign a ring: the resolution limit hides small cells in large graphs,
+reruns can move members, and "modularity grouped them" is not an
+explanation. You can compute connected components with union-find, show
+that the result does not depend on the order of the edges, and design
+the entity-resolution edges, with the identifier degree cap, on which
+the components are the rings; and you can check those rings without
+labels, against a baseline that shares their bias.
+
+A component labels every member the same, whether they sent money to the
+fraudster yesterday or are four rule edges away, and it says nothing
+about users joined to fraud by ordinary transfers rather than by rules.
+The next problem is a score that lets suspicion flow from known fraud
+along every edge, weaker with each step and with the age of each
+payment: <Ref lesson="guilt-by-association">guilt by association</Ref>.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+A graph has eight accounts and twelve unweighted edges: 1–2, 1–3, 1–4,
+2–3, 2–4, 3–4 (the first four all joined), 4–5, 3–6, 5–6, 5–7, 6–7 and
+7–8. For the split $S = \{1, 2, 3, 4\}$, $T = \{5, 6, 7, 8\}$, compute the
+cut, RatioCut, MinMaxCut and the modularity of the partition $\{S, T\}$.
+Which split does MinCut choose, and what is its RatioCut?
+
+<Solution>
+**Cut.** The edges 4–5 and 3–6 cross: $\operatorname{Cut} = 2$.
+
+**RatioCut.** $2 \times (1/4 + 1/4) = 1$.
+
+**MinMaxCut.** $\operatorname{in}(S) = 6$ (the four accounts all
+joined), $\operatorname{in}(T) = 4$ (5–6, 5–7, 6–7, 7–8):
+$2 \times (1/6 + 1/4) = 5/6$.
+
+**Modularity.** $M = 12$, 24 edge ends. Degrees: 1, 2: 3 each; 3, 4: 4
+each; 5, 6, 7: 3 each; 8: 1. Strength of $S$: $3 + 3 + 4 + 4 = 14$; of
+$T$: $3 + 3 + 3 + 1 = 10$.
+$Q = (12/24 - (14/24)^2) + (8/24 - (10/24)^2) = (0.500 - 0.340) + (0.333
+- 0.174) = 0.160 + 0.160 = 0.32$.
+
+**MinCut.** Account 8 has a single edge, so detaching it cuts 1, less
+than the 2 of the balanced split. Its RatioCut is $1 \times (1/1 + 1/7)
+= 8/7 \approx 1.14$, above the balanced split's 1: once the sizes are
+priced, the balanced split wins, as on the toy of the chapter.
+</Solution>
+</Exercise>
+
+<Exercise>
+On the nine users of the identifier-cap figure, an edge joins two users
+who share any identifier of degree at most the cap; U2 and U7 are
+flagged. (a) List the components and the users labelled as fraud risks
+for caps of 1, 2, 10, 60 and 400. (b) Why does neither extreme find a
+ring? (c) The real rule 2 also demands more than two shared identifiers.
+Which of the toy's ring edges would survive that demand, and what does
+it cost?
+
+<Solution>
+**(a)** Cap 1: every identifier has degree at least 2, so no edges; nine
+components of one; labelled: nobody besides U2 and U7. Cap 2: k1 and d3
+(degree 3) drop; d1 joins U1–U2, d2 joins U2–U3, k2 joins U6–U7;
+components $\{U1, U2, U3\}$, $\{U6, U7\}$, the rest alone; labelled U1,
+U3, U6. Cap 10: k1 and d3 return; $\{U1, U2, U3\}$ and $\{U6, U7, U8\}$;
+labelled U1, U3, U6, U8. Cap 60: the library PC d4 joins U3 to U4, U5,
+U9 and its 56 other users; ring 1 becomes a component of 62 users,
+labelled 61 unflagged (U1, U3, U4, U5, U9 and the 56 others) plus U6 and
+U8 in ring 2. Cap 400: the café address joins everyone it touches; one component
+holding both rings, U4, U5, U9 and the 449 users not drawn, all
+labelled.
+
+**(b)** A cap of 1 draws no edge at all, since an identifier used by one
+user is shared with no one: every user is alone and the method labels
+only the already flagged. An unbounded cap lets the busiest identifiers
+draw edges between strangers, and a single one of them merges every
+component it touches, so the labels follow café visits, not fraud.
+Rings exist only in the band between, here caps 3 to 59, and the band is
+found by looking at what each cap labels.
+
+**(c)** Count shared identifiers per ring pair: U1–U2 share k1 and d1
+(two); U2–U3 share k1 and d2 (two); U1–U3 share k1 and the café p1
+(two); U6–U7 share k2 and d3 (two); U6–U8 share d3 and p1 (two); U7–U8
+share d3 (one). Every pair passes the first condition, since k1, d1, d2,
+k2 and d3 are all used by three users or fewer, but no pair shares more
+than two identifiers. The strict rule keeps none of the toy's ring
+edges: both rings vanish, and U2 and U7 are left alone in their
+components, which is one way a flagged user ends up alone, as 118 of
+the 241 did on the peer-to-peer graph. The demand of a third shared
+identifier buys confidence that an edge is no coincidence and pays for
+it in recall: a ring whose members share exactly two things, which a
+careful ring can arrange, is invisible to it. Rule 1 (transfer plus
+shared card) is what catches pairs that share fewer identifiers but move
+money between them.
+</Solution>
+</Exercise>
+
+<Exercise>
+Show that for any partition into $k$ groups, $Q \leq 1 - 1/k$, with
+equality exactly when no edge runs between groups and every group has
+the same strength. Then compute $Q$ for a graph made of 11,500 separate
+pieces of equal strength, partitioned into those pieces.
+
+<Solution>
+$Q = \sum_i e_{ii} - \sum_i a_i^2$. The first sum is the share of edge
+ends inside groups, at most 1, with equality when no edge runs between
+groups. The $a_i$ are shares of all edge ends, so $\sum_i a_i = 1$. By
+the Cauchy–Schwarz inequality, $(\sum_i a_i)^2 \leq k \sum_i a_i^2$, so
+$\sum_i a_i^2 \geq 1/k$, with equality when all $a_i = 1/k$. Together,
+$Q \leq 1 - 1/k$, with equality when both conditions hold.
+
+For 11,500 equal pieces with no edges between them,
+$Q = 1 - 1/11{,}500 = 0.99991$. Unequal pieces lower the bound only to
+$1 - \sum a_i^2$, still near 1 as long as no piece holds a large share of
+the edges. A graph that is already in pieces scores near 1 under the
+partition that follows them, whatever is in the pieces.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "Louvain reached a modularity of 0.98 on the peer-to-peer graph,
+so the communities containing flagged users are fraud rings with 98%
+confidence." Name each step of the claim that fails.
+
+<Solution>
+**$Q$ is not a probability.** It is a difference of two shares of edge
+ends, inside minus chance, summed over communities; nothing in it is a
+probability of anything about a user.
+
+**$Q$ contains no label.** The flagged users never enter its
+computation. The same partition would score 0.98 if every flag were
+moved to a random user.
+
+**A high $Q$ reports fragmentation.** By the previous exercise, a graph
+in many small pieces scores near $1 - 1/k$ for the partition along its
+pieces; most users here register their own cards and use their own
+devices, so the graph is nearly in pieces and 0.98 says mostly that.
+
+**A community is not a ring.** A community holding a flagged user also
+holds whoever that user trades with, victims included; a small ring
+touching a larger group is merged into it by the resolution limit; and
+membership can shift between runs.
+
+What $Q$ does say: the partition puts far more weight inside groups than
+the members' activity alone would, so the communities are a meaningful
+way to shorten the list of places to look.
+</Solution>
+</Exercise>
+
+<Exercise>
+The 211 new fraud-risk users are 0.63% of 33,732 users and touch 12.7%
+of the transferred money. (a) Derive the share of transfers that a
+random set holding a fraction $f$ of the users touches, as sender or
+receiver, and evaluate it. (b) Explain why the random set is a biased
+baseline here, in which direction, and design a test that removes the
+bias, stating what result would count as support for the rings. (c) Part
+of the 12.7% is money that moved inside a component: between two of the
+211, or between one of them and a flagged member of the same component.
+Should those transfers count as evidence for the rings?
+
+<Solution>
+**(a)** A transfer is missed only if both ends are outside the set:
+probability about $(1 - f)^2$ for a random set. Touched: $1 - (1 - f)^2
+= 2f - f^2$. At $f = 0.0063$: $0.0126 - 0.00004 \approx 1.3\%$, by money
+too if amounts do not depend on the users. The 211 touch about ten times
+that.
+
+**(b)** Rule 2 needs shared identifiers, and users who transfer more
+also register more cards and devices and connect from more addresses,
+so they are more likely to receive a rule edge and land in a component
+with someone. The 211 are therefore selected partly for activity, and
+activity alone raises the money they touch: the random baseline is too
+low, and the ten-fold ratio overstates the evidence. A matched test:
+bin all users by number of transfers and number of identifiers; draw
+211 users at random with the same bin counts as the 211, many thousands
+of times; compute the share of money each draw touches. The rings are
+supported if 12.7% lies far in the upper tail of those draws (say,
+above all of 10,000), and the size of the excess over the matched median
+is the effect attributable to the rules rather than to activity.
+
+**(c)** Not as they stand. Rule 1 draws an edge only where one user
+sent money to another, so every rule-1 edge is a transfer inside a
+component, and a user who entered the 211 through one is guaranteed to
+touch that money: the test would count, as confirmation, the very
+transfers that built the rings. A matched random set has no such
+guaranteed transfers, so the matched test does not remove this.
+Recompute the share with transfers inside a component left out, for the
+211 and for every random draw alike. If the 211 still touch far more
+money than the matched sets, the excess is evidence the rules did not
+manufacture; if it collapses, the 12.7% was mostly the transfers rule 1
+was built from.
+</Solution>
+</Exercise>
+
+<Exercise>
+A component of the rule graph has five users with edges U1–U2, U1–U3,
+U2–U3, U3–U4 and U4–U5; U2 is flagged. (a) The labelling step marks
+U1, U3, U4 and U5 alike. Using the adjacency matrix $A$ and the vector
+$\mathbf{f}$ with a 1 at U2 (<Ref lesson="neighbourhood-and-centrality"
+id="counting-walks-with-matrix-powers">walk counts from the previous
+chapter</Ref>), compute the number of walks of length 1, 2, 3 and 4
+from each user to U2. (b) Which user looks most suspicious by each
+length, and what goes wrong as the length grows? (c) Propose one number
+per user that uses walks of every length but trusts short walks more.
+
+<Solution>
+**(a)** $A\mathbf{f}$ counts neighbours of U2: U1 1, U3 1, U4 0, U5 0.
+Then each step sums the previous vector over neighbours:
+
+| length | U1 | U2 | U3 | U4 | U5 |
+|---|---|---|---|---|---|
+| 1 | 1 | 0 | 1 | 0 | 0 |
+| 2 | 1 | 2 | 1 | 1 | 0 |
+| 3 | 3 | 2 | 4 | 1 | 1 |
+| 4 | 6 | 7 | 6 | 5 | 1 |
+
+(The U2 column counts walks from U2 back to itself.)
+
+**(b)** At length 1, U1 and U3 tie and U4, U5 score 0. At length 3, U3
+(4) leads U1 (3), not because it is closer but because it has more
+neighbours to walk through. At length 4, U4 (5) has almost caught up
+with U1 and U3 (6), although it never touched U2. Longer walks reach
+everyone and the counts grow with degree, so a single length either
+ignores distant members or ranks by how busy the neighbourhood is.
+
+**(c)** Weight each length by a factor that shrinks geometrically,
+$\sum_{k \geq 1} \beta^k (A^k \mathbf{f})_v$ for some $0 < \beta < 1$:
+with $\beta = 0.3$, U1's first four terms are $0.3 + 0.09 + 0.081 +
+0.049 = 0.52$, and summed to the end the scores are U1 0.62, U3 0.67,
+U4 0.22 and U5 0.07. The sum converges only if $\beta$ is below
+$1/\lambda_{\max}$, one over the largest eigenvalue of $A$; here
+$\lambda_{\max} \approx 2.2$, so any $\beta$ below about 0.45 will do.
+The scale still grows with degrees: U3 outranks U1, though both are one
+edge from U2, only because U3 has three neighbours to U1's two. Normalising each step
+so that the score is a probability, and restarting the walk at the known
+fraud, gives the random walk with restart of <Ref
+lesson="guilt-by-association">guilt by association</Ref>, which does
+this for a million nodes at once.
+</Solution>
+</Exercise>
+
+<Exercise>
+The team can make 100 calls a day. The model's ranking of cards gives
+the card at rank $r$ a probability $p_r = 0.3\,e^{-r/60}$ of being
+compromised, a call costs $C_a = \text{€}10$ and a compromised card
+found saves $V = \text{€}500$, as in <Ref lesson="economics-of-detection"
+id="the-value-of-the-next-call">the staffing example</Ref>. The ring
+labelling hands over 211 fraud-risk users. (a) If a fraud-risk user
+turns out to be a fraudster with probability $q$, and finding one saves
+the same $V$, from which rank should the model's calls be given up for
+fraud-risk users? Evaluate for $q = 0.1$. (b) The volume test said the
+211 touch ten times their share of the money. Does that give $q$? How
+would you estimate it at a cost the team can bear?
+
+<Solution>
+**(a)** A call is worth its expected saving minus its cost: $V p - C_a$.
+The cost is the same for both lists, so a fraud-risk call should replace
+a model call wherever $q > p_r$. With $q = 0.1$: $0.3\,e^{-r/60} < 0.1$
+when $e^{-r/60} < 1/3$, i.e. $r > 60 \ln 3 \approx 65.9$. Ranks 66 to
+100, 35 calls a day, go to fraud-risk users; the 211 are worked in about
+six days. Each such call is worth $500 \times 0.1 - 10 = \text{€}40$
+against $500\,p_r - 10$ for the model call it replaces, which is just
+under €40 at rank 66 and about €18 at rank 100: the swap gains about
+€400 a day.
+
+**(b)** No. Money touched is not the probability that a given member is
+a fraudster: a few large accounts can carry the share while most members
+are bystanders, and part of the excess is the activity bias of the rules.
+$q$ is estimated by calling: investigate a random sample of, say, 20 of
+the 211 first (two days of the swapped slots), count the confirmed
+fraudsters, and keep swapping only if the observed rate stays above the
+$p_r$ of the calls it displaces. With 20 calls the estimate is rough
+($q = 0.1$ means two hits, and anywhere from zero to five is plausible),
+so the comparison is revisited as more of the 211 are worked, and the
+calls are best spent on the fraud-risk users of the components with the
+most flagged members first.
+</Solution>
+</Exercise>
+
+<References>
+1. Neo4j GraphAcademy, *Graph Data Science in Practice* (workshop), Module 2 "Community Detection for Fraud" — Lesson 2 (Louvain: modularity, local moves and aggregation, the hierarchy of levels, weights and tolerance, the resolution limit and non-deterministic community ids), Lesson 3 (Louvain on users, cards and devices of the peer-to-peer dataset, network addresses excluded: about 11,500 communities, about 200 of them with a flagged user, modularity about 0.98, ranking communities by flagged count and share), Lesson 4 (degree, weakly connected components, union-find's make-set / union / find, Louvain against components on determinism and explainability, weight thresholds, seeded components and their grow-only caveat), Lesson 5 (entity-resolution rules, the high-degree identifier problem with the café address, the library computer and resold cards, the degree cap of 10 as a judgment, components on the rule edges only, the component-size table, labelling and the volume check; the workshop's "204,000 users", "mean component size 2.4" and "130×" are not consistent with its own component table, and this chapter uses the counts from reference 2). https://graphacademy.neo4j.com/courses/workshop-gds
+2. Z. Blumenfeld, "Exploring Fraud Detection With Neo4j & Graph Data Science – Part 2," Neo4j Developer Blog, 1 March 2022 — the two entity-resolution rules with their Cypher and counts (6,240 and 5,316 edges), weakly connected components over 33,732 users (28,203 components, largest 175, mean 1.2), 452 fraud-risk users of whom 241 flagged and 118 flagged singletons, the 65.2% and 12.7% money shares. https://neo4j.com/blog/developer/exploring-fraud-detection-neo4j-graph-data-science-part-2/
+3. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015 — Ch. 5, pp. 258–265 (community mining: graph partitioning, MinCut, RatioCut and MinMaxCut with the bisection example whose values 4, 7/3 and 1/3 and modularity 0.41 the chapter's toy reproduces; the Girvan–Newman algorithm by edge betweenness; modularity $Q = \sum_i (e_{ii} - a_i^2)$; complete, partial and overlapping communities); Ch. 6, pp. 292–293 (link analysis in claims investigation: claimants sharing address, car, bank account and phone treated as one person).
+4. M. E. J. Newman, M. Girvan, "Finding and evaluating community structure in networks," *Physical Review E* 69, 026113, 2004 — Sec. II (divisive algorithm by edge betweenness, recalculation after each removal), Sec. III (modularity defined through $e_{ij}$ and $a_i$).
+5. V. D. Blondel, J.-L. Guillaume, R. Lambiotte, E. Lefebvre, "Fast unfolding of communities in large networks," *Journal of Statistical Mechanics*, P10008, 2008 — Sec. 2 (the two phases, the modularity gain of moving an isolated node into a community, the hierarchy of passes, dependence on the order nodes are visited).
+6. S. Fortunato, M. Barthélemy, "Resolution limit in community detection," *PNAS* 104(1):36–41, 2007 — the condition under which merging two communities raises modularity, and the scale $\sqrt{2M}$ below which communities cannot be resolved.
+7. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 3rd ed., MIT Press, 2009 — Ch. 21 "Data Structures for Disjoint Sets" (make-set, union, find; connected components of a graph; union by rank and path compression, and their near-linear running time).
+</References>

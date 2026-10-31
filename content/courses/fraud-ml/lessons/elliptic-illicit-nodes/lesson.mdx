@@ -1,0 +1,755 @@
+On 203,769 Bitcoin transactions, 2% labelled illicit, a random forest on the given features beats a two-layer graph network, every model's overall F1 sits between 0.92 and 0.99, and at the 43rd fortnight all of them fall to zero. What in the dataset, the features and the time split produces each of those three facts?
+
+The numbers come from <Ref lesson="graph-neural-networks"
+id="the-elliptic-comparison">the Elliptic comparison</Ref> of the
+previous chapter: logistic regression, a feed-forward network and a
+random forest, each on the 94 local columns and on all 166, against a
+GCN, a Skip-GCN and EvolveGCN, all trained on time steps 1 to 34 and
+scored on steps 35 to 49. The forest on all 166 columns reached an
+illicit-class F1 of 0.788, the plain GCN 0.628. The same comparison
+printed a second, "micro-averaged" F1 for every model, and a per-step
+chart in which every line drops at step 43.
+
+Each fact invites a reading that is wrong. The first says graph networks
+do not work on transaction graphs. The second says the task is nearly
+solved. The third says the models were stale and retraining would have
+fixed them. None of the three survives a look at what the benchmark
+contains: which nodes are scored, what the 166 columns already hold,
+what each F1 averages over, and what happened to the illicit
+transactions at step 43.
+
+## What is scored: 16,670 labelled nodes in fifteen snapshots
+
+Every number in the comparison is computed on a test set, and the test
+set is not the 203,769 nodes. <Ref lesson="canonical-datasets"
+id="elliptic-a-graph-whose-labels-come-from-names">The Elliptic
+graph</Ref> is 49 snapshots about two weeks apart, each one connected
+component of transactions that reached the ledger within three hours,
+and 77% of its nodes carry no label.
+
+### The test set: labelled nodes only
+
+Only labelled nodes can be scored, so the test set is the labelled
+nodes of steps 35 to 49: 16,670 transactions, 1,083 of them illicit
+(6.5%). The training set, the labelled nodes of steps 1 to 34, holds
+3,462 illicit among 29,894 (11.6%). The unknown nodes stay in each
+step's graph, where a graph network aggregates over them, but they are
+never scored, <Ref lesson="graph-neural-networks"
+id="which-nodes-carry-a-loss">because unknown is not licit</Ref>.
+
+<Figure
+  src="./figures/test-steps.svg"
+  alt="Bars of illicit labelled transactions in each test step: 182, 33, 40, 111, 81, 112, 116 and 239 for steps 35 to 42, then 24, 24, 5, 2, 22, 36 and 56 for steps 43 to 49, with labelled licit counts printed under each step. A dashed line before step 43 is marked: a dark market closes. Totals: steps 35 to 42, 914 illicit of 9,983 labelled (9.2%); steps 43 to 49, 169 of 6,687 (2.5%)"
+  caption="Each test step is scored on its labelled nodes only, and the illicit count per step runs from 239 at step 42 down to 2 at step 46."
+/>
+
+### No edge crosses the split
+
+The split by time follows the rule of <Ref
+lesson="delayed-labels-prequential"
+id="a-shuffled-split-tests-a-model-that-cannot-exist">the validation
+chapter</Ref>: a test predicts deployment only if the model is trained
+on what existed before the test period. On a graph a random split
+breaks a second thing. Draw test nodes at random inside every step, and
+a test node's neighbours are mostly training nodes, whose labels the
+model was fitted to. Illicit transactions sit next to illicit ones
+often enough for that to matter: in the training steps, a third of the
+illicit nodes have an illicit neighbour. A column that counts illicit
+neighbours then reads part of the answer off the training labels next
+door, and a graph network trained on the same step has fitted its
+weights to those neighbours, three hours of the ledger away from the
+node it is tested on.
+
+<Figure
+  src="./figures/split.svg"
+  alt="Left: four small graphs labelled steps 33, 34, 35 and 36; the first two have blue training nodes, the last two amber test nodes, and a vertical line between steps 34 and 35 is marked: no edge crosses the cut. Right: one graph whose nodes are a random mix of blue training and amber test nodes; the edges that join a test node to a training node are drawn thick in amber"
+  caption="Because no edge joins two steps, the split by time leaves no training node beside a test node; a random split inside each step puts training labels next to most test nodes."
+/>
+
+Elliptic's snapshots make the split by time clean: no edge joins two
+steps, so the test graphs share no node and no edge with training. A
+GCN trained on steps 1 to 34 must score graphs it has never seen,
+<Ref lesson="graph-neural-networks"
+id="a-model-that-transfers-to-graphs-it-has-not-seen">which an inductive
+model can</Ref>, and no test node has a training node beside it: every
+neighbour of a test node lies in the same test step, and no label of
+that step was fitted.
+
+### The time step is a column
+
+The first of the 94 local columns is the time step itself. A model is
+free to learn "later steps are more illicit", and in training that is
+what the data says: steps 1 to 6 hold 1% illicit among their labelled
+nodes, steps 7 to 34 about 16%. In the test steps the share falls to
+6.5%. A model that uses the step therefore carries a trend from
+training into a test period where the trend has reversed.
+
+<Example title="what the step column does to a logistic regression">
+Rerunning the comparison on the public files (the release distributes
+the 166 columns, the labels and the edge list), fit a logistic
+regression on the 94 local columns, standardised on the training
+steps, and cut at 0.5. Its coefficient on the standardised step is
+0.58; the step's standard deviation over the training nodes is 10.3
+steps, so the logit rises by $0.58 / 10.3 = 0.057$ per step.
+
+A node at step 42 then gets $8 \times 0.057 = 0.45$ more on the logit
+than an identical node at step 34, and a node at step 49 gets
+$15 \times 0.057 = 0.85$ more: its odds of being called illicit are
+multiplied by $e^{0.85} = 2.3$. Nothing in the test steps supports
+that; their illicit share is below the training share.
+
+The model flags 4,382 test nodes and finds 79% of the illicit ones,
+with precision 0.20: illicit F1 0.31. Dropped from the inputs, the step
+leaves a model that flags 2,016 nodes, finds 71% of the illicit ones at
+precision 0.38: illicit F1 0.50. One column, used the way a linear
+model uses it, costs 0.18 of F1.
+</Example>
+
+The published logistic regression on the same 94 columns, step
+included, scored 0.457, far above the rerun's 0.31, and no default
+setting brings the rerun there: on the columns as released, without
+standardising, with either of the two optimisers scikit-learn has used
+by default, it scores 0.32 to 0.36 with the step and 0.48 to 0.51
+without. The published run differs in something it does not report. The
+0.18 therefore compares two fits of the rerun that differ in one column
+and nothing else; it does not explain the published row.
+
+A tree cannot carry the trend forward: every threshold it can place on the
+step lies between two training values, so every test step lands on the
+same side as step 34 (<Ref lesson="elliptic-illicit-nodes"
+id="exercises">the exercise on a tree and the step column</Ref> works
+this out). The rerun checks this on the published forest configuration:
+50 trees, 50 columns tried at each split, trained on steps 1 to 34, cut
+at 0.5, fitted with three random seeds. On all 166 columns it scores
+illicit F1 0.81 to 0.82, a spread of under 0.02 from seed to seed, and
+dropping the step moves each seed's score by at most 0.01. The column is
+still a hazard for any model that extends a fitted trend beyond the last
+training step, and the safe default is to drop it.
+
+## The forest's win: the graph was already in the columns
+
+The previous chapter left a question open: what in the 166 columns lets
+the forest win? <Ref lesson="graph-neural-networks"
+id="reading-the-table">Its reading of the table</Ref> gave the general
+reason, that a forest cuts the features it was given with thresholds
+while a GCN ends in a logistic regression on features it learned. That
+leaves two things to find out: what the forest was given, and where in
+its predictions the lead lies.
+
+### The 72 aggregates are a fixed layer
+
+For each local quantity of a transaction (number of inputs, fee,
+volume and so on), the aggregated columns hold the maximum, the minimum
+and the standard deviation of that quantity over the transactions one
+hop away, backward and forward, together with correlation coefficients
+computed over the same neighbours. A correlation pairs two quantities,
+and which pairs were used is not stated: the release does not describe
+its columns exactly. All of them are <Ref lesson="neighbourhood-and-centrality"
+id="recursive-aggregates-over-the-neighbours">the recursive aggregates</Ref>
+of the neighbourhood chapter, one round of them.
+
+<Figure
+  src="./figures/aggregates-layer.svg"
+  alt="A node v with three neighbours carrying the values 0.2, 0.9 and 0.4 of one feature. Lines fan from v to four boxes: max 0.9, min 0.2, std 0.29, corr with a second feature. An arrow leads to a blue box: appended to v's row as fixed columns, no weight is learned. A list beside it: gather, v's neighbours; aggregate, max, min, std, corr, chosen in advance; update, append to v's own 94. A note: a GCN layer gathers the same neighbours but aggregates with the normalised sum and learns W"
+  caption="The aggregated columns run the gather, aggregate and update steps of a graph layer once, with aggregators chosen by hand and nothing learned."
+/>
+
+Set beside <Ref lesson="graph-neural-networks"
+id="one-layer-of-message-passing">a message-passing layer</Ref>, that
+construction is one: it gathers each node's neighbours, aggregates with
+four functions, and updates the node's row by appending the results. It
+differs in having its aggregators chosen in advance and no learned
+weights. Before any model was trained, the data set had already been
+through one layer of a graph network whose aggregation someone designed,
+and the maximum and minimum it uses are aggregators that
+<Ref lesson="graph-neural-networks"
+id="functions-of-a-set-sum-mean-and-maximum">a sum or mean over
+neighbours</Ref> can only approximate through a learned transform.
+
+So every model on all 166 columns reads the graph, and the comparison
+is not the graph against no graph. It is a hand-built layer read by
+thresholds against a learned layer stacked on the same hand-built one
+(a GCN's first layer averages the aggregates over the neighbours again,
+reaching two hops) and read by a logistic output. A threshold on "the
+largest fee among the neighbours" is the use a hand-built maximum was
+made for.
+
+### The lead is precision
+
+An F1 of 0.788 against 0.705 does not say whether the forest finds
+more illicit transactions or raises fewer false alerts. The published
+table gives each model's illicit precision and recall, and with the
+1,083 illicit test nodes the two give back the counts: recall says how
+many illicit nodes were found, precision how many nodes were flagged to
+find them.
+
+<Example title="the forest's counts from its precision and recall">
+The forest on all 166 columns has illicit recall 0.670, so it finds
+$0.670 \times 1{,}083 = 726$ illicit nodes and misses 357. Its precision
+is 0.956, so it flags $726 / 0.956 = 759$ nodes, of which
+$759 - 726 = 33$ are licit: 33 false alerts.
+
+As a check, illicit F1 is
+$2 \cdot 726 / (2 \cdot 726 + 33 + 357) = 1{,}452 / 1{,}842 = 0.788$,
+the printed value.
+</Example>
+
+The same arithmetic on the graph networks' rows fills the rest of the
+table.
+
+| model (all 166 columns) | precision | recall | illicit found | flagged | false alerts |
+|---|---|---|---|---|---|
+| random forest | 0.956 | 0.670 | 726 | 759 | 33 |
+| Skip-GCN | 0.812 | 0.623 | 675 | 831 | 156 |
+| GCN | 0.812 | 0.512 | 554 | 682 | 128 |
+| EvolveGCN | 0.850 | 0.624 | 676 | 795 | 119 |
+
+The forest and the Skip-GCN find nearly the same number of illicit
+transactions, 726 against 675. The forest raises 33 false alerts to
+get them; the Skip-GCN raises 156, almost five times as many reviews
+spent on licit transactions for 51 fewer finds. The plain GCN loses on
+recall too, which is <Ref lesson="graph-neural-networks"
+id="reading-the-table">the dilution the skip term repairs</Ref>.
+
+Where does the forest's precision come from? The same forest on the 94
+local columns alone had precision 0.803 and recall 0.611. Adding the 72
+aggregates raised its recall by six points and its precision by fifteen,
+to 0.956: the forest's thresholds on those columns isolate regions that
+hold almost nothing licit. The graph networks read the same 72 columns
+and stop at a precision of 0.812 to 0.850, because a logistic output
+draws one weighted boundary through what its layers computed, and on
+this data it does not reproduce them.
+
+<Exercise>
+Recover the counts of the forest on the 94 local columns (precision
+0.803, recall 0.611) and compare them with its counts on all 166. What
+did the 72 aggregates change for an investigation team that reviews
+every flag?
+
+<Solution>
+Found: $0.611 \times 1{,}083 = 662$, missed 421. Flagged:
+$662 / 0.803 = 824$, so 162 false alerts. Check: illicit F1
+$= 2 \cdot 662 / (2 \cdot 662 + 162 + 421) = 1{,}324 / 1{,}907 = 0.694$,
+the printed value. With the aggregates the forest finds 64 more illicit
+nodes (726) and raises 129 fewer false alerts (33), from 65 fewer flags
+in all. For a team reviewing every flag, the aggregates cut the reviews
+spent on licit transactions by four fifths, and that, more than the
+extra finds, is what lifted the F1 from 0.694 to 0.788.
+</Solution>
+</Exercise>
+
+### How sure the numbers are
+
+Every published number is a single run, so a gap between two of them
+may be a gap between two seeds. The one that carries the argument above
+is the forest's gain from the aggregates, <Ref
+lesson="graph-neural-networks" id="reading-the-table">0.694 to
+0.788</Ref>, the largest any model drew from them. The rerun's forest,
+fitted with three seeds, measures it again. On all 166 columns the three
+seeds score 0.822, 0.811 and 0.809; on the 94 local columns, 0.779,
+0.758 and 0.766. Paired by seed, the aggregates add 0.043, 0.053 and
+0.043, at least twice the seed-to-seed spread, which is 0.013 on all 166
+columns and 0.021 on the local ones. The direction reproduces. The size
+does not: the published forest on local columns scored 0.694, below
+every run of the rerun, so the published gain of 0.094 is nearly twice
+the largest the rerun finds.
+
+The same spread settles the smaller gaps between published models.
+EvolveGCN's 0.720 against the Skip-GCN's 0.705 is a difference of
+0.015, which one forest moves between two seeds; the table cannot rank
+those two.
+
+## The overall F1: a score the licit majority sets
+
+The second column of the published table, an F1 "micro-averaged" over
+both classes, runs from 0.920 to 0.986 for the same models whose
+illicit-class F1 runs from 0.457 to 0.796. Two scores of one prediction
+cannot both describe its quality, and the difference lies in what each
+one counts.
+
+### Two averages of one confusion matrix
+
+The illicit-class F1 is computed from three counts of the illicit
+class: illicit nodes found (true positives), licit nodes flagged (false
+positives) and illicit nodes missed (false negatives). The
+micro-averaged F1 pools those counts over both classes, and for a
+classifier that gives each node one label it equals accuracy, as <Ref
+lesson="graph-neural-networks" id="exercises">the last exercise of the
+previous chapter</Ref> showed.
+
+The forest's counts from <Ref lesson="elliptic-illicit-nodes"
+id="the-lead-is-precision">its precision and recall</Ref> give both. Of
+the 15,587 licit test nodes it flags 33 and leaves $15{,}587 - 33 =
+15{,}554$ alone, so it is right on $726 + 15{,}554$ nodes:
+
+$$
+\text{accuracy} = \frac{726 + 15{,}554}{16{,}670} = 0.977,
+$$
+
+the printed micro-averaged F1, against an illicit F1 of 0.788 from the
+same four counts. The 15,554 licit nodes correctly left alone fill the
+micro numerator and appear nowhere in the illicit F1.
+
+### Doing nothing scores 0.935
+
+The predictor that calls every test node licit is right on the 15,587
+licit nodes and wrong on the 1,083 illicit ones: accuracy, hence
+micro-F1, $15{,}587 / 16{,}670 = 0.935$. That is the floor against which
+the micro column must be read.
+
+<Figure
+  src="./figures/confusion.svg"
+  alt="Two two-by-two tables over the 16,670 test nodes, rows the true class, columns the prediction. Left, call every node licit: 0 illicit found, 1,083 missed, 0 licit flagged, 15,587 licit left; micro-F1 15,587 / 16,670 = 0.935, illicit F1 0. Right, forest on all 166 features: 726 found, 357 missed, 33 flagged licit, 15,554 left; micro-F1 0.977, illicit F1 0.788"
+  caption="On the micro scale the forest's whole detection, 726 found less 33 false alerts, is worth 0.042 above flagging nothing."
+/>
+
+Two of the published models sit below the floor: logistic regression at
+0.920 on the local columns and 0.931 on all 166. They flag so many
+licit transactions that they make more mistakes than flagging nothing.
+
+<Figure
+  src="./figures/micro-vs-illicit.svg"
+  alt="Dot plot over an axis from 0.4 to 1. For each of nine models, an amber dot at its illicit-class F1 and a blue dot at its micro-averaged F1, joined by a grey line: logistic regression local 0.457 and 0.920, logistic regression with aggregates 0.481 and 0.931, network local 0.649 and 0.958, network with aggregates 0.653 and 0.962, random forest local 0.694 and 0.966, random forest with aggregates 0.788 and 0.977, GCN 0.628 and 0.961, Skip-GCN 0.705 and 0.966, EvolveGCN 0.720 and 0.968. A dashed blue line at 0.935 is marked all-licit"
+  caption="The micro column squeezes nine models into six hundredths around the doing-nothing line; the illicit column spreads them over a third of the scale."
+/>
+
+Above the floor, the micro column measures how a model trades its few
+illicit hits against its licit mistakes, both counted on a scale set by
+15,587 licit nodes. This is <Ref lesson="economics-of-detection"
+id="accuracy-prices-every-mistake-the-same">accuracy's flaw</Ref> in
+graph form: every mistake costs the same, and the licit class is
+fourteen times larger, so any detector that flags little scores close
+to 1. An investigation team needs something else again. It works down a
+ranked list until its daily budget runs out, so what it needs is <Ref
+lesson="alert-budget-metrics"
+id="precision-at-k-the-metric-cut-where-the-team-cuts">the precision of
+that list at its budget</Ref>, computed step by step, or average
+precision; both F1s judge <Ref lesson="alert-budget-metrics"
+id="a-threshold-metric-judges-a-cut-nobody-chose">one cut nobody
+chose</Ref>, the default 0.5. The illicit-class F1 is the closer of the
+two to the team's measure, because it ignores the licit nodes nobody
+flagged.
+
+## Step 43: the fall no model survives
+
+Where does the fall at step 43 come from? The opening offered one
+reading: the models went stale, and retraining would have fixed them. A
+fall in illicit F1 can come from three places, each with its own
+repair. It can lie in the model, in one architecture or in weights
+fitted to old data, and then another model or a retrained one repairs
+it. It can lie in the threshold, if the scores still rank the new
+illicit transactions high but no longer above 0.5, and then a lower cut
+repairs it. Or it can lie in the data, if the illicit transactions
+themselves changed, and then no model fitted to the old labels repairs
+it. The evidence answers in that order.
+
+### The model: every architecture falls, retrained or not
+
+Scored step by step, the rerun's forest on all 166 columns (its first
+seed) shows what its pooled 0.82 is made of: illicit F1 between 0.78
+and 0.96 on every step up to 42, then 0, 0.06, 0, 0.29, 0, 0 and 0.03.
+Pooled over steps 35 to 42 it is 0.91; over steps 43 to 49, 0.03. The
+pooled figure looks like a good model because 914 of the 1,083 illicit
+nodes come before the break.
+
+<Figure
+  src="./figures/per-step.svg"
+  alt="Two lines over test steps 35 to 49 for one forest on all 166 features. Blue, micro-averaged F1, stays between 0.88 and 1 throughout. Amber, illicit F1, lies between 0.78 and 0.96 up to step 42, then falls to 0 at step 43 and stays between 0 and 0.29 to step 49. A dashed line before step 43 is marked: dark market closes. Labels: steps 35 to 42 pooled 0.91; steps 43 to 49 pooled 0.03"
+  caption="At step 43 the illicit F1 falls to zero and the micro-averaged F1 does not move: 0.981 on step 43 itself."
+/>
+
+The micro-averaged F1 does not register the break. On step 43 the
+forest finds none of 24 illicit nodes, flags 2 of the 1,346 licit ones,
+and scores $1{,}344 / 1{,}370 = 0.981$, because the 1,344 licit nodes
+it still calls licit fill the count. A monitoring dashboard that tracked
+the overall F1 would have shown nothing at the moment the detector
+stopped working.
+
+Is the fall this forest's? The per-step chart published with the
+benchmark scores seven models: three forests and four graph networks.
+The forests are the one on all features, one fed the GCN's hidden
+vectors as extra columns, and one retrained before every test step on
+all labels up to the step before, as if investigators labelled each
+fortnight instantly and completely. The fourth graph network is
+Skip-EvolveGCN, EvolveGCN with the skip term added.
+
+<Figure
+  src="./figures/elliptic-step43-collapse.png"
+  alt="Line chart of illicit-class F1 over test time steps 35 to 49, with light blue bars giving the number of illicit nodes per step on a right axis from 0 to 250. Seven lines: Random Forest on all features, Random Forest on all features retrained up to the previous step, Random Forest with GCN node embeddings, GCN, Skip-GCN, EvolveGCN and Skip-EvolveGCN. From step 35 to 42 the forests score between about 0.75 and 0.98 and the graph networks between about 0.5 and 0.9. At step 43 every line drops to about 0. It stays there except for isolated rises: up to 0.19 at step 44, Skip-EvolveGCN at 0.67 and two forests at 0.40 at step 46, GCN at 0.51 and the retrained forest at 0.43 at step 48, and EvolveGCN at 0.73 at step 49. The bars after step 42 are small."
+  caption="The per-step illicit F1 of every model of the comparison. The forests and the graph networks fall to about zero together at step 43, and later rises come only at single steps."
+/>
+
+Every one of the seven scores near zero from step 43 on, apart from
+isolated steps where a handful of illicit nodes were found. The rerun
+agrees for the retrained forest: 0, 0.07, 0, 0.5 (on a step with two
+illicit nodes), 0, 0.11 and 0.16 on steps 43 to 49. Forests and graph
+networks fall together, so the fall is not an architecture's; the
+forest retrained on every label falls with them, and so does EvolveGCN,
+whose weights change from step to step, so it is not stale weights
+either.
+
+### The threshold: the ranking collapses too
+
+A failure at one cut could be a calibration problem: the scores may
+still rank illicit above licit, only below 0.5. They do not. On step 43
+the forest's scores give an average precision of 0.029, against the
+0.018 that <Ref lesson="alert-budget-metrics"
+id="what-a-ranking-with-no-information-scores">a ranking with no
+information</Ref> scores at that step's base rate of 24 in 1,370; its
+fifty highest-scored transactions hold no illicit one. Before the break
+the same fifty held between 29 and 50 per step. The scores carry
+almost nothing about the new illicit transactions, so no choice of cut
+or budget would recover them.
+
+### The data: fewer illicit transactions, and the rest look licit
+
+Two things changed at step 43, and the data shows both. The first is
+the count: step 42 holds 239 illicit transactions, step 43 holds 24,
+and the illicit share among labelled nodes falls from 11% to under 2%.
+A dark market, a site selling illegal goods for Bitcoin, closed
+between the two snapshots, and the illicit count fell with it.
+
+The second is what the remaining illicit transactions look like. Take
+each test transaction, find the five labelled training transactions
+nearest to it on the 93 local columns other than the step, each column
+standardised over the training nodes so that no single unit dominates
+the distance, and count how many of the five are illicit.
+
+<Figure
+  src="./figures/neighbours.svg"
+  alt="Horizontal bars of the share of illicit transactions among a test node's five nearest labelled training transactions: illicit nodes of steps 35 to 42, 0.78 (914 nodes); illicit nodes of steps 43 to 49, 0.08 (169 nodes); licit nodes of steps 35 to 42, 0.05 (9,069 nodes); licit nodes of steps 43 to 49, 0.06 (6,518 nodes)"
+  caption="Before the closure an illicit test transaction's nearest training transactions are mostly illicit; after it, they are as licit as a licit transaction's."
+/>
+
+Before the closure, an illicit test transaction has on average 78%
+illicit among its nearest training transactions: it resembles what
+training called illicit. After it, 8%, against 5% to 6% for licit test
+transactions. The illicit transactions of steps 43 to 49 sit in the
+part of the feature space that training filled with licit ones. A
+model that learned where illicit transactions lie cannot find
+transactions that now lie elsewhere, whatever its architecture.
+
+### Why retraining on every label cannot catch up
+
+The change in the data also explains why the retrained forest failed.
+Each new step adds about two dozen illicit transactions of the new kind
+to the 4,000 and more older ones, and a forest's vote in a region of
+the feature space follows the majority of the training transactions
+there, which stay licit. And the labels of a step arrive only after the
+step has been scored; in a bank they would arrive <Ref
+lesson="delayed-labels-prequential" id="the-label-clock">a delay later
+still</Ref>, so the oracle version is the best case. EvolveGCN fails
+for the same reason: its weights for a step are computed from the
+weights of earlier steps, which were fitted to illicit transactions of
+the old kind.
+
+<KeyFact>
+The break also bounds every pooled number of the comparison. 169 of the
+1,083 illicit test transactions lie beyond it, so a model that misses
+them recalls at most $914/1{,}083 = 0.84$, not 1: the published
+recalls, none above 0.68, are read against that ceiling, and
+the pooled table measures steps 35 to 42 with a fixed penalty for the
+seven steps after.
+</KeyFact>
+
+A change in how often the illicit class occurs and a change in which
+transactions are illicit are different changes with different remedies.
+<Ref lesson="concept-drift">The drift chapter</Ref> separates them and
+measures them without waiting for labels.
+
+## What the benchmark cannot tell a bank
+
+What can a bank take from these numbers for its own detector? Elliptic
+differs from a bank's setting in four ways, and each limits what its
+numbers say there.
+
+### Labels, unknowns and snapshots
+
+**The labels are attributions.** A transaction is illicit when the
+entity controlling its inputs belongs to an illicit category in <Ref
+lesson="canonical-datasets" id="where-the-labels-came-from">a company's
+attribution</Ref>; no investigator confirmed it, and a mixer, the
+transaction built to hide its owners, is unknown rather than illicit.
+
+**Most of the graph is unlabelled, and the labelled part is not a
+sample of it.** 77% of nodes are unknown, and the illicit share of the
+unknown is not known. For card fraud a customer who disputes a payment
+supplies something close to the truth; for laundering nothing does, and
+<Ref lesson="canonical-datasets" id="the-reading-grid">label
+completeness</Ref> is far from one. A model scored only on the
+attributed nodes is scored on the transactions someone could attribute,
+which need not resemble the illicit ones nobody has.
+
+**The time is snapshots.** Each step is three hours of the ledger,
+taken once a fortnight. A node's neighbourhood is what happened within
+those three hours, and nothing links a step to the next. A bank's graph
+is continuous and accumulates, so a neighbourhood there includes last
+month, <Ref lesson="fraud-as-a-graph"
+id="choosing-the-decay-from-a-horizon">weighted by age</Ref>.
+
+**The loop is missing.** No label date, so no delay; no entity, so no
+card or account to remove once found; no investigator budget, so the
+reported metric is a threshold F1; and no repeated runs, so no spread.
+
+### The module's tools on this graph
+
+The split by time also rules out <Ref lesson="guilt-by-association"
+id="restarting-at-the-known-fraud-the-exposure-score">the exposure
+score</Ref> and every column that counts labelled neighbours. The
+exposure score restarts its walk at known illicit nodes, and a
+labelled-neighbour count needs known labels next door; a test step
+shares no edge with training and has no label when it is scored, so
+neither has a node to start from. On Elliptic as split, only the label-free graph columns
+apply: the aggregates, <Ref lesson="neighbourhood-and-centrality"
+id="reading-the-table">the structural columns</Ref> such as degree,
+triangles and betweenness, and a graph network's hidden vectors. A bank's graph has no
+such wall: yesterday's confirmed frauds sit in today's graph, and the
+exposure score works there.
+
+<Conclusion>
+You can now take the three facts of the Elliptic benchmark apart. The
+forest beats the GCN because the 72 aggregate columns are already one
+round of message passing with hand-chosen aggregators, and a forest's
+thresholds use them with a precision a logistic output does not reach:
+33 false alerts against 156 for a similar number of illicit
+transactions found. The overall F1 sits between 0.92 and 0.99 because
+it is accuracy on a test set whose licit nodes alone score 0.935; it
+did not move when the detector failed. Every model falls at step 43
+because the illicit count fell from 239 to 24 a step when a dark market
+closed, and the transactions that remained lie among the licit ones;
+the pooled F1 hides that, the ranking collapses with it, and retraining
+on every label does not repair it.
+
+<Ref lesson="graph-propagation-lab">The lab</Ref> builds the module's
+tools in code (the sparse graph, components, the restart walk, egonet
+columns and a two-layer GCN) and scores them on an Elliptic subset,
+split by time as here. The collapse at step 43 stays
+open: it is a change in the stream itself, and the next module asks
+what can change in a transaction stream, how to tell a change in how
+often fraud occurs from a change in what fraud looks like, and how to
+see either before the labels arrive.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+Logistic regression on the local columns has a printed illicit
+precision of 0.348, recall of 0.668 and micro-averaged F1 of 0.920, on
+the 1,083 illicit and 15,587 licit test nodes. Check the row. What do you
+find, and which conclusion of the chapter survives it?
+
+<Solution>
+Found $0.668 \times 1{,}083 = 723$, missed 360. Flagged
+$723 / 0.348 = 2{,}078$, so 1,355 licit nodes flagged. Wrong
+predictions $1{,}355 + 360 = 1{,}715$, accuracy
+$1 - 1{,}715 / 16{,}670 = 0.897$, not the printed 0.920. The printed
+precision, recall and micro-F1 of this row cannot all describe one
+prediction on this test set; the printed value may come from a
+different run or a different set of nodes. Either number lies below
+the 0.935 of calling everything licit, so the conclusion that this
+model makes more mistakes than doing nothing survives both. The
+transferable move: recompute a table's counts before reading it, and
+keep only the conclusions that every consistent version of it supports.
+</Solution>
+</Exercise>
+
+<Exercise>
+Scores per step meet small numbers after step 43. (a) Step 46 has 2
+illicit and 710 licit labelled nodes; the rerun's forest flags 5, one
+of them illicit. Compute its illicit precision, recall and F1, and its
+micro-averaged F1. (b) What is the illicit F1 of any predictor on a
+step with no illicit node, if it flags nothing? If it flags one node?
+(c) The rerun's per-step illicit F1 values average to 0.51 over the
+fifteen steps, while the pooled F1 is 0.82. Which steps does each
+number weight, and which would you report?
+
+<Solution>
+**(a)** Precision $1/5 = 0.2$, recall $1/2 = 0.5$, F1
+$= 2 \cdot 0.2 \cdot 0.5 / 0.7 = 0.286$. Wrong predictions: 4 licit
+flagged and 1 illicit missed, so micro-F1 $= 1 - 5/712 = 0.993$. One
+node more or less found moves the F1 between 0 and 0.5: on this step
+the illicit F1 is mostly noise.
+
+**(b)** With no illicit node, recall is $0/0$; with nothing flagged,
+precision is $0/0$ too, and F1 is undefined. Libraries return 0 by
+convention, which reads as a total failure on a step where there was
+nothing to find. If the predictor flags one node, precision is $0/1 = 0$
+and F1 is 0 (or undefined, depending on how $0/0$ recall is treated).
+Steps with no illicit node have to be dropped from a per-step average,
+for the reason <Ref lesson="alert-budget-metrics"
+id="normalising-by-the-days-ceiling">the normalised card precision</Ref>
+is undefined on a day with no compromised card: there is nothing to
+find, so no score describes finding it.
+
+**(c)** The pooled F1 counts illicit nodes, so it weights steps by
+their illicit counts: 914 of 1,083 come before step 43, and it reads
+0.82. The average over steps weights each step equally, so the seven
+steps after the break, with 169 illicit nodes between them, count as
+much as the eight before, and it reads 0.51. Neither alone describes
+the detector; report both periods separately (0.91 before, 0.03 after)
+with the counts, which is what the per-step figure does.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "The random forest beats every graph network on Elliptic, so
+the graph carries no useful signal there." Name the step of the
+argument that fails.
+
+<Solution>
+**The step that fails** is equating "a graph network" with "the
+graph". The forest on all 166 columns reads 72 columns built from the
+graph, one round of aggregation over each node's neighbours.
+
+Evidence that the graph carries signal: adding those 72 columns raised
+illicit F1 for logistic regression (0.457 to 0.481), the feed-forward
+network (0.649 to 0.653) and the forest (0.694 to 0.788), and in the
+rerun the forest's gain (0.043 to 0.053, paired by seed) is at least
+twice its seed spread. The
+GCN's hidden vectors, computed from the graph, raised logistic
+regression on the local columns from 0.457 to 0.543. What the
+comparison shows is narrower: on this data, a hand-built graph layer
+read by a forest beat a learned graph layer read by a logistic output.
+</Solution>
+</Exercise>
+
+<Exercise>
+Design and run the check that the aggregates help the forest. Use the
+public files: labelled nodes, steps 1–34 for training and 35–49 for
+testing, a forest of 50 trees with 50 columns tried at each split, cut
+at 0.5. (a) What do you train, how many times, and what do you report?
+(b) What result counts as reproducing "aggregates help the forest", and
+what does not have to match?
+
+<Solution>
+**(a)** Two feature sets, the 94 local columns and all 166, each
+trained with at least three random seeds; for each run report illicit
+precision, recall and F1 on the pooled test set, and the F1 on steps
+35–42 and 43–49 separately. Report the spread across seeds.
+
+**(b)** Reproduction means the same order with a gap larger than the
+seed spread. A rerun gives 0.822, 0.811 and 0.809 on all 166 columns
+and 0.779, 0.758 and 0.766 on the local ones: paired by seed, gaps of
+0.043, 0.053 and 0.043 against a seed-to-seed spread of 0.013 and 0.021,
+so the direction reproduces. The published gap was 0.094 (0.694 to
+0.788), and the published forest on local columns is below every rerun;
+the size of the gap does not reproduce, and need not, since it was one
+run with no spread. Before 43 and after it, the gap should
+be checked separately: an improvement confined to steps 35–42 says
+nothing about the period the detector fails in.
+</Solution>
+</Exercise>
+
+<Exercise>
+A decision tree is trained on steps 1 to 34 with the step among its
+columns. (a) Show that it scores a test node from step 49 exactly as it
+would score the same node at step 34. (b) Why then is the step column
+still a risk for the tree, though a smaller one than for the logistic
+regression? (c) Design the check that decides whether to keep the
+column.
+
+<Solution>
+**(a)** A tree chooses each threshold on a column between two values
+seen in training, conventionally their midpoint; the largest step value
+in training is 34, so every threshold on the step is at most 33.5. A
+node at step 49 and the same node at step 34 both satisfy
+"step $> t$" for every such $t$, so they follow the same path to the
+same leaf and get the same score. The tree treats every test step as
+the last training step.
+
+**(b)** It can still learn a rule specific to the last training steps
+("step above 31.5 and fee above some value: illicit") from patterns
+that held only then, and apply it to all fifteen test steps. Step 34
+holds 7% illicit among labelled nodes; if the late training steps had
+an unusual illicit share or an unusual kind of illicit transaction, the
+tree projects it forward unchanged. The logistic regression does worse:
+it extends a slope, so the error grows with the distance from step 34.
+
+**(c)** Train with and without the column, several seeds each, and
+compare F1 on the test steps per period. In the rerun the forest moves
+by less than its seed spread; the logistic regression gains 0.18 when
+the column is dropped. Keep a time column only if the gain survives the
+seeds and has an explanation that holds beyond the training period.
+</Solution>
+</Exercise>
+
+<Exercise>
+Measure the change at step 43 without a model of illicitness. Take the
+illicit nodes of steps 40–42 and of steps 43–45, label them "before"
+and "after", and train a classifier to tell the two groups apart on the
+93 local columns other than the step, scoring it by AUC under 5-fold
+cross-validation. (a) A rerun gives an AUC of 0.986. Does that show
+that the illicit transactions changed at step 43? (b) The same check
+gives 0.967 on the licit nodes of the same steps, and 0.979 on the
+illicit nodes of steps 37–39 against 40–42. What do the three numbers
+together say? (c) Which measurement in the chapter does separate the
+illicit transactions after step 43 from those before, and what does it
+measure that the AUC does not?
+
+<Solution>
+**(a)** Not by itself. A high AUC says the two groups are separable,
+but any two periods may be separable for reasons that have nothing to
+do with illicitness.
+
+**(b)** They are: licit transactions of the same steps separate almost
+as well (0.967), and so do illicit transactions of two earlier periods
+with no event between them (0.979). Several local columns change with
+time for everyone; one of them correlates 0.58 with the step. Telling
+periods apart measures a change in the inputs, which happens all the
+time on this ledger, and an AUC near 1 is the normal state, not a
+signal. A distance between periods needs a baseline from periods known
+to be ordinary.
+
+**(c)** The nearest-neighbour count: 78% illicit among the five nearest
+training transactions before the closure, 8% after, the same as for
+licit transactions. It asks where the new illicit transactions sit
+relative to the training labels, which is the change that moves a
+classifier's decision; the AUC asks only whether the inputs moved.
+Telling those two kinds of change apart, a change in the inputs and a
+change in which inputs are illicit, is where <Ref lesson="concept-drift">the
+drift chapter</Ref> begins.
+</Solution>
+</Exercise>
+
+<Exercise>
+A ring-based alert would group connected illicit transactions. (a) Run
+<Ref lesson="communities-and-components"
+id="connected-components-groups-defined-by-a-path">union-find</Ref> on
+all of step 43's edges, ignoring direction. What does it return, and why
+was that certain before running it? (b) Restrict the graph to step 43's
+24 illicit nodes and the edges among them: a rerun finds 15 components,
+the largest of 4 nodes. On step 42 the 239 illicit nodes form 193
+components, the largest of 12. About a quarter of the illicit test
+nodes have an illicit neighbour, before the break and after it. What
+would a component-based alert have found at step 43, and what can it
+not do on this split?
+
+<Solution>
+**(a)** One component of all 5,063 nodes. Each Elliptic step was built
+as a single connected component of transactions, so union-find on its
+raw edges must return the whole step: on a raw graph, components are
+useless, as the communities chapter found for a café's IP address
+linking everyone.
+
+**(b)** On the illicit-only graph the components are small: of
+step 43's 24 illicit nodes, at most 4 are connected, and 15 groups
+cover them, so most stand alone. A component-based alert would have
+grouped a handful of pairs and quadruples, each needing at least one
+known illicit member to be flagged. On this split no test node has a
+known label when its step is scored, so there is no member to start
+from: the alert would have to start from the model's own flags, and the
+model flagged no illicit node at step 43. Components describe
+organisation once some members are known; they do not find a new kind
+of illicit transaction that the classifier misses. A quarter of illicit
+nodes with an illicit neighbour is evidence of clustering, but too
+little for neighbour labels to carry the detection alone.
+</Solution>
+</Exercise>
+
+<References>
+1. M. Weber, G. Domeniconi, J. Chen, D. K. I. Weidele, C. Bellei, T. Robinson, C. E. Leiserson, "Anti-Money Laundering in Bitcoin: Experimenting with Graph Convolutional Networks for Financial Forensics," KDD Workshop on Anomaly Detection in Finance, 2019 (arXiv:1908.02591) — Sec. 2.1 (203,769 transactions, 234,355 edges, 2% illicit, 21% licit; 94 local and 72 aggregated features, the first local feature being the time step; 49 time steps about two weeks apart, each one connected component within three hours, no edges between steps; Fig. 1, class balance per step), Sec. 2.2 (heuristic labelling and the loss of information in naive aggregates), Sec. 3 (licit and illicit categories; mixers ignored), Sec. 4 (70:30 temporal split, steps 1–34 and 35–49; forest of 50 trees with 50 maximum features; GCN of two layers, embedding size 100, weighted cross-entropy 0.3/0.7; Table 1, illicit precision, recall and F1 and micro-averaged F1 for every model and feature set; Table 2, EvolveGCN; Fig. 2 and "The Dark Market Shutdown", the collapse at step 43 and the forest retrained up to the previous step), Sec. 5 (the forest against the GCN; GCN embeddings as forest inputs). https://arxiv.org/abs/1908.02591
+2. Elliptic, "Elliptic Data Set: Bitcoin Transaction Graph," released 2019 — the public files of transaction features, classes and edges on which the rerun in this chapter was computed (per-step counts, the step-column logistic regression, the forests over three seeds, per-step scores, the nearest-neighbour shares, the retrained forest, the components of steps 42 and 43). https://www.kaggle.com/datasets/ellipticco/elliptic-data-set
+3. A. Pareja, G. Domeniconi, J. Chen, T. Ma, T. Suzumura, H. Kanezashi, T. Kaler, T. B. Schardl, C. E. Leiserson, "EvolveGCN: Evolving Graph Convolutional Networks for Dynamic Graphs," *AAAI*, 2020 (arXiv:1902.10191) — GCN weights for each time step computed by a recurrent network from the previous step's; the Elliptic node-classification experiment.
+4. E. Altman, J. Blanuša, L. von Niederhäusern, B. Egressy, A. Anghel, K. Atasu, "Realistic Synthetic Financial Transactions for Anti-Money Laundering Models," *NeurIPS 2023 Datasets and Benchmarks Track* (arXiv:2306.16424) — Sec. 1 and 3.1 (real laundering labels are incomplete, many instances missed), Sec. 7 (customer feedback gives card fraud a close ground truth; no comparable ground truth exists for laundering). https://arxiv.org/abs/2306.16424
+5. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 4.2, "Threshold-based metrics" (the mean misclassification error and its complement, accuracy; why they mislead under class imbalance; F1 and the balanced error rate). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+</References>
