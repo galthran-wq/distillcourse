@@ -17,6 +17,7 @@ import {
 import SelectionReference from "@/components/lessons/SelectionReference";
 import Figure, { type FigureProps } from "@/components/mdx/Figure";
 import FigureSequence from "@/components/mdx/FigureSequence";
+import { H2, H3 } from "@/components/mdx/Heading";
 import { ImageCredits } from "@/components/mdx/SourcedImage";
 import { LABEL_CLASS } from "@/components/ui/styles";
 import { loadCredits } from "@/lib/content/credits";
@@ -88,6 +89,8 @@ export default async function LessonPage({
   const imageCredits = loadCredits(entry.dir).entries;
 
   const components: MDXComponents = {
+    h2: H2,
+    h3: H3,
     // Cross-reference to another lesson of the same course: renders the
     // target's title (or custom children) as a link; plain text if the
     // target is not yet readable.
