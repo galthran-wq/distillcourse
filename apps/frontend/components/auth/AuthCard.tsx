@@ -10,14 +10,14 @@ import { ApiError } from "@/lib/http";
 import { setUser } from "@/lib/auth/store";
 
 type Mode = "login" | "signup";
-type Reported = Partial<Record<"email" | "password" | "invite_code", string>>;
+type Reported = Partial<Record<"email" | "password", string>>;
 
 /**
  * What the form can refuse without asking the server. The browser's own
  * validation says the same things in a bubble that covers the field and
  * disappears on the next keystroke; these stay under the field they are about.
  */
-function refuse(mode: Mode, email: string, password: string, invite: string): Reported {
+function refuse(mode: Mode, email: string, password: string): Reported {
   const found: Reported = {};
   if (email.trim() === "") found.email = "Enter your email address.";
   else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()))
@@ -27,8 +27,6 @@ function refuse(mode: Mode, email: string, password: string, invite: string): Re
   // show verbatim. The login form must not describe the policy.
   else if (mode === "signup" && password.length < MIN_PASSWORD_LENGTH)
     found.password = `At least ${MIN_PASSWORD_LENGTH} characters.`;
-  if (mode === "signup" && invite.trim() === "")
-    found.invite_code = "Accounts are invite-only; paste the code you were sent.";
   return found;
 }
 
@@ -43,7 +41,7 @@ export default function AuthCard({ mode }: { mode: Mode }) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const text = (name: string) => String(form.get(name) ?? "");
-    const problems = refuse(mode, text("email"), text("password"), text("invite_code"));
+    const problems = refuse(mode, text("email"), text("password"));
     setReported(problems);
     // Cleared before the guard: the last server answer described a request this
     // submit replaces, so it must not survive alongside the new field errors.
@@ -58,7 +56,6 @@ export default function AuthCard({ mode }: { mode: Mode }) {
         ? await signup({
             email: text("email"),
             password: text("password"),
-            invite_code: text("invite_code"),
             full_name: text("full_name") || undefined,
             timezone,
           })
@@ -100,7 +97,7 @@ export default function AuthCard({ mode }: { mode: Mode }) {
         </h1>
         <p className="mt-1.5 text-[13px] text-faint">
           {isSignup
-            ? "Accounts are invite-only while the tutor is in private use."
+            ? "An email and a password are all it takes."
             : "Your reading history, bookmarks and what the tutor remembers live on the account."}
         </p>
 
@@ -120,17 +117,7 @@ export default function AuthCard({ mode }: { mode: Mode }) {
             required
             error={reported.password}
           />
-          {isSignup && (
-            <>
-              <Input name="full_name" label="Name (optional)" />
-              <Input
-                name="invite_code"
-                label="Invite code"
-                required
-                error={reported.invite_code}
-              />
-            </>
-          )}
+          {isSignup && <Input name="full_name" label="Name (optional)" />}
           {error !== null && (
             <p role="alert" className={ALERT_CLASS}>
               {error}
@@ -154,7 +141,7 @@ export default function AuthCard({ mode }: { mode: Mode }) {
           href={isSignup ? "/login" : "/signup"}
           className="text-accent hover:underline"
         >
-          {isSignup ? "Sign in" : "Sign up with an invite code"}
+          {isSignup ? "Sign in" : "Sign up"}
         </Link>
         .
       </p>

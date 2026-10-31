@@ -41,20 +41,6 @@ async def test_signup_returns_the_user_and_opens_a_session(client: AsyncClient) 
     assert (await client.get(f"{AUTH}/me")).json()["email"] == body["email"]
 
 
-async def test_signup_rejects_a_wrong_invite_code(client: AsyncClient) -> None:
-    response = await client.post(f"{AUTH}/signup", json=signup_body(invite_code="nope"))
-
-    assert response.status_code == 403
-    assert client.cookies.get(sessions.COOKIE_NAME) is None
-
-
-async def test_signup_requires_an_invite_code(client: AsyncClient) -> None:
-    body = signup_body()
-    del body["invite_code"]
-
-    assert (await client.post(f"{AUTH}/signup", json=body)).status_code == 422
-
-
 async def test_signup_rejects_a_duplicate_email(client: AsyncClient) -> None:
     body = await signup(client)
 
@@ -109,14 +95,6 @@ async def test_signup_rejects_a_password_below_the_policy(client: AsyncClient) -
     body = signup_body(password="x" * (security.MIN_PASSWORD_LENGTH - 1))
 
     assert (await client.post(f"{AUTH}/signup", json=body)).status_code == 422
-
-
-async def test_signup_rejects_a_non_ascii_invite_code(client: AsyncClient) -> None:
-    response = await client.post(
-        f"{AUTH}/signup", json=signup_body(invite_code="пароль")
-    )
-
-    assert response.status_code == 403
 
 
 async def test_login_rejects_the_wrong_password(client: AsyncClient) -> None:

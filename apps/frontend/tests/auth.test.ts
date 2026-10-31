@@ -52,9 +52,9 @@ describe("the auth client", () => {
   });
 
   it("raises the API's own message so the form can show it", async () => {
-    stubFetch(respond(403, { detail: "invalid invite code" }));
+    stubFetch(respond(409, { detail: "email already registered" }));
 
-    await expect(me()).rejects.toThrow(new ApiError(403, "invalid invite code"));
+    await expect(me()).rejects.toThrow(new ApiError(409, "email already registered"));
   });
 
   it("names the field a 422 rejected instead of showing the status", async () => {

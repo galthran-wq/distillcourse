@@ -99,9 +99,8 @@ their schedules are paused until they write to it again.
 
 ## Accounts
 
-Signup requires `INVITE_CODE` from `.env`; hand that string to whoever should
-get an account. There is no password-reset mail and no email verification, so
-account recovery is an operator command:
+Signup is open to anyone with an email address. There is no password-reset
+mail and no email verification, so account recovery is an operator command:
 
 ```bash
 docker compose exec backend python -m app.cli reset-password someone@example.com
