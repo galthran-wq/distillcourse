@@ -6,6 +6,7 @@ import {
 } from "react";
 import { LABEL_CLASS } from "@/components/ui/styles";
 import { CONCLUSION_ANCHOR } from "@/lib/content/locator";
+import { AnchorMark } from "./Heading";
 
 /**
  * Textbook environments. Numbering is done with CSS counters (see
@@ -162,7 +163,10 @@ export function KeyFact({ children }: { children: ReactNode }) {
 export function Conclusion({ children }: { children: ReactNode }) {
   return (
     <section id={CONCLUSION_ANCHOR} className="conclusion">
-      <p className="conclusion-label">Conclusion</p>
+      <p className="conclusion-label">
+        Conclusion
+        <AnchorMark id={CONCLUSION_ANCHOR} />
+      </p>
       <div className="env-body">{children}</div>
     </section>
   );
