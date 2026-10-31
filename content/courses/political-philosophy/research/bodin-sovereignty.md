@@ -13,9 +13,11 @@ goal: Analyze Bodin's definition of sovereignty and its attributes, and explain 
   lesson's "new question" dissolves. From `machiavelli-effectual-truth` and
   `machiavelli-discourses-republic`: the effectual-truth standard; treaties kept only while
   useful; fear safer than love; Rome as a mixture made by tumult. From
-  `aristotle-regimes-and-the-middle` and `cicero-mixed-constitution`: the six regimes; polity;
-  Rome as the mixed constitution of consuls, senate and tribunes (Scipio's case). From
-  `platos-laws-second-best-city` (extra — Ref only): Sparta as the first mixture. From
+  `aristotle-regimes-and-the-middle`: the six regimes; polity. From
+  `polybius-anacyclosis-and-rome`: Rome as the mixed constitution of consuls (monarchic), senate
+  (aristocratic) and people (democratic), each able to block the others (Histories VI.11–18),
+  and Lycurgus's Sparta as the designed mixture. From `cicero-res-publica-and-natural-law`:
+  Scipio's restatement of the mixture as the best regime. From
   `constantine-and-representation` and `altar-of-victory`: the empire and the Church contesting
   who represents society — the medieval question in its late-antique form.
 - **Contributes:** The one move: when two religions each claim the Church's authority to bind a
@@ -29,7 +31,10 @@ goal: Analyze Bodin's definition of sovereignty and its attributes, and explain 
 - **Hands off:** Two problems stay open. (i) Bodin's sovereign holds his power from God,
   modelled on the father, and commonwealths begin in force (I.6) — so WHY would equals ever
   submit, and what makes force into obligation? `hobbes-state-of-nature-and-covenant` derives
-  the sovereign from the subjects' own fear and consent. (ii) Bodin binds the sovereign by
+  the sovereign from the subjects' own fear and consent; `filmer-patriarcha`, two lessons later,
+  takes the other half of Bodin's answer — the family as "a true image of the commonwealth" and
+  the father's power of life and death (I.2–4) — and makes fatherhood, not force, the origin of
+  every kingdom (Filmer cites Bodin on the family, Patriarcha II.3). One clause each. (ii) Bodin binds the sovereign by
   covenants and property yet lets no subject judge him — the unresolved tension between right
   and fact (a tyranny counts as a commonwealth though the definition says "rightly ordered");
   `hobbes-sovereign-and-liberty` removes the limits, `english-revolution-as-test` watches a
@@ -37,15 +42,15 @@ goal: Analyze Bodin's definition of sovereignty and its attributes, and explain 
   module: the twentieth-century jurist who will say Bodin's decisive passage is not "absolute
   and perpetual" but the marks of sovereignty in I.10, because they settle who decides when the
   law is suspended (`schmitt-political-theology`).
-- **Spine step:** "Wars of religion force a new answer: one sovereign power above every faction,
-  bound by no law of its own making — Bodin's definition, Hobbes's derivation from fear, and the
-  English Revolution as the test"
+- **Spine step:** "Christendom builds a law above kings; Machiavelli breaks it; the wars of
+  religion force one sovereign power above every faction — Bodin's definition, Hobbes's
+  derivation from fear, Filmer's from fatherhood — and the English Revolution tests them"
 
 ## Sources to consult
 
 - **Bodin, Six Books of the Commonwealth (abridged, ed. and tr. M. J. Tooley, Blackwell 1955;
   constitution.org text)** — summaries.json index 20; text at
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/bodin/six-books-tooley-1955-full.txt`
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/bodin/six-books-tooley-1955-full.txt`
   (line numbers are this file's; Book I begins l.1500, II l.3406, III l.4397, IV l.5677, V
   l.7150, VI l.8614; the file is Latin-1 in places — use `grep -a`). Read: Tooley's Introduction
   I (l.~101–410: biography; the 1547 Paris trial of a "Jean Bodin"; Blois 1576–77 l.327–360 —
@@ -103,30 +108,53 @@ goal: Analyze Bodin's definition of sovereignty and its attributes, and explain 
 - **Smith, Open Yale** — index 9: NO Bodin lecture. L12 Ch1 (Westphalia 1648; the sovereign
   state as highest authority) is usable for the forward anchor only.
 - **Schmitt, Political Theology ch. 1** — index 34;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/schmitt/political-theology-schwab-ia.txt`
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/schmitt/political-theology-schwab-ia.txt`
   l.1534–1582 (Bodin's "decisive passage" is the marks of I.10, not "absolute and perpetual";
   the retold scenario: if the prince had to consult senate or people before suspending law,
   sovereignty would be "a play between two parties"; indivisibility as an either/or). Forward
   hook ONLY; copyrighted — paraphrase one clause; Schmitt's name in References here (he is the
   material of a later lesson, not this one).
 - **Aquinas, De Regno I.7 and ST I-II 96.4–5** — index 18;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/aquinas/`.
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/aquinas/`.
   Backward Ref for the tyrannicide seam: Aquinas allowed the appointing multitude to depose;
   Bodin closes the door because a monarchy's people never appointed.
 - **Machiavelli, Prince XVII–XVIII; Discourses I.2, I.4** — index 19; backward Ref for the
   treaty/fear contrast and the mixed Rome Bodin reclassifies.
+- **Polybius, Histories VI.11–18 (Shuckburgh tr., public domain)** — index 89;
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/polybius/histories-book6-shuckburgh.txt`
+  (l.356–610: the consuls' powers VI.12, the senate's VI.13, the people's VI.14, how each blocks
+  the others VI.15–18). The mixed Rome that link 4 dismantles and that Exercise 6 corroborates
+  against Bodin's — Bodin's II.1 answers this picture item by item (the consuls' war powers, the
+  senate's control of the treasury, the people's confirmation of laws). Backward Ref; not
+  re-taught.
 - **Cicero, Republic I–II** — index 39;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/cicero/de-republica-de-legibus-loeb.txt`
-  — the mixed Rome of Scipio that Exercise 7 corroborates against Bodin's.
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/cicero/de-republica-de-legibus-loeb.txt`
+  — Scipio's restatement of the mixture (Ref `cicero-res-publica-and-natural-law`), one clause
+  at most.
+- **Patriarcha II.3 and I.4 (Filmer)** — index 90;
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/filmer/patriarcha-constitution-org.txt`
+  (Windows-1252 — `grep -a`). Forward hook only: Filmer cites Bodin's definition of the family
+  and takes Bodin's marks of sovereignty — judging capital crimes, war, peace — as already held
+  by Adam and the patriarchs ("the chiefest marks of 'sovereignty' that are found in any
+  monarch", I.4). One clause in the hand-off; do not teach Filmer here.
 - **Aristotle, Politics III.1 (citizen), IV (polity), VII.7 (climate)** — index 16 — backward
   Refs: Bodin's citizen-as-subject against Aristotle's citizen-as-office-holder; the climate
   theory Bodin inherits and de-fatalises.
-- **Strauss & Cropsey (eds.), History of Political Philosophy, 3rd ed.** — text landing at
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/strauss-cropsey/history-of-political-philosophy.txt`.
-  The 3rd edition has NO Bodin chapter (verify when the file lands — it is EMPTY at brief time);
-  consult the Hobbes chapter's remarks on Bodin as the nearest close reading.
+- **Strauss & Cropsey (eds.), History of Political Philosophy, 3rd ed.** — OCR text at
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/strauss-cropsey/history-of-political-philosophy.txt`.
+  VERIFIED: the volume has NO Bodin chapter (the editors' preface, l.~316–319, names Bodin among
+  the authors they omitted). Two chapters bear on this lesson: "Martin Luther and John Calvin"
+  (D. B. Forrester, pp. 318–355, ll. 15564–17457) — pp. 343–345 (~l.16595–16630) give the
+  Reformers' doctrine of suffering obedience (flee, suffer, never resist) and Calvin's loophole,
+  quoted from Institutes IV.20.31: magistrates "appointed to moderate the licentiousness of
+  princes (like the Ephors … or the Tribunes of the People … and possibly … the Three Estates …
+  in every realm)" may withstand a king in their official capacity. That is the seed of the
+  resistance tracts of the 1570s and gives link 6 its opposing doctrine from a primary text
+  (Calvin's words are the material; Forrester in References). And "Thomas Hobbes" (L. Berns, pp.
+  396–420) for the forward hook only.
 - **Not in the dossier, named by the opening ("a generation of pamphlets arguing that subjects
-  may kill a tyrant"):** the monarchomach tracts — Beza, Right of Magistrates (1574), Vindiciae
+  may kill a tyrant") — Calvin's lesser-magistrate passage above is the dossier's nearest
+  primary text:** the monarchomach tracts — Beza, Right of Magistrates (1574), Vindiciae
   contra tyrannos (1579), Hotman, Francogallia (1573). Tooley's Introduction names Beza (contra
   Beza on the necessity of consent). The Vindiciae's 1689 English translation is public domain
   (archive.org; the Garnett 1924 edition is also PD in the US) — the writer needs only ONE
@@ -134,9 +162,11 @@ goal: Analyze Bodin's definition of sovereignty and its attributes, and explain 
   the objection in link 6 and may paraphrase it from Tooley; `english-revolution-as-test` will
   cite it directly.
 
-Names ONLY in References: Tooley, Franklin, Skinner, Schmitt (here), Smith, Contarini and
-Polybius (as sources Bodin names — in body "the Venetian whose own description convicts him",
-"the Greek historian of Rome whom the reader met with Cicero").
+Names ONLY in References: Tooley, Franklin, Skinner, Schmitt (here), Smith, Forrester, Contarini
+(a source Bodin names — in body "the Venetian whose own description convicts him"). Polybius is a
+thinker the course teaches (`polybius-anacyclosis-and-rome`), so the body names him as the
+author of the mixed Rome Bodin takes apart; Calvin may be named as the author of the
+lesser-magistrate doctrine he wrote.
 
 ## EXPLANATION PLAN (L0)
 
@@ -200,7 +230,7 @@ act.
 4. **Then can sovereignty be shared? The mixed state reconstructed and refuted (II.1).** Obvious
    attempt, at full strength and from the reader's own lessons: Rome mixed consuls (kingly),
    senate (aristocratic) and people (democratic), and the mixture's mutual checks made it stable
-   for centuries (Ref `cicero-mixed-constitution`; `machiavelli-discourses-republic`); Venice
+   for centuries (Ref `polybius-anacyclosis-and-rome`; `machiavelli-discourses-republic`); Venice
    does the same with Doge, Senate and Great Council; "Contarini, Machiavelli, and many others
    have held the same opinion … it goes back … to Herodotus". Bodin's argument, step by step:
    (a) the marks are indivisible (link 3); (b) whoever makes law for all the rest is sovereign;
@@ -232,7 +262,9 @@ act.
    description of sovereignty. Headline the 3×3 grid.
 6. **Is a tyrant a king, and may he be killed?** Obvious attempt: Aquinas's (Ref) — a multitude
    that appointed its king may depose him; the resistance tracts' — lesser magistrates may
-   resist on the people's behalf. Bodin's king-vs-tyrant list (II.4: ~20 paired traits; tyranny
+   resist on the people's behalf, which rests on Calvin's loophole (magistrates set up "to
+   moderate the licentiousness of princes", like the ephors and tribunes — Institutes IV.20.31,
+   one sentence). Bodin's king-vs-tyrant list (II.4: ~20 paired traits; tyranny
    is a matter of degree; "no prince lacks a vice nor tyrant a virtue") grants the distinction
    and then refuses every consequence (II.5): "the subject is never justified in any
    circumstances in attempting anything against his sovereign prince, however evil and
@@ -330,10 +362,10 @@ tolerate, because the state must survive".
   Contarini (Venetian patrician whose book on Venice's constitution Bodin dismantles); Constable
   (France's chief military officer); Pasha; the Decemvirate (Ref to the Discourses lesson);
   Comines at Tours 1484; Theodoric (Ostrogothic king of Italy c. 500). Keep three per section.
-- **Do not re-teach** Aristotle's regimes or citizen, Cicero's mixed Rome, Machiavelli's Rome,
+- **Do not re-teach** Aristotle's regimes or citizen, Polybius's mixed Rome, Machiavelli's Rome,
   or Aquinas's tyranny chapter — recall each with a `<Ref>` and one clause; the
-  re-classification in link 4 ASSUMES the reader holds Scipio's picture of Rome and can watch it
-  fall.
+  re-classification in link 4 ASSUMES the reader holds Polybius's picture of Rome
+  (`polybius-anacyclosis-and-rome`) and can watch it fall.
 - **Summary vs text:** Tooley's Introduction gives Bodin's doctrine in Tooley's words; the body
   must quote BOOK text (I.8 l.2406, I.10 l.2696, II.1 l.3458ff, II.5 l.4076ff) for Bodin's
   claims and reserve the Introduction for the "new question" framing and the biography. The
@@ -355,9 +387,13 @@ tolerate, because the state must survive".
 - **Numbers (L12):** the Estates' date, 1572, 1576 and 1588 are the keepers; the clemency
   statistic, the aristocracy arithmetic (60 of 100 of 10,000) and the fines puzzle live in
   asides or an exercise, not in body prose.
-- **Dossier thin:** no monarchomach text; no Bodin secondary beyond Tooley; no Smith lecture;
-  the Strauss–Cropsey volume has no Bodin chapter and its file is empty. Say in References that
-  the lesson's close reading rests on Tooley's abridgement.
+- **Dossier thin:** no monarchomach text (Calvin's IV.20.31, quoted in the Strauss–Cropsey
+  Luther/Calvin chapter, is the nearest); no Bodin secondary beyond Tooley; no Smith lecture;
+  the Strauss–Cropsey volume has no Bodin chapter. Say in References that the lesson's close
+  reading rests on Tooley's abridgement.
+- **Register:** The course passes no verdict of its own on any author or idea: no condemning or
+  approving labels in its own voice. Judgement comes only through argument and evidence; a label
+  may appear only inside a quotation, with who applied it and when.
 
 ## FIGURE PLAN
 
@@ -432,9 +468,9 @@ tolerate, because the state must survive".
    would FALSIFY it on Bodin's own terms (Parliament making law for all without the king, or
    commanding the armed forces — IV.1). The solution says in one sentence that this is what the
    application lesson watches for.
-6. **Corroboration (E3 from `cicero-mixed-constitution`):** Scipio's Rome (Rep. I–II: the
-   mixture as the best regime because of mutual checks) and Bodin's Rome (II.1: popular,
-   governed aristocratically) describe the same institutions. Set two short excerpts side by
+6. **Corroboration (E3 from `polybius-anacyclosis-and-rome`):** Polybius's Rome (Histories
+   VI.11–18: consuls, senate and people, each able to block the others) and Bodin's Rome (II.1:
+   popular, governed aristocratically) describe the same institutions. Set two short excerpts side by
    side, state what each takes "the people confirm the senate's decrees" to be evidence of, and
    judge which account the facts of the tribunate (Ref `machiavelli-discourses-republic`)
    support better.

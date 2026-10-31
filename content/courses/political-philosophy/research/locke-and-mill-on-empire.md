@@ -16,10 +16,22 @@ goal: Analyze how Locke's theory of property and Mill's theory of progress each 
   ground of legitimate government; that lesson's notes reserve the America
   passages for here. From `mill-liberty-and-its-limits`: the harm principle,
   its exclusions for children and "backward states of society", and the
-  civilized-community clause named there as "the seed of the empire module";
-  Stephen's reply to Mill (coercion by opinion is how societies work) has been
-  met in the Muller anthology. From `burke-reflections`: the word "inheritance"
-  — dormant here, decisive next lesson.
+  civilized-community clause named there as "the seed of the empire module".
+  From `stephen-liberty-equality-fraternity` (now a prerequisite; its own lesson
+  in the democracy module): `coercion-by-opinion` — coercion, legal and moral,
+  as the normal instrument of improvement; India as Stephen's proof that no
+  government is neutral (LEF ch. II: the British in India legislate "on the
+  assumption that" the native religions are false, and "one of us two must rule
+  and the other must obey, and I mean to rule"); "power precedes liberty" (ch.
+  IV); and the gunpowder passage, which course.yaml assigns to that lesson —
+  this lesson recalls it with a `<Ref>` and re-quotes at most its one sentence
+  where the contradiction thesis needs its witness. From `burke-reflections`:
+  the word "inheritance" — dormant here, decisive next lesson. In course order
+  the reader arrives from `vitoria-right-to-the-americas`; the module before
+  this one closed on the heredity debate, whose institutional account
+  (`geography-or-institutions`)
+  met Locke as the drafter of Carolina's Fundamental Constitutions — recall in
+  a clause only if that lesson's ledger (`research/taught/`) shows it was used.
 - **Contributes:** One move: read the two passages and ask whether they are
   lapses or consequences. The lesson builds the "strategies of exclusion"
   reading as the course's own — a universal anthropology (free, equal, rational)
@@ -117,22 +129,40 @@ goal: Analyze how Locke's theory of property and Mill's theory of progress each 
   in intellect" (text in Bureau of Education, Selections from Educational
   Records, Part I, 1920; widely online); James Fitzjames Stephen, letter to The
   Times, 1 March 1883 (the Raj "founded, not on consent, but on conquest") and
-  the gunpowder passage (quoted by Mehta p. 29 with n.50 — the writer verifies
-  the source Mehta cites and quotes from it); Gandhi, Hind Swaraj (1909; his
+  "The Foundations of the Government of India", The Nineteenth Century 14
+  (October 1883), pp. ~541–568, the gunpowder passage at pp. 562–63 per Mehta's
+  n.50 (text l.1575) — PD, on archive.org and HathiTrust. NOTE: the gunpowder
+  passage is NOT in Liberty, Equality, Fraternity (grep of both staged editions,
+  `research/texts/stephen/lef-1874.txt` and `lef-1882.txt`, finds no "gunpowder");
+  it is from this 1883 article, ten years later. The Stephen lesson should cite
+  it as such; this lesson's Ref points to that lesson's treatment, and the
+  quotation's source is the 1883 article; Gandhi, Hind Swaraj (1909; his
   own English translation 1910), ch. XIII "What is true civilization?" —
   "Civilization is that mode of conduct which points to man the path of duty".
   Give pointers; the writer may quote these directly since they are PD.
-- **Muller, Conservatism: An Anthology** — index **48** — Stephen's Liberty,
-  Equality, Fraternity excerpt, already used in `mill-liberty-and-its-limits`;
-  recall by Ref only.
+- **Stephen, Liberty, Equality, Fraternity (1873)** — index **95** (full); texts
+  `research/texts/stephen/lef-1882.txt` (cleaner OCR): ch. II, the British in
+  India as proof that legislation cannot be neutral about religion (l.2385–2475:
+  Act XXI of 1850, suttee, missionaries; "one of us two must rule and the other
+  must obey, and I mean to rule" l.~2470–2474); ch. IV end, war and conquest as
+  "the sternest of all possible shapes" of compulsion (l.6463–6480). Recall by
+  `<Ref>` stephen-liberty-equality-fraternity — one clause; that lesson teaches
+  it. Public domain. (The Muller anthology excerpt, index 48, is superseded by
+  the full text.)
 - **Burke, Speeches on the Impeachment of Warren Hastings** — index **25**;
   `research/texts/burke-hastings/shard1.txt` l.761–766 "school-boys without
   tutors, minors without guardians" — the reversed childhood metaphor. Forward
   pointer only; the next lesson owns it.
-- **Strauss & Cropsey, History of Political Philosophy (3rd ed.)** — chapters
-  on Locke (Goldwin) and on Mill (Magid); text landing at
-  `research/texts/strauss-cropsey/history-of-political-philosophy.txt`, EMPTY
-  at brief time (0 lines). Consult when present as the standard close reading.
+- **Strauss & Cropsey, History of Political Philosophy (3rd ed.)** — text landed
+  at `research/texts/strauss-cropsey/history-of-political-philosophy.txt` (OCR,
+  not summarised): "John Locke" (Robert A. Goldwin, pp. 476–512) at
+  l.23136–24788 — the America and "waste" discussion around l.23770–23890 (the
+  Indians as America's "needy and wretched inhabitants"; §42 "waste"; the scale
+  of natural waste); "John Stuart Mill" (Henry M. Magid) at l.38012–38795 — the
+  stages of civilization and the signs of a civilized society around
+  l.38115–38200; "Jeremy Bentham and James Mill" (Timothy Fuller) at
+  l.34410–35478 (no India material). Grep for a check; the authors in
+  References only.
 - **Not in the dossier, References only if used:** Armitage, "John Locke,
   Carolina, and the Two Treatises of Government", Political Theory 32 (2004) —
   Locke's own colonial employment (Carolina constitutions 1669, Board of Trade
@@ -146,7 +176,7 @@ goal: Analyze how Locke's theory of property and Mill's theory of progress each 
 
 Start from the course.yaml opening verbatim. Develop it: two sentences by two
 men whose names stand for consent and liberty; the reader's natural first
-answer is "hypocrisy" — a man of principle who made exceptions when his country
+answer is that each made an exception to his principle when his country
 profited (both men were, as a matter of fact, employed by the enterprises
 concerned: Locke by the proprietors of Carolina and the Board of Trade, Mill
 for thirty-five years at the East India Company — state as fact, not as
@@ -273,15 +303,18 @@ without knowing what the theories say.
    Define **tutelage** here as Mill's own concept, not as an accusation.
 
 6. **Lapse or consequence? Two theses, stated so the reader can test them.**
-   The **contradiction thesis**: empire plainly contradicts consent,
+   The **contradiction thesis**: empire contradicts consent,
    representative government and equal citizenship — witness the hardening
    after 1857, and the Ilbert Bill of 1883 (a measure to let Indian judges try
    Europeans, defeated by a settler outcry), when Stephen wrote to The Times
    that the Raj rests "not on consent, but on conquest" and that its rulers
-   "shrink from the open… assertion" of superiority; and Stephen's gunpowder:
-   "A barrel of gunpowder may be harmless or may explode, but you cannot
-   educate it into household fuel by exploding little bits of it" — a liberal
-   saying the pedagogy is a pretence. The **strategies thesis**, the course's
+   "shrink from the open… assertion" of superiority; and Stephen's gunpowder
+   (recalled with `<Ref>` stephen-liberty-equality-fraternity, one clause — the
+   reader has met the man and his argument that coercion is the normal
+   instrument of rule; quote only the one sentence, from the 1883 article): "A
+   barrel of gunpowder may be harmless or may explode, but you cannot educate
+   it into household fuel by exploding little bits of it" — a liberal saying
+   the pedagogy is a pretence. The **strategies thesis**, the course's
    own: Mill's liberty is secondary to utility and keyed to a stage, so
    excluding India is not an inconsistency; the thick conditions that excluded
    India are the same ones that excluded the propertyless and women at home and
@@ -343,11 +376,13 @@ responsibility to Parliament is the worst despotism"; "Lapse or consequence?";
    argument that foreign despotism is better than native because it is
    permanent.
 7. **"A choice of despotisms"** (RG XVIII l.285–307) and the "human-cattle
-   farm" (l.341–353): the honest half of Mill — he does not call it anything
+   farm" (l.341–353): Mill's own word for the arrangement — he does not call it anything
    but despotism.
-8. **Stephen's gunpowder** (Mehta pp. 29–30, text l.1540–1556; verify and
-   quote from Stephen's own text per Mehta's n.50): the liberal who says the
-   tutelage story cannot be true, and the Times letter of 1 March 1883.
+8. **Stephen's gunpowder, recalled** (`<Ref>` stephen-liberty-equality-fraternity;
+   Mehta pp. 29–30, text l.1540–1556, n.50 at l.1575; quote from the 1883
+   Nineteenth Century article, not from LEF, where it does not occur): one
+   sentence as the witness of the contradiction thesis, with the Times letter
+   of 1 March 1883 — not a re-reading of Stephen.
 9. **Gandhi's definition** (Hind Swaraj ch. XIII; Mehta p. 113): one sentence,
    plus the 1950 franchise as the fact that tested the developmental claim.
 
@@ -386,22 +421,23 @@ responsibility to Parliament is the worst despotism"; "Lapse or consequence?";
   Memorandum defending the Company is not in the dossier; mention only as the
   context of RG XVIII's last paragraph.
 - **Do not re-teach** the labour theory, the two limits, consent, the harm
-  principle, or Stephen's general reply to Mill — one `<Ref>` clause each.
+  principle, or Stephen's reply to Mill and his India passages (`<Ref>`
+  stephen-liberty-equality-fraternity) — one `<Ref>` clause each.
   Burke's "schoolboys without tutors" is a forward pointer, not a set piece
   here.
 - **Where the dossier is thin:** James Mill's History and Macaulay's Minute are
   known only through Mehta's quotations — both are PD and must be quoted from
-  their own texts; Stephen's gunpowder passage likewise (Mehta's n.50 gives the
-  source). Gandhi via Mehta pp. 113–114 — PD, obtain. The "discontinuity"
+  their own texts; Stephen's gunpowder passage likewise — its source is "The
+  Foundations of the Government of India" (1883), not in the dossier; obtain it.
+  Gandhi via Mehta pp. 113–114 — PD, obtain. The "discontinuity"
   reading (Pitts) is not in the dossier beyond Mehta's refutation of it; name
   it fairly in a clause and cite Pitts in References.
 - **Numbers:** thirty-five years at the Company, 1600/1757/1765/1858, 1835,
   1857, 1883, 1950. The 9/10–99/100 figure is Locke's and stays in his
   sentence. No GDP or population figures — none are in the dossier and none
   are needed.
-- **Register:** no "hypocrite", no "racist", no "apologist" in the course's
-  voice. The lesson's conclusion is a question held open with the two theses
-  stated.
+- **Register:** The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when. The lesson's conclusion is a question held open with
+  the two theses stated.
 
 ## FIGURE PLAN
 

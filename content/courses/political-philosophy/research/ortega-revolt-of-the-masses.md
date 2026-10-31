@@ -7,16 +7,30 @@ goal: Analyze Ortega's diagnosis of the mass-man and his account of why a civili
 
 ## ARC (L10)
 
-- **Inherits:** Plato's democratic man, ruled by whichever desire arrives
-  (`decline-of-regimes`); Tocqueville's soft despotism and the "flock of timid
-  and industrious animals" (`tocqueville-tyranny-of-majority-and-soft-despotism`);
-  Carlyle's demand for heroes and his verdict that democracy is the absence of
-  real superiors (`carlyle-heroes`); Mann's Bürger/Literat/Philister typology
-  and his "Masse" left undefined in the right-hand column (`mann-reflections`);
-  and, from `nietzsche-on-the-right`, the label "aristocratic radicalism" and
-  the note that Ortega's noblesse oblige is one of its three borrowings. From
-  `marx-manifesto` the reader has class struggle, which this lesson's left
-  objection will use.
+- **Inherits:** From `spengler-decline-of-the-west` (prerequisite, the previous
+  lesson): Civilization as the late stage of every Culture, the world-city and
+  the formless "Fourth Estate", and the claim that the West's technique and
+  machines will run on through its winter — the two theses Ortega attacks by name
+  (ch. IX, XIV.2), so his anti-Spengler passages are now BACKWARD Refs, not
+  forward hooks. From the crowd-race-nation module: Le Bon's crowd — the man in
+  a crowd is not the man alone; suggestible, moved by images and leaders
+  (`taine-and-le-bon-revolution-and-crowd`, concept `crowd-psychology`) — the
+  predecessor Ortega never names, and whose "crowd" his "mass" is NOT; and
+  Renan's nation as "a daily plebiscite" (`renan-what-is-a-nation`, concept
+  `daily-plebiscite`), which Ortega quotes and turns toward the future. From
+  this module: Mosca's ruling class and Michels's party oligarchy
+  (`mosca-ruling-class`, `michels-and-pareto-oligarchy-and-elites`) — a
+  "minority" defined by organization and power, against which Ortega's minority
+  (those who demand much of themselves) must be distinguished at first use;
+  Mann's Bürger/Literat/Philister typology and his "Masse" left undefined in the
+  right-hand column (`mann-reflections`). Further back: Plato's democratic man,
+  ruled by whichever desire arrives (`decline-of-regimes`); Hume's "on opinion
+  only … government is founded" (`hume-against-the-original-contract`, concept
+  `government-founded-on-opinion`) — Ortega cites Hume for his own rule-by-opinion
+  thesis (XIV.1); Tocqueville's soft despotism and the "flock of timid and
+  industrious animals" (`tocqueville-tyranny-of-majority-and-soft-despotism`);
+  Carlyle's demand for heroes (`carlyle-heroes`); Marx's class struggle
+  (`marx-manifesto`), which this lesson's left objection will use.
 - **Contributes:** One move: a diagnosis of the crisis made by a LIBERAL, in
   which the dangerous new type is not a class but a kind of person — the man
   who feels "just like everybody", demands rights without duties, and is
@@ -29,15 +43,21 @@ goal: Analyze Ortega's diagnosis of the mass-man and his account of why a civili
   is "sharing existence with the enemy" is exactly what the next lesson denies:
   `schmitt-concept-of-the-political` will say the political is the real
   possibility of killing the enemy, and that a people which lets others name
-  its enemy is no longer politically free. Ortega's attack on Spengler and on
-  "decadence" as a commonplace (ch. IX, XIV.2) is the forward spiral to
-  `spengler-decline-of-the-west` and `what-measures-greatness`. His nation as
-  project (XIV.6–8) is inherited by `the-nation-and-its-defenders`, where
-  Renan's plebiscite is set against Scruton's home and Miller's identity.
-- **Spine step:** "Liberal Europe breaks: Mann sets Kultur against Zivilisation,
-  Ortega diagnoses the mass-man, Schmitt names the political as friend and
-  enemy and the sovereign as he who decides the exception — and Weimar is the
-  case"
+  its enemy is no longer politically free. Forward, one clause each: "direct
+  action" and the syndicalist general strike, which Ortega names as barbarism,
+  are given their own defence at full strength in `sorel-reflections-on-violence`
+  (next module); the nation as project (XIV.6–8) is inherited by
+  `the-nation-and-its-defenders`; and Ortega's thesis is turned upside down in
+  `lasch-revolt-of-the-elites` (equality module) — the people without loyalty to
+  place, obligation or gratitude to the past are, sixty years on, the educated
+  elites, not the masses. The FORWARD exercise targets Schmitt; Lasch's
+  inversion is a forward clause in the closing and may be a second exercise's
+  solution note.
+- **Spine step:** "Liberal Europe breaks: elite theorists show that a minority
+  always rules, Mann sets Kultur against Zivilisation, Spengler foretells the
+  West's winter, Ortega diagnoses the mass-man, Schmitt names the political as
+  friend and enemy and the sovereign as he who decides the exception — and
+  Weimar is the case"
 
 ## Sources to consult
 
@@ -123,12 +143,26 @@ goal: Analyze Ortega's diagnosis of the mass-man and his account of why a civili
     forced into commerce), 55 (the new moral code known to two dozen men).
 - **Spengler, The Decline of the West** — summary index 11; cached at
   `research/texts/spengler/vol1-form-and-actuality.txt` and
-  `vol2-perspectives-of-world-history.txt`. FORWARD HOOK ONLY. Read Vol. 1
-  Intro XII–XIV (pp. 31–41: Civilization as the inevitable destiny of every
-  Culture; world-city, mass, money, Caesarism) so the lesson can state in one
-  paragraph what Ortega is denying in ch. IX and XIV.2 — that "civilisation
-  succeeds culture" as a stage and that technique can outlive pure science.
-  Do not teach Spengler here.
+  `vol2-perspectives-of-world-history.txt`. BACKWARD REF ONLY — Spengler is now
+  the previous lesson (`spengler-decline-of-the-west`). Reread Vol. 1 Intro
+  XII–XIV (pp. 31–41) only to make sure Ortega's denials in ch. IX and XIV.2 are
+  set against what Spengler actually claimed (that "civilisation succeeds
+  culture" as a stage; that technique runs on into the Civilization) — recalled
+  in a clause with the Ref, never re-taught.
+- **Le Bon, The Crowd (1895)** — summary index 98; `research/texts/le-bon/`
+  (`the-crowd.txt`; shards `gustavele-s1-intro-book1.txt`, `gustavele-s2-book2.txt`).
+  Backward Ref only (`taine-and-le-bon-revolution-and-crowd`): reread the
+  Introduction ("the era of crowds") and Book I ch. 1 (the crowd's "mental
+  unity") to state in two sentences how Ortega's mass differs — a crowd is a
+  temporary psychological state of people assembled; Ortega's mass-man is a
+  permanent type who need not be in any crowd. Ortega does not name Le Bon; the
+  lesson notes the predecessor in one clause.
+- **Renan, "Qu'est-ce qu'une nation?" (1882)** — summary index 100;
+  `research/texts/renan/renan-quest-ce-quune-nation-1882.txt` (French, public
+  domain). Backward Ref only (`renan-what-is-a-nation`): check Ortega's
+  quotation of the "daily plebiscite" (XIV.8, l.4990–5002) against the French
+  ("un plébiscite de tous les jours") and against Renan's own emphasis on the
+  shared PAST, which is what Ortega turns round.
 - **Tocqueville, Democracy in America, Vol. II Pt IV ch. VI** — summary index
   28, cached `research/texts/democracyin-s5-v2-part4.txt`. Backward Ref only:
   the tutelary power and the flock (~lines 1093–1135 of that shard); the
@@ -137,8 +171,10 @@ goal: Analyze Ortega's diagnosis of the mass-man and his account of why a civili
 - **Plato, Republic VIII** — already taught; backward Ref for democratic man.
 - **Muller anthology ch. 7 (Schumpeter, "Political Leadership and Democracy",
   1942)** — summary index 48; cached `research/texts/muller/
-  conservatism-anthology.txt` lines ~3800–3900. Use ONE idea as the course's
-  own, in an Aside or exercise: that the citizen "drops down to a lower level
+  conservatism-anthology.txt` lines ~3800–3900. (Its competitive definition of
+  democracy was already used, as the course's own, in
+  `michels-and-pareto-oligarchy-and-elites`.) Use ONE further idea as the
+  course's own, in an Aside or exercise: that the citizen "drops down to a lower level
   of mental performance as soon as he enters the political field… He becomes a
   primitive again". It corroborates Ortega's hermetism from a different
   method. Muller and Schumpeter in References only (Schumpeter's text is
@@ -175,7 +211,13 @@ without duties, and he is not a social class.
    classes ("within every social class there are mass and genuine minority",
    the "great vehicle" and "lesser vehicle" of Buddhism); and the humble
    mediocre man who knows his limits is not mass — the mass-man is the one
-   who feels no lack. Heading: "The crowd has moved to the footlights".
+   who feels no lack. Two seams the newcomer needs, one sentence each: (i) this
+   is not Le Bon's crowd (Ref `taine-and-le-bon-revolution-and-crowd`) — the
+   crowd is people assembled and transformed for an hour, the mass-man is a type
+   who is the same alone at home; (ii) Ortega's "minority" is not Mosca's ruling
+   minority (Ref `mosca-ruling-class`) — Mosca's is defined by organization and
+   power, Ortega's by what a man demands of himself, so that a ruling minority
+   can be made of mass-men. Heading: "The crowd has moved to the footlights".
 
 2. **What has he done once in front?** Hyperdemocracy (ch. I end, ~256–303):
    old democracy was tempered by liberalism and law, the mass delegated;
@@ -245,7 +287,12 @@ without duties, and he is not a social class.
    technique is not self-sustaining — it is "a precipitate of superfluous,
    unpractical activities"; cut pure science and the machines run on for a
    generation (Weyl's remark, Note 13: ten or twelve physicists dead and
-   physics is lost). The Central African in the motor-car taking aspirin
+   physics is lost) — Ref `spengler-decline-of-the-west`: the
+   reader has Spengler's claim that the Machine is the Civilization's last work
+   and runs on through its winter; Ortega calls him "far too optimistic"
+   (~2193–2205) because technique cannot outlive the vocation that feeds it. One
+   clause of reminder, then Ortega's argument. The Central African in the
+   motor-car taking aspirin
    (~2317–2323) is the test: enjoying civilisation's products does not imply
    understanding or willing its principles. This also answers the charge that
    the diagnosis is contempt for the poor: the labourer who knows his limits
@@ -280,7 +327,11 @@ without duties, and he is not a social class.
    premise the whole module will fight over. "Rule is the normal exercise of
    authority, and is always based on public opinion… Never has anyone ruled
    on this earth by basing his rule essentially on any other thing than
-   public opinion" (l.3515–3519); Hume cited; Napoleon in Spain was
+   public opinion" (l.3515–3519); Hume cited (Ref
+   `hume-against-the-original-contract`: the reader has Hume's "on opinion only
+   … government is founded"; Ortega borrows it, and Mosca's political formula,
+   Ref `mosca-ruling-class`, was the same thesis given a content); Napoleon in
+   Spain was
    aggression, not rule; Talleyrand: "You can do everything with bayonets,
    Sire, except sit on them" (l.3539). Force is the apparatus one has because
    one already commands. Europe ruled the world for three centuries by
@@ -288,7 +339,11 @@ without duties, and he is not a social class.
    the class when the master leaves (XIV.2). Decadence, Ortega insists, is a
    commonplace people take "as they would take a tram" (XIV.2, with the
    explicit warning not to think of Spengler, l.3703–3705) — what is really
-   happening is that European life has outgrown the national State: economic,
+   happening is that European life has outgrown the national State. Ref
+   `spengler-decline-of-the-west` here, one clause: the reader has just read
+   the book Ortega is warning against, so the seam can SAY the reversal — from a
+   critic of the mass one expects a prophet of decline; Ortega denies the
+   decline and diagnoses a mismatch of scale: economic,
    intellectual and political capacity exceed the frontiers; Parliaments have
    lost prestige because they have lost TASKS, not because their machinery is
    defective (XIV.5, "Not effective for what?"). Heading: "Rule is opinion,
@@ -302,7 +357,9 @@ without duties, and he is not a social class.
    State has always been the great dragoman"); the ancient State divided
    governors from governed, the national State makes every subject a
    participant and is therefore democratic at root. Renan's "daily
-   plebiscite" is quoted (l.4990–5002) and turned round: the plebiscite is
+   plebiscite" (Ref `renan-what-is-a-nation`: the reader has the lecture —
+   memory and present consent, against race and language; one clause, no
+   re-teaching) is quoted as Ortega quotes it (l.4990–5002) and turned round: the plebiscite is
    on a FUTURE — "In defending the nation we are defending our to-morrows,
    not our yesterdays" (l.5030–5040); a nation is "always either in the
    making, or in the unmaking. Tertium non datur". Hence the proposal: Europe
@@ -380,9 +437,8 @@ commonplace"; "A nation is a plebiscite on tomorrow".
   power from 1922). Bolshevism (link 6: Lenin's party, in power since 1917).
   Hermetism (link 4: sealed, closed to appeal). Noluntas (link 3: Ortega's
   coinage, the will-not; negative freedom). Technicism (link 5). Polis (link
-  8: Ref `greek-miracle`, one clause). Renan's "daily plebiscite" (link 8:
-  Ernest Renan, French historian, lecture "What is a nation?", 1882; a
-  plebiscite is a direct popular vote). Rathenau (link 3: German industrialist
+  8: Ref `greek-miracle`, one clause). Renan's "daily plebiscite" (link 8: NOT
+  anchored afresh — Ref `renan-what-is-a-nation` with one clause of reminder). Rathenau (link 3: German industrialist
   and minister, murdered 1922 — the reader met the murder in
   `mann-reflections`; one clause and a Ref). Sombart (link 1: German
   economist whose population figures Ortega cites — name only as Ortega's
@@ -413,32 +469,38 @@ commonplace"; "A nation is a plebiscite on tomorrow".
   the State as its text (Ref), and Ortega's own ch. XIII and XIV.9 as the
   evidence that class is doing work he does not credit. No strawman "some
   believe".
-- **Spengler is NOT taught here.** The anti-Spengler passages (ch. IX ~2193–
-  2205; XIV.2 l.3700–3716) are used to state two of Ortega's theses —
-  technique is not self-sustaining, decadence is a commonplace — and to
-  announce that the civilizations module will test the organism theory. One
-  paragraph each at most; the writer reads Spengler's Intro XII–XIV only to
-  describe what Ortega denies without caricature.
+- **Spengler is NOT re-taught here.** He is the previous lesson. The
+  anti-Spengler passages (ch. IX ~2193–2205; XIV.2 l.3700–3716) state two of
+  Ortega's theses — technique is not self-sustaining, decadence is a
+  commonplace — each with a `<Ref>` and one clause recalling what Spengler
+  claimed. One paragraph each at most. The civilizations module's later test
+  of the organism theory is a forward clause at most.
+- **Le Bon and Renan are not re-taught either.** Le Bon's crowd is the
+  predecessor Ortega does not name — one clause and a Ref to separate the two
+  concepts (link 1); Renan's plebiscite is recalled with a Ref (link 8).
+- **Register (exact rule).** The course passes no verdict of its own on any
+  author or idea: no condemning or approving labels in its own voice.
+  Judgement comes only through argument and evidence; a label may appear only
+  inside a quotation, with who applied it and when.
 - **Scholars live in References only:** Muller (Schumpeter's text may be
   quoted one sentence as a primary voice in an Aside), Lilla, Sombart (unless
-  named as Ortega's cited source), Hume (Ortega cites him; the body may say
-  "a Scottish philosopher Ortega cites" or Ref nothing — Hume has no lesson
-  in this course).
+  named as Ortega's cited source), Hume may be named — Ortega cites him and he
+  has his own lesson (`hume-against-the-original-contract`; Ref it at link 7).
 - **Where the dossier is thin:** the Spanish original is not in the dossier;
   Ortega's earlier España invertebrada (1922) and the 1937 English preface
   (the "Epilogue for Englishmen", with its reflections on pacifism) are not
   in the dossier — the latter would sharpen the Schmitt hand-off and the
   writer may cite it in References from any post-1937 edition. Renan's 1882
-  lecture is not in the dossier; a public-domain English translation exists
-  (Renan died 1892) and the writer should cite it in References for
-  `the-nation-and-its-defenders` to reuse.
+  lecture IS now in the dossier (French, `research/texts/renan/`), taught in
+  `renan-what-is-a-nation`; cite it in References with that lesson's
+  translation.
 - **Where summary and text may disagree:** the summary's chapter line
   numbers for chs. IX–XIII are "shard 2 numbering" — they match the full
   file as checked (l.2317 aspirin, l.3078 learned ignoramus, l.3379 skeleton,
   l.3539 bayonets, l.4995 Renan). Verify the "triplicated" claim against the
   text of ch. V before asserting it.
-- **No real misconception slot** beyond the one above (Ortega as reactionary
-  snob); do not invent "some think the masses are the poor" unless the
+- **No real misconception slot** beyond the one above (the reading of the
+  book as an aristocrat's complaint about the poor); do not invent "some think the masses are the poor" unless the
   writer finds the reading documented — Ortega himself anticipates it (ch. I,
   II), which is enough to refute it from the text.
 
@@ -491,7 +553,9 @@ commonplace"; "A nation is a plebiscite on tomorrow".
    minority and give the two corrections he insists on (not a social class;
    the humble man is not mass). Then recall from `decline-of-regimes` Plato's
    democratic man and say in one sentence what Ortega adds (E3: self-
-   satisfaction and indocility, not merely licence).
+   satisfaction and indocility, not merely licence). Then say in one sentence
+   how the mass-man differs from Le Bon's crowd (Ref
+   `taine-and-le-bon-revolution-and-crowd`).
 2. **Document reasoning / sourcing drill:** the generosity passage (ch. VIII,
    l.2012–2030) with metadata (Madrid 1930, a philosopher writing in a
    dictatorship's last year for a newspaper public; the Primo de Rivera
@@ -551,10 +615,10 @@ commonplace"; "A nation is a plebiscite on tomorrow".
 
 - `nietzsche/order-of-rank` — the one Ref for Ortega's "radically
   aristocratic" view of society and for noblesse oblige as effort rather than
-  birth; the lesson states that Ortega's nobility is a borrowing from the
-  critique of equality (via `nietzsche-on-the-right`, which names it as one
-  of three) and marks the difference: Ortega keeps liberal democracy and
-  Nietzsche does not.
+  birth; the lesson states that Ortega's nobility echoes the critique of
+  equality and marks the difference: Ortega keeps liberal democracy and
+  Nietzsche does not. (The course's own survey of the right's borrowings from
+  Nietzsche is later, `the-right-after-1945`; no backward Ref to it.)
 - `nietzsche/herd-morality-in-modern-dress` — one clause where the lesson
   defines "to be different is to be indecent"; Ortega names Nietzsche among
   the prophets of the mass (ch. VI, with Hegel and Comte) and that is all the

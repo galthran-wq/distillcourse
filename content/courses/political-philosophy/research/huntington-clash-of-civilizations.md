@@ -11,15 +11,20 @@ goal: Analyze Huntington's hypothesis that cultural fault lines will replace ide
   Toynbee's list of about twenty-one, of which some six or seven are living — the
   list Huntington takes over by name; the five tokens that relate them; and the
   method question (a unit built for the history of growth). From
-  `spengler-decline-of-the-west`: Culture and Civilization, and Spengler's claim
+  `spengler-decline-of-the-west` (read in the crisis-of-liberal-Europe module, well
+  before this one; recall with a clause, and only through what the Toynbee lesson
+  already set against it): Culture and Civilization, and Spengler's claim
   that Cultures do not influence each other — against which Huntington's whole
   hypothesis is about interaction. From `schmitt-concept-of-the-political`: the
   friend–enemy distinction as the criterion of the political, the pluriverse of
   states, "whoever invokes humanity wants to cheat" — the backward Ref the
   hypothesis invites (Huntington's "universal civilization is a Western idea" is
-  Schmitt's argument in another vocabulary). From `ortega-revolt-of-the-masses`:
-  the nation as a project (Renan's plebiscite), which Huntington's "torn countries"
-  test. From `hellenization-of-christianity` and `altar-of-victory`: the 1500
+  Schmitt's argument in another vocabulary). From `renan-what-is-a-nation`: the
+  nation as "a daily plebiscite" of memory and will (and Barrès's answer that a
+  nation is accepted, not chosen — `barres-and-maurras-integral-nationalism`); from
+  `ortega-revolt-of-the-masses`: the nation as a project (`nation-as-project`) and
+  Europe as one. Huntington's "torn countries" and his fifth reason test exactly that
+  choice-versus-inheritance question at the scale of a civilization. From `hellenization-of-christianity` and `altar-of-victory`: the 1500
   boundary of Western Christianity rests on a history the reader has (the Greek
   and Latin churches). The reader also has the Cold War only as general knowledge;
   the lesson anchors it (L11).
@@ -37,13 +42,13 @@ goal: Analyze Huntington's hypothesis that cultural fault lines will replace ide
   And the measure: Huntington measures a civilization by power — indices of
   military, economic and institutional control — so `what-measures-greatness` sets
   that measure beside Spengler's duration and Toynbee's ideas-taken-up. A third,
-  deferred: Huntington's account of the WEST'S OWN identity — the Anglo-Protestant
-  core culture of *Who Are We?* (2004) — was not obtained by the reading swarm and
-  is handled in `the-nation-and-its-defenders` as reported by others, with the gap
-  stated there and here.
-- **Spine step:** "The question widens from the state to the civilization: Spengler's
-  organisms, Toynbee's challenge and response, Huntington's fault lines — three
-  measures of greatness and three accounts of decline, tested on the record"
+  later: Huntington's account of the identity of one Western nation — the
+  Anglo-Protestant core culture of the United States in *Who Are We?* (2004, now read
+  in full) — belongs to `albions-seed-and-who-are-we` in the nation module; this
+  lesson points forward to it in one sentence and states nothing of its argument.
+- **Spine step:** "The question widens from the state to the civilization: against
+  Spengler's organisms, Toynbee's challenge and response and Huntington's fault lines
+  — three measures of greatness and three accounts of decline, tested on the record"
 
 ## Sources to consult
 
@@ -159,9 +164,23 @@ goal: Analyze Huntington's hypothesis that cultural fault lines will replace ide
   — recall in one clause each; the lesson shows the structural kinship (an
   autonomous criterion of grouping; "humanity" as the West's war-concept) and the
   difference (Schmitt's grouping is a decision; Huntington's is an inheritance).
-- **Ortega, Revolt ch. XIV.7–8** — index 32: nation as "a daily plebiscite" on a
-  future programme, not blood or language — the backward Ref (`ortega-revolt-of-the-masses`)
-  that cuts against reason (5)'s immutability; one sentence.
+- **Renan, "What Is a Nation?" (1882)** and **Ortega, Revolt ch. XIV.7–8** — index 32
+  for Ortega: the nation as "a daily plebiscite" (Renan's phrase, which Ortega takes
+  up) on a future programme, not blood or language — the backward Refs
+  (`renan-what-is-a-nation`, `ortega-revolt-of-the-masses`) that cut against reason
+  (5)'s immutability; one sentence.
+- **Huntington, *Who Are We?* (2004)** — index 76; text
+  `research/texts/huntington/who-are-we.txt` (whole book; OCR noise in numerals).
+  Read in full, but its argument belongs to `albions-seed-and-who-are-we`. This
+  lesson uses it for ONE forward sentence and, if the writer wants it, for the
+  pitfalls below: ch. 2 (pp. 22–25, text l. ~1655–1665) — identities are defined by
+  self and others jointly, and Huntington's example is the West's reluctance to
+  accept Turkey's elites' wish to be Western, which is the torn-country third
+  condition restated eleven years on; ch. 2 (pp. 29–33, text l. ~1994–2030) — the
+  civic/ethnic dichotomy rejected and culture separated from ancestry ("ethnic-
+  racial" vs "cultural"), which confirms that his unit is cultural, not racial. Do
+  not import ch. 3–4 (the Anglo-Protestant core, the Creed) or ch. 9 (Mexican
+  immigration) here.
 - **Spengler, Decline Vol. 2 ch. III** — index 11: Cultures do not "influence" each
   other; creators absorb and transvalue — Ref `spengler-decline-of-the-west`; the
   contrast with Huntington's reason (2). One clause.
@@ -175,8 +194,7 @@ goal: Analyze Huntington's hypothesis that cultural fault lines will replace ide
   *Foreign Affairs* 72:5 (Nov/Dec 1993); Stephen Walt, "Building Up New Bogeymen",
   *Foreign Policy* 106 (1997). Huntington, *The Clash of Civilizations and the
   Remaking of World Order* (1996) — the book was NOT read by the swarm; the lesson
-  teaches the 1993 article and says so in References. Huntington, *Who Are We?* (2004)
-  — NOT obtained; deferred. The writer states each objection as a position in the
+  teaches the 1993 article and says so in References. The writer states each objection as a position in the
   course's own voice and cites the author in References only.
 - **Strauss–Cropsey:** no chapter. Not applicable.
 
@@ -209,7 +227,7 @@ hypothesis so that it could be right or wrong? The chain:
    each fails for Huntington: a region contains several (Europe east and west of the
    1500 line), a religion is only the most important of several elements, and race
    is explicitly not it ("people of the same race can be deeply divided by
-   civilization"; Toynbee's refutation stands — Ref). Answer: "the highest cultural
+   civilization"; Toynbee's case against race as the maker of civilizations is recalled with a Ref, one clause). Answer: "the highest cultural
    grouping of people and the broadest level of cultural identity people have short
    of that which distinguishes humans from other species", fixed by objective
    elements AND subjective self-identification — the Rome-resident ladder (Roman →
@@ -269,8 +287,9 @@ hypothesis so that it could be right or wrong? The chain:
    torn countries: a state whose elite wants one civilization and whose history is
    another — Turkey (Özal), Mexico (the adviser's "we could never say so publicly"),
    Russia (Atlanticists vs Eurasianists) — and the three conditions for switching.
-   Seam (Ref `ortega-revolt-of-the-masses`): Ortega's nation as a plebiscite on a
-   future would make switching a matter of will; Huntington's third condition (the
+   Seam (Refs `renan-what-is-a-nation`, `ortega-revolt-of-the-masses`): the nation
+   as a daily plebiscite, or as a project for a common future, would make switching
+   a matter of will; Huntington's third condition (the
    host must be willing) says it is not only up to the switcher. The because: this is
    where the hypothesis says what it predicts — and the next lesson reads Bosnia and
    Russia–Ukraine against exactly these paragraphs.
@@ -388,25 +407,33 @@ identity, states".
   vs combining against them — define); *Atlanticist / Eurasianist*; *Özal* (Turkish
   president 1989–93); *Mahbubani* (Singaporean diplomat — only if the "West and the
   Rest" phrase is attributed; otherwise the phrase is Huntington's in use).
-- **Who Are We? (2004) was NOT obtained.** The lesson must not state its thesis
-  (Anglo-Protestant core culture, the "creed", assimilation) as read. Where the
-  reader would expect it — the West's own identity, link 6 — write one sentence:
-  Huntington's later account of what holds the United States together is treated in
-  `the-nation-and-its-defenders`, where the course states it only as reported by
-  others. Repeat the gap in References.
+- **Who Are We? (2004) is read (index 76) but is a later lesson's material.** Earlier
+  versions of this brief said it was not obtained; that is wrong. The lesson does not
+  teach its thesis (Anglo-Protestant core culture, the Creed, assimilation, Mexican
+  immigration): that is `albions-seed-and-who-are-we`. Where the reader would expect
+  it — the West's own identity, link 6 — write one forward sentence with `<Ref>`:
+  eleven years later Huntington turned from the West against the rest to what holds
+  one Western nation together, and the nation module reads that argument. The book
+  may be cited in References for the two ch. 2 points listed under Sources.
+- **Register rule.**
+  The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
 - **The 1996 book was not read.** The article is the material. Where the book
   changed terms ("Sinic" for "Confucian", Africa promoted to a civilization, the
   "core state" concept), say nothing or one References sentence; do not import the
   book's maps or claims.
 - **"Descriptive, not advocacy":** report it as Huntington's self-description and
-  then show the policy section — the reader judges. Do not call him a prophet of
-  war (Said's charge) or a neutral observer; both are verdicts the lesson leaves
-  open.
+  then show the policy section — the reader judges. Whether the article describes
+  or provokes is a verdict the lesson leaves open; if a critic's characterisation
+  is reported, it is quoted with its author (References) and date, per the register
+  rule.
 - **Civilization vs race:** Huntington's definition is cultural and he says so;
   reason (5)'s "Russians cannot become Estonians" is about culture and language,
-  not blood. The hereditarian account is NOT Huntington's; do not conflate — it is
-  taught in `what-measures-greatness`, where his fifth reason is used as the modern
-  "immutability" claim that the critics read as essentialism.
+  not blood (and *Who Are We?* ch. 2 later separates culture from ancestry
+  explicitly). The hereditarian account is NOT Huntington's; do not conflate. The
+  race answer is recalled in `what-measures-greatness` (Gobineau with Toynbee's and
+  Spengler's refusals), where his fifth reason is set beside it as the cultural
+  "immutability" claim that the critics read as essentialism; the modern
+  hereditarian debate is the heredity module's.
 - **The six reasons are not six separate causes:** the summary's crispness tempts a
   list; derive each as a sub-answer (link 3) or the section is a recap (L0b).
 - **The trade-share figures** (Europe 51→59 etc.) are the article's only data; bind
@@ -431,7 +458,8 @@ identity, states".
 - **Dossier thinness:** the article is complete; the objections are not in the
   dossier at all (Said, Sen, Ajami) — the writer states each in one or two sentences
   from general knowledge, as a position, and cites the exact publication above; no
-  quotations from them. The 1996 book and 2004 book are gaps stated in References.
+  quotations from them. The 1996 book is a gap stated in References; the 2004 book
+  is in the dossier and belongs to a later lesson.
 
 ## FIGURE PLAN
 
@@ -486,7 +514,7 @@ identity, states".
 3. **Boundary probe:** Take reason (5) to its limit — suppose civilizational identity
    were perfectly immutable. Then no torn country could exist and no boundary could
    change; but Huntington needs both (link 2, link 5). Then the other limit —
-   perfectly mutable, Ortega's plebiscite — and the fault lines dissolve. State the
+   perfectly mutable, Renan's daily plebiscite (Ref `renan-what-is-a-nation`) — and the fault lines dissolve. State the
    hypothesis's actual position between the two and the sentence that fixes it.
    Solution: "less mutable … than political and economic ones" — a comparative,
    not an absolute; the three conditions are where the degree is set.

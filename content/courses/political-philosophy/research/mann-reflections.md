@@ -7,39 +7,57 @@ goal: Analyze Mann's wartime case that German Kultur and Western Zivilisation ar
 
 ## ARC (L10)
 
-- **Inherits:** The reader arrives from the democracy module with four things this
-  lesson leans on and must not re-teach: Tocqueville's forecast that equality
-  breeds a mild tutelary power and a timid, industrious citizen
+- **Inherits:** The reader arrives from the two elite-theory lessons that open
+  this module: a minority rules every regime under a formula the ruled believe
+  (`mosca-ruling-class`), and even a party built for the rule of the many is
+  led by an irremovable few whose members do not use the right to control them
+  (`michels-and-pareto-oligarchy-and-elites`, prerequisite — Michels's "an
+  electoral right exists, but no electoral duty"). Mann's question is different
+  and the seam must say so: not who rules, but what politics does to a people's
+  inner life. From the democracy module, four things this lesson leans on and
+  must not re-teach: Tocqueville's forecast that equality breeds a mild
+  tutelary power and a timid, industrious citizen
   (`tocqueville-tyranny-of-majority-and-soft-despotism`); Carlyle's claim that
   a society without reverence for superiors is governed by quacks
   (`carlyle-heroes`); Mill's individuality — the tree, not the machine
   (`mill-liberty-and-its-limits`), which Mann will claim for the German Bürger
-  and deny to the democrat; and, from the starred lesson
-  `nietzsche-on-the-right`, the label "aristocratic radicalism" and the fact
-  that Nietzsche despised the German state. `british-franchise` has just shown
-  the reader a democracy that arrived by stages and did not end the world.
-- **Contributes:** The module's first move: a diagnosis of the crisis of liberal
-  Europe made from inside a belligerent, by a man who distrusts politics as
-  such. Mann's one move is to recast the war as a conflict between two IDEAS of
+  and deny to the democrat; Marx's class war (`marx-manifesto`, prerequisite),
+  against which Mann's Bürger is defined as an ethical type, not a class. From
+  the crowd-race-nation module: Taine's Jacobin as a psychological type
+  (`taine-and-le-bon-revolution-and-crowd`, concept `esprit-classique`) — Mann's
+  Zivilisationsliterat is a revived Jacobin; and the Dreyfus Affair, with the
+  word "intellectuals" coined in it (`dreyfus-affair-as-test`) — the model case
+  of Mann's opponent, who reads the war as Zola read the Affair. Nietzsche is
+  recalled through the Nietzsche course only (see the last section); the
+  course's own lesson on the right's reception of Nietzsche comes later
+  (`the-right-after-1945`) and is not Ref'd backward.
+- **Contributes:** The module's turn from "who rules?" to "how should a people
+  live?": a diagnosis of the crisis of liberal Europe made from inside a
+  belligerent, by a man who distrusts politics as such. Mann's one move is to recast the war as a conflict between two IDEAS of
   how to live — Kultur (inward, musical, bound, unpolitical) and Zivilisation
   (reasoning, literary, dissolving, political) — and to put a face on the
   second idea, the Zivilisationsliterat, so that "democracy" can be defined as
   "politicisation of everything". The reader leaves able to state the
   antithesis in Mann's terms, to say why he calls himself nonpolitical, and to
   explain why Mann himself abandoned the position four years later.
-- **Hands off:** Mann's typology is of intellectuals (the Literat, the Bürger,
-  the Philister). It leaves open what has happened to the CROWD that democracy
-  has brought on stage, and whether a liberal can make the same diagnosis
-  without Mann's nationalism. `ortega-revolt-of-the-masses` takes both up: a
-  liberal diagnosing the mass-man as a type of person, not a class. Mann's
-  "democracy = politicisation" is also the first of three definitions of the
-  political in this module; Schmitt's (`schmitt-concept-of-the-political`)
-  will say the political is not a tone of voice but a grouping into friend and
-  enemy.
-- **Spine step:** "Liberal Europe breaks: Mann sets Kultur against Zivilisation,
-  Ortega diagnoses the mass-man, Schmitt names the political as friend and
-  enemy and the sovereign as he who decides the exception — and Weimar is the
-  case"
+- **Hands off:** Mann's Kultur and Zivilisation are two PRINCIPLES present at
+  once in every people, and he refuses to make them two stages of one growth
+  (the Hallström tree, link 2). The next lesson, `spengler-decline-of-the-west`,
+  published the same year, takes the same two words and does exactly that —
+  Civilization as the late stage of every Culture — and so turns an ethical
+  antithesis into a forecast. Further on: Mann's typology is of intellectuals
+  (the Literat, the Bürger, the Philister) and leaves open what has happened to
+  the CROWD that democracy has brought on stage; `ortega-revolt-of-the-masses`
+  takes that up, a liberal diagnosing the mass-man as a type of person, not a
+  class. Mann's "democracy = politicisation" is also the first of three
+  definitions of the political in this module; Schmitt's
+  (`schmitt-concept-of-the-political`) will say the political is not a tone of
+  voice but a grouping into friend and enemy.
+- **Spine step:** "Liberal Europe breaks: elite theorists show that a minority
+  always rules, Mann sets Kultur against Zivilisation, Spengler foretells the
+  West's winter, Ortega diagnoses the mass-man, Schmitt names the political as
+  friend and enemy and the sovereign as he who decides the exception — and
+  Weimar is the case"
 
 ## Sources to consult
 
@@ -186,11 +204,16 @@ France but a type.
    word. His psychology: he wants Germany defeated for its own good, as a
    substitute revolution (Zivilisationsliterat 15–30); he reads the war as
    "Macht und Geist", sabre against thought, on the model of the Dreyfus
-   affair (21); his programme is Entdeutschung, spelled out as Politisierung,
+   affair (21) — Ref `dreyfus-affair-as-test`, one clause: the reader has the
+   Affair and the "intellectuals" it named; Mann's Literat is that intellectual
+   transposed to Germany; his programme is Entdeutschung, spelled out as Politisierung,
    Literarisierung, Intellektualisierung, Radikalisierung, Demokratisierung
    (30). He is a revived Jacobin (Von der Tugend 380–392: optimism, demagogy,
    doctrinairism, self-righteousness, intolerance — the "Rehabilitierung der
-   Tugend"), and his lineage is Rousseau → Robespierre → Zola. Why a type and
+   Tugend"), and his lineage is Rousseau → Robespierre → Zola. Ref
+   `taine-and-le-bon-revolution-and-crowd`: Taine had already made the Jacobin
+   a psychological type rather than a party; Mann's portrait is in that line —
+   one clause, no re-teaching. Why a type and
    not a man? Because the man — Mann's brother Heinrich, whose Zola essay of
    1915 is the provocation — is never named in six hundred pages. The lesson
    says so and lets the brother speak once in his own words (see Sources).
@@ -215,7 +238,12 @@ France but a type.
    French bourgeois (a class, defined by property and politics), and the
    Philister (a type without culture) — Bürgerlichkeit 105–107; "Bin ich
    liberal, so bin ich es im Sinne der Liberalität und nicht des Liberalismus"
-   (75, 83). The historical claim: the apolitical German Bürger of 1820–60
+   (75, 83). Seam with the module's opening lessons (Ref
+   `michels-and-pareto-oligarchy-and-elites`): Michels found party members who
+   would not use their right to control their leaders and called it apathy;
+   Mann finds the same abstention and calls it a virtue — the same observation,
+   opposite valuation; say it in one sentence. The historical claim: the
+   apolitical German Bürger of 1820–60
    (81–87), with the tram-conductor scene (79–81: the stolid conductor's look
    at the political babbler as the German people's relation to politics) and
    Schopenhauer in September 1848 lending his opera glasses to Austrian
@@ -353,9 +381,9 @@ author's objection".
   Obrigkeitsstaat (link 5: the "authority-state" of Imperial Germany, a
   monarch's government not answerable to parliament). Bindung/Auflösung
   (link 2). Gesinnung (link 6: settled disposition). Dreigestirn (link 6:
-  three-star constellation). Events: the Dreyfus affair (link 3, half a
-  sentence: a Jewish French officer wrongly convicted of treason in 1894,
-  whose case split France and was taken up by Zola); the 1848 revolutions
+  three-star constellation). Events: the Dreyfus affair is not anchored
+  here — it has its own lesson; Ref `dreyfus-affair-as-test` with one clause of
+  reminder (link 3); the 1848 revolutions
   (link 4, one clause); Romain Rolland's "Au-dessus de la mêlée" (link 3,
   Sept 1914, the French novelist's appeal to intellectuals to stand above
   the war); Rathenau's murder (link 7, June 1922, the Jewish industrialist
@@ -364,6 +392,10 @@ author's objection".
   novelist, author of Der Untertan); Schopenhauer, Wagner (link 6, one clause
   each); Hallström (link 2, Swedish critic). Keep to three new terms per
   section (L11c); link 4 carries three and must be split into sub-headings.
+- **Register (exact rule).** The course passes no verdict of its own on any
+  author or idea: no condemning or approving labels in its own voice.
+  Judgement comes only through argument and evidence; a label may appear only
+  inside a quotation, with who applied it and when.
 - **Do not translate the book into a nationalist tract or into an apology.**
   Mann's "Ja-und-doch-Nein" is displayed, not solved (Politik 246–259); the
   lesson shows it, in the dry register, and does not moralise in either
@@ -401,12 +433,14 @@ author's objection".
   read the German). The Lilla "Submission" passage is about The Magic
   Mountain, not the Betrachtungen — use it only for the Naphta/Settembrini
   aside.
-- **The one real misconception to refute (L13):** that Mann's Kultur/
-  Zivilisation is the same distinction as Spengler's. It is not: Mann's are
-  two principles present at once in every people; Spengler's are two STAGES
-  of one organism — and Mann explicitly rejects the stage reading when he
-  rejects Hallström's tree (146–147). The refutation sets up
-  `spengler-decline-of-the-west`.
+- **No misconception slot here (L13).** The documented confusion — that
+  Mann's Kultur/Zivilisation is the same distinction as Spengler's — can only
+  be refuted once the reader has both, so it belongs to the NEXT lesson
+  (`spengler-decline-of-the-west`, which now follows this one). This lesson
+  lays the ground: Mann's are two principles present at once in every people,
+  and he explicitly rejects the stage reading when he rejects Hallström's tree
+  (146–147); state that here, plainly, without naming Spengler beyond a
+  forward clause (the FORWARD exercise does the rest).
 - **Numbers:** the birth-rate pair is the only series; everything else is
   dates. No tables of war statistics; the blockade and the "500,000 men for
   Briey" rebuke (107–108) are Mann's rhetoric, reported as such.
@@ -478,12 +512,17 @@ author's objection".
    claim; then: what does it record, what does it argue, what does it omit?
    What can it be USED to establish about Mann's confidence in his own
    position — and what can it not establish about German opinion in 1917?
-3. **Claim to refute:** "Mann's Kultur/Zivilisation is Spengler's Culture/
-   Civilization under other names: both say Germany is Kultur and the West is
-   Zivilisation." Name the failing step (Mann's are two principles present in
-   every people at once, not two stages of one organism; he rejects the stage
-   reading in the Hallström passage; and he says the German radical is a
-   Frenchman and Germany the battlefield of both).
+3. **Claim to refute (E3, from the module's first lessons):** "Mann's
+   tram conductor, who looks at the political babbler with indifference, is
+   Michels's apathetic party member: both show that the German people did not
+   want to rule." Name the failing step (Michels's member belongs to an
+   organization founded for popular rule and abstains from using rights he
+   holds; Mann's Bürger rejects politics as a form of life and claims the
+   abstention as Kultur — the one is an observation about organizations, the
+   other a valuation of a national type; and Mann's evidence is an anecdote
+   while Michels's is congress records). State what survives of the claim (both
+   describe a people that leaves politics to a few) and Ref
+   `michels-and-pareto-oligarchy-and-elites`.
 4. **Boundary probe:** Take Mann's definition "Man ist Politiker oder man ist
    es nicht. Und ist man es, so ist man Demokrat" and run it on the limiting
    case: a monarchist who campaigns, writes, organises and votes against
@@ -512,15 +551,15 @@ author's objection".
    writer's relation to politics is THE question) and where do they part?
    Which of the two can be used to establish what German intellectuals
    thought in 1915, and why neither can alone?
-8. **FORWARD (E7) → `ortega-revolt-of-the-masses`:** Mann's typology sorts
-   intellectuals (Literat, Bürger, Philister) and leaves the crowd under the
-   single word "Masse" in the right-hand column. Using his own criterion —
-   that what matters is a relation to Geist and Bildung, not property or
-   class — say what a typology of the CROWD on the same principle would have
-   to look like: can a worker be a Bürger, can a professor be a Philister?
-   The solution says that this is the move the next lesson's author makes
-   when he defines the mass-man as a kind of man found in every class, and
-   Refs `ortega-revolt-of-the-masses`.
+8. **FORWARD (E7) → `spengler-decline-of-the-west`:** Mann rejects the
+   Swedish critic's tree, in which Kultur is the blossom and Zivilisation the
+   foliage of one growth (146–147). Accept the tree instead, and follow it
+   through: if Zivilisation is the LATER stage of the same plant, what follows
+   for a people that has reached it — can it choose Kultur again, as Mann asks
+   Germany to, and what would one have to know to say when the change happens?
+   The solution says the reader has derived the thesis of the next lesson —
+   Civilization as the late stage every Culture reaches, so that its arrival
+   can be dated and forecast — and Refs `spengler-decline-of-the-west`.
 
 ## Nietzsche cross-course links (where his ideas enter)
 
@@ -537,7 +576,6 @@ author's objection".
 - `nietzsche/schopenhauer-and-the-birth-of-tragedy` — for the Schopenhauer
   side of the Dreigestirn, if the writer needs to anchor "pessimism" beyond
   the one clause the Mann text supplies.
-- The course's own extra lesson `nietzsche-on-the-right` (not the Nietzsche
-  course) is the Ref for "aristocratic radicalism" and for the fact that
-  Mann's Dreigestirn is one of three twentieth-century borrowings; this
-  lesson is its first instance in detail.
+- No Ref to this course's own lesson on the reception of Nietzsche on the
+  right: it is `the-right-after-1945`, later in the course, which takes Mann's
+  Dreigestirn as one of its cases — a forward mention at most, one clause.

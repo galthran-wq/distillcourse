@@ -16,7 +16,8 @@ goal: Analyze Burke's case against Hastings — that arbitrary power cannot be h
   1600, Plassey 1757, the 1765 revenue grant, Crown 1858), tutelage and the
   "strategies of exclusion", Mill's "highest moral trust" and "a choice of
   despotisms", and Burke's "schoolboys without tutors" as a forward pointer.
-  From `cicero-natural-law` and `aquinas-law-and-kingship`: a law above rulers
+  From `cicero-res-publica-and-natural-law` (where `natural-law` is now
+  introduced) and `aquinas-law-and-kingship`: a law above rulers
   by which statutes are judged — Burke's one explicit natural-law passage
   stands on it. From `vitoria-right-to-the-americas`: the prince as a judge
   between two commonwealths, never a prosecutor.
@@ -167,10 +168,14 @@ goal: Analyze Burke's case against Hastings — that arbitrary power cannot be h
   reference (Marshall, The Impeachment of Warren Hastings, 1965; Macaulay's
   essay "Warren Hastings", Edinburgh Review 1841 — PD — for the Westminster
   Hall scene). References only.
-- **Strauss & Cropsey, History of Political Philosophy (3rd ed.)**, ch. on
-  Burke (Mansfield) — text landing at `research/texts/strauss-cropsey/
-  history-of-political-philosophy.txt`, EMPTY at brief time (0 lines). Consult
-  when present.
+- **Strauss & Cropsey, History of Political Philosophy (3rd ed.)**, ch. "Edmund
+  Burke" (Harvey Mansfield, Jr.) — text landed at `research/texts/strauss-cropsey/
+  history-of-political-philosophy.txt` (OCR, not summarised), l.33273–34313. It
+  mentions Hastings once (l.~33315: in 1788 Fox's circle left Burke off a list of
+  office-holders as "too passionate in his prosecution of Warren Hastings") and
+  is otherwise about the Reflections, party and prudence — use it for the "one
+  theory of inherited order" check (grep "prescription", "prudence"), not for
+  India. Mansfield in References only.
 
 ## EXPLANATION PLAN (L0)
 
@@ -265,7 +270,7 @@ did in Bengal to Indians — and why did this man think they must?
    any man can give." Why: "We are all born in subjection… to one great,
    immutable, preëxistent law, prior to all our devices and prior to all our
    contrivances" — the law that "gives to our conventions and compacts all the
-   force and sanction they can have" (`<Ref>` cicero-natural-law /
+   force and sanction they can have" (`<Ref>` cicero-res-publica-and-natural-law /
    aquinas-law-and-kingship: a clause — this is Burke's natural law, the one
    place he argues from it rather than from prescription). Conquest confers no
    arbitrary right: the conqueror steps into the displaced sovereign's duties.
@@ -307,8 +312,9 @@ did in Bengal to Indians — and why did this man think they must?
    visit while the Nawab's pensioners were cut — the vulture "who feeds upon
    the prostrate, the dying, and the dead" (bind the number: a sum per day set
    against stipends stopped). And **Debi Sing and Rungpore** — a revenue farmer
-   of notorious record, re-appointed through Gunga Govind Sing (Hastings's
-   banian, "a name at the sound of which all India turns pale"), who farms the
+   whom Burke ranks, "in the universal opinion of all Bengal", next to Gunga
+   Govind Sing (shard3 l.1686–1689), and who is appointed through Gunga Govind
+   Sing (Hastings's banian, "a name at the sound of which all India turns pale"), who farms the
    districts of Dinagepore and Rungpore; the chain Burke makes the Lords
    follow: a bribe paid for the farm → exactions above the assessed revenue →
    loans at 600 per cent → forced sales of land, cattle, children → torture of
@@ -450,7 +456,7 @@ or to the Company?"
   speech as a second set — one sentence from it.
 - **Register:** the speech is forensic oratory; the course is not. Quote the
   invective short, in `<Quote>`, and keep the course's own sentences
-  declarative. No "hero", no "hypocrite".
+  declarative. The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
 - **Mehta, Marshall, O'Brien, Bromwich, Macaulay (as historian) only in
   References.** "The Reflections and the Hastings speech as one theory" is
   stated as the course's own.
@@ -458,7 +464,7 @@ or to the Company?"
   defence (PD, Debrett); the acquittal and the trial's length (public record);
   the closing speech of 1794 (not needed). The Gutenberg number discrepancy
   (#13968 in the meta vs #26159 in sources.yaml).
-- **Strauss–Cropsey** Burke chapter: file empty at brief time.
+- **Strauss–Cropsey** Burke chapter: landed; little on India (see Sources).
 
 ## FIGURE PLAN
 

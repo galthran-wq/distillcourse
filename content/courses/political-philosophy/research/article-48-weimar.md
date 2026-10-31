@@ -7,15 +7,26 @@ goal: Apply Schmitt's theory of the exception and his distinction between commis
 
 ## ARC (L10)
 
-- **Inherits:** The whole module, now to be cashed out: Mann's "democracy =
-  politicisation" and the unpolitical Bürger (`mann-reflections`); Ortega's
+- **Inherits:** The whole module, now to be cashed out: Mosca's organized
+  minority, its political formula and juridical defense as a balance of
+  organized forces (`mosca-ruling-class`); Michels's party oligarchy — the SPD
+  of this lesson is the party Michels studied — and Pareto's governing class
+  that will not use force and passes "from the lions to the foxes"
+  (`michels-and-pareto-oligarchy-and-elites`); Mann's "democracy =
+  politicisation" and the unpolitical Bürger (`mann-reflections`); Spengler's
+  forecast that democracy ends in plutocracy and then in Caesarism, personal
+  power behind constitutional forms kept but dead
+  (`spengler-decline-of-the-west`, concept `caesarism`); Ortega's
   mass-man, his claim that Parliaments lose prestige when they lose tasks, and
   that after 1848 coups replace revolutions (`ortega-revolt-of-the-masses`);
   Schmitt's friend–enemy criterion, the internal enemy and protego ergo obligo
   (`schmitt-concept-of-the-political`); and above all "sovereign is he who
   decides on the exception", norm vs decision, Article 48 read as controlled
   precondition and unlimited content, and commissarial vs sovereign
-  dictatorship (`schmitt-political-theology`). From earlier modules: Bodin's
+  dictatorship (`schmitt-political-theology`). From earlier modules: Donoso
+  Cortés's "dictatorship of the sabre" against "the dictatorship of the dagger"
+  (`donoso-cortes-on-dictatorship`) — the 1849 choice that Schmitt's 1932
+  "equal chance" restates for a republic; Bodin's
   "no subject may judge the sovereign" (`bodin-sovereignty`); the English
   Revolution read against Hobbes as the course's first application of a
   sovereignty theory to a record (`english-revolution-as-test`); Maistre's
@@ -32,18 +43,27 @@ goal: Apply Schmitt's theory of the exception and his distinction between commis
   clause with Schmitt's three questions, to say which dictatorship Weimar's
   was, and to argue both answers to the lesson's question — did the theory
   describe the collapse or help produce it?
-- **Hands off:** The presidential cabinets and the leader who followed are the
-  stage that the next module's first thinker calls Caesarism, the end of
-  democracy in money and the Press (`spengler-decline-of-the-west`). The
-  question "could a constitution defend itself against a party using its own
-  legality?" returns in `udhr-read-against-the-right` (a declaration that binds
-  no sovereign) and in `the-2015-crisis-read-three-ways` (states deciding an
-  exception at a border). Schmitt himself returns in `voegelin-gnosticism` as
-  the rival reader of secularisation.
-- **Spine step:** "Liberal Europe breaks: Mann sets Kultur against Zivilisation,
-  Ortega diagnoses the mass-man, Schmitt names the political as friend and
-  enemy and the sovereign as he who decides the exception — and Weimar is the
-  case"
+- **Hands off:** The module ends on a parliament that could not act and a
+  movement that took power legally. The next module asks what the radical
+  right wanted instead of the republic it watched fail. It opens with
+  `sorel-reflections-on-violence`: a socialist who argued, a generation before
+  Weimar, that a movement which bargains in parliament has already accepted its
+  enemy's world, and that what moves masses is a myth of decisive battle, not a
+  programme — the diagnosis both the KPD and the NSDAP of 1930–33 could claim,
+  and the FORWARD exercise's target. The author of the theory of the exception
+  joined the party that ended the Reichstag; what in his work disposed him to
+  it, and why Spengler refused, is `the-right-in-1933` (that module's
+  application) — this lesson states the bare fact once and Refs forward.
+  Further on: "could a constitution defend itself against a party using its
+  own legality?" returns in `udhr-read-against-the-right` (a declaration that
+  binds no sovereign) and in `the-2015-crisis-read-three-ways` (states deciding
+  an exception at a border). Schmitt himself returns in `voegelin-gnosticism`
+  as the rival reader of secularisation.
+- **Spine step:** "Liberal Europe breaks: elite theorists show that a minority
+  always rules, Mann sets Kultur against Zivilisation, Spengler foretells the
+  West's winter, Ortega diagnoses the mass-man, Schmitt names the political as
+  friend and enemy and the sovereign as he who decides the exception — and
+  Weimar is the case"
 - **APPLICATION spec (L16):**
   - *Artefact:* (1) the yearly counts, 1930–1932, of laws passed by the
     Reichstag, of emergency decrees issued by the Reich president under
@@ -60,7 +80,14 @@ goal: Apply Schmitt's theory of the exception and his distinction between commis
     `sovereignty` (Bodin: whoever can refuse is sovereign); `mass-man`
     (Ortega's Parliaments that lose tasks; coups replace revolutions);
     `kultur-vs-zivilisation` (Mann's unpolitical German as the voter who
-    chose the presidential regime — a claim to test, not assert).
+    chose the presidential regime — a claim to test, not assert);
+    `iron-law-of-oligarchy` and `circulation-of-elites` (the SPD's toleration
+    decided by its Reichstag leadership; a governing class that would neither
+    use force nor yield — Pareto's foxes — in the Prussian ministry of July
+    1932); `caesarism` (Spengler's forms-kept-but-dead, tested against a
+    leader who came to power through the forms). The course.yaml list of
+    reinforced concepts names six; these three are recalls by Ref, not new
+    teaching.
   - *Departures the lesson must name:* (a) the exception was not DECLARED
     against a parliament but tolerated BY it — the SPD's toleration policy
     from October 1930 kept the Reichstag from using its §3 right to demand
@@ -314,6 +341,13 @@ the theory.
    party, "tolerated" Brüning: it voted against every motion to demand repeal
    of a decree, because the alternative was a dissolution and a worse
    Reichstag. The curve in the figure is that policy. Ref
+   `michels-and-pareto-oligarchy-and-elites`, one sentence: the policy was set by
+   the party's Reichstag leadership — the oligarchy Michels described, now
+   deciding the fate of the constitution — and members on the party's left who
+   rejected it split off in 1931 (the Socialist Workers' Party, SAPD; verify the
+   date and the issue in Winkler or Evans before stating). State it as a case
+   for the reader to weigh against Michels's law (a leadership acting on its own
+   judgment of the members' interest), not as a verdict. Ref
    `ortega-revolt-of-the-masses` (XIV.5): a Parliament that loses tasks loses
    prestige — here it GAVE the tasks away. Heading: "Fewer laws, more decrees:
    the counts and what produced them".
@@ -408,17 +442,18 @@ the theory.
    NSDAP still lacked a majority; the Enabling Act of 23 March passed by the
    two-thirds Article 76 required, with the Centre's votes and the Communists'
    seats empty — parliament using its one surviving power, amendment, to end
-   itself. Then Schmitt: joined the party in May 1933; drafted for the
-   Gleichschaltung of the Länder — the Preussenschlag made general; wrote on 1
-   August 1934, after the killing of the SA leadership and of his own patron
-   Schleicher, that "the Führer protects the law". Reported as fact bearing on
-   the theory's reception (Strong l.127–141; Schwab l.919–939; Fawcett
-   l.9287–9310), dated, once. The lesson's question follows directly: the
-   equal-chance doctrine said a constitution may deny legality to its enemies;
-   the Enabling Act was the enemies using legality against the constitution;
-   and the man who wrote the doctrine concluded that the new authority, being
-   established, was good (Ref `maistre-and-bonald`, Maistre's "any government
-   is good once established", via `schmitt-political-theology` link 6).
+   itself. Then ONE sentence on Schmitt, dated, as fact: he joined the party in
+   May 1933 and helped draft the laws that put Reich governors over the Länder
+   — the Preussenschlag made general (Fawcett l.9295; verify in Bendersky). The
+   rest of his 1933–34 conduct ("Der Führer schützt das Recht", the 1936 fall)
+   and the question what in his theory disposed him to it are
+   `the-right-in-1933` — forward `<Ref>`, not told here. The lesson's own
+   question follows directly from the record: the equal-chance doctrine said a
+   constitution may deny legality to its enemies; the Enabling Act was the
+   enemies using legality against the constitution; and the theory had said
+   that a decision, once taken, is valid even if wrong, and (with Maistre, Ref
+   `maistre-and-bonald` via `schmitt-political-theology` link 6) that "any
+   government is good once established".
    Heading: "January to March 1933: legality against the constitution".
 
 7. **Did the theory describe the collapse or help produce it?** Both readings
@@ -449,7 +484,17 @@ the theory.
    the voter who chose the presidential regime — state it as a claim the
    reader may test against the election figures (the presidential election
    of 1932 re-elected Hindenburg with the SPD's votes, against Hitler), not as
-   established. Heading: "Diagnosis or prescription? Two readings of the
+   established. Two further readings from this module, each a clause with its
+   Ref, for the reader to weigh rather than for the lesson to adopt: Spengler's
+   (Ref `spengler-decline-of-the-west`) — the presidential cabinets as the
+   predicted stage in which the constitutional forms are kept and power becomes
+   personal; against it, that the power went not to a Caesar of money or the
+   army but to a mass party through an election and a two-thirds vote. Pareto's
+   (Ref `michels-and-pareto-oligarchy-and-elites`) — a governing class that would
+   neither use force nor yield (the Prussian ministry that yielded "only to
+   force" and to one officer) displaced by a movement willing to use it; against
+   it, that the Reich did use force against Prussia, and that the decisive
+   transfers were legal. Heading: "Diagnosis or prescription? Two readings of the
    record".
 
 Headings as claims: "Article 48 as written: a controlled gate and an open
@@ -505,10 +550,13 @@ against the constitution"; "Diagnosis or prescription?".
    444 to 94, with the arithmetic of who was absent). Each link legal; the
    chain the end of legality. The Centre's vote and Kaas's reasons as the
    one place where a "decision" in Schmitt's sense was taken — by a party.
-8. **"Der Führer schützt das Recht"** (1 August 1934; Strong l.740–750):
-   reported in one paragraph — the killings of 30 June–2 July, Hindenburg's
-   telegram, Schmitt's article — as the terminus of "any government is good
-   once it is established". Dated, factual, no epithet.
+8. **Article 48 under Ebert, 1919–1925** (verify the count in Kolb or Evans;
+   "about 135" decrees is the usual figure): the same clause used against the
+   Spartacist and Communist risings, the Kapp putsch, the Hitler putsch of 1923
+   and the inflation — and the republic stabilised. One paragraph; it is the
+   refutation's discriminating example (L13: "Article 48 destroyed Weimar") and
+   it sets up both readings of link 7. ("Der Führer schützt das Recht", 1934,
+   formerly planned here, belongs to `the-right-in-1933`.)
 
 ## Pitfalls / subtleties to flag
 
@@ -557,19 +605,22 @@ against the constitution"; "Diagnosis or prescription?".
   the published series — exercise 7.
 - **Dates:** this is the lesson where contingency IS the point, so the exact
   day appears for 14 September 1930, 20 July 1932, 25 October 1932, 30 January,
-  28 February, 5 March and 23 March 1933, and 1 August 1934. Everything else
+  28 February, 5 March and 23 March 1933 (1 August 1934 now belongs to
+  `the-right-in-1933`). Everything else
   to the month or year.
 - **Do not teach the Depression.** One clause (the slump from autumn 1929;
   unemployment at about a third of the workforce by early 1932 — bound) is
   the context; the lesson is about the constitution, not the economy, and
   the Borchardt debate on Brüning's room for manoeuvre (Muller note 5) goes in
   References at most.
-- **Do not moralise in either direction.** The two readings of link 7 are
-  both the course's own and both complete. Schmitt's 1933–34 conduct is
-  reported, dated and once; "Nazi jurist" never appears as an epithet; nor
-  does any sentence that excuses. Equally, do not present the "toleration
-  policy" as cowardice — give the SPD's reason (a worse Reichstag after any
-  dissolution) as it gave it.
+- **Register (exact rule).** The course passes no verdict of its own on any
+  author or idea: no condemning or approving labels in its own voice.
+  Judgement comes only through argument and evidence; a label may appear only
+  inside a quotation, with who applied it and when. Applied here: the two
+  readings of link 7 are both the course's own and both complete; Schmitt's
+  1933 membership is reported, dated and once; the SPD's toleration policy is
+  given with the reason the SPD gave for it (a worse Reichstag after any
+  dissolution).
 - **A single-cause reading is the real misconception (L13):** "Article 48
   destroyed Weimar." Refute it with the record: Ebert used Article 48 well
   over a hundred times in 1919–25 (verify the count in Kolb or Evans; "about
@@ -602,7 +653,9 @@ against the constitution"; "Diagnosis or prescription?".
   "spring 1933" or "1 May 1933" with a note); the Altona dead (17–19); the
   decree counts (±2 by what is counted). Give the range or the rounded word.
 - **Do not re-teach** the exception, the two dictatorships, the friend–enemy
-  criterion, Ortega's Parliaments, Bodin: Ref and a clause each. This lesson
+  criterion, Ortega's Parliaments, Michels's law, Pareto's lions and foxes,
+  Spengler's Caesarism, Donoso's sabre, Bodin: Ref and a clause each. Do not
+  tell Schmitt's 1933–34 story beyond one sentence: it is `the-right-in-1933`'s. This lesson
   introduces no concept id; it reinforces six.
 
 ## FIGURE PLAN
@@ -715,7 +768,10 @@ against the constitution"; "Diagnosis or prescription?".
    SPD's toleration policy; Brüning's appointment without a majority; the
    Preussenschlag; the Depression. Defend the ranking from the record, and
    state which of the six the theory of the exception predicts and which it
-   cannot see.
+   cannot see. Then (E3) say which of the six Michels's law (Ref
+   `michels-and-pareto-oligarchy-and-elites`) and Spengler's Caesarism (Ref
+   `spengler-decline-of-the-west`) would each rank first, and why the record
+   does not settle between them.
 7. **Research-shaped task:** Using the digitised Reichsgesetzblatt 1932 Teil I
    (ALEX), count the ordinances headed as issued by the Reich president "auf
    Grund des Artikels 48" and compare with the published figure of 66. Report
@@ -723,22 +779,23 @@ against the constitution"; "Diagnosis or prescription?".
    amending decree count? does a decree under §1 count?). Then state what the
    discrepancy shows about every published series — and whether the lesson's
    claim survives a range of ±5.
-8. **FORWARD (E7) → `spengler-decline-of-the-west`:** The sequence
-   parliament → presidential cabinets → a leader governing by decree and
-   acclamation is, the next lesson's author will say, the normal late stage of
-   a Civilization — democracy exhausting itself in money and the Press,
-   replaced by personal power. Using only the record this lesson has laid out,
-   name two features of 1930–33 that fit such a stage and two that do not (a
-   party built from the mass, not a general; a legal transfer; a parliament
-   that voted for it). The solution says the reader has stated the test the
-   next module runs on the theory of Caesarism, and Refs
-   `spengler-decline-of-the-west`.
+8. **FORWARD (E7) → `sorel-reflections-on-violence`:** Between 1930 and 1932
+   the largest socialist party in Europe tolerated decrees that cut wages and
+   benefits, to keep a worse Reichstag from being elected; in the same years
+   the two parties that promised a final struggle rather than a programme of
+   reforms — the KPD and the NSDAP — gained votes at every election. Write the
+   case that a critic would make who held that a movement which bargains with
+   its opponents in parliament has already accepted their world, and that what
+   holds a class together is an image of decisive battle it can believe, not a
+   programme it can check. What would he say the toleration policy did to the
+   SPD's followers, and what would he say the two extremes offered them? The
+   solution says the reader has reconstructed, from the Weimar record, the
+   argument of the next module's first author, written in 1906–08 about French
+   socialism, and Refs `sorel-reflections-on-violence`.
 
 ## Nietzsche cross-course links (where his ideas enter)
 
-- `nietzsche/the-nazi-appropriation` — one Ref at link 6, where the lesson
-  reports Schmitt's 1933 decision: the course's neighbour has already treated
-  how a thinker's work was taken up by the regime; here the thinker joined,
-  and the lesson marks the difference in one clause.
-- Otherwise none. This is an application lesson; its material is the Weimar
-  record and the module's own theories.
+- None. This is an application lesson; its material is the Weimar record and
+  the module's own theories. The Ref to `nietzsche/the-nazi-appropriation` that
+  once sat at Schmitt's 1933 decision moves with that decision to
+  `the-right-in-1933`.

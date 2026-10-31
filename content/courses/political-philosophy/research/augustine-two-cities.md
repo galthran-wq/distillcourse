@@ -8,10 +8,16 @@ goal: Analyze Augustine's account of the two cities and his verdict that no eart
 ## ARC (L10)
 
 - **Inherits:** Scipio's definition — a people is a multitude bound by
-  agreement about right and shared advantage (`cicero-mixed-constitution`);
-  Laelius's natural law with God as its author, and the Roman justification of
-  empire by the ladder of rule (God over man, mind over body, master over
-  slave) (`cicero-natural-law`); Aristotle's natural slavery and its admitted
+  agreement about right and shared advantage — Laelius's natural law with God
+  as its author, a tyrant's city as no commonwealth, Cicero's "we retain only
+  the form of the commonwealth, but have long since lost its substance"
+  (Rep. V.1–2, which Augustine himself quotes in II.21), and the Roman
+  justification of empire by the ladder of rule (God over man, mind over
+  body, master over slave) (all `cicero-res-publica-and-natural-law`);
+  Polybius's forecast that Rome would decay through wealth and flattery of
+  the people, and his functional reading of Roman religion
+  (`polybius-anacyclosis-and-rome`, VI.56–57) — the pagan charge of 410 is
+  the same functional reading turned against the Christians; Aristotle's natural slavery and its admitted
   difficulty (`aristotle-political-animal-and-natural-slavery`); the struggle
   for representation, Varro's "the city is prior to its gods", Eusebius's one
   emperor for one God and its collapse, so that the question "what truth does
@@ -147,8 +153,12 @@ goal: Analyze Augustine's account of the two cities and his verdict that no eart
 - **Cicero, Rep. I.xxv.39, III.33–37** — index 39; `research/texts/cicero/de-
   republica-de-legibus-loeb.txt` lines 2524–2545 (definition), 7966–7988
   (natural law), 8050–8119 (natural-slavery justification, which Keyes notes
-  survives through De Civ. Dei XIX.21). `<Ref>` both Cicero lessons; recall,
-  never re-teach. Keyes PD in the US only.
+  survives through De Civ. Dei XIX.21). `<Ref>` `cicero-res-publica-and-natural-law` (the one Cicero lesson; the
+  dropped slugs `cicero-mixed-constitution` and `cicero-natural-law` must
+  never be Ref'd); recall, never re-teach. Keyes PD in the US only. Rep.
+  V.1–2 (lines 9070–9125, "we retain only the form of the commonwealth, but
+  have long since lost its substance") survives through City of God II.21 —
+  the passage where Augustine promises the argument XIX.21 delivers.
 - **Machiavelli, Discourses II.2 (Thomson tr.)** — index 19; text
   `research/texts/machiavelli/discourses.txt` lines 5925–5977: "our religion…
   teaches us to make little account of worldly glory… glorifies men of a
@@ -193,10 +203,23 @@ goal: Analyze Augustine's account of the two cities and his verdict that no eart
   self-contradictory (pp. 146–150) — the Platonic ancestor of the two-cities
   move; one sentence as the course's own, Strauss in References.
 - **Strauss & Cropsey, History of Political Philosophy (3rd ed.), ch. "St.
-  Augustine" (Ernest L. Fortin)** — text landing at
-  `research/texts/strauss-cropsey/history-of-political-philosophy.txt` (EMPTY
-  at brief time; consult as the standard close reading when it lands).
-  References.
+  Augustine" (Ernest L. Fortin), pp. 176–205** — now landed (OCR, not
+  summarised): `research/texts/strauss-cropsey/history-of-political-
+  philosophy.txt` lines 8743–10254. Read: 8925–8945 (Augustine's politics
+  "more directly Ciceronian than Platonic"); 8960–9000 (Cicero's definition
+  quoted "with approval"; the philosophers' best city exists only in speech;
+  "one would have to omit from Cicero's definition any reference to justice"
+  to call actual cities cities — the second definition, "a common agreement
+  as to the objects of their love"); 9055–9075 (property, slavery and
+  government as consequences of sin); 9310–9340 (Rome "never a republic
+  because true justice and law never had a place in it"); 9421–9510 (Varro
+  as a witness against himself); 9770–9815 (p. 199: the Altar of Victory in
+  382 and Symmachus's argument as the background of 410; the charge that
+  Christianity's "dual citizenship" weakens civic devotion — the political,
+  not the religious, form of the pagan case); 9935–9960 (Eusebius, Ambrose,
+  Prudentius and Orosius as the Christian writers Augustine is correcting).
+  Copyrighted; paraphrase; the "dual citizenship" objection is stated as the
+  course's own in link 7, Fortin in References.
 - **Adamson HoP 110–113** (index 6): Confessions, freedom and grace, City of
   God — blurbs only; References.
 - Books I–XIII and XX–XXII were NOT read by the swarm (sources.yaml). The
@@ -274,8 +297,8 @@ republic and shows that by its own terms Rome never was one.
    city real goods (link 3) and still deny it justice (link 6).
 5. **Slavery, rule and the household — is hierarchy natural?** The reader
    arrives with Aristotle's natural slave (`<Ref>`) and Cicero's ladder
-   (`<Ref>` `cicero-natural-law`: God over man, mind over body, master over
-   slave, Rome over provinces). Augustine takes the ladder and cuts it
+   (`<Ref>` `cicero-res-publica-and-natural-law`: God over man, mind over
+   body, master over slave, Rome over provinces). Augustine takes the ladder and cuts it
    (XIX.15): God gave man dominion "not man over man, but man over the
    beasts"; the righteous were shepherds of cattle, not kings of men;
    slavery "is a name introduced by sin and not by nature" — the wage of sin,
@@ -313,8 +336,14 @@ republic and shows that by its own terms Rome never was one.
    own self-representation, and a definition of justice that requires
    worship of the true God was not Scipio's — Scipio's *ius* was the agreed
    right of Roman citizens. Augustine has changed the meaning of "right" and
-   then found Rome wanting by it. (b) *The worldly charge* (Machiavelli,
-   Discourses II.2, `<Quote>` short): a religion that glorifies "men of a
+   then found Rome wanting by it. (b) *The worldly charge*, first in the form the pagans of 410 meant it
+   (as the course's own): a religion that enrols its believers in a higher
+   country gives them two citizenships, and the city's unconditional claim
+   on their devotion is weakened — the political, not the superstitious,
+   version of "Rome fell because it left its gods", and Polybius's
+   religion-as-device seen from the losing side (`<Ref>`
+   `polybius-anacyclosis-and-rome`). Then its sharpest later statement
+   (Machiavelli, Discourses II.2, `<Quote>` short): a religion that glorifies "men of a
    humble and contemplative, rather than of an active life" and makes men
    "brave to suffer rather than to do" has "made the world feebler, and
    given it over as a prey to wicked men". Augustine's available reply: the
@@ -435,7 +464,9 @@ definition"; "The peace of Babylon: what is left to rulers"; conclusion.
   pagan gods: real spirits, wicked; the reader must know he means it
   literally); Eusebius (`<Ref>` previous lesson); Orosius (Augustine's pupil,
   History Against the Pagans, 417 — only if the Lilla irony is used).
-- **Do not re-teach** Scipio's definition, Laelius's natural law, Aristotle's
+- **Register.** The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+- **Do not re-teach** Polybius's forecast and religion-as-device, Scipio's
+  definition, Laelius's natural law, Aristotle's
   natural slavery, Eusebius or Varro: each is a `<Ref>` plus one clause. The
   lesson's labour is Augustine's use of them.
 - **The two cities are not Church and state.** The commonest misreading (L13
@@ -485,7 +516,7 @@ definition"; "The peace of Babylon: what is left to rulers"; conclusion.
    house idiom named in the instructions.
 3. `draw:` `<FigureSequence>` (4 frames) — **the ladder of rule, cut**: frame
    1 Cicero's ladder (God / man; mind / body; master / slave; Rome /
-   provinces) as drawn in `cicero-natural-law`; frame 2 Augustine's cut —
+   provinces) as drawn in `cicero-res-publica-and-natural-law`; frame 2 Augustine's cut —
    "not man over man, but man over the beasts"; frame 3 slavery re-attached
    as penal (sin → judgment → servitude); frame 4 God restored at the top as
    the condition of every rung (XIX.15, XIX.21, XIX.25). One change per
@@ -496,8 +527,8 @@ definition"; "The peace of Babylon: what is left to rulers"; conclusion.
    with the step Augustine adds (God is owed his due) highlighted and the
    Ciceronian steps in the second colour.
 6. `draw:` single `<Figure>` — **two definitions of a people side by side**
-   (XIX.21 / XIX.24): clauses, where Rome falls, what "justice" does — the
-   figure `cicero-mixed-constitution` left half-empty, now filled.
+   (XIX.21 / XIX.24): clauses, where Rome falls, what "justice" does — Scipio's left-hand definition is the clause diagram of
+   `cicero-res-publica-and-natural-law`, now set beside Augustine's.
 7. `draw:` single `<Figure>` — **the robber's concentric peaces** (XIX.12):
    self → comrades → household → the city he would rule — perversion still
    inside the order of peace.
@@ -536,8 +567,8 @@ definition"; "The peace of Babylon: what is left to rulers"; conclusion.
    (XV.22) and "every man seeks peace by waging war" (XIX.12), derive
    Augustine's position on a *just war* without reading XIX.7 — what must he
    say about its cause, its conduct and the victor's feeling? Then check
-   against XIX.7 ("if he remembers that he is a man") and against Cicero's
-   just-war clauses (`<Ref>` `cicero-natural-law`): what did Augustine keep,
+   against XIX.7 ("if he remembers that he is a man") and against Cicero's just-war clauses (`<Ref>`
+   `cicero-res-publica-and-natural-law`): what did Augustine keep,
    and what did he add?
 6. *Synthesis — counter-argument stem.* Someone claims (Machiavelli,
    Discourses II.2): "This teaching made the world feeble and handed it to
@@ -569,4 +600,7 @@ definition"; "The peace of Babylon: what is left to rulers"; conclusion.
 none — but one note for the writer: Nietzsche's "slave revolt" reading of
 Christian humility is the sharpened form of Machiavelli's II.2 charge; do NOT
 Ref it here (the module's Nietzsche entry is `hellenization-of-christianity`);
-the Machiavelli lessons and `nietzsche-on-the-right` carry the line forward.
+the Machiavelli lessons carry the line forward, and in this course
+`ressentiment-and-envy` is where the slave-revolt reading is Ref'd
+(`nietzsche/slave-revolt-and-ressentiment`) and `the-right-after-1945` where
+Nietzsche's reception on the right is taught.

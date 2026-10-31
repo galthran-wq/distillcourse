@@ -1,3 +1,5 @@
+> **SUPERSEDED (2026-10-31 structure revision).** This lesson was dropped from course.yaml; its material is merged into cicero-res-publica-and-natural-law. Kept only as a fuller record that the successor brief may point to — never brief a lesson from this file.
+
 # Research brief: cicero-natural-law (Cicero on natural law: Carneades's challenge and Laelius's reply)
 
 status: planned

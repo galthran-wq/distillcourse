@@ -9,9 +9,12 @@ goal: Analyze how the Roman Empire and the Church fought over who represented th
 
 - **Inherits:** Cicero's civil religion — a city must have gods, may admit
   no new or alien ones, deifies its virtues and (by the Caesars' time) its
-  rulers — standing beside a natural law that is one for all nations
-  (`cicero-natural-law`, Laws II); Scipio's commonwealth as the property of a
-  people (`cicero-mixed-constitution`); and from `hellenization-of-christianity`
+  rulers — standing beside a natural law that is one for all nations, and
+  Scipio's commonwealth as the property of a people (both
+  `cicero-res-publica-and-natural-law`; Laws II was its hand-off paragraph);
+  Polybius's functional reading of Roman religion — "a scrupulous fear of
+  the gods … keeps the Roman commonwealth together", a device a state of
+  philosophers would not need (`polybius-anacyclosis-and-rome`, VI.56); and from `hellenization-of-christianity`
   a Church that put "an irremovable landmark between God and Caesar", then
   grew Roman forms of its own, with Logos Christology as its concept of God
   (`logos-christology`). The reader has no Voegelin and no theory of
@@ -36,7 +39,8 @@ goal: Analyze how the Roman Empire and the Church fought over who represented th
   vocabulary returns in `schmitt-political-theology` (Voegelin's "end of
   political theology" as the standing objection to Schmitt) and
   `voegelin-gnosticism`, which only *recalls* what this lesson defines
-  (course.yaml line 1243).
+  (course.yaml notes of `voegelin-gnosticism`: "constantine-and-representation
+  introduced the vocabulary; this lesson only recalls it").
 - **Spine step:** "A Jewish movement becomes Europe's religion by being remade
   in Greek concepts and Roman forms; Constantine's empire and the Church fight
   over who represents the truth; Augustine denies that any earthly city can be
@@ -173,7 +177,9 @@ goal: Analyze how the Roman Empire and the Church fought over who represented th
   treaties, "how sacred an association of citizens becomes when the immortal
   gods are made members of it") and 14564–14580 ("No one shall have gods to
   himself, either new gods or alien gods, unless recognized by the State").
-  `<Ref>` `cicero-natural-law`; one clause of recall. This is the Roman side's
+  `<Ref>` `cicero-res-publica-and-natural-law`; one clause of recall. With
+  Polybius VI.56 (`polybius-anacyclosis-and-rome`; `research/texts/polybius/
+  histories-book6-shuckburgh.txt` lines 1770–1790) this is the Roman side's
   own statement of civil theology, and the writer should use it so that
   Varro's category is not the first time the reader meets the idea.
 - **Lilla, The Shipwrecked Mind, "From Luther to Walmart"** — index 10; text
@@ -188,10 +194,19 @@ goal: Analyze how the Roman Empire and the Church fought over who represented th
   believer "must both know on which side they are really standing"; it is
   the inverse of the problem this lesson poses. Optional; References.
 - **Strauss & Cropsey, History of Political Philosophy (3rd ed.), ch. "St.
-  Augustine" (Ernest L. Fortin)** — text landing at
-  `research/texts/strauss-cropsey/history-of-political-philosophy.txt` (EMPTY
-  at brief time; consult when landed, as the standard close reading for the
-  Augustinian end of this lesson). References.
+  Augustine" (Ernest L. Fortin), pp. 176–205** — now landed (OCR, not
+  summarised): `research/texts/strauss-cropsey/history-of-political-
+  philosophy.txt` lines 8743–10254. For this lesson read lines 9421–9510
+  (pp. 191–193): Augustine uses Varro "as a witness against himself"; Varro
+  "defended civil theology not because it was true but because it was
+  useful", and signalled by putting human things before divine things in his
+  Antiquities that the city's gods were "products of the human mind". This
+  is a second reading of Varro's painter sentence beside the one in link 4
+  (the city representing itself in its gods): state both as the course's
+  own, Fortin in References. Also lines 9935–9960 (p. 202): Eusebius,
+  Ambrose, Prudentius and Orosius read the prophecies as promising peace and
+  prosperity under a Christian empire — the Eusebian position as Augustine's
+  target. Copyrighted; paraphrase.
 - **Adamson HoP 101–103, 113** (index 6): Greek apologists, Origen, City of
   God — blurbs only; References.
 - Primary texts NOT in the dossier that the lesson may quote short, PD: the
@@ -217,7 +232,9 @@ exists by being represented.
 1. **Why would a tolerant empire kill people over a sacrifice?** The obvious
    attempt: intolerance, or the Christians' stubbornness. Neither explains
    why *this* refusal and not the Jews' or the Epicureans'. The reader
-   already has Cicero's law (`<Ref>` `cicero-natural-law`): a city has its
+   already has Cicero's law (`<Ref>` `cicero-res-publica-and-natural-law`)
+   and Polybius's account of the oath-keeping Roman official
+   (`<Ref>` `polybius-anacyclosis-and-rome`, one clause): a city has its
    gods and admits no new ones unless the state recognizes them, because
    oaths, treaties and "the association of citizens" become sacred when the
    gods are members of it. Rome's gods were not a belief the city held but
@@ -277,9 +294,15 @@ exists by being represented.
    doubt about its gods. Rome did not. Varro: "as the painter is prior to
    the painting… so are the cities prior to the institutions of the
    cities" — the city makes its gods, and that does not make them false
-   (III.4). Cicero's Scipio treats Greek philosophy as "foreign learning",
-   a spice on ancestral custom (`<Ref>` `cicero-mixed-constitution`: Scipio
-   refusing to build a city in speech). The imperial cult grew out of this
+   (III.4). Rome preferred its own tested constitution to any city built in
+   speech — Polybius barred Plato's Republic from the contest as "a statue"
+   beside living men, and Cicero's Scipio proves the best state from Rome's
+   own history (`<Ref>` `polybius-anacyclosis-and-rome`,
+   `cicero-res-publica-and-natural-law`, one clause). And Polybius had
+   already read Roman religion as a device for holding the many (VI.56).
+   Varro's sentence admits two readings — the city sincerely representing
+   itself in its gods, or (as Augustine took it) a learned man defending as
+   useful gods he thought made by men; state both. The imperial cult grew out of this
    compactness, not out of megalomania: the principate itself came from the
    patron–client bond — Octavian's oath of 32 BC bound the West to him as
    clients to a patron — so the emperor was the existential representative
@@ -324,7 +347,8 @@ exists by being represented.
    the strongest statement of why civil theology is not a superstition but a
    condition of a plural empire's existence — and it is the ancestor of
    every later argument that a universal creed cannot hold a particular
-   people together (forward clause to module 10, no names). Origen's reply
+   people together (forward clause to `the-nation-and-its-defenders` and
+   `hazony-virtue-of-nationalism`, no names). Origen's reply
    (c. 248): it not only can happen, it will. Then the lesson's own
    observation: both were right — Christianity did dissolve the gods that
    held the ethnic cultures of the empire, and it did become the one nomos
@@ -456,7 +480,11 @@ ends political theology (or does it)"; conclusion.
   theology" is his claim; Berkhof's reading of 311–13 is one reading. Name
   Voegelin once as the author of the representation tool; state the Roman
   history as the course's own; Berkhof, Hauriou, Toynbee in References only.
-- **Do not re-teach** Harnack's Hellenization or the martyrs' landmark —
+- **Register.** The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+- **Dropped slugs.** `cicero-mixed-constitution` and `cicero-natural-law` no
+  longer exist; every Cicero recall goes to `cicero-res-publica-and-natural-law`.
+- **Do not re-teach** Polybius's religion-as-device (a `<Ref>` and a
+  clause), Cicero's Laws II, Harnack's Hellenization or the martyrs' landmark —
   `<Ref>` and a clause. Do not teach the Altar of Victory here beyond
   Ambrose's one formula; it is the next-but-one lesson's artefact.
 - **The Soviet test case** must be illustrative, not polemical: the point is
@@ -474,8 +502,8 @@ ends political theology (or does it)"; conclusion.
   dossier; all are known here through Voegelin's quotations, which the writer
   should verify against ANF/NPNF (PD, New Advent/CCEL) before quoting. No
   Roman-history survey for the imperial cult; keep its anchors to a
-  half-sentence each. The Strauss–Cropsey Augustine chapter file was empty at
-  brief time.
+  half-sentence each. The Strauss–Cropsey Augustine chapter has now landed (lines 8743–10254;
+  see Sources) but is OCR and unsummarised: grep before relying on a page.
 - **Numbers:** keepers — 311/313 (the edicts), 325 (Nicaea), 1936 (the
   Soviet constitution). 250 (Decius), 303 (Diocletian), 336 (Tricennial),
   381 (Constantinople confirms the Trinity) are anchors to the decade.
@@ -581,10 +609,9 @@ ends political theology (or does it)"; conclusion.
    and may well be true). Leave it open; it is the question mark in the
    heading.
 7. **FORWARD (E7)** → `augustine-two-cities`. Take Varro's sentence ("the
-   cities are prior to the institutions of the cities") and Scipio's
-   definition of a people (`<Ref>` `cicero-mixed-constitution`: bound by
-   agreement about right). If the city makes its gods, and justice means
-   giving each his due *including the true God* (`<Ref>` `cicero-natural-law`:
+   cities are prior to the institutions of the cities") and Scipio's definition of a people (`<Ref>` `cicero-res-publica-and-natural-law`:
+   bound by agreement about right). If the city makes its gods, and justice
+   means giving each his due *including the true God* (same lesson: Laelius's
    God the author of law), can a city that makes its own gods ever be a
    people in Scipio's sense? Write the inference. The solution says: the
    next lesson's bishop runs exactly this inference and concludes that Rome

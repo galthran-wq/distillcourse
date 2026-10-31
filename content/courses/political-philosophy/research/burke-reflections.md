@@ -10,13 +10,21 @@ goal: Analyze Burke's case against the Revolution as a failure of knowledge befo
 - **Inherits:** From `locke-property-and-consent`: consent as the only ground of
   government, the trust that can be forfeited, the right of resistance and the
   appeal to heaven — the doctrine Price will claim 1688 established. From
-  `rousseau-inequality-and-general-will`: the general will, total alienation,
-  "forced to be free", the Legislator, and the problem the last exercise left —
-  whether a people can deliberate a government into being. From the Plato and
-  Aristotle modules: `mixed-constitution` (`platos-laws-second-best-city`,
-  `cicero-mixed-constitution`) and Aristotle's rule of law; from
-  `english-revolution-as-test`: 1642–1660 and the Restoration, so 1688 is the
-  next English date. From `cicero-natural-law` and `aquinas-law-and-kingship`:
+  `hume-against-the-original-contract`: Whig and Tory (anchored there — recall,
+  do not re-anchor); government founded on opinion, "Antiquity always begets the
+  opinion of right"; time turning a title that began in force into right; the
+  generations "in perpetual flux", so "the new brood should conform themselves to
+  the established constitution"; violent innovation that "no individual is
+  entitled to make"; and the forecast that after "a total dissolution of
+  government" every wise man wishes for a general. Burke builds on all of it,
+  and the lesson should say so in one sentence where prescription enters. From
+  `rousseau-inequality-and-general-will` (the previous lesson): the general will,
+  total alienation, "forced to be free", the Legislator, and the problem the last
+  exercise left — whether a people can deliberate a government into being. From
+  the earlier modules: `mixed-constitution` (`platos-laws-second-best-city`,
+  `polybius-anacyclosis-and-rome`) and Aristotle's rule of law; from
+  `english-revolution-as-test`: 1642–1660 and the Restoration. From
+  `cicero-res-publica-and-natural-law` and `aquinas-law-and-kingship`:
   `natural-law`, which Burke will invoke for prescription.
 - **Contributes:** One move: Burke's case against the Revolution is epistemic
   before it is moral. No generation knows enough to design a society from
@@ -30,18 +38,24 @@ goal: Analyze Burke's case against the Revolution as a failure of knowledge befo
 - **Hands off:** Burke argues from history and consequences; Maistre will say
   he conceded too much — the English constitution is not a model but an
   accident, and no constitution at all is made by men (`maistre-and-bonald`,
-  the Act of Settlement quarrel). The deeper handoff is Strauss's question,
-  stated here as the course's own: if the standard of a good constitution is
-  that it grew, where is the standard by which growth is judged? That is the
-  road to Hegel (`hegel-ethical-life-and-the-state`). Burke's forecasts (paper
-  money, the departments that will not obey Paris, the general who becomes
-  master) are the predictions the module's application `assignats` tests.
-  Burke's India (the Hastings impeachment, "geographical morality") is HELD for
-  `burke-against-hastings` in the empire module — one sentence here, no more.
-- **Spine step:** "Government by consent (Locke) and the general will (Rousseau)
-  make a revolution thinkable; Burke, Maistre and Bonald answer that no
-  generation knows enough to design a society, and Hegel absorbs both sides into
-  the rational state"
+  the next lesson; the Act of Settlement quarrel). Burke's inheritance also
+  raises a question he does not ask: inheritance *of what* — a state's
+  constitution or a people's language, customs and character? Herder had
+  already answered "a people", and Fichte will turn it into a nation's mission
+  (`herder-and-fichte-volk-and-nation`); one sentence at the close. The deeper
+  handoff is the course's own forward objection: if the standard of a good
+  constitution is that it grew, where is the standard by which growth is judged?
+  That is the road to Hegel (`hegel-ethical-life-and-the-state`). Burke's
+  forecasts (paper money, the departments that will not obey Paris, the general
+  who becomes master) are the predictions the module's application `assignats`
+  tests. Burke's India (the Hastings impeachment, "geographical morality") is
+  HELD for `burke-against-hastings` in the empire module — one sentence here,
+  no more.
+- **Spine step:** "Government by consent (Locke) is doubted by Hume and
+  radicalised by Rousseau's general will; when France tries to frame a government
+  from principles, Burke, Maistre and Donoso Cortés answer that no generation
+  knows enough, Herder and Fichte put the people before the state, and Hegel
+  absorbs both sides into the rational state"
 
 ## Sources to consult
 
@@ -182,10 +196,24 @@ goal: Analyze Burke's case against the Revolution as a failure of knowledge befo
 - **Maistre, Considerations ch. 6 n.2 (p. 92: Paine's constitution "you can
   put in your pocket") and Berlin VI pp. 128–129 (Maistre vs Burke on the Act
   of Settlement)** — for the one-sentence forward hook to `maistre-and-bonald`.
-- **Strauss & Cropsey (eds.), History of Political Philosophy, 3rd ed., ch. on
-  Burke (Harvey Mansfield)** — text landing at
-  `research/texts/strauss-cropsey/history-of-political-philosophy.txt`; consult
-  as the standard close reading. DOSSIER GAP: file empty at writing time.
+- **Strauss & Cropsey (eds.), History of Political Philosophy, 3rd ed., "Edmund
+  Burke" by Harvey Mansfield, Jr., pp. 687–709** — text
+  `research/texts/strauss-cropsey/history-of-political-philosophy.txt`
+  l.33273–34409 (OCR; page headers inline). Copyrighted: paraphrase; Mansfield in
+  References only. Consult as the standard close reading (prescription,
+  prudence, the Reflections' relation to Burke's earlier Whig career) and grep it
+  for any claim about Burke's consistency the lesson makes.
+- **Prescription — Burke against the Assembly, with Hume behind him** —
+  `research/texts/burke/reflections-s3.txt` l.665–704 (the Assembly "openly
+  reprobate[s] the doctrine of prescription", which a French jurist calls "a
+  part of the law of Nature"; "If prescription be once shaken, no species of
+  property is secure"; Parliament has no right "to overrule prescription"),
+  l.1107–1110 ("prescription, which through long usage mellows into legality
+  governments that were violent in their commencement"), and
+  `reflections-s1.txt` l.1944 (against "the rights of men" "there can be no
+  prescription"). The l.1107–1110 sentence is Hume's "Of the Original Contract"
+  OC 22 in Burke's words (`research/texts/hume/hume-original-contract.txt`):
+  quote both side by side in one sentence each (link 2).
 
 ## EXPLANATION PLAN (L0)
 
@@ -223,8 +251,15 @@ then a general.
    state without the means of some change is without the means of its
    conservation" — reform confined to "the peccant part". This is the "method
    of nature": a permanent body of transitory parts, the whole never old, never
-   young. Ask here, as a reader would, why an inherited right is safer than a
-   declared one — the next link answers.
+   young. Add *prescription* here (define: title by long, unbroken possession):
+   the Assembly "openly reprobate[s] the doctrine of prescription", and Burke's
+   reply that prescription "through long usage mellows into legality governments
+   that were violent in their commencement" (S3 l.1107–1110) is the previous
+   lesson's thesis that time turns force into title (`<Ref>`
+   hume-against-the-original-contract, OC 22) — one sentence; Burke's addition is
+   to make the inheritance a principle the English chose ("we have chosen our
+   nature rather than our speculations"). Ask here, as a reader would, why an
+   inherited right is safer than a declared one — the next link answers.
 3. **What does an inherited constitution know that its designers could not?**
    The epistemic core (goal). Burke's own words: "we are afraid to put men to
    live and trade each on his own private stock of reason; because we suspect
@@ -348,9 +383,12 @@ then a general.
    generalise (`<Ref>` hegel-ethical-life-and-the-state) and Maistre will push
    further than Burke would go — "a constitution which is made for all nations
    is made for none", and the English constitution is no model but an accident
-   (`<Ref>` maistre-and-bonald). Close by saying what the reader can now do:
-   state Burke's case in its epistemic form and locate where it rests on
-   judgment.
+   (`<Ref>` maistre-and-bonald). And one sentence on the question Burke's
+   inheritance leaves unasked — the inheritance of a constitution, or of a
+   people's language and ways? — which a Lutheran pastor had already answered
+   (`<Ref>` herder-and-fichte-volk-and-nation). Close by saying what the reader
+   can now do: state Burke's case in its epistemic form and locate where it rests
+   on judgment.
 
 ## Set pieces and worked examples to recreate
 
@@ -401,9 +439,13 @@ then a general.
 
 ## Pitfalls / subtleties to flag
 
-- **Terms to anchor (L11):** *Whig* and *Tory* (the two parliamentary
-  connections since the 1680s — roughly the party of 1688 and parliamentary
-  supremacy against the party of crown and church; Burke a Whig — one sentence);
+- **Register rule.** The course passes no verdict of its own on any author or
+  idea: no condemning or approving labels in its own voice. Judgement comes only
+  through argument and evidence; a label may appear only inside a quotation, with
+  who applied it and when.
+- **Terms to anchor (L11):** *Whig* and *Tory* (recall with `<Ref>`
+  hume-against-the-original-contract, where they were anchored; one clause: Burke
+  a Whig); *prescription* (title by long possession — define at link 2);
   *Dr Price* (Richard Price, a Dissenting minister and moral philosopher, friend
   of Franklin; his sermon of 4 November 1789 was to the Revolution Society,
   which commemorated 1688); *the Old Jewry* (a London street, the chapel's
@@ -460,7 +502,8 @@ then a general.
   may be named: Price, Paine, Wollstonecraft, Hume (S3 l.1309), Rousseau,
   Locke, Aristotle (S2 l.1974–2053, fn 105), Maistre (forward).
 - **Dossier gaps:** Paine, Wollstonecraft and Price are not cached (all PD;
-  pointers above); the Strauss–Cropsey chapter is unavailable (empty file).
+  pointers above). The Strauss–Cropsey Burke chapter has landed (OCR,
+  l.33273–34409).
 
 ## FIGURE PLAN
 
@@ -476,7 +519,9 @@ then a general.
    parts**: overlapping generations as bars on a time axis; frame 1 one
    generation; 2 the next overlapping; 3 the entail passing (improve, never
    alienate); 4 the whole never old, never young — "in what we improve we are
-   never wholly new" (S1 l.1079–1090; S2 l.985–999).
+   never wholly new" (S1 l.1079–1090; S2 l.985–999). Reuse the lower axis of the
+   `hume-against-the-original-contract` silkworms figure (overlapping bars) so
+   the eye sees the same flux now carrying an entail.
 4. `draw:` `<Figure>` — **private stock of reason vs the general bank of ages**:
    two columns — one man's small tested stock against the accumulated,
    partly latent reasons of institutions — with "prejudice with its reason"
@@ -543,7 +588,9 @@ then a general.
    improve; the unborn are parties too, so the living are trustees not slaves)
    and state what would have to be true for it to survive (that only present
    consent can bind — which is Locke's and Rousseau's premise, and exactly what
-   Burke denies).
+   Burke denies; add, with a `<Ref>` to hume-against-the-original-contract, that
+   on Hume's "perpetual flux" there is never a moment when "the living" are a
+   single party able to consent).
 7. **FORWARD (E7) → `maistre-and-bonald`.** Burke says the English
    constitution is the model France should have "improved into" and that 1688
    was a necessity rightly handled. Suppose a critic grants Burke everything
