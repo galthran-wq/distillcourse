@@ -166,7 +166,13 @@ sum of the transformed values now sees where the suspicion sits, which
 the sum of raw values could not. With several transforms side by side
 the sum can tell any two neighbourhoods apart: the sums of
 $1, h, h^2, \dots, h^m$ fix the number of neighbours and then their
-values, for every neighbourhood of at most $m$.
+values, for every neighbourhood of at most $m$. Take two neighbours
+with values $a$ and $b$. The sum of 1 gives the count, 2; the sums of
+$h$ and $h^2$ give $a + b$ and $a^2 + b^2$, hence
+$ab = \big((a+b)^2 - (a^2+b^2)\big)/2$, and $a$ and $b$ are the two
+roots of $t^2 - (a+b)\,t + ab$. With more neighbours the first $m$
+power sums fix, in the same way, every coefficient of the polynomial
+whose roots are the neighbours' values, and so the values themselves.
 
 The mean and the maximum keep one blind spot whatever the transform.
 The mean of $f$ over $\{a\}$ is $f(a)$, and over $\{a, a\}$ it is
@@ -177,24 +183,26 @@ never changes a maximum either: with several transforms the maximum can
 report which values occur among the neighbours, never how often. On raw
 values it is blinder still and sees only the largest.
 
-Where the learned weights sit therefore matters. Weights applied to
-each neighbour before a sum let the labels choose what the sum counts;
-weights applied only after the aggregation work on what it has already
-merged and cannot separate it again.
+Where the learned weights sit therefore matters. A learned function
+with a nonlinearity in it, applied to each neighbour before a sum, lets
+the labels choose what the sum counts; weights applied only after the
+aggregation work on what it has already merged and cannot separate it
+again.
 
 <KeyFact>
-A graph layer may combine a node's neighbours only through an
-order-free aggregation. A learned transform applied to each neighbour
-before a sum recovers what the raw sum loses; no transform makes the
-mean see how many neighbours there are ($\{a\}$ and $\{a, a\}$ have the
-same mean), or the maximum see how often a value occurs.
+Only a nonlinear transform counts as "before the sum". A weight matrix
+$W$ is linear, so $\sum_u h_u W = \big(\sum_u h_u\big) W$, and the same
+holds for any weighted sum: a matrix applied to each neighbour is the
+same matrix applied after the aggregation, and sees only what the
+aggregation has already merged.
 </KeyFact>
 
 ## Message passing: gather, aggregate, update
 
-With an order-free aggregation in hand, the convolution can be rebuilt
-for graphs. The baseline comes first, because the question is what the
-graph adds.
+An aggregation summarises one node's neighbours, once. A layer has to
+do it at every node with one set of weights, as the filter does at
+every pixel, and a network of such layers has to earn its edges: it
+must do better than the same network with the edges thrown away.
 
 ### The network that ignores the graph
 
@@ -257,8 +265,13 @@ weights the labels set.
 
 ## One graph convolutional layer, in matrix form
 
-The three steps are a recipe. Written for every node at once, they
-become a matrix product, which is also how they are computed.
+Every node runs the same layer, but nodes are not the same size: a
+merchant has 3,000 cardholders, a cardholder three merchants. The
+weight each edge gets in the aggregation decides whether the merchant's
+input is a thousand times the cardholder's, and how loudly the merchant
+speaks at each of its cardholders. Written for all nodes at once, the
+aggregation is a matrix product, and those weights are the entries of
+the matrix.
 
 ### Sum aggregation is a sparse matrix product
 
@@ -509,11 +522,23 @@ graph of a thousand nodes or a million.
 
 <KeyFact>
 In a GCN layer the graph fixes how neighbours are combined and
-training fixes only what is combined; one layer is a degree-weighted
-blend of linear functions of the neighbours' features, so a maximum, or
-a count of suspicious neighbours, can be approximated only through the
-ReLU between layers.
+training fixes only what is combined. Because $W$ is linear,
+$\hat{A}(HW) = (\hat{A}H)W$: one layer sits on the "after" side of its
+aggregation, and a count of suspicious neighbours becomes possible only
+once the ReLU of one layer comes before the sum of the next.
 </KeyFact>
+
+The "how" half can be learned as well. *Attention* replaces the fixed
+weight $1/\sqrt{\tilde{d}_v\tilde{d}_u}$ by a learned one: a score
+computed from the pair of vectors $(h_v, h_u)$, normalised over $v$'s
+neighbours by a softmax. The weights then depend on the neighbours'
+features, so the layer can give the one suspicious neighbour among
+three thousand most of the weight instead of the same share as the
+rest; because the same scoring function is applied to every pair, the
+result is still order-free. The softmax makes the weights sum to 1, so
+an attention layer is a weighted mean and shares the mean's blindness
+to how many neighbours there are. Nor does it reach further: the sum
+still runs over the same one-hop neighbourhood.
 
 ## Logistic regression as one setting: the skip connection
 
@@ -624,22 +649,27 @@ validation folds say so.
 
 ### Reaching further without more layers
 
-Two layers cannot see a laundering cycle of six hops. Two additions
-reach further without stacking layers. A *global node*, joined to every
-node, gives each node a two-step route to every other: whatever the
-global node gathers in one layer, every node receives in the next. And
-*attention* replaces the fixed weight $1/\sqrt{\tilde{d}_v\tilde{d}_u}$
-by a learned one: a score computed from the pair of vectors
-$(h_v, h_u)$, normalised over $v$'s neighbours by a softmax. The weights
-then depend on the neighbours' features, so the layer can attend to the
-one suspicious neighbour among three thousand, and because the score
-is computed per pair, the result is still order-free.
+A two-layer model knows nothing beyond two hops, and a third layer buys
+one more hop at the price of another round of averaging. Some of what
+lies further away can be had without it. A *global node*, joined to
+every node, gathers from the whole graph in one layer, and every node
+receives what it gathered in the next: within two layers each node
+holds, beside its two-hop neighbourhood, one graph-wide aggregate, such
+as how much of the step's money moved within a day. That aggregate is
+the same for every node and keeps no structure. A laundering cycle of
+six hops reaches a node through it only as six more accounts averaged
+in with all the others, not as a cycle; a shape of that length has to
+be counted some other way, as the cycle counts handed to the trees in
+the second comparison below are.
 
 ## Training on a graph: labels, masks and sampled neighbourhoods
 
-A GCN is trained like the network of the earlier module, by gradient
-steps on cross-entropy, with three differences that come from the
-graph.
+A GCN is trained by gradient steps on cross-entropy, like the network
+of the earlier module, but the graph removes what that training took
+for granted. Most nodes carry no label, yet every one of them enters
+the forward pass; the test steps are graphs the model has never seen;
+and a node's two-hop neighbourhood can be most of the graph, so rows no
+longer split into independent batches.
 
 ### Which nodes carry a loss
 
@@ -729,9 +759,11 @@ at scoring time.
 
 ## When a graph network beats hand-built neighbour features
 
-Everything above says what a GCN can compute. Whether it should replace
-the hand-built aggregates is a question for measurement, and two public
-datasets have been used to answer it.
+A GCN learns its neighbourhood summary from the labels; a forest on
+hand-built columns gets a summary someone chose. Learning the summary
+costs the dilution, the smoothing and the sampling; choosing it costs
+whatever the chooser missed. Which cost is larger on real data no
+algebra settles, and two public datasets have been used to measure it.
 
 ### The Elliptic comparison
 
@@ -770,9 +802,10 @@ From "the GCN sees the graph and the others do not" one would expect
 the graph network on top. The table shows the opposite, in three steps.
 
 **The plain GCN loses to the network without the graph** (0.628
-against 0.649 and 0.653). This is the dilution of the exercise on
-accounts 1 and 2. Its precision equals the Skip-GCN's (0.812 for both);
-its recall is lower (0.512 against 0.623), which is what passing every
+against 0.649 and 0.653), which is consistent with the dilution of the
+exercise on accounts 1 and 2. Its precision equals the Skip-GCN's
+(0.812 for both); its recall is lower (0.512 against 0.623), which is
+what passing every
 node's features through its neighbourhood would do if it blurred illicit
 transactions into their licit neighbours.
 

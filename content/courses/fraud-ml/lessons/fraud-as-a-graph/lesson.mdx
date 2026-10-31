@@ -111,13 +111,18 @@ You have already built one feature that reads across this link. The <Ref
 lesson="point-in-time-features" id="a-feature-built-from-labels-what-the-bank-knew-that-morning">delayed
 terminal risk</Ref> scores a payment by the share of the terminal's other
 payments that turned out to be fraud: it looks from the payment to its
-merchant, and from the merchant to that merchant's other customers. A graph
-lets the look go one step further, from those customers to the other
-merchants they paid. That is the link the <Ref
-lesson="financial-crime-typology" id="card-present-card-not-present">typology</Ref>
-pointed to for card-not-present fraud, where numbers stolen in bulk from one
-merchant's database are spent on thousands of cards whose only common point
-is that merchant.
+merchant, and from the merchant to the labels on that merchant's other
+payments. One kind of fraud escapes that look. In the card-not-present fraud
+of the <Ref lesson="financial-crime-typology"
+id="card-present-card-not-present">typology</Ref>, card numbers are stolen
+in bulk from one merchant's database and then spent at other merchants, so
+the frauds land scattered over many shops and no terminal's fraud rate
+rises. What they share lies behind them, and the graph reaches it in three
+steps: from the fraudulent payments to their cards, from those cards to the
+merchant they all paid in the weeks before, and from that merchant to the
+other cards it served, which are now at risk although none has been misused
+yet. The step through the card is the one a terminal's own statistics never
+take.
 
 <Definition title="bipartite graph">
 A graph is *bipartite* if its nodes split into two sets $V_1$ and $V_2$
@@ -167,8 +172,9 @@ $1.2 \times 10^{12}$ cells; a month of payments is about thirty million
 lines of list. So the list, or a sparse-matrix format that stores only the
 non-zero cells and is a list in disguise, is what runs. The matrix is what
 the mathematics is written in, because the operations of the coming lessons,
-such as "add up the weights of a node's neighbours", are products of the
-matrix with a vector, and a sparse product touches only the stored cells.
+such as "give each node the weighted sum of a value held by its
+neighbours", are products of the matrix with a vector, and a sparse product
+touches only the stored cells.
 
 For a bipartite graph the matrix has a fixed shape. Order the nodes with
 all cardholders first; write $W$ for the $n_c \times n_m$ block of
@@ -176,7 +182,7 @@ cardholder–merchant weights, with $n_c$ cardholders and $n_m$ merchants.
 Then the full matrix is
 
 $$
-\begin{pmatrix} 0 & W \\ W^\top & 0 \end{pmatrix},
+Q = \begin{pmatrix} 0 & W \\ W^\top & 0 \end{pmatrix},
 $$
 
 and $W$ alone, the upper-right $3 \times 3$ block of the toy's matrix,
@@ -282,15 +288,28 @@ The fraud label belongs to a payment, which is an edge. For one hop that
 is no obstacle: the delayed terminal risk stands at a merchant and counts
 the labelled edges that touch it. The trouble starts when suspicion should
 travel further, from $p_1$ to $m_1$, from $m_1$ to $c_2$, who paid there
-too, and from $c_2$ to the other merchants $c_2$ paid. Each of those steps
-is, as the matrix section said, a product of the matrix with a vector, and
-the vector has one entry per node: how suspect each cardholder and each
-merchant is at that step. "Payment $p_1$ was fraud" has no entry in that
-vector, so it cannot be where the spreading starts. The walks of <Ref
-lesson="guilt-by-association">a later lesson</Ref> are exactly such
-repeated products.
+too, and from $c_2$ to the other merchants $c_2$ paid.
 
-The obvious move puts the label on an endpoint. Marking $c_1$ fraudulent
+Spreading suspicion one step is a product of the matrix with a vector. Let
+$x$ hold one number per node, $x_j$ meaning how suspect node $j$ is. Then
+
+$$
+(Qx)_i = \sum_j Q_{ij} \, x_j
+$$
+
+gives node $i$ the suspicion of its neighbours, each weighted by the edge
+that joins them. Run it on the toy with $x = 1$ at $m_1$ and 0 elsewhere.
+Only the column of $m_1$ contributes, so $c_1$ receives 0.97 and $c_2$
+receives 0.91, the weights of $p_1$ and $p_3$; $c_3$, which never paid at
+$m_1$, and the three merchants, which have no edges among themselves,
+receive 0. A second product carries the suspicion on to $m_2$ and $m_3$,
+and the walks of <Ref lesson="guilt-by-association">a later lesson</Ref>
+are exactly such repeated products. But the step had to start from a
+vector indexed by cardholders and merchants. "Payment $p_1$ was fraud" has
+no entry in it, so the label cannot be where the spreading starts.
+
+The obvious move, the one the step above made, puts the label on an
+endpoint. Marking $c_1$ fraudulent
 because $p_1$ was gets the victim wrong: the card was stolen, and its other
 payment $p_2$ was the owner's. Marking $m_1$ accuses what may be a perfectly
 honest shop where a stolen number was used once. Each endpoint is only
@@ -354,7 +373,9 @@ $M^\top$ in its lower-left.
 />
 
 The label now sits on node $p_1$, and any method that starts from labelled
-nodes can start there. Two prices are paid. Every path between a cardholder
+nodes can start there: one step of $Q_{\text{tri}}$ from $x = 1$ at $p_1$
+puts 0.97 on $c_1$ and on $m_1$, both endpoints partly implicated, and
+nothing elsewhere. Two prices are paid. Every path between a cardholder
 and a merchant is twice as long, since it now passes through a payment
 node. And the graph has a node per payment, so it is as large as the log
 inside the horizon; the decay of the previous section, which lets old
@@ -509,7 +530,7 @@ labels, each defined on the directed multigraph with $k \geq 2$:
 <Figure
   src="./figures/motifs.svg"
   alt="A gallery of eight small directed graphs in two rows: fan-out, fan-in, gather-scatter, scatter-gather; simple cycle, random chain, bipartite, stack. The account where each pattern starts is amber, and each has a one-line definition under it"
-  caption="The eight motifs. The structuring diamond is a scatter-gather; the eight-row example holds a simple cycle."
+  caption="The eight motifs. The structuring diamond is a scatter-gather; the eight-row example holds a simple cycle and a scatter-gather."
 />
 
 Read the eight rows against these definitions. C is a fan-in with $k = 3$
@@ -517,8 +538,12 @@ Read the eight rows against these definitions. C is a fan-in with $k = 3$
 second payment to D adds an edge but not a distinct payee. B is also a
 fan-out with $k = 2$ (it pays C and E). D is a fan-in with $k = 2$: C pays
 it in row 4 and E in rows 5 and 8, and again the repeat adds no distinct
-payer. Rows 1, 4 and 6 form a simple cycle of length three. Four of the
-five accounts are a fan-in or a fan-out, in eight ordinary-looking rows.
+payer. Rows 1, 4 and 6 form a simple cycle of length three. And B's fan-out
+and D's fan-in share their intermediates: B pays C (row 2, 9 May) and C pays
+D (row 4, 20 May); B pays E (row 7, 11 June) and E pays D (row 8, 19 June).
+That is a scatter-gather from B to D through C and E, each leg in time
+order. Four of the five accounts are a fan-in or a fan-out, and two of the
+eight shapes are present, in eight ordinary-looking rows.
 
 ### A shape is evidence only with a clock and an amount
 
@@ -540,10 +565,18 @@ shape:
   or are linked to each other through shared identifiers point to one
   controller behind the shape.
 
-The window cuts both ways. The cycle in the eight rows took five weeks to
-close; a one-day window never sees it, and a five-week window also sees
-every customer who paid a firm and got a refund. Shape detectors are
-therefore built as features: for each transfer, how many cycles of up to,
+Run the scatter-gather of the eight rows through these tests. Its legs
+run from 9 May to 19 June, six weeks, so a six-hour window discards it at
+once. The amounts agree: B sent 700 and 650, while C passed on 1,300 of the
+3,050 it had received from three payers, and E paid D 2,500 eight days
+after receiving 650 from B. Neither forward looks like B's money passing
+through. As far as these rows show, the diamond is a shape and nothing
+more.
+
+The window cuts both ways, though. The cycle in the same rows took five
+weeks to close; a one-day window never sees it either, and a five-week
+window also sees every customer who paid a firm and got a refund. Shape
+detectors are therefore built as features: for each transfer, how many cycles of up to,
 say, ten accounts it closes within the window, whether it is part of a
 scatter-gather, how many distinct accounts its payer paid in the last day.
 They are computed by processing the transfers in time order, so that a
