@@ -285,13 +285,25 @@ function Head({ kind, id, grade }: { kind: string; id: string; grade: Grade }) {
   );
 }
 
-const labelOf = new Map(vPlaced.map((v) => [v.id, v.label]));
+const labelOf = new Map<string, string>([
+  ...vPlaced.map((v) => [v.id, v.label] as const),
+  ...pPlaced.map((p) => [p.id, p.short] as const),
+  ...tPlaced.map((t) => [t.id, t.short] as const),
+]);
 
-/** A thesis's `from`, read off EDGES: its premises, then its own verdicts. */
-function restsText(t: string) {
-  const premises = onto(t).filter(isPremise);
-  const verdicts = onto(t).filter((x) => !isPremise(x)).map((x) => labelOf.get(x));
-  return premises.join(", ") + (verdicts.length > 0 ? `; verdicts: ${verdicts.join("; ")}` : "");
+// A reader who has not met the numbering reads the panel, so every node it
+// names carries its words, one per line, never a bare run of codes.
+function Named({ ids }: { ids: string[] }) {
+  return (
+    <ul style={{ margin: "2px 0 0", padding: 0, listStyle: "none" }}>
+      {ids.map((id) => (
+        <li key={id}>
+          {column.get(id) !== "v" && <span style={{ fontWeight: 700, marginRight: 6 }}>{id}</span>}
+          {labelOf.get(id)}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 const lessonHref = (slug: string) => `/courses/political-philosophy/lessons/${slug}`;
@@ -416,6 +428,12 @@ export default function DoctrineDerivationMap() {
           maxWidth: W,
           margin: "14px auto 0",
           paddingTop: 10,
+          paddingBottom: 10,
+          // The map is taller than a screen: the panel stays pinned to the
+          // bottom of the viewport so a selection near the top is read in view.
+          position: "sticky",
+          bottom: 0,
+          background: "var(--paper)",
           borderTop: `1px solid ${FRAME}`,
           fontSize: 13,
           lineHeight: 1.45,
@@ -425,9 +443,16 @@ export default function DoctrineDerivationMap() {
           <Panel key={t.id} id={t.id}>
             <Head kind="Thesis" id={t.id} grade={t.grade} />
             <p style={{ margin: 0 }}>{t.statement}</p>
-            <p style={pnLine}>
-              <span style={pnKey}>rests on</span> {restsText(t.id)}
-            </p>
+            <div style={pnLine}>
+              <span style={pnKey}>rests on</span>
+              <Named ids={premisesOf(t.id)} />
+            </div>
+            {onto(t.id).some((x) => !isPremise(x)) && (
+              <div style={pnLine}>
+                <span style={pnKey}>and directly on the verdicts</span>
+                <Named ids={onto(t.id).filter((x) => !isPremise(x))} />
+              </div>
+            )}
             <p style={pnLine}>
               <span style={pnKey}>weakest premise</span> {t.weakest}
             </p>
@@ -443,35 +468,46 @@ export default function DoctrineDerivationMap() {
             <p style={pnLine}>
               <span style={pnKey}>overturned by</span> {p.overturnedBy}
             </p>
-            <p style={pnLine}>
-              <span style={pnKey}>if overturned</span>{" "}
-              {thesesOn(p.id).length > 0
-                ? `${thesesOn(p.id).join(", ")} lose${thesesOn(p.id).length === 1 ? "s" : ""} a premise.`
-                : "no thesis rests on it directly: it is background, the record the others are read against."}
-            </p>
+            {thesesOn(p.id).length > 0 ? (
+              <div style={pnLine}>
+                <span style={pnKey}>if overturned, these theses lose a premise</span>
+                <Named ids={thesesOn(p.id)} />
+              </div>
+            ) : (
+              <p style={pnLine}>
+                <span style={pnKey}>if overturned</span> no thesis loses a premise: it is background, the
+                record the others are read against.
+              </p>
+            )}
           </Panel>
         ))}
         {vPlaced.map((v) => (
           <Panel key={v.id} id={v.id}>
             <div style={pnHead}>
-              <span style={{ fontWeight: 700 }}>Verdict, module {v.n}</span>
+              <span style={{ fontWeight: 700 }}>Verdict: {v.label}</span>
               <GradeMark grade={v.grade} size={10} />
               <span style={{ opacity: 0.75 }}>{v.grade}</span>
             </div>
             <p style={{ margin: 0 }}>
-              {v.label[0].toUpperCase() + v.label.slice(1)}.{" "}
+              Reached in the lesson{" "}
               <a href={lessonHref(v.lesson)} style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 2 }}>
                 {v.title}
-              </a>
+              </a>{" "}
+              (module {v.n}).
             </p>
-            <p style={pnLine}>
-              <span style={pnKey}>grounds</span> {outOf(v.id).join(", ")}
-              {(() => {
-                const via = tPlaced.map((t) => t.id).filter((t) => lit.get(v.id)!.has(t) && !outOf(v.id).includes(t));
-                return via.length > 0 ? `; through them ${via.join(", ")}` : "";
-              })()}
-              .
-            </p>
+            <div style={pnLine}>
+              <span style={pnKey}>supports</span>
+              <Named ids={outOf(v.id)} />
+            </div>
+            {(() => {
+              const via = tPlaced.map((t) => t.id).filter((t) => lit.get(v.id)!.has(t) && !outOf(v.id).includes(t));
+              return via.length > 0 ? (
+                <div style={pnLine}>
+                  <span style={pnKey}>and through them the theses</span>
+                  <Named ids={via} />
+                </div>
+              ) : null;
+            })()}
           </Panel>
         ))}
       </div>
