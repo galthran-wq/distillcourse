@@ -1,3 +1,5 @@
+> **SUPERSEDED (2026-10-31 structure revision).** This lesson was dropped from course.yaml; its material is merged into cicero-res-publica-and-natural-law (the mixed constitution and the cycle: polybius-anacyclosis-and-rome). Kept only as a fuller record that the successor brief may point to — never brief a lesson from this file.
+
 # Research brief: cicero-mixed-constitution (Cicero's res publica and the mixed constitution)
 
 status: planned

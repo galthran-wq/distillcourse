@@ -7,15 +7,18 @@ goal: Analyze Aquinas's hierarchy of laws and his account of kingship and tyrann
 
 ## ARC (L10)
 
-- **Inherits:** From `cicero-natural-law`: true law is right reason in agreement with nature,
-  one and eternal, and an unjust statute is not a law (Laelius's reply to Carneades). From
+- **Inherits:** From `cicero-res-publica-and-natural-law`: true law is right reason in agreement
+  with nature, one and eternal, and an unjust statute is not a law (Laelius's reply to Carneades);
+  a tyranny is no commonwealth at all. From
   `augustine-two-cities`: no earthly city is just; rulers "serve"; slavery is a consequence of
   sin, not of nature; the earthly peace is a truce the pilgrim uses. From
   `aristotle-regimes-and-the-middle` and `aristotle-political-animal-and-natural-slavery`: the
   six regimes, rule of law against the best man, man as political animal, natural slavery. From
-  `platos-laws-second-best-city` (extra — recall only by Ref, never assume): the mixed
-  constitution. The reader has NOT met scholastic method, the Summa, or any medieval
-  institution.
+  `polybius-anacyclosis-and-rome`: the mixed constitution (consuls, senate, people, each able
+  to block the others) as the arrangement that arrests the cycle of regimes. From
+  `altar-of-victory` (the previous module's close): Ambrose's "the emperor is within the Church,
+  not above it" — the claim De Regno I.15 turns into a doctrine. The reader has NOT met
+  scholastic method, the Summa, or any medieval institution.
 - **Contributes:** The one move is to show how a Christian who has just received Aristotle's
   Politics (translated into Latin c. 1260) fits Aristotle's naturally good city inside
   Augustine's fallen world: law is reason's ordinance, descending from God's plan through
@@ -30,14 +33,17 @@ goal: Analyze Aquinas's hierarchy of laws and his account of kingship and tyrann
   changing the question (what works, not what ought); `bodin-sovereignty` answers that no
   subject judges and the question "who are the rulers" is replaced by "what is a state". Vitoria
   (`vitoria-right-to-the-americas`, empire module) is this lesson's natural law applied to Spain
-  in America — forward hook only, one clause.
-- **Spine step:** "Christendom builds a law above kings — and Machiavelli breaks it, measuring
-  princes and republics by what works rather than what ought to be"
+  in America, and `vermeule-common-good-constitutionalism` (post-liberal module) takes this
+  lesson's definition of law as the anchor of every term it uses — forward hooks only, one
+  clause each.
+- **Spine step:** "Christendom builds a law above kings; Machiavelli breaks it; the wars of
+  religion force one sovereign power above every faction — Bodin's definition, Hobbes's
+  derivation from fear, Filmer's from fatherhood — and the English Revolution tests them"
 
 ## Sources to consult
 
 - **Aquinas, De Regno (On Kingship), tr. Kenny** — summaries.json index 18; text at
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/aquinas/de-regno-kenny-trans.txt`
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/aquinas/de-regno-kenny-trans.txt`
   (paragraph numbers in square brackets `[n]`; the file has OCR glitches and footnote residues —
   quote only after checking the sentence). Read: I.1 [3–9] (ship and pilot; man without hair,
   horns, claws; why a multitude needs a ruler — "the proper divides, the common unites"); I.2
@@ -49,16 +55,16 @@ goal: Analyze Aquinas's hierarchy of laws and his account of kingship and tyrann
   the Theban legion [45–46]; "private presumption" vs "public authority" [47–48]; deposition by
   a multitude that appointed [49]; appeal to a superior, then to God [50–52]); I.8–12 [53–92]
   (reward of kings; why tyranny does not pay — friendship [77], fear as water under pressure
-  [81], the tyrant as hypocrite [83]); I.13–16 [93–122] (king as soul to body; end of society is
+  [81], the tyrant who plays the king like an actor, Aquinas's "hypocrite" [83]); I.13–16 [93–122] (king as soul to body; end of society is
   virtuous life ordered to God; the king subject to the priesthood in matters of the ultimate
   end [103–112]). Appendix 6 (obedience to usurpers and sinful commands — a usurper by violence
   may be repelled). Book II (site, climate) is off-path: skip except II.1 [126–127] climate
   theory for a one-clause Ref back to Aristotle VII.7.
 - **Aquinas, Summa Theologiae I-II qq. 90–97 (English Dominican translation, 1920; New Advent)**
   — index 18; texts at
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/aquinas/summa-i-ii-qq90-93.txt`
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/aquinas/summa-i-ii-qq90-93.txt`
   and
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/aquinas/summa-i-ii-qq94-97.txt`
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/aquinas/summa-i-ii-qq94-97.txt`
   (the second has hyperlink line-breaks mid-word — reassemble before quoting). Read in full:
   q.90 aa.1–4 (definition gathered at a.4: "an ordinance of reason for the common good, made by
   him who has care of the community, and promulgated" — qq90-93 file ~l.552; a.1 ad 3 on the
@@ -77,27 +83,31 @@ goal: Analyze Aquinas's hierarchy of laws and his account of kingship and tyrann
   (besieged city; "necessity knows no law"); q.97 a.1–3 (why law changes; custom as law;
   Augustine's corrupt electorate).
 - **Strauss, Natural Right and History, ch. IV pp. 156–164** — index 35; text
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/strauss/nrh-s4-ch4.txt`.
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/strauss/nrh-s4-ch4.txt`.
   Use for two theses stated as the course's own in the Pitfalls/objection link, never named in
   body: (i) the Thomistic reading of Aristotle (immutable principles, mutable conclusions)
   against the Averroist one (pp. 156–159); (ii) "Thomistic natural law is practically
   inseparable from theology" (pp. 163–164) and the extreme-situation point (pp. 159–163) that
   Machiavelli will press. Copyrighted: paraphrase; at most one short clause quoted.
 - **Augustine, City of God XIX** — index 17;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/cityofgod-book19.txt`.
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/cityofgod-book19.txt`.
   Only for backward Refs (XIX.15 slavery from sin; XIX.17 the pilgrim uses the earthly peace).
   Do not re-teach.
 - **Cicero, Laws I–II and Rep. III** — index 39;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/cicero/`.
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/cicero/`.
   Backward Ref only: Aquinas cites "Tully" at q.91 a.3 (justice from nature, then custom, then
   law).
 - **Strauss & Cropsey (eds.), History of Political Philosophy, 3rd ed., ch. "St. Thomas
-  Aquinas"** — text landing at
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/strauss-cropsey/history-of-political-philosophy.txt`;
-  consult as the standard close reading to check the reconstruction (especially the De Regno /
-  Summa relation and the mixed regime of I-II 105). NOTE: at brief-writing time this file is
-  EMPTY (0 bytes; OCR not landed) — the writer must check whether it has arrived and otherwise
-  proceed without it.
+  Aquinas" (E. L. Fortin, pp. 248–275)** — OCR text at
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/strauss-cropsey/history-of-political-philosophy.txt`,
+  lines 12211–13656 (OCR: check every sentence against the page before relying on it). Use pp.
+  256–257 (~l.12571–12625) for link 6: the simply best regime is kingship of one wise man for
+  virtue, the most dangerous for the same reason; "for concrete purposes" the best regime is the
+  mixed one, with Moses and the elders as the sacred precedent (note 25 cites ST I-II 105 a.1
+  and On Kingship I.6 [42]) — the reconciliation of De Regno and the Summa the lesson's link 6
+  needs, stated as the course's own. Use the "Moral virtue and the natural law" section (from
+  ~l.12724) to check links 3–4 (indemonstrable principles, conclusions, dispensation). Fortin's
+  name in References only.
 - **Smith, Open Yale lectures** — index 9: no Aquinas lecture. One usable aside in L7 Ch1
   (Aquinas and Dante read Aristotle as a monarchist) — References only if at all.
 - **Not in the dossier, named in course.yaml key_ideas:** ST I-II q.105 a.1 ("the mixed regime
@@ -159,7 +169,7 @@ Christian king needs to know which is true of HIS kingdom.
    nature did not bring in the contrary — property and slavery are "devised by human reason"
    (a.5 ad 3). Seam with earlier lessons: this is a third answer to the natural-slavery question
    — not nature (Aristotle, Ref), not sin alone (Augustine, Ref), but human reason's addition.
-   Cicero's "true law is right reason" (Ref `cicero-natural-law`) is here given a structure: a
+   Cicero's "true law is right reason" (Ref `cicero-res-publica-and-natural-law`) is here given a structure: a
    first precept, tiers, and a theory of error.
 4. **How does "do no harm" become "the thief pays fourfold"?** Obvious attempt: deduce every
    statute from natural law. Fails: natural law says the evildoer should be punished but not
@@ -198,7 +208,9 @@ Christian king needs to know which is true of HIS kingdom.
    forms (I.4); the tyrant forbids friendship, marriage, shared meals and wealth to forestall
    conspiracy (I.4 [26–28]); Rome's freedom made it vigorous and its civil wars made emperors
    (I.5–6). Then the Summa's own concession: q.95 a.4 ranks the mixed regime best (and q.105
-   a.1, if fetched, makes Moses's polity a mixture — flag the dossier gap). Say the seam
+   a.1, if fetched, makes Moses's polity a mixture — flag the dossier gap). The mixture is the
+   one the reader met in Rome (`polybius-anacyclosis-and-rome`, Ref, one clause); Aquinas's
+   precedent for it is Hebrew, not Roman. Say the seam
    plainly: the two texts answer two questions — which simple form is best (one), and which
    arrangement of offices is safest (mixed) — and the lesson should not pretend they are one
    answer.
@@ -219,7 +231,7 @@ Christian king needs to know which is true of HIS kingdom.
    unworthy but lawful ruler is obeyed; commands to sin are refused). The reply the course
    states as its own: Aquinas has placed enforcement of the law above kings in a public
    authority he never specifies — a pope (I.15 [110–112]), an electing multitude, a superior
-   lord — and that unspecified judge is what the next three lessons fight over.
+   lord — and that unspecified judge is what the rest of this module fights over.
 
 Headings fall out as claims: "Law is an ordinance of reason, or the prince's pleasure is
 lawlessness"; "Four laws because human law cannot see inside a man"; "Natural law has one
@@ -257,7 +269,7 @@ tyrant worst"; "Who may act against a tyrant: public authority, never a private 
    people selling its votes forfeits the right — the one text where Aquinas makes the form of
    government depend on the people's condition; a ready seam to Machiavelli's corrupt city
    (I.55) in `machiavelli-discourses-republic`.
-8. **Fear as water under pressure** (I.11 [81]) and the tyrant as hypocrite "who plays a king on
+8. **Fear as water under pressure** (I.11 [81]) and the tyrant (Aquinas's "hypocrite", an actor) "who plays a king on
    stage" ([83]) — the passages Machiavelli's Prince XVII–XIX will answer; set them up here so
    the next lesson's objection is a recall, not a new teaching.
 
@@ -299,11 +311,15 @@ tyrant worst"; "Who may act against a tyrant: public authority, never a private 
   vicar" in matters of the ultimate end — report it as what the text says (it is the medieval
   answer to "who judges the king"), neither inflate it into a theory of papal supremacy nor drop
   it; it is exactly what Bodin's "new question" will refuse.
-- **Thin places in the dossier:** no secondary reading on Aquinas beyond Strauss ch. IV (8
-  pages) and the empty Strauss–Cropsey file; no Marsilius or any medieval rival. Say in
-  References that the lesson reconstructs from the two primary texts only.
-- **No moralising:** neither "medieval obscurantism" nor "the perennial philosophy"; the lesson
-  reports what the arguments establish and where they leave the judge of kings unnamed.
+- **Thin places in the dossier:** secondary reading on Aquinas is Strauss ch. IV (8 pages) and
+  the Strauss–Cropsey chapter (OCR); no Marsilius text (the Strauss–Cropsey volume has a
+  Marsilius chapter, ll. 13657–14603, which the writer may consult for a one-clause forward
+  pointer to a medieval rival who gave the legislative power to the people, but not teach).
+  Say in References that the lesson reconstructs from the two primary texts.
+- **Register:** The course passes no verdict of its own on any author or idea: no condemning or
+  approving labels in its own voice. Judgement comes only through argument and evidence; a label
+  may appear only inside a quotation, with who applied it and when. The lesson reports what the
+  arguments establish and where they leave the judge of kings unnamed.
 
 ## FIGURE PLAN
 
@@ -374,7 +390,7 @@ tyrant worst"; "Who may act against a tyrant: public authority, never a private 
    (obey an unjust law to avoid scandal), De Regno I.7 [47–49] (deposition by the multitude that
    appointed), Appendix 6 (a usurper may be repelled) — and construct the single consistent
    position they allow, or show where none exists. Then compare with Cicero's "unjust statutes
-   are not laws" (`cicero-natural-law`, Ref): what Aquinas adds (the scandal clause, the public
+   are not laws" (`cicero-res-publica-and-natural-law`, Ref): what Aquinas adds (the scandal clause, the public
    authority) and why.
 7. **Synthesis / counter-argument (E3 from `augustine-two-cities`):** "Aquinas has quietly
    reversed Augustine: the city is natural and good again." Name two facts the claim fails to

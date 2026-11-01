@@ -7,12 +7,29 @@ goal: Analyze Toynbee's theory of how civilizations arise, grow, break down and 
 
 ## ARC (L10)
 
-- **Inherits:** From `spengler-decline-of-the-west`: the morphology (eight Cultures as
-  organisms with a fixed lifespan; Culture → Civilization; contemporaneity) and the
-  objection left open there — that a theory which argues from analogy and
-  reclassifies every counter-instance cannot be tested, and that Toynbee's own
-  sentence ("set[s] up a metaphor and then proceed[s] to argue from it as if it were
-  a law") was quoted but not developed. From `sparta-as-test-case`: the Spartan
+- **Inherits:** This lesson OPENS the civilizations module; the lesson before it in
+  course order is `the-cognitive-elite` (the equality module's application), and
+  nothing from that module is needed here. The question widens: the course has asked
+  who should rule a state and whether its inequalities are natural; now it asks what
+  the larger unit is that states belong to, and why such units rise and fall. Two
+  earlier answers are recalled, each by `<Ref>` and a clause, because Toynbee wrote
+  against both. From `spengler-decline-of-the-west` (read in the crisis-of-liberal-
+  Europe module, about forty lessons back — re-anchor it, do not assume it
+  remembered): the morphology (eight Cultures as organisms with a fixed lifespan;
+  Culture → Civilization; contemporaneity) and the objection left open there — that a
+  theory which argues from analogy and reclassifies every counter-instance cannot be
+  tested, with Toynbee's sentence ("set[s] up a metaphor and then proceed[s] to argue
+  from it as if it were a law") quoted there but not developed. From
+  `gobineau-inequality-of-races` (crowd-race-nation module): the racial theory of
+  history (`racial-theory-of-history`) and degeneration by mixture
+  (`degeneration-by-mixture`) — Gobineau's ten civilizations, all credited to "the
+  impulse of the white races", his own rejection of climate as a cause (Essay I.vi),
+  and his pledge that one counter-instance would make "the whole theory on which this
+  book rests" false. That lesson tested Gobineau's steps from inside (circularity, the
+  evidence of the 1850s, his own list); Toynbee's race chapter is the comparative test
+  from outside, and is taught here as that answer. From `chamberlain-and-grant`: the
+  Teutonic thesis and Grant's Nordic programme, which Toynbee's chapter names in one
+  paragraph each ("Americans also had their uses for the 'Nordic man'"). From `sparta-as-test-case`: the Spartan
   regime as reported by Aristotle and Plato — kings, gerousia, ephors, the agoge, the
   helots, the second Messenian war, the falling citizen numbers — and that lesson's
   note that Toynbee's "arrested civilization" chapter is the forward reading. From
@@ -22,8 +39,9 @@ goal: Analyze Toynbee's theory of how civilizations arise, grow, break down and 
   and "mechanical mimesis" re-describe. From `greek-miracle` and
   `aristotle-political-animal-and-natural-slavery`: the Greek colonisation movement
   and the climate theory (VII.7), both of which Toynbee uses as cases.
-- **Contributes:** The module's second answer: civilizations are not organisms with a
-  lifespan but the common field of individuals' acts; they arise when a creative
+- **Contributes:** The module's first answer, given against Spengler's (Ref) and
+  against Gobineau's (Ref): civilizations are not organisms with a lifespan, nor the
+  work of a race, but the common field of individuals' acts; they arise when a creative
   minority answers a challenge neither too easy nor too hard, grow by turning the
   challenge inward, break down when the minority stops creating and rules by force,
   and die "by suicide, not murder". The lesson reconstructs the mechanism, applies it
@@ -34,15 +52,17 @@ goal: Analyze Toynbee's theory of how civilizations arise, grow, break down and 
   of twenty-one; `huntington-clash-of-civilizations` takes that list and makes the
   boundaries between its members the battle lines of the future, with the question
   whether a unit built for the history of growth can serve a theory of conflict. (b)
-  Toynbee's refutation of race (IV) and environment (IV, VII) is used here as a set
-  piece in the theory of genesis; `what-measures-greatness` returns to it as the
-  module's treatment of the hereditarian account, with Spengler's "race does not
-  migrate" and Aristotle's and Bodin's climate theories beside it. (c) Toynbee's
-  measure — the universal church as the sole beneficiary, growth as etherialization
-  — is the third of the three measures compared in `what-measures-greatness`.
-- **Spine step:** "The question widens from the state to the civilization: Spengler's
-  organisms, Toynbee's challenge and response, Huntington's fault lines — three
-  measures of greatness and three accounts of decline, tested on the record"
+  Toynbee's case against race (IV.2) and environment (IV.3, VII) is used here as a set
+  piece in the theory of genesis — his answer to the Gobineau lesson; `what-measures-
+  greatness` recalls it beside Gobineau's own claim and Spengler's different refusal
+  ("a race does not migrate") when it asks whether race can serve as a measure of
+  greatness, and the modern, statistical form of the debate is held for the heredity
+  module (`hereditarian-case-iq-and-nations` and after). (c) Toynbee's measure — the
+  universal church as the sole beneficiary, growth as etherialization — is the third
+  of the three measures compared in `what-measures-greatness`.
+- **Spine step:** "The question widens from the state to the civilization: against
+  Spengler's organisms, Toynbee's challenge and response and Huntington's fault lines
+  — three measures of greatness and three accounts of decline, tested on the record"
 
 ## Sources to consult
 
@@ -122,7 +142,7 @@ goal: Analyze Toynbee's theory of how civilizations arise, grow, break down and 
     "arbitrary fantasy"; the climbers on one cliff; the Parable of the Sower.
   - **XIII–XIV Breakdowns; Deterministic Solutions** (s6, pp. 244–254; text l. 300–330
     for Spengler): the piper who becomes drill-sergeant; cosmic senescence, organic
-    life-span (Spengler refuted), racial degeneration (Italy as natural experiment,
+    life-span (Spengler answered), racial degeneration (Italy as natural experiment,
     pp. 249–251), cyclical theory (wheel and vehicle, p. 253).
   - **XV Loss of Command over the Environment** (s6, pp. 255–274; suicide passages at
     text l. 1015–1040 and l. 1636–1645): loss of command is consequence, not cause;
@@ -171,6 +191,21 @@ goal: Analyze Toynbee's theory of how civilizations arise, grow, break down and 
     (pp. 910–912).
 - **Spengler, Decline, Vol. 1 ch. III §VI–VIII and Intro §XII** — index 11 — for the
   position Toynbee answers (recall by Ref; one sentence of reminder).
+- **Gobineau, Essay on the Inequality of the Human Races, Book I (Collins tr. 1915,
+  PD)** — index 101; texts `research/texts/gobineau/`. Recall ONLY, by Ref
+  `gobineau-inequality-of-races`; two passages are worth setting beside Toynbee's
+  chapter so the reader sees the two arguments meet: the falsifiability pledge
+  (`s4-ch14-16.txt` l. 1364–1374: "If there is any element of life in these ten
+  civilizations that is not due to the impulse of the white races, any seed of death
+  that does not come from the inferior stocks that mingled with them, then the whole
+  theory on which this book rests is false") and the ten civilizations listed in the
+  Note to ch. XVI (Indian, Egyptian, Assyrian, Greek, Chinese, Roman, Germanic, and
+  three American). And Gobineau's own ch. VI, which rejects climate and geography as
+  causes ("it is the people which has always given to the land its moral, economic,
+  and political value") — so Toynbee's two rejected theories are each other's
+  rivals, and Gobineau had already made half of Toynbee's case against environment.
+- **Chamberlain and Grant** — indices 102, 103: recall only, by Ref
+  `chamberlain-and-grant`, where Toynbee's IV.2 names them (s2 l. 280–297).
 - **Augustine, City of God XIX.17, 26** — index 17; text `research/texts/cityofgod-book19.txt`:
   the heavenly city "calls citizens out of all nations" and uses the peace of
   Babylon — the backward Ref against which Toynbee's chrysalis is read (Toynbee's
@@ -178,7 +213,7 @@ goal: Analyze Toynbee's theory of how civilizations arise, grow, break down and 
   uses the earthly city's peace and inherits nothing from it).
 - **Aristotle, Politics II.9 and VII.7** — index 16 — only as recalled from
   `sparta-as-test-case` and `aristotle-political-animal-and-natural-slavery`; Toynbee
-  cites Aristotle's epitaph on Sparta (IX p. 181) and refutes the climate theory
+  cites Aristotle's epitaph on Sparta (IX p. 181) and argues against the climate theory
   Aristotle holds (IV.3, with Hippocrates' *Airs, Waters, Places* as the "Hellenic
   theory" named in the footnote at text l. 462).
 - **Ortega, Revolt, ch. IX–X** — index 32 — the mass-man as "vertical invasion of the
@@ -222,22 +257,46 @@ biological fate (Spengler) or a list of accidents? The chain:
    by descent; Spengler's are sealed organisms.
 2. **How not to explain genesis: race and environment.** Question: twenty-one
    civilizations arose out of some 650 primitive societies; why these? Attempt 1:
-   race — the "Nordic man". Why it fails (IV.2): the idol has a history (Gobineau's
-   reply to revolutionary pamphleteers who cast the Gauls as throwing out their
-   Frankish lords — "to this nonsense Gobineau replied with some more telling
-   nonsense of his own"), and the facts: about half the civilizations were made by
-   more than one race, and no race made more than a few. Attempt 2: environment —
+   race — the answer the reader has met at full strength in
+   `gobineau-inequality-of-races` (Ref, one clause: a creative race founds every
+   civilization and mixture dissolves it; ten civilizations, all credited to the
+   white race). Do NOT re-teach it. The seam states what is new: the Gobineau lesson
+   tested the argument's internal steps; Toynbee tests it from outside, against a
+   larger list, by the very standard Gobineau set himself (his pledge that one
+   counter-instance would falsify the whole theory — quote it here, short). Toynbee's
+   case (IV.2), in three steps: (i) the idol has a political history — Gobineau's
+   answer to revolutionary pamphleteers who cast the Gauls as throwing out their
+   Frankish lords, which Toynbee calls "telling nonsense" (quote with attribution;
+   the course does not adopt the word), and a linguistic premise — that peoples
+   whose languages are related must be related by blood — which Toynbee names as the
+   wrong inference (one sentence; forward Ref `reich-ancient-dna-and-the-indo-europeans`
+   for what ancient DNA later showed about that inference — a pointer only); (ii)
+   the tally: about half the civilizations drew on more than one race, and no race
+   made more than a few — the counter-instances Gobineau's pledge invited; (iii) the
+   positive claims made for the "Nordic" type cannot survive the correlation test of
+   IV.3 (below), because the same stock appears where civilization arose and where it
+   did not. Attempt 2: environment —
    the Hellenic theory (Hippocrates, Aristotle VII.7 — Ref
    `aristotle-political-animal-and-natural-slavery`): the Nile made Egypt, the steppe
    made the Scythians. Why it fails (IV.3): "the correlation must be proved to be
    fixed and permanent"; so find the same environment elsewhere — the North American
    prairie, the pampas, the Australian bush got cowboys and gauchos, not Scythians;
    the Colorado and Rio Grande got no Egypt; and Angkor Wat stands in the tropical
-   rain where the theory says no civilization can arise. Answer: both theories look
-   for a cause inside nature; the cause must be an encounter. This set piece is the
-   module's first treatment of the hereditarian argument; it is taught here as
-   Toynbee's refutation, at full strength and in his words, and returns in
-   `what-measures-greatness` with Spengler and the older climate theories beside it.
+   rain where the theory says no civilization can arise. Note for the seam: Gobineau
+   had already rejected environment (Essay I.vi — rich America stayed barbarous,
+   thin-soiled Attica flourished), so the two theories Toynbee rejects are rivals
+   that each attack the other's crude form; Toynbee's move is to reject both by one
+   test. Answer: both theories look for a cause inside nature — a fixed property of
+   the people or of the place; the cause must be an encounter. Where the strongest
+   reply enters (one paragraph, at full strength): a race theorist can answer that
+   the tally counts mixed populations, not the creative element within each, and that
+   a weaker, probabilistic claim is untouched by counter-instances; Toynbee's reply
+   is the Italy case of XIV (the same stock across the Republic, the Dark Ages, the
+   Renaissance and the decline after 1530 — "it is not more difficult to find
+   non-racial explanations"), which holds the population fixed and lets the outcome
+   vary. The lesson states how far that reaches and stops there: the modern,
+   statistical form of the hereditarian argument is the heredity module's, and
+   `what-measures-greatness` recalls this chapter beside Gobineau and Spengler.
 3. **Challenge and response: the mechanism.** Question: if not a thing (race, soil),
    what? Attempt: the reader may expect a cause of the same kind — a better thing.
    Why Toynbee refuses it: a perfect static state is set in motion only from outside
@@ -298,8 +357,9 @@ biological fate (Spengler) or a list of accidents? The chain:
    fatal consequences of his assault upon himself", and the wound is dated 431 BC;
    "a society does not ever die 'from natural causes', but always dies from suicide
    or murder — and nearly always from the former". Attempt 2: biological lifespan
-   (Spengler) or racial degeneration — refuted in XIV (the metaphor-as-law passage;
-   Italy's uninterrupted blood across its ups and downs). Answer (XVI): breakdown is
+   (Spengler) — answered in XIV by the metaphor-as-law passage — or racial
+   degeneration (Gobineau's mixture) — already met in link 2 by the Italy case; one
+   clause here, not a second treatment (L0f). Answer (XVI): breakdown is
    the creative minority's failure — mimesis is mechanical and brittle (the piper who
    becomes drill-sergeant); the minority stops creating and rules by force (becomes
    a dominant minority); its three forms are the "nemesis of creativity" — idolizing
@@ -341,9 +401,10 @@ biological fate (Spengler) or a list of accidents? The chain:
    argument he makes himself — history, science and fiction differ by the quantity
    of data, and civilizations are "few but vast". Where the lesson concedes: a
    theory tested on twenty-one cases, fourteen of them breakdowns, cannot
-   distinguish a law from a pattern; Toynbee's refutations of race and environment
-   are stronger than his positive law, because a refutation needs one
-   counter-instance and a law needs them all. Where it replies: unlike Spengler's,
+   distinguish a law from a pattern; Toynbee's arguments against race and
+   environment are easier to make than his positive law, because a claimed fixed
+   correlation falls to one counter-instance while a law needs them all — and, as
+   link 2 conceded, the counter-instance does not reach a probabilistic claim. Where it replies: unlike Spengler's,
    Toynbee's mechanism names an agent (the minority) and a criterion (self-
    determination), so it says what a counter-instance would look like — a
    civilization that kept creating and still broke down, or one murdered in full
@@ -368,11 +429,17 @@ cases, at our own peril".
    and opens its politics ("the education of Hellas"), Sparta conquers Messenia —
    the same case opens the book and anchors the arrested-civilization chapter.
    Build as a three-column figure and use it twice.
-3. **Gobineau's "Nordic man" and the race tally** (IV.2, text l. 205–300): the
-   pamphlet war after 1789 (Gauls vs Franks), Gobineau's inversion, "this idol of the
-   Teutonic market-place", the American "uses for the Nordic man"; then the table —
-   which races contributed to which civilizations — and the finding that about
-   half drew on more than one. Quote two short phrases; paraphrase the rest.
+3. **Gobineau's pledge against Toynbee's tally** (Gobineau ch. XVI, `gobineau/s4-ch14-16.txt`
+   l. 1364–1374; Toynbee IV.2, s2 l. 205–300): first Gobineau's own standard, quoted
+   short and recalled by Ref (one counter-instance falsifies the whole); then
+   Toynbee's account of where the "Nordic man" came from — the pamphlet war after
+   1789 (Gauls vs Franks), Gobineau's inversion, the Aryan-language inference
+   ("rightly inferred" a common language, "wrongly inferred" a common race), "this
+   idol of the Teutonic market-place", Chamberlain and the American "uses for the
+   Nordic man" (Refs `chamberlain-and-grant`); then the table — which races
+   contributed to which civilizations — and the finding that about half drew on more
+   than one. Gobineau's ten beside Toynbee's twenty-one in one small table makes the
+   test visible. Quote two short phrases of Toynbee's; paraphrase the rest.
 4. **The environment test** (IV.3, text l. 436–600): state the test as Toynbee does
    ("this correlation must be proved to be fixed and permanent"), then run it —
    steppe vs prairie/pampas/bush; Nile vs Colorado/Rio Grande; Angkor Wat in the
@@ -445,16 +512,31 @@ cases, at our own peril".
 - **Period language** (summary pedagogy field): "natives", "Negro intuition",
   "barbarians", racial and religious judgments of the 1930s–50s. Quote around them;
   do not reproduce them in the course's own voice; do not editorialise on them —
-  where Toynbee's own argument refutes race theory, that is the point to make.
+  where Toynbee's own argument tells against race theory, that is the point to make.
+- **Register rule.**
+  The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+  Toynbee's own words for Gobineau ("telling nonsense", "this idol of
+  the Teutonic market-place", "amusing account") are such labels: quote them as
+  Toynbee's, 1934, and let the tally and the correlation test carry the argument. The
+  same applies to the course's wording of the key idea "Race and environment
+  refuted": in the body, "Toynbee argues against" / "Toynbee's test", not "refuted"
+  in the course's voice.
+- **Do not re-teach Gobineau, Chamberlain, Grant or Spengler.** Each has its own
+  earlier lesson; recall each with a `<Ref>` and one clause (L0e, L11d). What this
+  lesson adds is Toynbee's comparative test of their claims, nothing of their
+  exposition.
 - **Do not re-teach Sparta.** One table recalling the earlier lesson's facts (Ref
   `sparta-as-test-case`), then Toynbee's reading. Likewise Augustine (Ref) and
   Ortega (Ref).
-- **No misconception slot** beyond the two Toynbee himself refutes (race,
+- **No misconception slot** beyond the two Toynbee himself argues against (race,
   environment) and "murder by barbarians", which is a documented popular view of
   Rome's fall and gets the refutation schema at link 6 (Gibbon as coroner).
 - **L8a:** Geyl, Trevor-Roper, Somervell (as editor), Martin Wight, Hughes —
   References only. Thucydides, Gibbon, Herodotus may be named as the texts Toynbee
-  quotes (named objects), not as authorities for the lesson's claims.
+  quotes (named objects), not as authorities for the lesson's claims. Spengler,
+  Gobineau, Chamberlain and Grant are thinkers whose texts are the course's material
+  (each has a lesson) and may be named, with their Refs; Stoddard (named beside
+  Grant in IV.2) goes in References only.
 - **Numbers:** keeper numbers are three — twenty-one civilizations, 431 BC, and
   "half the civilizations draw on more than one race". The 98%/2% of 300,000 years
   (IV.1) goes in a figure caption, not prose.
@@ -475,6 +557,12 @@ cases, at our own peril".
    Eastern; Syriac → Iranic + Arabic; Egyptiac alone; the four American societies —
    with the five tokens shown once as the "rib" between Hellenic and Western. From
    the summary's figure idea (II).
+2a. `draw:` single `<Figure>` — **Gobineau's ten against Toynbee's twenty-one**: two
+   columns; Gobineau's ten (Essay ch. XVI Note), each tagged with the race he credits;
+   Toynbee's list beside it, each tagged with the races IV.2's table says contributed
+   (one / more than one). Gobineau's pledge in a line above the table; caption states
+   only what the table shows (how many of the twenty-one draw on more than one
+   race). Course's own; placed at link 2, after the Ref to the Gobineau lesson.
 3. `draw:` `<FigureSequence>` (4 frames) — **The environment test**: frame 1 the
    Hellenic theory as an arrow steppe → Scythians, Nile → Egypt; frame 2 add the
    prairie/pampas/bush with cowboys/gauchos/stockmen, no Scythians; frame 3 add the
@@ -533,13 +621,16 @@ cases, at our own peril".
    abortive one, or no civilization at all? Then the other end: severity to the
    maximum (Greenland). Solution: the golden mean is exactly the hypothesis that
    rules both out, and the three-term comparison is how Toynbee locates it.
-4. **Claim to refute:** "Toynbee refutes the race theory by showing that the
+4. **Claim to refute (E3 spiral):** "Toynbee disposes of Gobineau by showing that the
    civilizations were made by mixed populations." Name the step that is missing (a
-   race theorist can reply that the creative element in each mixture was one race)
-   and state the step Toynbee actually relies on (the correlation test: the same
-   "race" produces a civilization in one place and none in another; Gobineau's own
-   Franks). Solution gives the stronger refutation and where it is in IV.2–IV.3.
-5. **Derivation the lesson did not do:** Toynbee refutes the environment theory with
+   race theorist can reply that the creative element in each mixture was one race —
+   which is exactly Gobineau's own reading of mixture, Ref
+   `gobineau-inequality-of-races`) and state the steps Toynbee actually relies on
+   (the correlation test: the same "race" produces a civilization in one place and
+   none in another; the Italy case across time). Then say which form of the race
+   claim neither step reaches (a probabilistic one). Solution gives the stronger
+   argument, where it is in IV.2–IV.3 and XIV, and its limit.
+5. **Derivation the lesson did not do:** Toynbee argues against the environment theory with
    one test — find the same environment elsewhere. Run the same test on his own
    positive thesis: name two "hard countries" that produced no civilization and say
    what Toynbee would need to add (the golden mean) to survive them, and whether the

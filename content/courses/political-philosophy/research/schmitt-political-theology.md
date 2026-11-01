@@ -17,9 +17,20 @@ goal: Analyze Schmitt's definition of the sovereign as the one who decides on th
   general will (`rousseau-inequality-and-general-will`); the tool
   "political theology" and the Eusebian emperor as God's representative, with
   the sentence that the Trinity ended political theology
-  (`constantine-and-representation`); Schmitt's own criterion of the political
-  and the sovereignty of whichever grouping decides the extreme case
-  (`schmitt-concept-of-the-political`).
+  (`constantine-and-representation`); Donoso Cortés's 1849 speech — when
+  legality fails, the choice is between the dictatorship of the insurrection
+  and the dictatorship of the government, "the dictatorship of the sabre" —
+  and his diagnosis of the liberal bourgeoisie as a "discussing class" that
+  answers "Christ or Barabbas?" with a committee (`donoso-cortes-on-dictatorship`,
+  prerequisite; concepts `dictatorship-of-the-sabre`, `discussing-class`):
+  Schmitt's ch. 4 READS Donoso, and the lesson recalls him with a Ref and a
+  clause, never re-teaches him; Schmitt's own criterion of the political and
+  the sovereignty of whichever grouping decides the extreme case
+  (`schmitt-concept-of-the-political`, prerequisite). From this module:
+  Pareto's governing class that will not use force and so passes "from the
+  lions to the foxes" (`michels-and-pareto-oligarchy-and-elites`) — the
+  sociologist's version of the liberal paralysis Schmitt's ch. 4 describes;
+  one clause, optional.
 - **Contributes:** One move: the sovereign is defined by the EXCEPTION, not
   the rule — "sovereign is he who decides on the exception" — with two
   consequences Schmitt draws from it: that legal order rests on a decision a
@@ -36,11 +47,14 @@ goal: Analyze Schmitt's definition of the sovereign as the one who decides on th
   `article-48-weimar`. The secularisation thesis is re-met in
   `voegelin-gnosticism` as the rival reading of the same modernity, and the
   "decision" returns in `strauss-natural-right-and-history` as the thing
-  Weber's fact–value distinction leaves to the will.
-- **Spine step:** "Liberal Europe breaks: Mann sets Kultur against Zivilisation,
-  Ortega diagnoses the mass-man, Schmitt names the political as friend and
-  enemy and the sovereign as he who decides the exception — and Weimar is the
-  case"
+   Weber's fact–value distinction leaves to the will. Whether a man who held
+   that a wrong decision is still valid could tell, in 1933, which decision to
+   resist is `the-right-in-1933` (next module) — a forward clause only.
+- **Spine step:** "Liberal Europe breaks: elite theorists show that a minority
+  always rules, Mann sets Kultur against Zivilisation, Spengler foretells the
+  West's winter, Ortega diagnoses the mass-man, Schmitt names the political as
+  friend and enemy and the sovereign as he who decides the exception — and
+  Weimar is the case"
 
 ## Sources to consult
 
@@ -341,8 +355,12 @@ theology asked about miracles.
    secularised theological concepts".
 
 6. **What happened after 1848, and whose side is Schmitt on?** Ch. 3 end and
-   ch. 4. Legitimacy collapsed in 1848 — "royalism is no longer because there
-   are no kings" (Donoso Cortés) — and the decisionist's only answer is
+   ch. 4. The reader has Donoso's 1849 argument from its own lesson (Ref
+   `donoso-cortes-on-dictatorship`: legality cannot decide the case it was not
+   written for; the dictatorship of the sabre against that of the dagger) —
+   recall it in one clause; what is NEW here is Schmitt's use of it. In
+   Schmitt's reading, legitimacy collapsed in 1848 — "royalism is no longer
+   because there are no kings" — and the decisionist's only answer is
    dictatorship, "the solution that Hobbes also reached" (l.2984–3024). The
    counter-revolutionary philosophers are Schmitt's own tradition (ch. 4
    l.3033–3118): their centre is the decision, "a big either/or" admitting no
@@ -351,17 +369,20 @@ theology asked about miracles.
    synonymous", "any government is good once it is established", because what
    matters is that a question be decided "without delay and without appeal"
    (Ref `maistre-and-bonald`: the executioner as the bond; the thirteen theses
-   become "every order rests on a decision"). Donoso: the bourgeoisie is "una
-   clasa discutidora", a class that moves every battle onto the plane of talk
-   (l.3225–3230); liberal constitutionalism paralyses the king through
-   parliament but keeps him on the throne, as deism excludes God but keeps his
-   existence; the list of liberal contradictions ending "What did it actually
-   want?" (l.3236–3252); "Christ or Barabbas?" answered with a proposal to
-   adjourn or appoint a commission (l.3313–3316); "Dictatorship is the
-   opposite of discussion" (l.3367). The anthropology (l.3132–3222): the
+   become "every order rests on a decision"). The discussing class and "Christ
+   or Barabbas?" answered with a commission are Donoso's (Ref
+   `donoso-cortes-on-dictatorship`, concept `discussing-class` — recalled, not
+   re-explained; l.3225–3230, 3313–3316 are Schmitt quoting him). Schmitt's own
+   additions, which ARE this lesson's matter: liberal constitutionalism paralyses
+   the king through parliament but keeps him on the throne, as deism excludes God
+   but keeps his existence — the theology/state parallel of link 5 applied to
+   1830–48; the list of liberal contradictions ending "What did it actually
+   want?" (l.3236–3252); and the generalisation "Dictatorship is the opposite of
+   discussion" (l.3367). The anthropology (l.3132–3222): the
    anarchist's good people and corruptible magistrate vs Donoso's radicalised
-   original sin — and Schmitt's own aside that Donoso's exaggeration is a
-   political, not a dogmatic, decision. The anarchist paradox: Bakunin must
+   original sin (Ref, one clause) — and Schmitt's own aside, which is new and
+   is the point, that Donoso's exaggeration is a political, not a dogmatic,
+   decision. The anarchist paradox: Bakunin must
    "decide against the decision" and becomes "in theory the theologian of the
    antitheological and in practice the dictator of an anti-dictatorship"
    (l.3367–3478). Ref `burke-reflections` for contrast: Burke's inheritance is
@@ -372,8 +393,12 @@ theology asked about miracles.
 7. **What kind of dictatorship?** Strong l.223–235, Schwab l.1096–1116: Die
    Diktatur (1921) distinguishes the COMMISSARIAL dictator, who suspends the
    constitution in order to restore the conditions under which it can
-   function (Lincoln in the Civil War; the Roman dictator of the Republic,
-   Ref `cicero-mixed-constitution`), from the SOVEREIGN dictator, who uses the
+   function (Lincoln in the Civil War; the Roman dictator of the Republic —
+   appointed by a consul for a named task and at most six months; anchor it in
+   one clause, since `polybius-anacyclosis-and-rome` taught the consuls, senate
+   and people but not the dictatorship, and Machiavelli's defence of it,
+   Discourses I.34, was not part of `machiavelli-discourses-republic`'s
+   reading), from the SOVEREIGN dictator, who uses the
    crisis to abolish the constitution and create the conditions for a new one
    (the National Convention of 1792; de Gaulle in 1958 as Strong's example).
    Schwab's three questions (l.1026–1055): who decides the exception exists,
@@ -448,11 +473,12 @@ missing criterion".
    method — "one could as well derive relativity theory from currency
    relations" — as the paragraph that explains what a sociology of concepts is
    NOT.
-8. **Maistre on infallibility and Donoso's Barabbas** (ch. 4 l.3092–3118,
-   3313–3316): the two quotations and the inference from each — decided
-   "without delay and without appeal" matters more than how; the commission
-   of investigation as the liberal answer to the only question that cannot be
-   deferred. Then "Dictatorship is the opposite of discussion".
+8. **Maistre on infallibility, read by Schmitt** (ch. 4 l.3092–3118): the
+   quotation and the inference — decided "without delay and without appeal"
+   matters more than how. Donoso's Barabbas (l.3313–3316) is recalled in ONE
+   clause with a Ref — the set piece belongs to `donoso-cortes-on-dictatorship`.
+   Then Schmitt's own generalisation, "Dictatorship is the opposite of
+   discussion", and the deism parallel for the July Monarchy.
 9. **The Constantine IV anecdote** (Voegelin l.4195–4203) as the course's own
    evidence for the objection: an army asks for two co-emperors to image the
    Trinity; the suggestion "sounds more like a joke"; the noses are cut off.
@@ -473,10 +499,9 @@ missing criterion".
   5: the eighteenth-century belief in a creator who does not intervene).
   Immanence / transcendence (link 5: within the world / beyond it). Sociology
   of concepts (link 5). Legitimacy (link 6: the title by which power is held,
-  as distinct from legality — Weimar's word for the fight). Donoso Cortés
-  (link 6: Spanish diplomat and Catholic thinker, 1809–1853, whose 1849
-  speech on dictatorship Schmitt quotes). Clasa discutidora (link 6, Spanish:
-  "the discussing class"). Commissarial / sovereign dictatorship (link 7:
+  as distinct from legality — Weimar's word for the fight). Donoso Cortés and
+  the "discussing class" (link 6): NOT anchored afresh — he has his own lesson;
+  Ref `donoso-cortes-on-dictatorship` with one clause of reminder. Commissarial / sovereign dictatorship (link 7:
   from commissar, one commissioned by another; sovereign, one who commissions
   himself). Katechon only if used (Strong l.780–796; better omitted). Article
   48, Reichstag, Reich president (link 2, one paragraph: the Weimar
@@ -497,8 +522,15 @@ missing criterion".
 - **Do not teach Article 48's history here.** One paragraph defines it; the
   counts, the Preussenschlag and 1933 are the next lesson's. The seam at
   link 7 says so.
-- **Do not re-teach** Bodin, Hobbes, Maistre, Rousseau, Locke's prerogative,
-  Voegelin's representation: Ref and one clause each. `constantine-and-
+- **Do not re-teach** Bodin, Hobbes, Maistre, Donoso Cortés (the 1849 speech,
+  the sabre and the dagger, the discussing class, Barabbas — all taught in
+  `donoso-cortes-on-dictatorship`), Rousseau, Locke's prerogative, Voegelin's
+  representation: Ref and one clause each. The lesson's matter is what Schmitt
+  DOES with them.
+- **Register (exact rule).** The course passes no verdict of its own on any
+  author or idea: no condemning or approving labels in its own voice.
+  Judgement comes only through argument and evidence; a label may appear only
+  inside a quotation, with who applied it and when. `constantine-and-
   representation` already introduced "political theology" as a concept id;
   this lesson REINFORCES it and introduces `secularization-thesis` as the
   specifically Schmittian claim.
@@ -592,7 +624,10 @@ missing criterion".
 1. **Retrieval (the one warm-up):** State the definition of sovereignty and
    give its two readings of "decides on"; then recall from `bodin-sovereignty`
    Bodin's test for who is sovereign and say in one sentence how Schmitt's
-   differs (E3: the marks vs the exception; both ask who can refuse).
+   differs (E3: the marks vs the exception; both ask who can refuse). Then
+   recall from `donoso-cortes-on-dictatorship` the choice Donoso put to the
+   Cortes in 1849 and say which of the two readings of "decides on" it is
+   (deciding WHAT to do, once the exception is granted).
 2. **Document reasoning / sourcing drill:** The opening paragraph of ch. 3
    ("All significant concepts…", l.2466–2478) with metadata (Munich/Bonn,
    March 1922, a professor of public law writing for jurists in a republic

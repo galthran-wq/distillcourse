@@ -22,8 +22,10 @@ goal: Evaluate Huntington's hypothesis against the published tests of conflict a
   cases "at our own peril" — which this lesson answers for Huntington with a dataset
   rather than a sample. From the course's earlier applications (`sparta-as-test-case`,
   `altar-of-victory`, `english-revolution-as-test`, `assignats`, `british-franchise`,
-  `article-48-weimar`): the habit of reading a real artefact against a theory and
-  naming the departures.
+  `dreyfus-affair-as-test`, `article-48-weimar`, `udhr-read-against-the-right`, and
+  above all `the-cognitive-elite`, the module just before, which also read a
+  published statistical argument against a theory): the habit of reading a real
+  artefact against a theory and naming the departures.
 - **Contributes:** The module's application (L16): a hypothesis of 1993 checked thirty
   years on. The artefact is twofold — the published statistical tests of the
   hypothesis on dyadic conflict data (Russett–Oneal–Cox 2000; Henderson–Tucker 2001;
@@ -35,15 +37,25 @@ goal: Evaluate Huntington's hypothesis against the published tests of conflict a
   across; the alignments that cut across the lines) and refutes (the Russia–Ukraine
   corollary) the hypothesis — and names what the tests measure that the hypothesis
   did not claim.
-- **Hands off:** The module ends here. What stays open goes to the next module and the
-  last: the question Huntington's fifth reason raised — whether a people's identity is
-  inherited or chosen — becomes the question of the nation and who may join it
-  (`the-nation-and-its-defenders`, where *Who Are We?*, not obtained, is reported as
-  stated by others); and the method of this lesson — a theory read against a count
-  and a case, with departures named — is the method of `the-2015-crisis-read-three-ways`.
-- **Spine step:** "The question widens from the state to the civilization: Spengler's
-  organisms, Toynbee's challenge and response, Huntington's fault lines — three
-  measures of greatness and three accounts of decline, tested on the record"
+- **Hands off:** The module ends here, and the next module (why-the-west) opens with
+  `weber-only-in-the-west`. The hand-off is the one premise all three of the module's
+  authors share and none of them explains: that the West is singled out — Spengler's
+  Faustian Culture in its winter, Toynbee's one civilization "not clearly
+  disintegrating" that has "Westernised all", Huntington's West "at an extraordinary
+  peak of power" whose ideas (individualism, liberalism, constitutionalism, human
+  rights, the rule of law, the separation of church and state) "often have
+  little resonance" elsewhere. The count has just tested who fights whom; it has said nothing
+  about why that list of ideas, and that power, arose in one civilization and not
+  another. That question is the next module's, and its first answer — Weber's,
+  from a religious ethic — is the next lesson. Two later threads, one clause each in
+  the Conclusion at most: the question Huntington's fifth reason raised (identity
+  inherited or chosen) returns as the nation and who may join it, with Huntington's
+  own answer for the United States in `albions-seed-and-who-are-we` (Who Are We?,
+  now read); and the method of this lesson — a theory read against a count and a
+  case, departures named — is the method of `the-2015-crisis-read-three-ways`.
+- **Spine step:** "The question widens from the state to the civilization: against
+  Spengler's organisms, Toynbee's challenge and response and Huntington's fault lines
+  — three measures of greatness and three accounts of decline, tested on the record"
 - **APPLICATION spec (L16):**
   - *The artefact (what real thing is read):* (1) three published tests of the
     hypothesis on interstate conflict data — the papers themselves, their tables,
@@ -182,8 +194,13 @@ goal: Evaluate Huntington's hypothesis against the published tests of conflict a
 - **Schmitt, Concept §§III, VI** — index 34 — only if the writer uses the realist
   objection's kinship with Schmitt's "states, not humanity"; Ref, one clause.
 - **Strauss–Cropsey:** not applicable.
-- **Who Are We? (2004):** NOT obtained; not used here; the gap is restated in
-  References as the module's open item.
+- **Who Are We? (2004)** — index 76, read in full; not used here. It belongs to
+  `albions-seed-and-who-are-we`; at most one clause of forward reference in the
+  Conclusion.
+- **Weber, Author's Introduction (1920)** — index 108; text
+  `research/texts/weber/protestant-ethic-parsons-routledge.txt` l. 762–872: FORWARD
+  only, for the solution of the FORWARD exercise (one sentence and a `<Ref>` to
+  `weber-only-in-the-west`); nothing of Weber's argument here.
 
 ## EXPLANATION PLAN (L0)
 
@@ -321,12 +338,15 @@ chain:
    Huntington's own example; and the claim that alignments would run increasingly
    along civilizational lines "as the conflict continued", on his own first case.
    Then the module's close: of the three theories, the one that could be checked was
-   checked and gave a mixed answer with its weakest part refuted; the two that cannot
+   checked and gave a mixed answer, with one corollary its author stated as a test contradicted by the record; the two that cannot
    be checked stand or fall by their measures (Ref `what-measures-greatness`). The
-   problem that stays open: whether what held Bosnia's parties apart and Ukraine's
-   together or apart was civilization, nation or state — which is the next module's
-   question (Ref `the-nation-and-its-defenders`), with Huntington's own answer for
-   the United States, *Who Are We?*, still unread by the course.
+   problem that stays open, stated in the Conclusion: the count tested who fights
+   whom, and took for granted what all three authors took for granted — that the
+   West is the civilization the others react to, at a "peak of power", carrying
+   ideas the Rest call Western rather than universal. Why that list of ideas and that
+   power arose in one civilization is the question the next module asks, and its
+   first answer starts from a religious ethic (Ref `weber-only-in-the-west`, one
+   sentence; no Weber content here).
 
 Headings as claims or questions: "What would count as a test?" / "Which civilization
 is a state in? The coding problem" / "The count: across the lines and within them" /
@@ -426,7 +446,10 @@ refutes".
   Islamic groups involved in many conflicts, most of them with other Muslims. The
   lesson gives the finding as the papers give it, bound, and does not generalise to
   "Islam has bloody borders" as proven or refuted.
-- **Who Are We? gap:** restated in References; not used.
+- **Who Are We?** is read (index 76) and belongs to `albions-seed-and-who-are-we`;
+  earlier versions of this brief called it a gap — that is wrong. Not used here.
+- **Register rule.**
+  The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
 - **L8a:** Russett, Oneal, Cox, Henderson, Tucker, Chiozza, Fox, Tusicisny, Silber,
   Little, Malcolm, Burg, Shoup, Holbrooke — References only. In the body the tests
   are "the published tests", "one study", "a second"; the datasets (Correlates of
@@ -542,14 +565,18 @@ refutes".
    state interest in NATO's credibility — and defend the ranking from the lesson's
    dated record. Then say which of the module's three measures of greatness (Ref
    `what-measures-greatness`) the intervention counts under, if any.
-8. **FORWARD (E7)** → `the-nation-and-its-defenders`: In Bosnia the three peoples
-   spoke one language and had lived in one state for seventy years; in Ukraine two
-   Orthodox Slavic peoples went to war. Write down what, in each case, the parties
-   themselves said they were fighting as — a civilization, a nation, a state — and
-   what that implies for the unit the next module must define. The solution says in
-   one sentence that the next module's first lesson asks what a nation is before
-   anyone can disagree about politics, and that Huntington's own answer for the
-   United States is the book the course could not obtain, with `<Ref>`.
+8. **FORWARD (E7)** → `weber-only-in-the-west`: Huntington lists the ideas he says
+   the West has and the Rest resist — individualism, liberalism, constitutionalism,
+   human rights, equality, liberty, the rule of law, democracy, free markets, the
+   separation of church and state. For each, write down whether you know of an
+   earlier or non-Western instance (the reader has some from the course: the Greek
+   polis, Polybius's Rome, Chinese examination officials named in passing, the
+   Islamic trade world), and then state what, if each has precedents elsewhere,
+   could still be peculiar to the West — the things themselves, or the way they were
+   combined and made systematic. The solution says in one sentence that the next
+   lesson opens on exactly this distinction — a list of things "found elsewhere, but
+   not in this form" written in 1920 — and asks what kind of claim it is, with
+   `<Ref>`.
 
 ## Nietzsche cross-course links (where his ideas enter)
 

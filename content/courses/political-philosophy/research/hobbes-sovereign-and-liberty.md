@@ -14,8 +14,9 @@ goal: Analyze the powers Hobbes gives the sovereign, the liberties he leaves the
   law-making, indivisible, no mixed state, no subject judges the sovereign — but bound by God
   and nature, fundamental laws, covenants and property. From `aquinas-law-and-kingship`: the
   sovereign exempt from the coercive but not the directive force of law; an unjust law is
-  violence. From `aristotle-regimes-and-the-middle` and `cicero-mixed-constitution`: the ancient
-  liberty of sharing in rule; the mixed constitution. From `machiavelli-discourses-republic`:
+  violence. From `aristotle-regimes-and-the-middle`: the ancient liberty of sharing in rule
+  (ruling and being ruled in turn). From `polybius-anacyclosis-and-rome`: the mixed constitution
+  as three parts each able to block the others. From `machiavelli-discourses-republic`:
   conflict as the source of liberty — the thesis XXIX turns into a disease.
 - **Contributes:** The one move: from "the sovereign is not a party and every subject is his
   author" derive the twelve rights (he cannot breach, forfeit, be accused or punished; he judges
@@ -26,21 +27,28 @@ goal: Analyze the powers Hobbes gives the sovereign, the liberties he leaves the
   the diagnosis of England's war. The lesson closes on the paradox: the most absolute sovereign
   in the tradition, built from equality and consent, leaving a private liberty the ancients
   never had.
-- **Hands off:** Open problems: (i) the test — does the record of 1642–1660 behave as XXIX says?
-  `english-revolution-as-test`. (ii) The objection the next module opens with: an absolute
-  sovereign is "judge in his own cause" and so still in the state of nature with his subjects
-  (`locke-property-and-consent`). (iii) Two forward frames, one clause each: the reading of
+- **Hands off:** Open problems: (i) the FOUNDATION, attacked from the royalist side — the next
+  lesson, `filmer-patriarcha`. Hobbes has built the most absolute sovereign in the tradition on
+  natural equality and the consent of men born free; a royalist contemporary will accept every
+  right this lesson lists and reject the premise: no one is born free, every man is born a son
+  under a father's command, and paternal power is natural, not (as Leviathan XX says) a
+  dominion the child consents to. The FORWARD exercise lands on that premise. (ii) The test —
+  does the record of 1642–1660 behave as XXIX says? `english-revolution-as-test`, after Filmer.
+  (iii) The liberal objection, which arrives only in the next module and against BOTH Hobbes and
+  Filmer: an absolute sovereign is "judge in his own cause" and so still in the state of nature
+  with his subjects (`locke-property-and-consent`) — one clause. (iv) Two forward frames, one
+  clause each: the reading of
   Hobbes as a moralist of individuality — the whole edifice protects the individual will from
   other wills (`oakeshott-rationalism-in-politics`), and "protection and obedience" restated as
   the cogito of the state (`schmitt-concept-of-the-political`).
-- **Spine step:** "Wars of religion force a new answer: one sovereign power above every faction,
-  bound by no law of its own making — Bodin's definition, Hobbes's derivation from fear, and the
-  English Revolution as the test"
+- **Spine step:** "Christendom builds a law above kings; Machiavelli breaks it; the wars of
+  religion force one sovereign power above every faction — Bodin's definition, Hobbes's
+  derivation from fear, Filmer's from fatherhood — and the English Revolution tests them"
 
 ## Sources to consult
 
 - **Hobbes, Leviathan (1651), Part II (Gutenberg #3207)** — summaries.json index 21; text at
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/hobbes-leviathan/pg3207-full.txt`
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/hobbes-leviathan/pg3207-full.txt`
   (line numbers are this file's). Chapters begin: XVIII l.5720, XIX l.6136, XX l.6537, XXI
   l.6881, XXIV l.8067, XXVI l.8619, XXVIII l.10159, XXIX l.10571, XXX l.11024. Read XVIII, XIX
   (first half), XXI, XXVI (first half), XXIX in full; XX, XXIV, XXVIII, XXX for one passage
@@ -108,7 +116,7 @@ goal: Analyze the powers Hobbes gives the sovereign, the liberties he leaves the
   them in such a motion, as not to hurt themselves … as Hedges are set, not to stop Travellers,
   but to keep them in the way" — search "Hedges"); equal justice; taxes on consumption.
 - **Smith, Open Yale L14** — index 9;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/oyc/lecture-14.txt`:
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/oyc/lecture-14.txt`:
   Ch1 (sovereign as office and artificial person, not owner — "contra Louis XIV"); Ch2 l.51–52
   (the command theory of law; David and Uriah; just law vs good law; hedges); Ch3 l.64 (liberty
   as immunity from service; Lucca; the Hobbesian liberal state); Ch4 (the bourgeois citizen;
@@ -116,7 +124,7 @@ goal: Analyze the powers Hobbes gives the sovereign, the liberties he leaves the
   course's own; name in References.
 - **Oakeshott, "The Moral Life in the Writings of Thomas Hobbes" (Rationalism in Politics, 1962,
   pp. 248–294)** — index 43;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/oakeshott/rationalismi-s6-hobbes.txt`.
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/rationalismi-s6-hobbes.txt`.
   THE objection/forward frame of this lesson: s.1 pp. 248–250 (three idioms of the moral life —
   communal ties, individuality, common good; Hobbes as the philosopher of INDIVIDUALITY); s.2
   pp. 253–260 (felicity; pride and fear; "the tame man" who accepts reason's "low-grade (if
@@ -130,35 +138,50 @@ goal: Analyze the powers Hobbes gives the sovereign, the liberties he leaves the
   the thesis as the course's own ("the reading of Hobbes as a moralist of individuality") with
   the name in References.
 - **Schmitt, The Concept of the Political V and VII** — index 34;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/schmitt/concept-of-political-miller-ia.txt`
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/schmitt/concept-of-political-miller-ia.txt`
   (~l.1374–1382: "protego ergo obligo is the cogito ergo sum of the state"; VII l.1797–1871:
   sovereignty of law means the rule of those who decide its content — Hobbes). Forward hook ONLY
   (one clause; the concept id `protection-and-obedience` records the restatement); copyrighted;
   name in References.
 - **Strauss, Natural Right and History V.A pp. 181–184** — index 35;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/strauss/nrh-s5-ch5a-hobbes.txt`:
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/strauss/nrh-s5-ch5a-hobbes.txt`:
   the fundamental fact is a RIGHT (self-preservation), duties are conditional, "the state
   safeguards rights" — Hobbes as "the founder of liberalism". Copyrighted; paraphrase; the
   thesis supports the paradox in link 7; name in References.
 - **Voegelin, New Science of Politics V.5 and VI.5** — index 36;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/voegelin/new-science-of-politics-full.txt`
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/voegelin/new-science-of-politics-full.txt`
   (~l.5830–6136; ~l.6977–7078): "no public truth but peace", the sovereign controls doctrine;
   Leviathan as the omnipotent state that eliminates debate about its own truth. OPTIONAL frame
   for right 6 (judge of doctrines) — it connects to `constantine-and-representation`'s
   "representation" vocabulary (Ref). Paraphrase; name in References.
 - **Bodin, Six Books I.8, I.10, II.1, II.5** — index 20;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/bodin/six-books-tooley-1955-full.txt`
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/bodin/six-books-tooley-1955-full.txt`
   l.2406ff, l.2696, l.3458ff, l.4076ff — backward Refs for the two-column comparison (Figure 7).
 - **Aquinas, ST I-II 96.4–5** — index 18 — backward Ref: "sovereign exempt from the coercive
   force" is the ancestor of XXVI's "not subject to the civil laws"; "unjust law is violence" is
   what XXVI's "no law can be unjust" denies.
-- **Strauss & Cropsey (eds.), History of Political Philosophy, 3rd ed., ch. "Thomas Hobbes"** —
-  text landing at
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/strauss-cropsey/history-of-political-philosophy.txt`;
-  consult as the standard close reading of XVIII–XXI and XXIX. FILE EMPTY at brief time — check.
+- **Hobbes, Leviathan XX "Dominion Paternall How Attained Not By Generation, But By Contract"**
+  — same file, l.6590–6660: paternal dominion is "not so derived from the Generation, as if
+  therefore the Parent had Dominion over his Child because he begat him; but from the Childs
+  Consent, either expresse, or by other sufficient arguments declared"; two parents are equally
+  parents, so generation alone settles nothing; "If there be no Contract, the Dominion is in the
+  Mother"; dominion follows preservation ("it ought to obey him by whom it is preserved"); and
+  l.~6744 "a great Family if it be not part of some Common-wealth, is of it self, as to the
+  Rights of Soveraignty, a little Monarchy". Not taught in the body beyond one clause — it is
+  the premise the FORWARD exercise inverts and the next lesson attacks.
+- **Strauss & Cropsey (eds.), History of Political Philosophy, 3rd ed., ch. "Thomas Hobbes"
+  (L. Berns, pp. 396–420)** — OCR text at
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/strauss-cropsey/history-of-political-philosophy.txt`,
+  lines 19286–20513. For this lesson pp. 406–415 (ll. ~19740–20230): the deduction of the
+  sovereign's rights from the contract and the right to punish as the one right not given
+  (l.19740–19753); obligation and protection — "he that has the power to protect all also has
+  the power to oppress" (l.19864–19884, the objection in link 7); the forms of government and
+  "the liberty of the citizen in each form … is the same" (l.19927–19971); the case against the
+  mixed regime (l.20010–20022); the seditious doctrines (l.20132–20184). Standard close reading
+  to check links 1–6; copyrighted — paraphrase; Berns in References.
 
-Names ONLY in References: Oakeshott, Schmitt, Strauss, Voegelin, Smith, Skinner (Liberty before
-Liberalism — the "ancient liberty" debate), Pettit, Warrender, Coke (Hobbes names him: Sir
+Names ONLY in References: Oakeshott, Schmitt, Strauss, Voegelin, Smith, Berns, Skinner (Liberty
+before Liberalism — the "ancient liberty" debate), Pettit, Warrender, Coke (Hobbes names him: Sir
 Edward Coke, the common lawyer — he may be named in body as the object of Hobbes's attack,
 L8a(b)).
 
@@ -201,7 +224,7 @@ by — and whether the subject who authorised him has anything left.
    punishment is not a right the subjects gave (none can give up the right to defend himself)
    but the sovereign's own natural right to everything, left untouched.
 3. **Can the rights be divided?** Obvious attempt: England's own constitution — King, Lords and
-   Commons sharing power (the reader will read the 1642 Answer in the next lesson). Hobbes
+   Commons sharing power (the reader will read the 1642 Answer in the module's application lesson, `english-revolution-as-test`). Hobbes
    (XVIII l.6028–6060): "These Rights Are Indivisible … incommunicable, and inseparable"; "a
    Kingdome divided in it selfe cannot stand"; "if there had not first been an opinion received
    of the greatest part of England, that these Powers were divided between the King, and the
@@ -227,7 +250,7 @@ by — and whether the subject who authorised him has anything left.
    with one another; to choose their own aboad, their own diet, their own trade of life, and
    institute their children as they themselves think fit" — "The Greatest Liberty Of Subjects,
    Dependeth On The Silence Of The Law" (l.7218). Then the attack on ANCIENT liberty
-   (l.7069–7100, Ref `aristotle-regimes-and-the-middle`, `cicero-mixed-constitution`): the
+   (l.7069–7100, Ref `aristotle-regimes-and-the-middle`, `polybius-anacyclosis-and-rome`): the
    liberty the Greek and Latin authors praise is the commonwealth's, not the man's — "There is
    written on the Turrets of the city of Luca in great characters at this day, the word
    LIBERTAS; yet no man can thence inferre, that a particular man has more Libertie, or
@@ -273,7 +296,7 @@ by — and whether the subject who authorised him has anything left.
    Person, but three" — "I have seen a man, that had another man growing out of his side".
    Lesser diseases: want of money (the "nutritive faculty" starved), monopolies, "the Popularity
    of a potent Subject", great towns, "the Liberty of Disputing against absolute Power".
-   Dissolution by conquest ends obligation (link 5 again). This is the chapter the next lesson
+   Dissolution by conquest ends obligation (link 5 again). This is the chapter the application lesson
    tests — the writer does NOT narrate 1642–60 here; one clause names what the application
    lesson reads.
 7. **The OBJECTION at full strength: absolutism or the first liberalism?** State the paradox as
@@ -289,15 +312,18 @@ by — and whether the subject who authorised him has anything left.
    by protecting it from other wills; the sovereign is an umpire of a race whose runners want to
    be "foremost"; the retained rights, the silence of the law, "the end of obedience is
    protection", XXX's hedges ("not to stop Travellers, but to keep them in the way"), the "good
-   law" that is "needful … and perspicuous" as distinct from a merely just one — a state that
+   law" that is "needful … and perspicuous" as distinct from one that is only just — a state that
    exists so that each may pursue his own felicity; and the moral cost that reading names: the
    whole arrangement is written for "the tame man", who trades felicity for security, while
    Hobbes himself knew the proud man who "knows how to belong to himself" and called justice "a
    Nobleness or Gallantness of courage (rarely found)" (XV) — and did not build on him because
    such men are rare. The lesson concedes that both readings quote Hobbes correctly, states
-   where they divide (whether "peace" is the end or the means), and hands the question forward:
-   the next module's first author will say the absolute sovereign is "judge in his own cause"
-   and so still in the state of nature (`locke-property-and-consent`); a twentieth-century
+   where they divide (whether "peace" is the end or the means), and hands the question forward.
+   First, and next: a royalist will accept every right in this chapter and refuse its
+   foundation — men are not born equal and unbound but born sons, under command
+   (`filmer-patriarcha`; one clause, no exposition). Later: the next module's first author will
+   say the absolute sovereign, whether made by covenant or inherited from Adam, is "judge in his
+   own cause" and so still in the state of nature (`locke-property-and-consent`); a twentieth-century
    jurist will restate "the end of obedience is protection" as the first truth of every state
    (`schmitt-concept-of-the-political`); and the postwar reading of Hobbes as the first theorist
    of RIGHTS before duties (`strauss-natural-right-and-history`) will make this chapter the
@@ -319,7 +345,7 @@ stated".
    David and Uriah (XXI l.7024–7030): iniquity to God, no injustice to Uriah. The sentence the
    whole chapter turns on.
 3. **The twelve rights** (XVIII) as the table of Figure 1, each row with its one-line "because"
-   from the end of the institution and the 1640s claim that denied it (reserved for the next
+   from the end of the institution and the 1640s claim that denied it (reserved for the application
    lesson's Exercise; here only Coke's law and a Presbyterian assembly as the two examples
    Hobbes himself names).
 4. **Multiplying glasses and prospective glasses** (XVIII l.6127–6130): passions magnify the
@@ -349,7 +375,7 @@ stated".
   imitated; "the children of Peleus" (Medea's trick — the daughters cut their father to pieces
   to make him young); the Council of State (the executive of the English Commonwealth after
   1649). Three per section.
-- **Do not narrate the English civil war here** — one clause per XXIX item; the next lesson
+- **Do not narrate the English civil war here** — one clause per XXIX item; the application lesson
   reads the documents. Do not re-teach the covenant, author/actor, or Bodin's marks — `<Ref>`
   plus a clause.
 - **The real misreading (L13):** "Hobbes gives the sovereign unlimited power over the subject's
@@ -367,11 +393,13 @@ stated".
 - **Numbers (L12):** none beyond the chapter numbers and 1651–52; the "twelve" rights and
   "nineteen" laws are the keepers.
 - **Spelling:** 1651 orthography inside quotations; gloss once.
-- **No moralising:** neither "Hobbes the totalitarian" nor "Hobbes the liberal" as the lesson's
-  verdict.
+- **Register:** The course passes no verdict of its own on any author or idea: no condemning or
+  approving labels in its own voice. Judgement comes only through argument and evidence; a label
+  may appear only inside a quotation, with who applied it and when. The two readings in link 7
+  are stated as readings; neither is the lesson's verdict.
 - **Dossier thin:** Behemoth (Hobbes's own history of the war) is NOT in the dossier — do not
-  cite; De Cive neither; the Strauss–Cropsey chapter file is empty; Oakeshott's essay is the
-  only secondary on the liberty chapters and is copyrighted.
+  cite; De Cive neither; the Strauss–Cropsey chapter (OCR) and Oakeshott's essay are the
+  secondary readings on the liberty chapters, both copyrighted.
 
 ## FIGURE PLAN
 
@@ -441,7 +469,7 @@ stated".
    subject's obligation end, and WHO judges that the moment has come? Show that the only
    available judge is the subject — and that this reintroduces the "private judgement" XXIX
    names as the first seditious doctrine. The solution states the tension plainly and says the
-   next lesson watches England meet it in 1646–51.
+   application lesson (`english-revolution-as-test`) watches England meet it in 1646–51.
 4. **Claim to refute (E6b):** "Hobbes's sovereign may do anything whatever to a subject, and the
    subject must comply." Name the steps that fail (retained rights; the substituted soldier;
    "iniquity" is still possible and God punishes it; obedience ends with protection) and state
@@ -465,13 +493,17 @@ stated".
    judges which doctrines may be taught; XXVI — no law can be unjust) and state what would have
    to be true for it to survive (that "peace" in Hobbes is only a means to each man's felicity,
    never an end — the dividing line the lesson named in link 7).
-8. **FORWARD (E7) → `english-revolution-as-test`:** take XXIX's "Mixt Government" (money on one
-   assembly, command on one man, law on the consent of a third) and write, in two or three
-   sentences, what a KING'S adviser would have to assert to defend England as a mixture of three
-   estates that is nonetheless one commonwealth — and name which of Hobbes's twelve rights that
-   defence must concede to Parliament. The solution says in one sentence that the king's
-   advisers wrote exactly such a defence in June 1642 and that the next lesson reads it against
-   XXIX, with a `<Ref>`.
+8. **FORWARD (E7) → `filmer-patriarcha`:** Leviathan XX says a parent's dominion over a child
+   comes "not … from the Generation" but "from the Childs Consent", and that in nature it is the
+   mother's. Reverse the premise: suppose dominion comes from generation itself and belongs to
+   the father, and that every man alive was born under such a dominion. Using only this lesson's
+   rights and XVIII's argument that a sovereign made by covenant cannot be accused or punished,
+   derive (a) whether any man was ever in a position to covenant at all, (b) whether the
+   sovereign's twelve rights still follow, and (c) what becomes of "the end of obedience is
+   protection". The solution shows that the rights survive and the covenant disappears — the
+   sovereign's power becomes a father's, inherited rather than authorised — and says in one
+   sentence that the next lesson's author builds kingship on exactly this premise, with a
+   `<Ref>`.
 
 ## Nietzsche cross-course links (where his ideas enter)
 

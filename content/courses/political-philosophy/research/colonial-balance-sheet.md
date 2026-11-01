@@ -17,7 +17,19 @@ goal: Evaluate the argument that colonialism was on balance beneficial and legit
   test and so invites exactly the accounting this lesson examines. From
   `vitoria-right-to-the-americas`: "for their benefit, not Spanish profit", and
   the requerimiento's void consent (the ancestor of the "subjective legitimacy"
-  dispute). From module 1 onward: the sourcing drill.
+  dispute). NEW backward Refs from the heredity module, which now precedes this
+  one: `geography-or-institutions` — the institutional account of colonial
+  rule (`inclusive-and-extractive-institutions`: where Europeans settled they
+  built institutions they would live under; where they extracted, they built
+  institutions to extract, and those outlasted them; the reversal of fortune —
+  the colonies richest in 1500 are among the poorest now); and
+  `national-data-audited` — the settler-mortality table under that account,
+  audited: a strong association, a causal estimate that rests on recoded
+  entries, and the point the reader was asked to reach in its forward exercise,
+  that a table comparing colonies with colonies cannot say what colonial rule
+  did compared with no colonial rule. That lesson also ran the sourcing drill on
+  datasets, which this lesson's "lazy citations" charge and the next-but-one
+  audit lesson both use. From module 1 onward: the sourcing drill.
 - **Contributes:** A contested empirical claim laid out as an argument with its
   history: the thesis as its author made it (three failures of the anti-colonial
   critique; a method of counterfactual cost–benefit; a test of legitimacy by
@@ -144,8 +156,19 @@ goal: Evaluate the argument that colonialism was on balance beneficial and legit
   - The scholarship both sides lean on: Abernethy, The Dynamics of Global
     Dominance (2000), p. 403 (the test); Hechter, Alien Rule (2013); Acemoglu,
     Johnson & Robinson, "The Colonial Origins of Comparative Development", AER
-    91:5 (2001); Heldring & Robinson, "Colonialism and Economic Development in
-    Africa" (NBER WP 18566, 2012) — the paper Gilley concedes.
+    91:5 (2001) — now a course result, not a bare citation: taught in
+    `geography-or-institutions` (via Why Nations Fail, index 51) and audited in
+    `national-data-audited`; recall by `<Ref>`, never re-taught; Heldring &
+    Robinson, "Colonialism and Economic Development in Africa" (NBER WP 18566,
+    2012) — the paper Gilley concedes, by one of the institutional account's
+    authors: its finding (a negative effect of colonial rule on African
+    development, with exceptions) is the institutional account's own ledger.
+  - Gilley's sentence on the institutional studies (original, char. offset
+    ~6031: such studies "control for variations in colonial rule itself … But
+    they do not control for the presence or absence of colonialism (for
+    instance in a highly cited study by Acemoglu and colleagues)", note 4) —
+    the link between the previous module's table and this lesson's
+    counterfactual problem. Quote it in link 2.
   If a critic's text cannot be obtained, the lesson says so in References and
   marks the paraphrase "as quoted in the 2022 Response".
 - **Burke, Speech in Opening the Impeachment** — index **25**; `research/texts/
@@ -164,10 +187,11 @@ goal: Evaluate the argument that colonialism was on balance beneficial and legit
   The restrictionist frame for why the controversy ran as it did — one clause
   in the body as "the charge that the academy is a culture of repudiation",
   Scruton in References only. Copyrighted; a sentence at most.
-- **Murray, The Strange Death of Europe ch. 10 "The stain of Europe"** — index
-  **50**; text `research/texts/murray/strange-death-of-europe.archive-djvu.txt`
-  (NOT `strange-death-of-europe.txt`, which is a mis-staged file — see
-  pitfalls). Pointer only; the next lesson owns it.
+- **Murray, The Strange Death of Europe ch. 10 "The tyranny of guilt"** — index
+  **75** (the clean full text; prefer it to the earlier read, index 50); text
+  `research/texts/murray/strange-death-of-europe.txt` (now the real Murray: ch. 10
+  at l.4633, section "The stain of Europe" at l.4809). Pointer only; the next
+  lesson owns it.
 - No Strauss–Cropsey chapter applies.
 
 ## EXPLANATION PLAN (L0)
@@ -222,8 +246,17 @@ September 2017) and leave the controversy for link 7.
    disruptive enough" charge — critics blame colonialism both for destroying
    institutions and for freezing them — with Taylor's reply that the two
    complaints are about different things (what was provided and how it was
-   used). Because: a balance needs a baseline, and the dispute is largely about
-   which.
+   used). Then the third ledger the reader already holds (`<Ref>`
+   geography-or-institutions; `<Ref>` national-data-audited, one clause each):
+   the institutional account does not ask whether colonialism helped or harmed
+   but which colonialism — settlement colonies left institutions their settlers
+   lived under, extraction colonies left institutions built to extract, and the
+   effect runs in opposite directions. Quote the article's own sentence that
+   such studies "do not control for the presence or absence of colonialism" —
+   both sides of this dispute agree that a comparison of colonies with
+   colonies cannot supply the counterfactual of no colony, which is the point
+   the previous module's audit ended on. Because: a balance needs a baseline,
+   and the dispute is largely about which.
 
 3. **Failure two: subjective legitimacy.** Question: can the governed settle
    it? The article: ask whether those subject to it treated it as rightful,
@@ -400,17 +433,17 @@ decide".
 - **No settling, no moralising, no "some believe".** The tone rule names this
   lesson's subject by name. The course's own sentences state what each side
   claims, what evidence each gives, and what each must concede; the verdict is
-  the reader's. "Apologist", "denialist", "woke", "cult" never appear in the
-  course's voice.
-- **Do not re-teach** Burke's trust or Mill's test (one Ref clause each); do
-  not anticipate Waldron or Murray beyond the hand-off sentence; do not
+  the reader's. The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+- **Do not re-teach** Burke's trust or Mill's test (one Ref clause each), nor
+  the institutional account, the reversal of fortune or the settler-mortality
+  audit (`<Ref>` geography-or-institutions, `<Ref>` national-data-audited — one
+  clause each); do not anticipate Waldron or Murray beyond the hand-off
+  sentence; do not
   pre-run the audit of the three studies — name the "lazy citations both ways"
   charge and stop.
-- **Mis-staged file:** `research/texts/murray/strange-death-of-europe.txt`
-  contains George H. Smith's The Case Against God, not Murray. Murray's text is
-  `strange-death-of-europe.archive-djvu.txt` (and the `thestrange-s*.txt`
-  shards). Only a pointer is needed here, but the writer should not open the
-  wrong file.
+- **Murray's file has been replaced:** `research/texts/murray/strange-death-of-europe.txt`
+  is now the clean full text (summary index 75); the earlier djvu file and the
+  warning about a mis-staged file no longer apply.
 - **Scruton, Murray, Mehta, Abernethy, Hechter, Rodney, Elkins, Hochschild,
   Acemoglu, Heldring, Robinson, Lange: References only.** Gilley, Kendhammer,
   Khan, Klein, Taylor, Robinson may be named in the body as the authors of the
@@ -455,8 +488,15 @@ decide".
    case anchored as a place (L11a), not a number. Placement: float right at
    the violence paragraph of link 2 or 5. Optional; the lesson is an argument
    and stays draw-heavy.
+8. `draw:` **Three ledgers** — single `<Figure>`, three columns: the article's
+   (colonial rule vs the never-colonised and the post-colonial record — a
+   counterfactual of no colony), the critics' (harms against a pre-colonial or
+   independent baseline), the institutional account's (settlement vs
+   extraction colonies — colony against colony, `<Ref>` geography-or-institutions);
+   under each, the comparison it can make and the one it cannot. Placed at the
+   end of link 2.
 
-Balance: 6 draw / 1 source.
+Balance: 7 draw / 1 source.
 
 ## EXERCISE PLAN (E6/E7 + playbook-history mix)
 

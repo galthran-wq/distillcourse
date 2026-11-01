@@ -1,3 +1,5 @@
+> **SUPERSEDED (2026-10-31 structure revision).** This lesson was dropped from course.yaml; its material is merged into a ★ section of maistre-and-bonald. Kept only as a fuller record that the successor brief may point to — never brief a lesson from this file.
+
 # Research brief: war-is-divine (Maistre's Seventh Dialogue: war, sacrifice and the soldier)
 
 status: planned

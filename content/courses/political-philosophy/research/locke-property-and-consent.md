@@ -14,31 +14,46 @@ goal: Analyze Locke's derivation of property from labour and of legitimate gover
   sovereign, and a sovereign who cannot be accused of injustice and is bound by
   no law of his own making (`sovereignty`, `covenant`, `authorization`,
   `liberty-as-silence-of-law`, `protection-and-obedience`). From
-  `cicero-natural-law` and `aquinas-law-and-kingship` they hold `natural-law` as a
-  law above statutes and the question whether an unjust law binds. From
-  `english-revolution-as-test` they know 1649 and 1660, so 1688 is one more
-  English date to place.
+  `filmer-patriarcha` (the prerequisite): `patriarchal-divine-right` — political
+  power is fatherly power descended from Adam, no one is born free, the king is
+  above the laws — and the two points that lesson marked for an opponent to
+  break: Filmer's strongest (no one consents to being born into a polity; where
+  in history did a people ever meet to choose a ruler? how does a majority bind
+  infants and the absent?) and his weakest (which living king is Adam's heir?).
+  From `english-revolution-as-test` (the previous lesson): 1642–1660, the regicide,
+  the Protectorate and the Restoration, so 1688 is the next English date and
+  "who judges the king?" is a live question. From
+  `cicero-res-publica-and-natural-law` and `aquinas-law-and-kingship`:
+  `natural-law` as a law above statutes and the question whether an unjust law
+  binds.
 - **Contributes:** One move: Locke keeps Hobbes's starting point (free and equal
-  men with no common judge) and changes one premise — the state of nature is
-  already under a law that reason can read — and from that single change derives
-  property before government, government by consent and limited by trust, and a
-  right to resist a ruler who breaks the trust. The lesson's centre is the
-  derivation and the objections Locke himself raises and answers ("it will be
-  said… I answer").
-- **Hands off:** Two problems stay open. (1) Consent: Locke's "tacit consent"
-  reaches anyone who "barely travels on the highway"; a reader will feel it
-  proves too much — Hume's objection is put at full strength in this lesson, and
-  Rousseau's answer (consent must be active, renewed, and the people must
-  assemble) is the next lesson, `rousseau-inequality-and-general-will`. (2)
-  Property: Locke makes "this is mine" the first natural act; Rousseau makes it
-  the first crime. The handoff sentence is Rousseau's opening ("The first man
-  who, having enclosed a piece of ground…"). The right of resistance is the
-  thing Burke (`burke-reflections`) will say England never claimed in 1688 and
-  France is about to misuse.
-- **Spine step:** "Government by consent (Locke) and the general will (Rousseau)
-  make a revolution thinkable; Burke, Maistre and Bonald answer that no
-  generation knows enough to design a society, and Hegel absorbs both sides into
-  the rational state"
+  men with no common judge), refuses Filmer's (men are born subjects), and
+  changes one premise — the state of nature is already under a law that reason
+  can read — and from that single change derives property before government,
+  government by consent and limited by trust, and a right to resist a ruler who
+  breaks the trust. The First Treatise's demolition of Filmer is reported in one
+  section; the Second Treatise is the lesson. Its centre is the derivation and
+  the objections Locke himself raises and answers ("it will be said… I answer").
+- **Hands off:** Three problems stay open. (1) Consent: Locke's "tacit consent"
+  reaches anyone who "barely travels freely on the highway"; the reader will feel
+  it proves too much, and Locke's own answer to "no historical instances" (Sects
+  100–112) is thin. This lesson states the weak point in one paragraph and hands
+  it to the next lesson, `hume-against-the-original-contract`, where it is
+  argued at full strength (the sleeping passenger, conquest and usurpation, the
+  promise regress). (2) Property: Locke makes "this is mine" the first natural
+  act; Rousseau makes it the first crime (`rousseau-inequality-and-general-will`,
+  two lessons on). (3) The right of resistance is the thing Burke
+  (`burke-reflections`) will say England never claimed in 1688 and France is
+  about to misuse. The reading of Locke as Hobbes made respectable (link 8) is
+  argued again in `strauss-natural-right-and-history`; the America passages are
+  held for `locke-and-mill-on-empire`; prerogative ("the power of doing public
+  good without a rule", link 7) returns as the liberal tradition's own emergency
+  power in `donoso-cortes-on-dictatorship`.
+- **Spine step:** "Government by consent (Locke) is doubted by Hume and
+  radicalised by Rousseau's general will; when France tries to frame a government
+  from principles, Burke, Maistre and Donoso Cortés answer that no generation
+  knows enough, Herder and Fichte put the people before the state, and Hegel
+  absorbs both sides into the rational state"
 
 ## Sources to consult
 
@@ -85,19 +100,13 @@ goal: Analyze Locke's derivation of property from labour and of legitimate gover
     four ways the legislative is altered (Sects 214–217); breach of trust (Sects
     221–222); the rebellion objection answered (Sects 223–230, Polyphemus Sect.
     228); who shall be judge (Sects 240–242).
-- **Hume, "Of the Original Contract" (1748) and "Of Passive Obedience" (1748)**
-  — summaries.json index 48 (Muller anthology ch. 1); text at
-  `research/texts/muller/conservatism-anthology.txt` l.1089–1350 (Original
-  Contract from l.1133, Passive Obedience from l.1199; Muller's headnote
-  l.981–1015). Hume's essays are public domain in themselves (also Gutenberg,
-  Essays Moral, Political and Literary): quote Hume directly; Muller's headnotes
-  and footnotes are copyrighted — paraphrase, and Muller's name goes in
-  References only. Yields: the objection carried in this lesson — consent is a
-  historical fiction, "almost all governments" began in usurpation or conquest,
-  the sailor who "consents" to the ship, generations in perpetual flux, 1688
-  decided by "a majority of about seven hundred" for ten million, and the
-  positive counter-account (allegiance rests on utility and habit, like the
-  duty to keep promises).
+- **Hume, "Of the Original Contract" (1748)** — summaries.json index 91; text
+  `research/texts/hume/hume-original-contract.txt`. FORWARD ONLY: the next lesson,
+  `hume-against-the-original-contract`, reads it whole. Here one sentence at the
+  end of link 6 names the objection ("a Scottish philosopher sixty years later
+  asks where any such consent can be found") with the forward `<Ref>`; do not
+  quote the ship or the "seven hundred" here — the next lesson's opening uses
+  them.
 - **Strauss, Natural Right and History, ch. V.B "Locke" (pp. 202–251)** —
   summaries.json index 35; text `research/texts/strauss/nrh-s6-ch5b-locke.txt`.
   Copyrighted: paraphrase, a sentence at most. Yields the reading the lesson
@@ -115,17 +124,34 @@ goal: Analyze Locke's derivation of property from labour and of legitimate gover
   "master of taciturnity", the naturalisation ceremony as the only true express
   consent (L16), prerogative and the fire example (L17). Smith in References
   only; never a content source against the text.
-- **Strauss & Cropsey (eds.), History of Political Philosophy, 3rd ed., ch. on
-  Locke (Robert A. Goldwin)** — text landing at
-  `research/texts/strauss-cropsey/history-of-political-philosophy.txt`;
-  consult as the standard close reading. DOSSIER GAP: at writing time the file
-  is empty (OCR not landed); if still empty, work from the primary text and
-  Strauss's NRH ch. V.B.
-- **Filmer, Patriarcha (1680)** — named in course.yaml notes as an objection.
-  Not in the dossier. Public domain (Liberty Fund / archive.org). The lesson
-  needs one sentence of Filmer (kingly power is paternal power descended from
-  Adam) as the target of Locke's Ch. I and Ch. VI; Locke's own summary (Sect. 1,
-  Sects 52–76) suffices. Do not read Filmer at length.
+- **Strauss & Cropsey (eds.), History of Political Philosophy, 3rd ed., "John
+  Locke" by Robert A. Goldwin, pp. 476–512** — text
+  `research/texts/strauss-cropsey/history-of-political-philosophy.txt`
+  l.23136–24894 (OCR of a scan; page headers inline). Copyrighted: paraphrase;
+  Goldwin in References only. Consult as the standard close reading of the
+  Second Treatise's order of argument (state of nature → property → political
+  society → limits → dissolution) and grep it for any claim the lesson makes
+  about the sequence.
+- **Filmer, Patriarcha (1680)** — summaries.json index 90; text
+  `research/texts/filmer/patriarcha-constitution-org.txt` (public domain). The
+  reader has the whole of Filmer from `filmer-patriarcha`; this lesson does NOT
+  re-read him. It needs only the four claims Locke's First Treatise refutes, as
+  Locke himself lists them at Second Treatise Ch. I Sect. 1 (l.139–170: Adam had
+  no such authority by fatherhood or donation; if he had, his heirs had no right
+  to it; if they had, no law fixes the heir; if it did, the eldest line is lost —
+  so whoever rejects Filmer must "find out another rise of government"), and
+  Filmer's two objections Locke answers in the Second Treatise: no historical
+  instance of men meeting to set up a government, and all men born under
+  government (Sect. 100, l.2121; Patriarcha ch. II sec 5–7).
+- **Locke, First Treatise (1689/90)** — NOT IN THE DOSSIER (the staged text is the
+  Second Treatise only). Public domain (Two Treatises, e.g. the Liberty Fund /
+  constitution.org text). Not needed beyond Second Treatise Ch. I Sect. 1 and Ch.
+  VI (Sects 52–76, "parental", not "paternal", power — the mother shares it; it
+  ends with the child's minority; Sect. 74 l.1565 concedes that fathers became
+  princes in the first ages, but "by the express or tacit consent of the
+  children"). Locke's verdict on Filmer's style is in the Preface (l.54–123) and
+  needs no First Treatise; if the writer wants a First Treatise sentence, take it
+  from a public-domain text and verify.
 - Background on 1688 (James II's flight, the Convention Parliament, the
   Declaration of Right, William III): standard public-domain histories; the
   lesson needs two sentences and a date, no more (L11b).
@@ -138,6 +164,26 @@ so why set up a government, and what could they have agreed to give it? Locke
 answers against Hobbes on every point and ends by justifying the overthrow of a
 king.
 
+0. **Whom is Locke answering?** One section, before the derivation. The reader
+   has Filmer (`<Ref>` filmer-patriarcha, one clause: political power is a
+   father's power descended from Adam; no one is born free). Locke's Preface says
+   the book justifies William III "by the consent of the people, the only one of
+   all lawful governments", and Ch. I Sect. 1 reports the First Treatise's result
+   in four steps (Adam had no such power; his heirs had no right to it; no law
+   fixes the heir; the eldest line is lost) — so "he that will not give just
+   occasion to think that all government in the world is the product only of
+   force and violence … must of necessity find out another rise of government".
+   State the burden plainly: having denied Filmer's title, Locke must show what
+   title any government has, without falling back on force. Then Sect. 2–3: the
+   magistrate's power distinguished from a father's, a master's, a husband's, a
+   lord's — "political power" defined. Ch. VI (Sects 52–76) answers Filmer's
+   strongest point in one paragraph: the power is "parental" (the mother shares
+   it), it ends when the child reaches reason, and where fathers became princes
+   it was "by the express or tacit consent of the children" (Sect. 74). Mark the
+   seam (L10b): from a man who has just destroyed the patriarchal title one
+   expects him to deny Filmer's history too; Locke concedes the history (fathers
+   often became kings) and denies that it was fatherhood that made them so.
+   Heading as claim: *Adam's heir cannot be found, so another title is needed*.
 1. **What changes if the state of nature has a law?** The reader has Hobbes
    (`<Ref>` hobbes-state-of-nature-and-covenant): no common power, no law, so
    war. Obvious attempt: keep Hobbes's picture and only soften the sovereign.
@@ -219,19 +265,18 @@ king.
    compact that makes a member) or tacitly, by enjoying any possession under the
    government, "or barely travelling freely on the highway" (Sect. 119), which
    binds only for the duration of the enjoyment and makes no one a member.
-   **OBJECTION at full strength here — Hume, "Of the Original Contract"**: a
-   consent so cheap is no consent ("we may as well assert that a man, by
-   remaining in a vessel, freely consents to the dominion of the master, though
-   he was carried on board while asleep"); almost every actual government began
-   in conquest or usurpation; a people's generations are not a silkworm's clean
-   succession but "in perpetual flux"; and 1688 itself was decided by about
-   seven hundred men for ten million. Hume's own answer to "why obey?":
-   utility and habit — the same ground on which promises bind ("we are not
-   surely bound to keep our word because we have given our word to keep it").
-   The lesson concedes that Locke's tacit consent cannot bear the weight, and
-   notes Locke's partial defence (Sects 100–103: governments are older than
-   records, "advice to patriarchalists not to search the origins"), then hands
-   the problem to Rousseau (`<Ref>` rousseau-inequality-and-general-will).
+   Filmer's two objections (`<Ref>` filmer-patriarcha) are the ones Locke answers
+   here by name (Sect. 100): no historical instance, and all men born under
+   government. His replies: history is silent about every people's infancy as
+   about every man's, and where beginnings are seen — Rome, Venice, the peoples of
+   America — they are agreements (Sects 101–112); a son is "born a subject of no
+   country" until he consents (Sect. 118). State the weak point plainly and stop:
+   the highway makes consent so cheap that it can hardly be refused, and the
+   historical reply rests on absence of evidence. One sentence hands it on: a
+   Scottish philosopher sixty years later will ask where any such consent can be
+   found (`<Ref>` hume-against-the-original-contract). Do not argue Hume here; the
+   next lesson does. Locke's partial defence to keep: tacit consent is limited by
+   design (Sects 121–122), and express consent — the naturalised member — is real.
 7. **Who judges when the ruler breaks the agreement?** The Hobbesian wall: no
    subject may judge the sovereign (`<Ref>` bodin-sovereignty,
    hobbes-sovereign-and-liberty). Locke's answer in steps: the legislative is
@@ -253,9 +298,10 @@ king.
    Sect. 210); and the doctrine is "the best fence against rebellion", because
    rulers who use force against law are the true rebels (Sect. 226). The
    Polyphemus reductio (Sect. 228): telling men to bear a tyrant is Ulysses
-   preaching passive obedience in the Cyclops's den. Hume's "Of Passive
-   Obedience" is the measured counter: resistance may be right in extremity,
-   but a doctrine should "preach obedience" and not publish the exceptions.
+   preaching passive obedience in the Cyclops's den. Set this against Filmer's
+   "no deposition; the multitude would be judge in its own cause" (`<Ref>`
+   filmer-patriarcha) — Locke's answer is that the ruler who uses force against
+   law has already made himself the party in a state of war.
 8. **Is this Hobbes in sheep's clothing?** Close by putting the reading the
    course states as its own (Strauss, Smith in References) against the text:
    Locke keeps Hobbes's foundation (self-preservation, equality, no common
@@ -293,12 +339,12 @@ king.
    table**: defect → remedy → power given up → power retained. The nemo dat
    chain (Sect. 135) and the sergeant's penny (Sect. 139) complete it: what the
    people never had, the legislative cannot have.
-5. **The highway and the ship**: Locke's tacit consent (Sect. 119, "barely
-   travelling freely on the highway") against Hume's sleeping sailor and his
-   "seven hundred for ten million" — the two passages quoted side by side,
-   then the reader asked what Hume's provenance (a Tory-leaning sceptic
-   writing in 1748 against Whig orthodoxy) lets the passage be USED to
-   establish.
+5. **The highway and its limits**: Locke's tacit consent (Sect. 119, "barely
+   travelling freely on the highway") quoted whole, then Sects 121–122 (binding
+   only "during such enjoyment"; the naturalised member as the only express
+   consent) — so the reader sees how little Locke claims for it before the next
+   lesson tests even that. The comparison with Hume's ship belongs to
+   `hume-against-the-original-contract`.
 6. **The ship to Algiers (Sect. 210)**: the captain who steers for Algiers
    despite contrary winds — how a "long train of actions" reveals a design
    without any single act being conclusive. Use it to derive the threshold for
@@ -315,10 +361,14 @@ king.
 
 ## Pitfalls / subtleties to flag
 
+- **Register rule.** The course passes no verdict of its own on any author or
+  idea: no condemning or approving labels in its own voice. Judgement comes only
+  through argument and evidence; a label may appear only inside a quotation, with
+  who applied it and when.
 - **Terms to anchor at first mention (L11):** *state of nature* (recall with
   `<Ref>` to Hobbes, one clause); *law of nature* (distinguish from Hobbes's
   "laws of nature" as theorems of peace — Locke's binds as God's law known by
-  reason; recall Cicero/Aquinas with `<Ref>` cicero-natural-law); *executive
+  reason; recall Cicero/Aquinas with `<Ref>` cicero-res-publica-and-natural-law); *executive
   power of the law of nature* (define: every man's right to punish breaches in
   the state of nature); *property* — in Locke's wide sense "lives, liberties and
   estates" (Sect. 123) as well as goods; say so at first use or Ch. IX reads as
@@ -326,21 +376,21 @@ king.
   the executive power, not the modern "branches"); *prerogative* (the crown's
   discretion to act without or against law for the public good); *trust*
   (fiduciary, a legal term: a power held for another's benefit); *appeal to
-  heaven*; *Filmer* (Sir Robert Filmer, d. 1653, whose Patriarcha, published
-  1680, derived royal power from Adam's fatherhood — the target of Locke's
-  First Treatise); *1688* (James II fled, the Convention Parliament declared
+  heaven*; *Filmer* (`<Ref>` filmer-patriarcha — recall, do not re-anchor;
+  the First Treatise is "the foregoing discourse" of Sect. 1); *1688* (James II fled, the Convention Parliament declared
   the throne vacant and offered it to William and Mary with a Declaration of
   Right — one sentence); *Jephtha* (Judges 11, a judge of Israel who, with no
   arbiter between him and the Ammonites, left the cause to "the Lord the
-  Judge"); *Hume* (Scottish philosopher, 1711–76, writing in 1748 — a primary
-  interlocutor, may be named in the body as the author of the objection).
+  Judge"); *Hume* — not anchored here beyond the one forward sentence; the
+  next lesson introduces him.
 - **Dates to the decade** (1680s–90s) except 1688/1690, where contingency is
   the point (the Treatise was drafted before the revolution it is read as
   justifying — the Preface says the middle was lost; do not present it as a
   pamphlet written after the fact without saying the drafting is disputed).
-- **Do not re-teach Hobbes.** The reader has the covenant and the twelve rights;
-  recall each with a `<Ref>` and one clause. The lesson's energy goes to the
-  differences.
+- **Do not re-teach Hobbes or Filmer.** The reader has the covenant and the
+  twelve rights, and the whole of Patriarcha; recall each with a `<Ref>` and one
+  clause. The lesson's energy goes to the differences. Do not argue Hume's
+  objection either — one forward sentence (link 6).
 - **Do not teach the America passages here** beyond Sect. 49 and the one-line
   flag; `locke-and-mill-on-empire` reads Sects 36–43 and Ch. VIII Sects
   102–108 as the "waste land" argument.
@@ -357,8 +407,8 @@ king.
   it needs its own apparatus; one sentence in References at most.
 - **Tacit consent is weak and Locke knows it** — he limits it to "the duration
   of the enjoyment" and says it makes no one a member (Sects 121–122). Do not
-  strawman him as claiming the highway makes citizens; put Hume against the
-  real claim.
+  strawman him as claiming the highway makes citizens; state the real claim,
+  so that the next lesson can put Hume against it.
 - **"Appeal to heaven" is not a prediction of divine intervention**; it names
   the absence of an earthly judge. A common misreading worth one refuting
   sentence, not a L13 slot.
@@ -369,12 +419,13 @@ king.
   way; the empire module takes them up.
 - **Names that go ONLY in References:** Strauss, Smith, Muller, Goldwin
   (Strauss–Cropsey), Macpherson (if the "possessive individualism" reading is
-  mentioned), Laslett, Dunn, Tully. Hume and Filmer may be named in the body as
-  primary interlocutors. State the Strauss thesis as the course's own: "the
+  mentioned), Laslett, Dunn, Tully. Filmer may be named in the body as the
+  primary interlocutor (`<Ref>`); Hume only in the forward sentence. State the Strauss thesis as the course's own: "the
   charge that Locke's law of nature is Hobbes's right of self-preservation
   under another name".
-- **Dossier gap:** Strauss–Cropsey text file is empty at writing time; Filmer
-  is not cached (one public-domain sentence suffices).
+- **Dossier gap:** the First Treatise is not in the dossier (Second Treatise Ch.
+  I Sect. 1 and Ch. VI carry what the lesson needs). The Strauss–Cropsey Locke
+  chapter has landed (OCR, l.23136–24894). Filmer is staged in full (index 90).
 
 ## FIGURE PLAN
 
@@ -406,11 +457,14 @@ king.
    mismanagement tolerated → private oppression (appeal to law) → "a long train
    of abuses" with a visible design → right to resist; the Algiers ship and the
    twelve-penny purse as the two marked points (Sects 207–210, 225).
-7. `draw:` `<Figure>` — **Locke's tacit consent against Hume's objections**:
-   two columns, Locke's claim (Sects 116–122: born a subject of no country;
-   consent express or tacit; tacit binds only while enjoying) against Hume's
-   three replies (sleeping sailor; conquest and usurpation as the usual origin;
-   generations in flux) and his alternative ground (utility and habit).
+7. `draw:` `<Figure>` — **Filmer's chain and where Locke cuts it**: Filmer's four
+   links (Adam's dominion by fatherhood or donation → his heirs inherit it → a law
+   fixes the heir → the eldest line is known → today's kings rule by it), with
+   Locke's four denials (Sect. 1) marked as cuts on each link, and the
+   consequence written under the broken chain: "another rise of government"
+   must be found. Placed at link 0. Inspired by summary 90 and the
+   `filmer-patriarcha` lesson's argument map (reuse its layout so the eye tracks
+   the cuts — voita rule 2).
 8. `source: no pool candidate — hunt:` a portrait of Locke — Godfrey Kneller's
    1697 portrait (Hermitage) via Wikimedia Commons (PD-Art, verify the file's
    licence tag). The reader must see the face of the "master of taciturnity"
@@ -429,14 +483,19 @@ king.
    "inconveniences" (Ch. IX) remain, and would men still have reason to leave
    it? The reader must find that the impartial-judge defect survives abundance
    (men are still partial in their own cases), so government is not only about
-   scarcity — and note that Hume makes the opposite argument about justice
-   under abundance.
-3. *Document reasoning (sourcing drill).* Hume's "seven hundred for ten
-   million" sentence on 1688: author, date (1748), audience (a Britain where
-   Whig contract theory was orthodoxy), what it records, what it argues, what it
-   omits (that Locke's own account says the people act only when government is
-   dissolved, Sect. 149), and what it can be USED to establish — that 1688 was
-   not a Lockean express consent, not that Locke's theory is false.
+   scarcity.
+3. *Document reasoning (sourcing drill, E3 — `filmer-patriarcha`).* Second
+   Treatise Ch. I Sect. 1 (l.139–170), Locke's four-point summary of his refutation
+   of Filmer: author (an exile returned with William of Orange), date (published
+   1689/90, the Treatises probably drafted in the early 1680s during the
+   Exclusion Crisis — say the drafting date is disputed), audience (readers of
+   the Revolution settlement, among whom Filmer's Patriarcha, published 1680, was
+   the Tory text), what it records (the shape of the First Treatise's argument),
+   what it argues (no living king can claim Adam's title), what it omits
+   (Filmer's strongest point — that no one consents to being born into a polity —
+   which Sect. 1 does not touch and Ch. VIII must), and what it can be USED to
+   establish: that Locke needed a new title for government, not that he had
+   found one.
 4. *Plausible false claim to refute.* "Locke's labour theory shows that
    whoever works a thing owns it, so a tenant who farms land for twenty years
    owns it." Name the failing step: Locke's title is first appropriation from
@@ -454,15 +513,16 @@ king.
    would have to be true for the claim to survive (that a minority may judge
    for the whole — which Locke denies in Sect. 243 but which his "each man
    judges in his conscience" of Sect. 241 sits uneasily beside).
-7. **FORWARD (E7) → `rousseau-inequality-and-general-will`.** Take Locke's
-   first appropriation (Sect. 27–28) and ask: when the man who enclosed says
-   "this is mine", what must the others believe for his act to bind them, and
-   what has he gained if they believe it? The reader should arrive at the
-   thought that property needs a convention the first owner benefits from
-   disproportionately — the doorstep of Rousseau's "the first man who, having
-   enclosed a piece of ground, bethought himself of saying 'This is mine', and
-   found people simple enough to believe him". Solution says so in one sentence
-   with the `<Ref>`.
+7. **FORWARD (E7) → `hume-against-the-original-contract`.** Locke says a man who
+   enjoys any possession under a government, "or barely travel[s] freely on the
+   highway", gives tacit consent, binding while the enjoyment lasts (Sects
+   119–122). Test the claim on a person for whom leaving is not a real option:
+   a labourer who speaks no other language and lives on daily wages, in a
+   country whose ruler forbids emigration. Is his staying a choice, and if not,
+   what is left of the consent? The reader should reach the thought that tacit
+   consent presupposes a free exit the poor rarely have. The solution says in one
+   sentence that the next lesson's Scottish philosopher makes exactly this
+   objection with a man carried aboard a ship asleep, with the `<Ref>`.
 
 ## Nietzsche cross-course links (where his ideas enter)
 

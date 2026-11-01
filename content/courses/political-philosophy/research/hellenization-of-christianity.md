@@ -8,9 +8,14 @@ goal: Explain how a Jewish movement was remade in Greek concepts and Roman forms
 ## ARC (L10)
 
 - **Inherits:** The reader has Cicero's natural law — one law for Rome and
-  Athens, God its author, each city nonetheless keeping its own ancestral gods
-  (`cicero-natural-law`) — and the Roman commonwealth as a thing defined by
-  agreed right (`cicero-mixed-constitution`). They have Plato's Forms only as
+  Athens, God its author, each city nonetheless keeping its own ancestral
+  gods and admitting "no new gods or alien gods, unless recognized by the
+  State" — and the Roman commonwealth as a thing defined by agreed right
+  (both from `cicero-res-publica-and-natural-law`, this lesson's
+  prerequisite). From `polybius-anacyclosis-and-rome` they have Rome's
+  constitution and Polybius's reading of Roman religion as the device that
+  "keeps the Roman commonwealth together" (VI.56) — useful when the lesson
+  says what Rome's own gods were before the Gospel reached them. They have Plato's Forms only as
   far as the Cave and the Good (`kallipolis-and-the-philosopher-king`). They
   have NOT met Christianity as a historical object: no Gospels, no Paul, no
   creed, no bishop. If they took the Nietzsche course they have his Jesus/Paul
@@ -31,7 +36,9 @@ goal: Explain how a Jewish movement was remade in Greek concepts and Roman forms
   world" (Harnack's "two provinces", Mark x.42), what is left for the city to
   be — Augustine's question. And the conceptual vocabulary (Logos, substance,
   dogma) is what Spengler will call a pseudomorphosis and Voegelin a
-  differentiation; both return in module 7–8.
+  differentiation; both return later — `spengler-decline-of-the-west` (in the
+  `crisis-of-liberal-europe` module) and `voegelin-gnosticism` (in the
+  `postwar-conservatism` module).
 - **Spine step:** "A Jewish movement becomes Europe's religion by being remade
   in Greek concepts and Roman forms; Constantine's empire and the Church fight
   over who represents the truth; Augustine denies that any earthly city can be
@@ -428,6 +435,12 @@ verdict"; "Pseudomorphosis: a third reading"; conclusion.
   (31 BC, Octavian defeats Antony and Cleopatra; the Principate follows).
   No more than three new named terms per section (L11c): the lesson is
   term-dense, so sections must be short and many.
+- **Register.** The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+- **Do NOT re-teach Cicero or Polybius.** Natural law and the civil-religion
+  clause are a `<Ref>` to `cicero-res-publica-and-natural-law` plus a clause;
+  Roman religion as a civic device is a `<Ref>` to
+  `polybius-anacyclosis-and-rome`. (The two dropped slugs
+  `cicero-mixed-constitution` and `cicero-natural-law` must never be Ref'd.)
 - **Do NOT re-teach Nietzsche.** Every claim about his position is a `<Ref>`
   plus a clause. The lesson reconstructs only the *point of contact* (what
   both agree on; the three disagreements). A reader without the Nietzsche
@@ -443,11 +456,14 @@ verdict"; "Pseudomorphosis: a third reading"; conclusion.
   (monasticism, Augustine, the martyrs' landmark), and say once that the
   kernel/husk cut is itself a judgment. Never present "the Gospel was X" as
   settled history.
-- **Harnack's Pharisee foil** is a stock of nineteenth-century Protestant
-  anti-Judaism; use his structural claim (law-religion vs inward religion)
-  without the caricature, and do not moralise either way.
-- **Spengler's vol. 2** carries race, blood and antisemitism-adjacent
-  passages (summary 11 pedagogy); use only the pseudomorphosis definition,
+- **Harnack's Pharisee foil** is the nineteenth-century Protestant picture
+  of Judaism as a religion of law, and later scholarship disputes it as a
+  description of first-century Judaism; use his structural claim
+  (law-religion vs inward religion), attributed to him, without his
+  portrait of the Pharisees, and do not moralise either way.
+- **Spengler's vol. 2** carries passages on race, blood and the Jews that
+  this lesson does not need (summary 11 pedagogy; they are read, as
+  arguments, in `spengler-decline-of-the-west`); use only the pseudomorphosis definition,
   Actium, Pilate, Paul and Marcion, and frame "Magian" as his construction.
   Atkinson is PD in the US only — short quotes.
 - **Where the summaries and text differ:** index 8's shard-local line numbers
@@ -573,7 +589,7 @@ verdict"; "Pseudomorphosis: a third reading"; conclusion.
    and a tool.
 8. *Document reasoning — second-order concept: change and continuity (E3
    reach-back).* Cicero's Laws II.8 forbade "new gods or alien gods unless
-   recognized by the State" (`<Ref>` `cicero-natural-law`). Using Harnack's
+   recognized by the State" (`<Ref>` `cicero-res-publica-and-natural-law`). Using Harnack's
    three stages, say at which stage, if any, Christianity stopped being an
    "alien god" in Cicero's sense — and what that says about which side
    changed, the city or the sect.

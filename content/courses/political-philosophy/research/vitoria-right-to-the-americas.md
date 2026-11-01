@@ -8,7 +8,8 @@ goal: Analyze Vitoria's examination of every title by which Spain might hold the
 ## ARC (L10)
 
 - **Inherits:** The reader arrives with four things this lecture uses as premises and
-  must never re-teach. From `cicero-natural-law`: true law as right reason in
+  must never re-teach. From `cicero-res-publica-and-natural-law` (which now
+  introduces `natural-law` and `just-war`): true law as right reason in
   agreement with nature, above every statute (Rep. III.22), just war only for
   honour or safety with reparation demanded first (III.23), and the Roman claim
   that rule over the servile is just (III.36–37) — the ancestor of the title
@@ -22,10 +23,22 @@ goal: Analyze Vitoria's examination of every title by which Spain might hold the
   as its forward hook. From `locke-property-and-consent` (earlier in course
   order): property derived from labour — kept dormant here; the empire lesson
   after this one turns it against Vitoria's dominium. In course order the
-  reader arrives from `udhr-read-against-the-right` (not a prerequisite — the
-  knowledge prerequisites are Aquinas and Aristotle): they have just finished a
-  module on the foundations of rights and now meet the first thematic halt, the
-  West judging its own conquests.
+  reader arrives from `national-data-audited`, the application that closes the
+  heredity module (not a prerequisite — the knowledge prerequisites are Aquinas
+  and Aristotle). That module hands this one two things the lecture meets head
+  on. (i) Cajamarca is already anchored: `geography-or-institutions` opened on
+  "why did Spanish soldiers capture the Inca emperor at Cajamarca in 1532, and
+  not Inca soldiers the king of Spain?" — a question about cause (guns, germs,
+  steel; the Spanish model of capturing the ruler and taking tribute). Vitoria
+  asks the question that lesson did not: by what right. Recall Cajamarca with a
+  `<Ref>` and a clause; do not re-anchor it. (ii) The institutional account
+  (`inclusive-and-extractive-institutions`; the reversal of fortune;
+  `national-data-audited` on the colonial-institutions table) argued that what
+  the conquerors built — tribute, forced labour, the encomienda — shaped the
+  Americas' later poverty. This lesson does not weigh that claim; it asks what
+  title the builders had. The seam is one sentence at the opening (L10a): the
+  previous module asked what conquest caused; this one asks whether it was
+  rightful, beginning with the man who asked it first.
 - **Contributes:** One move: take every title Spain could claim, state each at
   full strength, strip it by natural, divine and human law, and see what is left
   — a right of travel, trade and preaching held under the law of nations — and
@@ -120,7 +133,7 @@ goal: Analyze Vitoria's examination of every title by which Spain might hold the
   who apprehends reason without having it; 1255a3–b15 slavery by law vs by
   nature and the concession; I.8 1256b23–26 war on those born to be ruled who
   will not submit is "naturally just" — the sentence Sepúlveda used.
-- **Cicero, Rep. III.36–37** — index **39**; `research/texts/cicero/
+- **Cicero, Rep. III.36–37** (lesson `cicero-res-publica-and-natural-law`) — index **39**; `research/texts/cicero/
   de-republica-de-legibus-loeb.txt` (Loeb pp. 213–215): rule over the servile
   as just, "unjust to rule those capable of self-government" (III.25 in the
   summary's numbering). Recall by Ref; one clause.
@@ -142,10 +155,19 @@ goal: Analyze Vitoria's examination of every title by which Spain might hold the
   Introduction is his — quote it as "the edition's introduction" in References,
   never in the body).
 - **Strauss & Cropsey, History of Political Philosophy (3rd ed.)** — the volume
-  has no Vitoria chapter; consult the Aquinas chapter (Fortin) for the
-  natural-law background. Text landing at
-  `research/texts/strauss-cropsey/history-of-political-philosophy.txt` — at
-  brief time the file is EMPTY (0 lines; OCR not landed). Consult when present.
+  has no Vitoria chapter; consult the Aquinas chapter (Ernest L. Fortin, "St.
+  Thomas Aquinas", pp. 248–275) for the natural-law background: text landed at
+  `research/texts/strauss-cropsey/history-of-political-philosophy.txt` (OCR, not
+  summarised), chapter at l.12211–13700 (the section on moral virtue and the
+  natural law from about l.12723). Grep it for a check; Fortin in References
+  only.
+- **Acemoglu & Robinson, Why Nations Fail ch. 1** — index **51**; `research/texts/
+  acemoglu-robinson/why-nations-fail.txt` l.375–410 (Buenos Aires 1534; the
+  encomienda as practised — "put the inhabitants to work for him" l.409).
+  Backward Ref only (`geography-or-institutions`): one clause where the
+  encomienda is anchored, so the reader connects the institution Vitoria's
+  contemporaries fought over with the one the previous module blamed for the
+  reversal of fortune. Do not argue the economic claim here.
 
 ## EXPLANATION PLAN (L0)
 
@@ -289,9 +311,11 @@ lesson's chain is his own quaestio.
    made every obstruction an injury; the ladder from persuasion to full war
    turns resistance itself into the just cause; the eighth title restores
    tutelage; the exchequer closes the door the argument had opened. The set
-   piece is the Letter to Arcos (1534) on Cajamarca (anchor: November 1532,
-   Pizarro's men seize the Inca Atahualpa at a meeting and massacre his
-   unarmed retinue; a ransom in gold is taken and he is executed in 1533):
+   piece is the Letter to Arcos (1534) on Cajamarca (recall, do not re-anchor:
+   `<Ref>` geography-or-institutions, whose opening asked why the Spaniards
+   could do it; one clause adds what that lesson did not need — Atahualpa's
+   unarmed retinue massacred at the meeting, a ransom in gold taken, the Inca
+   executed in 1533):
    Vitoria writes that the Indies' profits "freeze the blood in my veins", that
    even granting a just title the Indians could not know it and are innocents,
    that the conquistadors "can allege no title other than iure belli", and: "if
@@ -359,8 +383,8 @@ the exchequer"; "Did the just titles license the conquest?"
    fifth, the duty to converts).
 8. **The Letter to Arcos** (pp. 331–3): the set piece of the objection — three
    short quotations ("freeze the blood", "no title other than iure belli", "men
-   but monkeys… incapable of injury"), with Cajamarca anchored in one
-   half-sentence first.
+   but monkeys… incapable of injury"), with Cajamarca recalled by `<Ref>`
+   geography-or-institutions in one half-sentence first.
 
 ## Pitfalls / subtleties to flag
 
@@ -377,7 +401,11 @@ the exchequer"; "Did the just titles license the conquest?"
   junta Vitoria's introduction mentions); the requerimiento (1513); Sublimis
   Deus (Paul III, 1537: the Indians are true men, not to be enslaved); the New
   Laws (1542); encomienda (a grant of Indian labour and tribute to a settler —
-  anchor only if used); Cajamarca (1532); Wycliff and Fitzralph (fourteenth-
+  anchor only if used — and then `<Ref>` geography-or-institutions if its
+  ledger, `research/taught/geography-or-institutions.md`, shows the encomienda
+  was taught there as part of the extractive model); Cajamarca
+  (1532 — already anchored in `geography-or-institutions`: recall, do not
+  re-anchor); Wycliff and Fitzralph (fourteenth-
   century Oxford: dominion depends on grace); Innocent IV and Hostiensis
   (thirteenth-century canon lawyers: the one grants infidels dominion, the
   other denies it); Cajetan (Aquinas's commentator, d. 1534); Cano (Vitoria's
@@ -399,7 +427,7 @@ the exchequer"; "Did the just titles license the conquest?"
   enslavement of the innocent in a permanent war against pagans (Law of War
   §42), wholesale punishment after victory against infidels (§§45–48), the
   natural-slavery title left open. State them as what the text says; the
-  tone rule forbids both apology and denunciation.
+  register rule applies: The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
 - **No demographic numbers.** The dossier has none for the conquest's death
   toll and the "Black Legend" debate is not in it; the lesson needs no number
   except, if any, the one Vitoria gives (the fifth-part tax). Dates: 1493,
@@ -411,8 +439,12 @@ the exchequer"; "Did the just titles license the conquest?"
 - **Do not re-teach** Aquinas's four laws and determination, Aristotle's
   slave, Cicero's natural law or just war — one `<Ref>` clause each. Do not
   pre-empt Locke's waste land (next lesson) beyond the hand-off sentence.
-- **Strauss–Cropsey:** no Vitoria chapter; the text file is empty at brief
-  time.
+- **Strauss–Cropsey:** no Vitoria chapter; the Aquinas chapter has landed (OCR)
+  — see Sources.
+- **Do not re-teach the previous module.** Cajamarca's proximate causes, the
+  encomienda's economic legacy and the reversal of fortune belong to
+  `geography-or-institutions` and `national-data-audited`; this lesson recalls
+  them in a clause each and asks only the question of right.
 - **Gutenberg/OCR:** page numbers in the Vitoria text are stray numerals;
   footnotes interleave. Quote from the translation, not the footnotes, and
   check each quotation against the line numbers above.

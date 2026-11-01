@@ -20,7 +20,17 @@ goal: Analyze the counter-revolutionary case that no constitution can be made by
   `augustine-two-cities`: Providence in history and the earthly peace; from
   `aquinas-law-and-kingship`: God as author of punishment (Summa I q.49 a.2,
   which Maistre cites). From `english-revolution-as-test`: 1649, Cromwell,
-  Monk and 1660 — the parallel Maistre builds his prophecy on.
+  Monk and 1660 — the parallel Maistre builds his prophecy on, out of Hume's
+  History of England (Considerations ch. 11). From
+  `hume-against-the-original-contract`: government founded on opinion and the
+  denial that any actual government began in consent — Maistre's Seventh
+  Dialogue says sovereigns "command effectively … only within the circle of
+  things acknowledged by opinion, and they are not the ones who trace the circle
+  of opinion" (spd.txt l.12699–12700), Hume's thesis in a theologian's mouth. For
+  the starred section: from `hobbes-state-of-nature-and-covenant`, sovereigns
+  "in the state and posture of Gladiators" toward one another; from
+  `cicero-res-publica-and-natural-law`, `just-war`; from `augustine-two-cities`,
+  the earthly peace and sacrifice.
 - **Contributes:** One move, in two voices. Maistre: the Revolution is not a
   crime men committed but a punishment God is carrying out through men who think
   they lead it; from this follow rules — no nation gives itself a constitution,
@@ -30,22 +40,35 @@ goal: Analyze the counter-revolutionary case that no constitution can be made by
   individual, the family is its model, and marriage — like sovereignty — is a
   bond the parties cannot dissolve because a third party (the child; God) is
   always present. Then the charge: that this is the first draft of fascism — put
-  at full strength and answered.
-- **Hands off:** War is held entirely for `war-is-divine` (extra). The forward
-  reading is the twentieth-century jurist who will say the counter-revolution's
-  real discovery was the *decision* — authority that answers nothing and
-  decides "without delay and without appeal" — against liberalism's "everlasting
-  conversation" (`schmitt-political-theology`); say it in one paragraph. The
-  problem that stays open for `hegel-ethical-life-and-the-state`: if Burke
-  grounds order in inherited reason and Maistre in a Providence reason cannot
-  reach, is there an account on which the state is rational AND not designed?
-  Maistre's count of laws and his "three constitutions in five years" are tested
-  in `assignats`. The conservative/reactionary distinction (Lilla) is seeded here
-  and taught in `what-conservatism-is`.
-- **Spine step:** "Government by consent (Locke) and the general will (Rousseau)
-  make a revolution thinkable; Burke, Maistre and Bonald answer that no
-  generation knows enough to design a society, and Hegel absorbs both sides into
-  the rational state"
+  at full strength and answered. A starred section (it absorbs what had been planned as
+  a separate extra lesson on war) extends the executioner's argument to war — the Seventh
+  Dialogue's soldier and executioner, the earth as an altar, war as a divine law
+  of expiation (`war-as-expiation`) — with Hegel's and Schmitt's accounts named
+  as later comparisons. The core path reads correctly without it.
+- **Hands off:** (1) The next lesson, `herder-and-fichte-volk-and-nation`, takes
+  up "I have seen Frenchmen, Italians, Russians … but man I have never met" from
+  the other side: if only peoples exist, what makes a people — its language,
+  customs and memory (Herder), or a mission (Fichte)? (2) The forward reading of
+  the counter-revolution as a doctrine of the *decision* — authority that answers
+  nothing and decides "without delay and without appeal" — is taken a step
+  further by a Spanish deputy in 1849, who, finding no legitimate king left to
+  restore, asks for a dictatorship (`donoso-cortes-on-dictatorship`, later this
+  module), and is theorised by a twentieth-century jurist against liberalism's
+  "everlasting conversation" (`schmitt-political-theology`); one paragraph here.
+  (3) The problem that stays open for `hegel-ethical-life-and-the-state`: if
+  Burke grounds order in inherited reason and Maistre in a Providence reason
+  cannot reach, is there an account on which the state is rational AND not
+  designed? (4) Maistre's count of laws and his "three constitutions in five
+  years" are tested in `assignats`. (5) The starred section's comparisons point
+  forward to Hegel's §§321–340 (`hegel-ethical-life-and-the-state`) and to the
+  "real possibility of killing" (`schmitt-concept-of-the-political`). The
+  conservative/reactionary distinction (Lilla) is seeded here and taught in
+  `what-conservatism-is`.
+- **Spine step:** "Government by consent (Locke) is doubted by Hume and
+  radicalised by Rousseau's general will; when France tries to frame a government
+  from principles, Burke, Maistre and Donoso Cortés answer that no generation
+  knows enough, Herder and Fichte put the people before the state, and Hegel
+  absorbs both sides into the rational state"
 
 ## Sources to consult
 
@@ -111,7 +134,88 @@ goal: Analyze the counter-revolutionary case that no constitution can be made by
   (Aquinas; pp. 14–15); the terrace and the three just men (p. 15); the Laws of
   Manu on punishment (pp. 18–19); THE EXECUTIONER (pp. 19–21; spd.txt
   l.2517–2603); judicial error and Calas (pp. 21–22). Fifth Dialogue p. 131 (the
-  dog at the execution) for one image. The Seventh Dialogue is NOT read here.
+  dog at the execution) for one image.
+- **Maistre, St Petersburg Dialogues, SEVENTH DIALOGUE (pp. 205–242) — FOR THE
+  STARRED SECTION ONLY** — summaries.json index 26; text
+  `research/texts/maistre/spd.txt` from c. l.12650 (shard
+  `research/texts/consideratio-s4-seventh.txt`). Copyrighted (Lebrun 1993): a
+  sentence or two per quotation; Lebrun's notes correct Maistre's facts (use
+  them, name him in References). Read in order (pages, then spd.txt lines where
+  checked):
+  - pp. 205–206: war is "humanly inexplicable"; "kings order, you march" is no
+    answer, since "Sovereigns command effectively and in a lasting way only
+    within the circle of things acknowledged by opinion, and they are not the
+    ones who trace the circle of opinion" (l.12699–12700; Peter the Great's
+    beards; the calendar no government dares reform); the question is war's
+    *facility*, not its possibility.
+  - pp. 206–209: THE VISITING STRANGER — told that society lets only two men
+    kill, the executioner (rarely, the guilty, after judgment) and the soldier
+    (often, the innocent, without judgment), he guesses which is honoured and gets
+    it exactly backwards; the two extremes touch "in the same way that in a
+    circle 1° touches 360°" (l.12784); the soldier may execute only soldiers,
+    with soldiers' weapons, for military crimes, or his honour is lost (pp.
+    207–208); the Roman vine-branch (p. 209).
+  - pp. 209–210: "the most honoured thing in the world has always been the right
+    to shed innocent blood innocently" — glory itself must be explained.
+  - pp. 210–211: THE HOTTENTOT (l.12938 ff.): Rousseau's own frontispiece shows
+    the savage returning to his fellows; "society is as old as man"; the savage
+    is degraded man (`<Ref>` rousseau-inequality-and-general-will, where the
+    engraving was shown).
+  - pp. 211–212: why nations never left the state of nature — every argument
+    against a society of nations works against a society of individuals; the
+    Abbé de Saint-Pierre's perpetual peace; "an occult and terrible law demanding
+    human blood" (l.13001).
+  - pp. 212–215: the soldier's character; "legions of atheists could not stand
+    against burning legions"; the gentle youth who cannot wring a dove's neck
+    and climbs a pile of corpses tomorrow; the idealised old-regime war
+    (campaigns May to December, hospitals, enemy officers at balls).
+  - pp. 216–218: THE UNIVERSAL LAW OF VIOLENT DEATH — rage through the vegetable
+    and animal kingdoms up to man, who "kills to nourish himself, to clothe
+    himself … to kill"; "man himself is charged with slaughtering man"; the earth
+    "an immense altar on which every living thing must be immolated without end"
+    (l.13315); war as the price of unpunished crime and abolished atonement —
+    "if human justice struck all criminals there would be no war".
+  - pp. 218–219: "War is therefore divine in itself, since it is a law of the
+    world" (l.13353) and the list that follows (l.13353–13416): divine in its
+    supernatural consequences, its mysterious glory, the protection of its great
+    leaders, the way it breaks out, its results, the force that decides it.
+  - pp. 219–223: against "God is on the side of the big battalions" — momentum
+    as mass × speed (Maistre's analogy, not a formula), Providence keeping the
+    balance by small obstacles (the geese of the Capitol); "Tell me, General,
+    what is a lost battle? … It is a battle one believes one has lost" (l.13519);
+    "it is imagination that loses battles". The rest (prayer, Psalms, dreams, pp.
+    224–238) is NOT read.
+- **Maistre, Considerations ch. 3 "On the Violent Destruction of the Human
+  Species" (pp. 51–63) — FOR THE STARRED SECTION** — `research/texts/maistre/cof.txt`
+  (l.2505: "blood is the manure of the plant we call genius"). War as the
+  habitual state of mankind (France at war forty years of ninety-six, p. 52 —
+  Maistre's own count, bind it as his); the pruned tree and the gardener who
+  wants "fruit, not wood or leaves"; the dogma of *reversibility* — the innocent
+  pay for the guilty, the source of sacrifice (pp. 61–62); Lebrun's casualty
+  correction (n.36). One paragraph.
+- **Hegel, Philosophy of Right §§321–340 — FOR THE STARRED SECTION, forward** —
+  summaries.json index 27; `research/texts/hegel-pr/philosophy-of-right-full.txt`
+  l.8732 (§321) to l.9048 (§340): §324 (with Remark and Addition) war as "the
+  ethical moment", "the winds preserve the sea from the foulness of calm";
+  §333 no Praetor between states; §§338–339 recognition survives in war; §340
+  world history as the court. Two sentences, forward `<Ref>`
+  hegel-ethical-life-and-the-state (two lessons on).
+- **Schmitt, The Concept of the Political §§3, 7 — FOR THE STARRED SECTION,
+  forward** — summaries.json index 34;
+  `research/texts/schmitt/concept-of-political-miller-ia.txt` (§7 l.1573–1688;
+  Maistre named in the list at l.1687). Copyrighted: one sentence. The friend–enemy
+  grouping with "the real possibility of killing"; the enemy public (hostis), not
+  private (inimicus); war the presupposition, not the aim, of politics. Two
+  sentences, forward `<Ref>` schmitt-concept-of-the-political.
+- **Berlin V pp. 110–113, 120–122, VII pp. 139–140 and Garrard pp. 118–122 — FOR
+  THE STARRED SECTION** — the "vast altar" passage read as "the paranoiac world of
+  modern Fascism"; soldiers vs executioners; Tolstoy borrowing the "lost battle"
+  thought for War and Peace (Berlin VII; Garrard n.16 confirms); Garrard's
+  concession that on war Berlin is "substantially correct" — Maistre "glorifies
+  war, declares it mysterious and divine" — and his hedge that the altar is
+  providential theodicy "akin to Hegel, unlike Burke"; Berlin's own hedge that
+  Maistre condemned militarism ("la bâtonocratie") and conquest (XII pp.
+  168–169). Paraphrase; names in References only.
 - **Maistre, Essay on the Generative Principle of Political Constitutions
   (1814), excerpts in Muller ch. 2** — summaries.json index 48; text
   `research/texts/muller/conservatism-anthology.txt` l.2270–c.2420 (shard
@@ -233,8 +337,9 @@ goal: Analyze the counter-revolutionary case that no constitution can be made by
   oppositions (p. 99) — background only, to show Maistre inherits a French
   Catholic polemic older than 1789. One clause; References only.
 - **Strauss & Cropsey (eds.), History of Political Philosophy, 3rd ed.** — no
-  chapter on Maistre or Bonald; the Burke chapter (Mansfield) is the nearest.
-  File empty at writing time (DOSSIER GAP).
+  chapter on Maistre or Bonald (the OCR has landed; grep finds no Maistre,
+  Bonald or Donoso); the Burke chapter (Mansfield, l.33273–34409) and the Hegel
+  chapter (Hassner, l.35558–37006, for §§321–340) are the nearest.
 
 ## EXPLANATION PLAN (L0)
 
@@ -312,8 +417,13 @@ most famous charge against it.
    is circular — what has lasted is divine, and what is divine will last — and
    let it stand until link 7.
 4. **What then holds a society together, if not consent and not a written
-   law?** Obvious attempt (Hobbes, `<Ref>`): the sword. Maistre agrees and
-   goes further: not the sword as threat but the man who wields it against the
+   law?** The reader has two answers already: Hume's opinion (`<Ref>`
+   hume-against-the-original-contract — force is always on the side of the
+   governed) and Hobbes's sword (`<Ref>`). Maistre accepts Hume's denial of
+   consent and gives it a theological ground (the Seventh Dialogue's "circle of
+   opinion" no sovereign traces is one clause here). Against the obvious
+   attempt — the sword — Maistre agrees with Hobbes and goes further: not the
+   sword as threat but the man who wields it against the
    condemned. The First Dialogue's frame (a boat on the Neva, three men, the
    question why the wicked prosper), then the set piece: the executioner. "So
    who is this inexplicable being who, when there are so many … honourable
@@ -413,22 +523,97 @@ most famous charge against it.
    militarism "la bâtonocratie", wanted to meet Napoleon and was suspected at
    Turin as a "royalist Jacobin" — not a nostalgic. (iv) What survives: that he
    "glorifies war, declares it mysterious and divine" is substantially right
-   (`<Ref>` war-is-divine, where it is read); and that his method is a lawyer's
+   (one sentence here; the starred section below reads the text for readers who
+   want it); and that his method is a lawyer's
    brief — the circle of link 3 — is right. The course's own position: the
    charge is best read as a warning about where the executioner's argument goes
    when its theology is removed and its sociology kept; the reader is left to
    weigh. Seed the distinction `what-conservatism-is` will teach: the reactionary
    reads history as a rupture, as the revolutionary does; Burke does not (one
    sentence, Lilla in References).
-9. **Where this leads.** One paragraph: a jurist of the next century will say
-   the counter-revolutionaries' real discovery was the decision — sovereignty
-   and infallibility "perfectly synonymous", any government good once
-   established, a question decided "without delay and without appeal" against
-   the liberal "everlasting conversation" (`<Ref>` schmitt-political-theology).
-   And the open problem for the next lesson: Burke grounds order in reason men
-   inherit, Maistre in a Providence reason cannot reach; a professor in Berlin
-   will claim the state is rational without being designed (`<Ref>`
+9. **Where this leads.** One paragraph, in the core path (it must not depend on
+   the starred section). Three hand-offs: (i) "There is no such thing as man" —
+   only Frenchmen, Italians, Russians — raises the question what makes a people
+   one, which a Lutheran pastor had answered with language and custom and a Berlin
+   philosopher will turn into a nation's mission (`<Ref>`
+   herder-and-fichte-volk-and-nation, the next lesson). (ii) The decision: the
+   counter-revolutionaries' real discovery, a later reader will say, was
+   authority that decides — sovereignty and infallibility "perfectly synonymous",
+   any government good once established, a question decided "without delay and
+   without appeal"; a Spanish deputy of 1849, seeing no legitimate king left,
+   will draw the conclusion Maistre did not — dictatorship (`<Ref>`
+   donoso-cortes-on-dictatorship) — and a jurist of the next century will set it
+   against the liberal "everlasting conversation" (`<Ref>`
+   schmitt-political-theology). (iii) The open problem: Burke grounds order in
+   reason men inherit, Maistre in a Providence reason cannot reach; a professor in
+   Berlin will claim the state is rational without being designed (`<Ref>`
    hegel-ethical-life-and-the-state).
+10. **★ War is divine: the Seventh Dialogue.** A `## ★` section after link 8's
+   replies and before the Conclusion (L2b): nothing in the core path, the
+   Conclusion or the exercises outside the ★-marked one may depend on it.
+   Problem (from the executioner the reader has just met): society lets two men
+   kill by law, and honours the one who kills more and more innocently — why?
+   The chain, compressed to six steps, each with its "because":
+   (a) *Why do men march at all?* "Kings order, you march" fails, because
+   sovereigns command only within "the circle of things acknowledged by opinion"
+   (Peter the Great could send thousands to die and nearly faced revolt over
+   beards; `<Ref>` hume-against-the-original-contract for opinion) — so the
+   puzzle is war's *facility*, not its possibility.
+   (b) *The stranger.* Told of the two legal killers, a visitor from another
+   world would honour the executioner and shun the soldier; we do the reverse;
+   the two "touch … as in a circle 1° touches 360°". The soldier's honour has
+   rules (he may execute only soldiers, with soldiers' weapons, for military
+   crimes) — so honour is a code about *what kind* of killing is clean, and "the
+   most honoured thing in the world has always been the right to shed innocent
+   blood innocently". Glory is a fact that must be explained.
+   (c) *Is war a relic of a state of nature nations have not yet left?* The
+   contract theorists' answer (`<Ref>` hobbes-state-of-nature-and-covenant:
+   sovereigns as gladiators; `<Ref>` rousseau-inequality-and-general-will). Two
+   replies: there never was a state of nature — Rousseau's own frontispiece shows
+   the Hottentot going back to his fellows, "society is as old as man"; and every
+   argument against a society of nations works equally against a society of
+   individuals, so if nations never contracted, something stronger than interest
+   keeps them apart — "an occult and terrible law demanding human blood". Seam:
+   from the contract story one expects war to recede with civilisation; Maistre
+   (Considerations ch. 3) counts France at war forty years in ninety-six, by his
+   own count, and says the flow of blood is roughly constant.
+   (d) *What is this law?* The widening lens — violence through plants and
+   animals to man, who "kills … to kill", until "man himself is charged with
+   slaughtering man"; the earth "an immense altar on which every living thing
+   must be immolated without end". Then the link to the executioner's theodicy
+   (link 4): human justice punishes too few and the age has abolished atonement,
+   so the debt is collected in war — "if human justice struck all criminals there
+   would be no war". Define *expiation* and *reversibility* (the innocent suffer
+   for the guilty — Considerations ch. 3 pp. 61–62; `<Ref>` augustine-two-cities
+   for sacrifice and the earthly peace) and the course's concept
+   `war-as-expiation`.
+   (e) *In what sense "divine"?* "War is therefore divine in itself, since it is a
+   law of the world" — divine as a *law of the world*, not as approved by God (the
+   First Dialogue's distinction: God authors the evil that punishes, not the evil
+   that defiles). The seven senses as a compact table (figure); the last — the
+   force that decides it — carried by "what is a lost battle? … It is a battle one
+   believes one has lost": if victory is moral, not arithmetical, war is the one
+   human activity whose outcome cannot be engineered. One clause: a Russian
+   novelist read these pages and gave the thought to his generals (Tolstoy in
+   References).
+   (f) *Two later accounts on which war is no accident*, as a three-column ledger
+   (why war exists / what it does for the state / who judges / what would end
+   it), each in two sentences and each a forward `<Ref>`: Hegel — war "the
+   ethical moment", "the winds preserve the sea from the foulness of calm", no
+   Praetor between states, world history the judge (`<Ref>`
+   hegel-ethical-life-and-the-state); Schmitt — the political as the grouping of
+   friend and enemy with "the real possibility of killing", the enemy public, not
+   private (`<Ref>` schmitt-concept-of-the-political). Where they agree with
+   Maistre: war is necessary, not accidental; where they differ: Hegel's
+   necessity is the state's self-knowledge, Schmitt's a criterion, and neither
+   gives a theodicy.
+   Close the ★ section on what the argument costs: Maistre's idealised
+   old-regime war (pp. 214–215) set against the Revolutionary wars he was living
+   through (Lebrun's corrections); and the charge revisited in one sentence — on
+   war the reply concedes that Maistre "glorifies war, declares it mysterious and
+   divine", and keeps the hedge that he condemned conquest and "the rule of the
+   stick" and never praised war for the nation's sake: his altar is God's, not
+   the nation's.
 
 ## Set pieces and worked examples to recreate
 
@@ -482,9 +667,24 @@ most famous charge against it.
    XI–XII; Garrard pp. 120–128): six charges, each with the Maistre text it
    rests on, the reply, and what is conceded. Names in References; the body
    says "the charge" and "the reply".
+10. **★ The visiting stranger (Seventh Dialogue pp. 206–208; spd.txt l.12784)** —
+   told in Maistre's order (two legal killers; who kills whom, how often, with
+   what judgment), the stranger's guess and its inversion, then the honour code
+   as the rules that make a killing clean.
+11. **★ The altar and the debt (pp. 216–218; spd.txt l.13315)** — the chain of
+   slaughter from plants to man; the altar sentence; the debt argument (fewer
+   punishments, no atonement, therefore war) set beside the executioner's
+   theodicy of link 4.
+12. **★ "A battle one believes one has lost" (pp. 221–223; spd.txt l.13519)** —
+   against the big battalions; momentum as Maistre's analogy (do not typeset as
+   a formula); the Tolstoy echo in one clause.
 
 ## Pitfalls / subtleties to flag
 
+- **Register rule.** The course passes no verdict of its own on any author or
+  idea: no condemning or approving labels in its own voice. Judgement comes only
+  through argument and evidence; a label may appear only inside a quotation, with
+  who applied it and when.
 - **Terms to anchor (L11):** *Savoy* (an Alpine duchy ruled by the king of
   Sardinia from Turin, French-speaking, annexed by France in 1792 — Maistre was
   a senator of its high court; anchor at the opening's "Savoyard"); *Lausanne*
@@ -523,12 +723,27 @@ most famous charge against it.
   "power–minister–subject" triad is standard Bonald but is not in the cached
   excerpts — state it as his doctrine without quotation marks. The 1816 divorce
   law is public record but not in the dossier — verify before stating.
-- **War is held for `war-is-divine`.** The Seventh Dialogue, "the earth as an
-  altar", "war is divine", the soldier/executioner inversion — none of it here
-  beyond the one sentence in the reply (viii.iv). Chapter 3 of the
-  Considerations (war as the habitual state, blood as "manure") is likewise
-  held; if the writer needs the theodicy of sacrifice for the executioner, take
-  the First Dialogue's version (God the author of the evil that punishes).
+- **The starred section (war) is skippable by construction (L2b).** Mark it `## ★`;
+  place it after the replies and before the Conclusion; the Conclusion, the
+  forward paragraph (link 9) and every exercise except the one marked ★ must read
+  correctly without it. The core path keeps only one sentence on war (link 8
+  reply iv). Chapter 3 of the Considerations belongs to the ★ section too.
+- **★ "War is divine" means "a law of the world", not "approved by God"** —
+  state this at first use, or the reader takes the title as blasphemy or as
+  cheerleading. Maistre is not a militarist (he condemns conquest and
+  "bâtonocratie"); say it once without using it to soften the altar passage.
+- **★ The idealised eighteenth-century war (pp. 214–215) is a claim to test**, not
+  history the course adopts; Maistre's casualty and war-year figures are his,
+  bound as his. The momentum "formula" is an analogy — no arithmetic (E2).
+- **★ Hegel and Schmitt enter only as a two-sentence ledger each**, forward
+  `<Ref>`s; do not teach §§321–340 or the friend–enemy criterion here.
+- **★ Terms (L11):** *the Seventh Dialogue* (the seventh evening, set in 1809);
+  *the Abbé de Saint-Pierre* (Charles-Irénée Castel, whose plan for perpetual
+  peace in Europe, 1713, Rousseau abridged); *expiation*; *reversibility*; *Te
+  Deum* (the hymn sung for victories); *the geese of the Capitol* (Rome, 390 BC,
+  saved when geese woke the garrison); *Peter the Great's beards* (his 1698
+  decree); *Praetor* (the Roman judge between citizens — there is none between
+  states). At most three per paragraph.
 - **The 15,479 laws and "three constitutions in five years" are the application
   lesson's artefact**; one sentence here, no table.
 - **The stock portrait is a target, not the lesson.** The course does not teach
@@ -559,14 +774,19 @@ most famous charge against it.
 - **Names ONLY in References:** Berlin, Garrard, Lebrun, Muller, Davidson
   (Bonald's translator), Lilla, Fawcett, McMahon, Cioran, Faguet, Sainte-Beuve,
   Darcel, Bradley, Lamennais (his "books written on the scaffold" may be quoted
-  in References only), Bongie (the Hume collage), Talmon. Thinkers who may be
+  in References only), Bongie (the Hume collage), Talmon, Unamuno ("the abattoir
+  of the late Count Joseph de Maistre" — an epigraph in References at most),
+  Görres, Tolstoy (as the borrower; War and Peace may be named as an object). Thinkers who may be
   named in the body: Maistre, Bonald, Burke, Rousseau, Montesquieu, Paine,
-  Hume (as Maistre's source), Aquinas (`<Ref>`), Schmitt (forward `<Ref>`),
-  Hegel (forward `<Ref>`). State the charge as "the charge that Maistre is a
+  Hume (`<Ref>`; also as Maistre's source), Aquinas (`<Ref>`), Herder and Fichte
+  (forward `<Ref>`), Donoso Cortés (forward `<Ref>`), Schmitt (forward `<Ref>`),
+  Hegel (forward `<Ref>`), Saint-Pierre, La Bruyère, Frederick II (★). State the charge as "the charge that Maistre is a
   forerunner of fascism", never "Berlin argues".
 - **Dossier gaps:** Bonald (above); Du Pape and On the Sovereignty of the People
   are cited only through Berlin and Garrard (the "river into the ocean" passage
-  is from the latter); Strauss–Cropsey has no chapter and the file is empty.
+  is from the latter); Strauss–Cropsey has no chapter (file landed; checked).
+  For the ★ section the Seventh Dialogue, Considerations ch. 3, Hegel §§321–340
+  and Schmitt's Concept are all present; Tolstoy is not cached and not needed.
 
 ## FIGURE PLAN
 
@@ -610,10 +830,25 @@ most famous charge against it.
    engraving after it, via Wikimedia Commons (PD-Art; verify). The reader must
    see the face Berlin's stock portrait ("snow on his head, fire in his mouth")
    was built around. Placement: float right at the opening. Optional; the lesson
-   is a close reading of arguments and stays draw-heavy (8 draw / 1 source).
+   is a close reading of arguments and stays draw-heavy (10 draw / 2 source, the ★ section included).
    Alternative: a photograph of the Neva embankment at St Petersburg with the
    bronze Peter the Great (the Dialogues' opening scene, First Dialogue p. 4) —
    Wikimedia Commons, check the photographer's CC licence.
+
+10. `draw:` `<Figure>` — **★ the 1°/360° circle**: a circle of social rank with the
+   soldier at the top and the executioner at the bottom, adjacent where 1° meets
+   360° — the two legal killers as the extremes that touch (Seventh Dialogue p.
+   207; summary 26 figures). Placed in the ★ section.
+11. `draw:` `<Figure>` — **★ three accounts of war**: Maistre / Hegel / Schmitt ×
+   (why war exists / what it does for the state / who judges / what would end it),
+   with section pointers (Seventh Dialogue pp. 216–219; PR §§324, 333, 340;
+   Concept §§3, 7). Placed at the end of the ★ section.
+12. `source:` **★ the frontispiece of Rousseau's Discourse on Inequality (1755),
+   "Il retourne chez ses Égaux"** — no pool candidate; the same capture the
+   `rousseau-inequality-and-general-will` brief plans (Gallica or Wikimedia
+   Commons, PD-old; verify). REUSE that file (one credits.yaml entry per lesson).
+   The reader must see what Maistre read against the book: the man handing back
+   his European clothes and walking toward his people. Placement: ★ step (c).
 
 ## EXERCISE PLAN (E6/E7 + playbook-history mix)
 
@@ -662,21 +897,25 @@ most famous charge against it.
    would have to be true for it to survive (that the sociology — order rests on
    punishment men cannot rationally approve — can be detached from the theology
    and still be held; which is what the charge's author says happened).
-7. **FORWARD (E7) → `hegel-ethical-life-and-the-state`.** Burke says the
-   constitution knows what no individual knows; Maistre says it is the work of a
-   Providence no reason can read. Take Maistre's own sentence that a
-   constitution is "the solution to the problem: given the population, mores,
-   religion, geography … find the laws that suit it" and ask whether that
-   problem has a rational solution — one a mind could in principle understand
-   after the fact, even if no assembly could compute it in advance. The reader
-   should reach the thought that an order could be rational without being
-   designed — understood at dusk, not planned at dawn. The solution says in one
-   sentence that this is the next lesson's "owl of Minerva", with the `<Ref>`.
-8. *Retrieval across the module (E3).* Place on one line Locke's appeal to
-   heaven, Rousseau's Legislator who speaks for the gods, Burke's consecrated
-   state, and Maistre's executioner as God's "two poles": in each, what work
-   does God do for the political argument? (Judge of last resort; authority the
-   people cannot yet see; guarantor of the entail; author of punishment.)
+7. **FORWARD (E7) → `herder-and-fichte-volk-and-nation`.** Maistre says the
+   Constitution of 1795 "is made for man", that "there is no such thing as man",
+   and that he has met only Frenchmen, Italians, Russians. Take him at his word
+   and ask what makes a Frenchman a Frenchman rather than a man: list what a
+   constitution "made for the French" would have to know (Maistre's own list —
+   population, mores, religion, geography) and decide which of these a people
+   could carry with it if it lost its state. The reader should reach the thought
+   that language, custom and memory make a people prior to any constitution. The
+   solution says in one sentence that the next lesson's Lutheran pastor built a
+   philosophy of history on exactly that, and that a Berlin philosopher turned it
+   into a nation's mission, with the `<Ref>`.
+8. *★ Boundary probe (the starred section).* Maistre's own counterfactual: "if
+   human justice struck all criminals there would be no war" (Seventh Dialogue p.
+   217). Suppose it did. Does the altar passage (pp. 216–217) still hold? The
+   reader should find that the "universal law of violent death" is argued from
+   nature, not from unpunished crime, so the Dialogue gives war two independent
+   grounds and the counterfactual removes only one — and say which of the two a
+   later account that calls war "the ethical moment" of the state shares (`<Ref>`
+   hegel-ethical-life-and-the-state, forward; the solution names §324).
 
 ## Nietzsche cross-course links (where his ideas enter)
 
@@ -686,6 +925,9 @@ most famous charge against it.
   Nietzsche course has already shown punishment as the engine of culture;
   Maistre grounds it in divine law, Nietzsche in cruelty made memory. Do not
   re-teach either.
+- `nietzsche/cruelty-and-culture` (★ section) — one comparative clause at the
+  altar passage: Nietzsche describes the same fact (culture built on cruelty
+  made memory) and refuses the theodicy. Do not re-teach.
 - `nietzsche/nietzsche-and-politics` — why Nietzsche is not a reactionary
   (contempt for nationalism, the state and antisemites). Use in the reply to the
   charge, one clause: the genealogy that runs Maistre → Nietzsche → fascism

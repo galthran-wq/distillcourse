@@ -12,8 +12,9 @@ goal: Analyze Machiavelli's argument that a prince must learn how not to be good
   tyranny "does not pay" because fear is a weak support and friendship a strong one (De Regno
   I.11). From `augustine-two-cities`: pagan virtue as splendid vice because it serves glory, and
   the earthly city driven by libido dominandi. From `thrasymachus-and-the-ring`: justice as the
-  interest of the stronger and the unjust man who seems just. From `cicero-natural-law`:
-  Carneades's "the wise man who does not seize an advantage is a fool". From
+  interest of the stronger and the unjust man who seems just. From
+  `cicero-res-publica-and-natural-law`: Carneades's "the wise man who does not seize an advantage
+  is a fool", and Rome's empire as the great case of taking what was not its own. From
   `kallipolis-and-the-philosopher-king`: the one who has seen must be compelled to rule.
 - **Contributes:** The one move: Machiavelli replaces "how a prince ought to live" with "how men
   actually keep power" (Prince XV) and from that standard derives rules that invert the
@@ -26,14 +27,15 @@ goal: Analyze Machiavelli's argument that a prince must learn how not to be good
   analysis favour — and was Machiavelli a Machiavellian? `machiavelli-discourses-republic` takes
   it. The standard itself (effectual truth) is reused there and attacked in `bodin-sovereignty`
   (treaties, fear vs affection) — forward hooks, one clause each.
-- **Spine step:** "Christendom builds a law above kings — and Machiavelli breaks it, measuring
-  princes and republics by what works rather than what ought to be"
+- **Spine step:** "Christendom builds a law above kings; Machiavelli breaks it; the wars of
+  religion force one sovereign power above every faction — Bodin's definition, Hobbes's
+  derivation from fear, Filmer's from fatherhood — and the English Revolution tests them"
 
 ## Sources to consult
 
 - **Machiavelli, The Prince (Marriott tr., 1908; Gutenberg #1232)** — summaries.json index 19;
   text at
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/machiavelli/prince.txt`
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/machiavelli/prince.txt`
   (line numbers below are this file's). Read whole (it is short). Priority: Introduction
   l.271–298 (the Vettori letter of 13 Dec 1513 — evening in court dress with the ancients),
   l.339–341 (statesman out of work as a whale); Dedication l.526–533 (landscape painter); I
@@ -54,41 +56,46 @@ goal: Analyze Machiavelli's argument that a prince must learn how not to be good
   possible fortress is not to be hated by the people"); XXIV (why Italian princes lost); XXV
   l.3461–3550 (river and dikes; Julius II; fortune a woman); XXVI (exhortation; Petrarch).
 - **Machiavelli, Discourses I.9, I.10, I.58, II.2** — same index;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/machiavelli/discourses.txt`.
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/machiavelli/discourses.txt`.
   Only for the forward hook to the next lesson: I.9 "the end excuses the means" is said of
   FOUNDERS (Romulus) — the writer needs it to refute the slogan in Exercise 4; I.10 (ladder of
   glory; Caesar a destroyer). Do not teach the Discourses here.
 - **Smith, Open Yale L10–L11** — index 9;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/oyc/lecture-10.txt`,
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/oyc/lecture-10.txt`,
   `lecture-11.txt`. Pedagogical scaffold only: L10 Ch2 (Vettori letter, Columbus comparison),
   Ch4 (armed prophets — "a teacher and a kind of educator"), Ch5 (virtù as manly self-assertion;
   Ramiro; "what would X be without Y"); L11 Ch4 "Was Machiavelli a Machiavellian?" (l.63–68: the
   humours of IX, the people's end "more decent", Spinoza's reading) — this is the hand-off
   question. Smith's name in References only; his framing questions become the course's own.
 - **Augustine, City of God XIX.25** — index 17;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/cityofgod-book19.txt`:
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/cityofgod-book19.txt`:
   virtues not referred to God are vices because they serve pride/glory. Backward Ref
   (`augustine-two-cities`), one clause; the inversion is the lesson's objection.
 - **Aquinas, De Regno I.11–12 [75–92]** — index 18;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/aquinas/de-regno-kenny-trans.txt`:
-  tyranny does not pay — friendship [77], fear as water under pressure [81], hypocrite-king
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/aquinas/de-regno-kenny-trans.txt`:
+  tyranny does not pay — friendship [77], fear as water under pressure [81], the tyrant as Aquinas's stage "hypocrite"
   [83]. Backward Ref to `aquinas-law-and-kingship` set piece 8; the objection at full strength.
 - **Strauss, Natural Right and History ch. IV pp. 159–163 and V.A pp. 177–181** — index 35;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/strauss/nrh-s4-ch4.txt`,
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/strauss/nrh-s4-ch4.txt`,
   `nrh-s5-ch5a-hobbes.txt`: the "extreme situation" reading (Aristotle starts from the normal
   case and deviates reluctantly; Machiavelli makes the extreme case the norm; "lowered the goal
   to make it attainable"; "that greater Columbus"). Copyrighted — paraphrase; the "teacher of
   evil" charge (Thoughts on Machiavelli, not in dossier) is named in References only, and stated
   in body as "the charge that the book teaches evil openly".
 - **Bodin, Six Books, Tooley Introduction II.3 (~l.440–560) and V.vi** — index 20;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/bodin/six-books-tooley-1955-full.txt`:
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/bodin/six-books-tooley-1955-full.txt`:
   the flat contrast — a prince keeps a treaty only when it suits (Machiavelli) vs must keep
   faith even with pirates (Bodin); fear vs affection "because friendship is the bond of
   society". Forward hook to `bodin-sovereignty`; one clause.
 - **Strauss & Cropsey (eds.), History of Political Philosophy, 3rd ed., ch. "Niccolò
-  Machiavelli"** — text landing at
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/strauss-cropsey/history-of-political-philosophy.txt`;
-  consult as the standard close reading. FILE EMPTY at brief time (0 bytes) — check for arrival.
+  Machiavelli" (L. Strauss, pp. 296–317)** — OCR text at
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/strauss-cropsey/history-of-political-philosophy.txt`,
+  lines 14604–15563; the Prince is pp. 296–304 (ll. 14604–~15030), the Discourses from p. 305.
+  Use: the opening (pp. 296–297, l.14645–14660) — what is old in "Machiavellian" politics is
+  the practice, what is new is its public defence in a book under the author's name (state as
+  the course's own for the newcomer's problem); the Prince as a mirror of princes in form that
+  carries a revolutionary teaching (pp. 302–304, ~l.14958–14970); Fortuna as a woman to be
+  struck (~l.14778) for link 6. Copyrighted — paraphrase; Strauss's name in References.
 
 Names ONLY in References: Strauss, Smith, Skinner, Pocock, Mansfield, Berlin ("The Originality
 of Machiavelli"), Marriott (translator), Spinoza and Rousseau as READERS of The Prince (their
@@ -260,14 +267,16 @@ the people, not the great"; "Fortune is a river: dykes, timing and the fit to th
   the Frederick the Great "King Chance" footnote, the arrest-and-torture footnote beyond one
   clause, the Third Man film clip from the lectures. Keep the Italian-wars chronology to the
   decade and to the four or five names above.
-- **No moralising in either direction:** neither "the realist who saw through pieties" nor "the
-  teacher of evil". The body states the arguments; the "teacher of evil" charge is named as a
-  charge, with its source in References.
+- **Register:** The course passes no verdict of its own on any author or idea: no condemning or
+  approving labels in its own voice. Judgement comes only through argument and evidence; a label
+  may appear only inside a quotation, with who applied it and when. The body states the
+  arguments; the charge that the book teaches evil openly appears only as a charge, attributed
+  (Strauss, 1958, References), never as the course's verdict.
 - **Fortune as a woman (XXV):** report the sentence and its argumentative work (impetuosity
   preferred); do not editorialise, do not omit.
-- **Dossier thin:** no Machiavelli secondary beyond Smith's two lectures and Strauss's pages;
-  the Strauss–Cropsey chapter file is empty. The Florentine Histories and the Art of War are not
-  in the dossier — do not cite them.
+- **Dossier thin:** no Machiavelli secondary beyond Smith's two lectures, Strauss's pages in
+  Natural Right and History and his Strauss–Cropsey chapter (OCR). The Florentine Histories and
+  the Art of War are not in the dossier — do not cite them.
 
 ## FIGURE PLAN
 

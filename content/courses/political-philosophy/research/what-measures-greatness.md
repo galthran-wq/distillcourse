@@ -8,12 +8,19 @@ goal: Compare Spengler's, Toynbee's and Huntington's answers to whether civiliza
 ## ARC (L10)
 
 - **Inherits:** The three theories, each already reconstructed at full strength and met
-  by its objection: from `spengler-decline-of-the-west` the eight Cultures as
+  by its objection: from `spengler-decline-of-the-west` (read in the crisis-of-
+  liberal-Europe module, not in this one — the module's title sets Toynbee and
+  Huntington "against Spengler", so he is recalled as the foil, with a clause of
+  reminder at each use) the eight Cultures as
   organisms, Culture → Civilization, contemporaneity, Caesarism, and the method
   objection (analogy as proof; the fellah reclassification); from
   `toynbee-challenge-and-response` the twenty-one, challenge and response, breakdown
-  as "suicide, not murder", universal state and universal church, the refutation of
-  race and environment (IV) and the small-sample caveat; from
+  as "suicide, not murder", universal state and universal church, his case against
+  race and environment (IV, XIV — already set there against Gobineau's pledge) and
+  the small-sample caveat; from `gobineau-inequality-of-races` and
+  `chamberlain-and-grant` (crowd-race-nation module) the racial theory of history and
+  degeneration by mixture, Gobineau's ten civilizations, the Teutonic thesis and
+  the Nordic programme, each already reconstructed and tested there; from
   `huntington-clash-of-civilizations` the seven or eight, the fault lines, the
   kin-country syndrome, "universal civilization is a Western idea", and the three
   objections. Further back, the climate theories the reader met as Aristotle's
@@ -26,29 +33,38 @@ goal: Compare Spengler's, Toynbee's and Huntington's answers to whether civiliza
   greatness and three accounts of decline, tested on the record": the three theories
   set on the same three cases (Rome, Byzantium, the West) and the three measures
   (power, duration, ideas others take up) shown to be what each theory's account of
-  decline presupposes. And the module's treatment of the hereditarian account of
-  civilization — race as cause — as an argument with a history (Gobineau,
-  Chamberlain; the older environmental variant in Hippocrates, Aristotle, Bodin),
-  its evidence, and its objections (Toynbee IV, Spengler V(B), the correlation test),
-  never settled and never moralised (course outcome `co-contested`).
+  decline presupposes. And a fourth candidate measure and cause, recalled rather
+  than taught: race. Gobineau's answer (Ref) is set beside the module's three
+  authors, two of whom refused it — Toynbee by the correlation test (Ref) and
+  Spengler by a different route ("a race does not migrate", Vol. 2 V(B), taught
+  HERE for the first time, since the Spengler lesson reserved it) — and the lesson
+  asks what each refusal reaches and what it does not. The modern, statistical form
+  of the debate (IQ, heritability, ancient DNA) is explicitly held for the heredity
+  module; this lesson says so in one sentence and does not anticipate it. Never
+  settled and never moralised (course outcome `co-contested`).
 - **Hands off:** The three measures agree on nothing, so the lesson closes without a
   verdict and with one check available: Huntington's theory predicts, and
-  `testing-the-clash` runs the count. The forward hook beyond the module: on the
-  third measure (ideas others take up) the West's liberal ideas are the most widely
-  adopted in history, and the course's last module asks whether that success is
-  itself the decline — "failed because it succeeded" (`deneen-post-liberalism`). The
-  hereditarian account returns, in a different guise, as "replacement" in
-  `murray-strange-death-of-europe`, where the same discipline (argument, history,
-  evidence, objections) is applied.
-- **Spine step:** "The question widens from the state to the civilization: Spengler's
-  organisms, Toynbee's challenge and response, Huntington's fault lines — three
-  measures of greatness and three accounts of decline, tested on the record"
+  `testing-the-clash` runs the count. Three forward Refs, one sentence each, no
+  exposition: (1) the third measure — ideas others take up — can be turned into a
+  count of whose work the world's histories of science and art name, and
+  `murray-human-accomplishment` (why-the-west module) builds exactly that count;
+  (2) on the same measure the West's liberal ideas are the most widely adopted in
+  history, and the last module asks whether that success is itself the decline —
+  "failed because it succeeded" (`deneen-post-liberalism`); (3) the race answer
+  returns twice, in the heredity module (`hereditarian-case-iq-and-nations`, with
+  measurement and statistics in place of Gobineau's history) and as "replacement"
+  in `powell-raspail-and-camus` (`replacement-as-argument`), where the same
+  discipline (argument, history, evidence, objections) is applied.
+- **Spine step:** "The question widens from the state to the civilization: against
+  Spengler's organisms, Toynbee's challenge and response and Huntington's fault lines
+  — three measures of greatness and three accounts of decline, tested on the record"
 
 ## Sources to consult
 
 A synthesis lesson adds no new primary author; everything below is a precise
 re-reading of material already in the dossier, pointed at the three cases and the
-hereditarian set piece.
+race question. The one passage taught here for the first time is Spengler's
+chapter on race (Vol. 2 V(B)), which the Spengler lesson reserved for this one.
 
 - **Spengler, Decline (Atkinson)** — index 11; texts `research/texts/spengler/vol1-*.txt`,
   `vol2-*.txt` (PD in the US only; short quotations). Read:
@@ -80,23 +96,24 @@ hereditarian set piece.
   - I–III (s1): the unit; the "misconception of the unity of civilization" and its
     three roots (III.2, pp. 36–41); Ch'ien Lung 1793; the "brush-handle"
     periodization; "at our own peril" (III.4).
-  - IV.2 (s2, text l. 205–300): the race theory — Gobineau's "Nordic man" and its
-    origin in the Gauls-vs-Franks pamphlet war; "this idol of the Teutonic
-    market-place"; "Americans also had their uses for the Nordic man" (l. 292 —
-    immigration restriction); the race tally (table p. 54: about half the
-    civilizations drew on more than one race; no race made more than a few);
-    "xanthotrichous, glaucopian, dolichocephalic" (l. 212) as his mockery of the
-    anthropometric vocabulary.
+  - IV.2 (s2, text l. 205–300): already taught in `toynbee-challenge-and-response`
+    (Gobineau's "Nordic man", the Gauls-vs-Franks origin, the race tally — about half
+    the civilizations drew on more than one race). Recall the tally in one clause
+    with Ref; do not retell the origin story.
   - IV.3 (s2, l. 436–470 and 480–600): the correlation test stated — both theories
     "suppose that this psychical diversity is fixedly and permanently correlated, in
     the relation of effect to cause, with certain elements of observed diversity in
     the non-psychical domain of nature"; the Hippocrates footnote (*Airs, Waters,
-    Places* chs. 13 and 24) naming the Hellenic environment theory.
+    Places* chs. 13 and 24) naming the Hellenic environment theory. Taught in the
+    Toynbee lesson (link 2); here the "fixedly and permanently correlated" sentence
+    is quoted once more only because the paired sourcing drill (Exercise 2) needs
+    it beside Spengler's.
   - XIV (s6, pp. 247–254; text l. 300–330, 400–450): the four determinisms — cosmic
     senescence, organic life-span (Spengler), racial degeneration, cyclical; the
     Italy natural experiment against the racial explanation (pp. 249–251, l. 405–
     450: the same stock produced Rome, the Dark Ages, the Renaissance and the
     decline after 1530; "It is not more difficult to find non-racial explanations").
+    The Italy case was used in the Toynbee lesson against Gobineau; recall it by Ref.
   - XV–XVI (s6–s8): "suicide, not murder"; the East Roman Empire as the idolization
     of an ephemeral institution (XVI.4, s8 from l. 461 — the Byzantium case: a ghost
     of the Roman universal state raised too soon, which "strangled" the growth of
@@ -151,23 +168,25 @@ hereditarian set piece.
   ONLY as the forward hook (one sentence, Ref `deneen-post-liberalism`); Deneen is
   an `author:` in sources.yaml and the subject of a later lesson — name him in the
   hook or not at all; nothing of his argument is stated here.
-- **Fawcett, Conservatism** — index 40; ch. 6 iii (Spengler among the "decline and
-  anomie" thinkers) and Appendix C — for the biographical anchors on Gobineau and
-  Chamberlain if Fawcett has them (check `conservatism-s11-appendixC.txt`; Fawcett's
-  gazetteer covers thinkers from H. Adams to Weaver — Gobineau and Chamberlain may
-  not be entries; if absent, the anchors below come from general knowledge and the
-  References). Fawcett is `authors:` — References only.
-- **Not in the dossier, References only:** Arthur de Gobineau, *Essai sur l'inégalité
-  des races humaines* (4 vols., 1853–55; Eng. tr. of vol. 1 by Collins, 1915 — PD);
-  Houston Stewart Chamberlain, *Die Grundlagen des neunzehnten Jahrhunderts* (1899;
-  Eng. *Foundations of the Nineteenth Century*, Lees tr., 1911 — PD); Madison Grant,
-  *The Passing of the Great Race* (1916 — Toynbee's "American uses"); Hippocrates,
-  *Airs, Waters, Places* (Loeb; PD translations exist); Montesquieu, *Spirit of the
-  Laws* XIV–XVII (1748; Nugent tr., PD) as the eighteenth-century climate theory
-  between Bodin and the nineteenth century; Pieter Geyl and Hugh Trevor-Roper on
-  Toynbee (as in the Toynbee brief). The writer states Gobineau's and Chamberlain's
-  theses in one or two sentences each, as positions, with dates; no quotation is
-  needed and none should be invented.
+- **Gobineau, Essay Book I (Collins tr. 1915, PD)** — index 101; texts
+  `research/texts/gobineau/`. RECALL ONLY, by Ref `gobineau-inequality-of-races`,
+  which reconstructed and tested the argument. Two pointers the synthesis needs: the
+  ten civilizations and the pledge (`s4-ch14-16.txt` l. 1364–1374 and the Note to ch.
+  XVI) — Gobineau's MEASURE of greatness is which race's "impulse" a civilization
+  carries, and his account of decline is mixture; and ch. VI, where he rejects climate
+  ("it is the people which has always given to the land its moral, economic, and
+  political value"). One short quotation at most.
+- **Chamberlain and Grant** — indices 102, 103: recall only, by Ref
+  `chamberlain-and-grant`, in one clause, where the race answer's political turn
+  (from Gobineau's fatalism to a programme) is relevant to the measure question;
+  nothing of their exposition.
+- **Not in the dossier, References only:** Hippocrates, *Airs, Waters, Places* (Loeb;
+  PD translations exist); Montesquieu, *Spirit of the Laws* XIV–XVII (1748; Nugent
+  tr., PD) as the eighteenth-century climate theory between Bodin and the nineteenth
+  century; Pieter Geyl and Hugh Trevor-Roper on Toynbee (as in the Toynbee brief).
+- **Murray, Human Accomplishment** — index 60: FORWARD Ref only
+  (`murray-human-accomplishment`), for the sentence that the third measure can be
+  made a count; nothing of its method or findings here.
 - **Strauss–Cropsey:** the Aristotle chapter (for VII.7) only if the writer wants to
   check the recall; text at `research/texts/strauss-cropsey/history-of-political-philosophy.txt`.
   Otherwise not applicable.
@@ -189,7 +208,7 @@ wrong, or are they measuring different things? The chain:
    "Ptolemaic" Ancient–Medieval–Modern). Why all three reject it: Spengler — Cultures
    are separate organisms, "Mankind" an empty word; Toynbee — the "misconception of
    the unity of civilization" has three roots (the egocentric illusion, the
-   "unchanging East", straight-line progress), each refuted (Ch'ien Lung's letter
+   "unchanging East", straight-line progress), each answered (Ch'ien Lung's letter
    shows the view from the other side; the "unchanging East" is the unchanging
    steppe); Huntington — "the very notion of a 'universal civilization' is a Western
    idea". Answer: all three say "many". The because — and the lesson's first real
@@ -274,55 +293,60 @@ wrong, or are they measuring different things? The chain:
    resists is Western) — so the West is simultaneously declining (Spengler: form;
    Huntington: power share) and at its maximum (Toynbee/Ortega: ideas taken up).
    State this as the module's result, without a verdict.
-6. **The hereditarian account: who made it and what it claimed.** Question: there is
-   a fourth account of civilization and its decline that none of the three holds and
-   two of them attack — that a civilization is the work of a race and declines when
-   the race is diluted. Why it must be taught here: because Spengler and Toynbee both
-   argue against it at length, and because the reader who identifies with the right
-   (course audience) will meet it and should know its history and its objections,
-   not a label. Give its history as an argument: the older ENVIRONMENTAL variant —
-   Hippocrates and Aristotle VII.7 (Ref: Europeans spirited, Asians intelligent and
-   servile, Greeks both — character from climate), Bodin's three zones (north rules
-   by force, middle by law, south by religion — and his own qualification, "this
-   compulsion is not of the order of necessity", laws and custom can alter it),
-   Montesquieu (References); then the nineteenth-century HEREDITARIAN turn —
-   Gobineau's *Essai* (1853–55: civilizations are the creation of the "Aryan" race and
-   decline by mixture; written, as Toynbee shows, as an aristocrat's reply to the
-   Revolution's "Gauls against Franks"), Chamberlain's *Grundlagen* (1899: the
-   "Teutonic" race as the maker of modern Europe), the American immigration-
-   restriction literature (Toynbee's "Americans also had their uses for the Nordic
-   man"). State the claim at its strongest and in its own structure: a fixed
-   correlation between a heritable physical type and the capacity for civilization,
-   with mixture as the mechanism of decline. The because: this is an empirical
-   claim with a mechanism and a prediction, which is why it can be tested — and was.
-7. **The objections, from the module's own authors.** Toynbee (IV.2–3, XIV): (a) the
-   correlation must be "fixed and permanent" — but about half the civilizations drew
-   on more than one race and no race made more than a few, so the same type is
-   present where civilization arose and where it did not; (b) Gobineau's own case
-   collapses on its history — the "Nordic" Franks and "Gallic" populace were a
-   political fiction of the 1790s turned inside out; (c) the Italy natural
-   experiment — the same stock produced the Roman Republic, the Dark Ages, the
-   Renaissance and the decline after 1530, so the variable that changed was not
-   blood ("it is not more difficult to find non-racial explanations"); (d) the
-   environmental variant fails the same test (steppe vs prairie; Nile vs Colorado;
-   Angkor in the rain). Spengler (V(B)): the anthropologists' races are an artefact
-   of classification — "classifying as autobiography"; the X-ray in which race
-   vanishes; "a race does not migrate" — landscape remakes the descendants, so the
-   race that supposedly carried a civilization across the sea is not the race that
-   arrives; and race and language have independent histories, so a "people" is not a
-   blood-line. Huntington: civilizations are cultural, not racial, by definition
-   ("people of the same race can be deeply divided by civilization"); yet his reason
-   (5) — identities "less mutable", "Russians cannot become Estonians" — is where
-   the critics (Sen, References) say essentialism re-enters by the cultural door.
-   Where the lesson concedes to the hereditarian side: Toynbee's refutation is of
-   the "fixed and permanent" form; a weaker, probabilistic claim is not touched by
-   counter-instances alone, and Spengler's own positive use of "race" (blood,
-   breeding, "men of race" against money and intellect) shows that an author can
-   reject the anthropologists' races and keep a physiognomic one. Where it holds:
-   none of the module's three authors, two of them on the right, found the account
-   necessary to explain any of the twenty-one cases, and the module's three cases
-   (Rome, Byzantium, the West) are each explained by all three without it. Leave the
-   reader to weigh; do not moralise; do not call the question closed.
+6. **A fourth answer, recalled: race as the measure and the cause.** Question: the
+   three authors measure greatness by duration, by what is handed on, by power — is
+   there an answer that makes the measure and the cause of decline one and the same
+   thing? Yes, and the reader has met it at full strength: Gobineau's (Ref
+   `gobineau-inequality-of-races`, two or three sentences of recall, no
+   re-teaching): a civilization's greatness is the "impulse" of the creative race
+   that founded it, and its decline is that race's dilution by mixture — so his
+   ten civilizations are ranked and dated by blood, and his pledge (one
+   counter-instance falsifies the whole) makes the claim testable. Place it in one
+   paragraph against the older ENVIRONMENTAL account the reader also has —
+   Aristotle VII.7 (Ref `aristotle-political-animal-and-natural-slavery`: Europeans
+   spirited, Asians intelligent, Greeks both) and Bodin's three zones with his own
+   qualification, "this compulsion is not of the order of necessity" (Ref
+   `bodin-sovereignty`) — and note that Gobineau himself rejected climate (Essay
+   I.vi), so the two natural-cause accounts were rivals. Then one clause (Ref
+   `chamberlain-and-grant`) that the account turned from Gobineau's fatalism into a
+   programme. The because, and the seam: of the four answers this is the only one in
+   which the measure of greatness and the account of decline are fixed by a single
+   heritable property; that is what makes it the cleanest to test, and why two of
+   the module's three authors, both on the right, wrote against it. Say in the same
+   paragraph, plainly, what this lesson does NOT do: the twentieth-century form of
+   the question — measured intelligence, heritability, national averages, ancient
+   DNA — is a different argument with different evidence, and the heredity module
+   takes it up (`hereditarian-case-iq-and-nations`, forward Ref, one sentence).
+7. **Two refusals, and what each reaches.** Question: Toynbee and Spengler both deny
+   that race makes civilizations; do they deny the same thing? Toynbee (recall, Ref
+   `toynbee-challenge-and-response`, one clause each — he was taught there against
+   Gobineau's pledge): the correlation is not "fixed and permanent" — about half the
+   civilizations drew on more than one race; the same stock in Italy produced four
+   different outcomes. Spengler (NEW here — his race chapter, Vol. 2 V(B), was
+   reserved for this lesson): the anthropologists' races are an artefact of
+   classification — "classifying as autobiography"; the X-ray in which race
+   vanishes; "A race does not migrate. Men migrate", so the stock that supposedly
+   carried a civilization across the sea is not the stock that arrives; race and
+   language have independent histories, so a "people" is not a blood-line. And then
+   Spengler's own positive "race" — blood, breeding, "men of race" against money and
+   intellect (Vol. 2 X(A), XI, XIV) — so the reader sees that he rejects the
+   anthropologists' race and keeps a physiognomic one. The because: Toynbee tests a
+   correlation and finds counter-instances; Spengler denies that the thing correlated
+   exists as the race theorists define it, while keeping a different thing under the
+   same word — two refusals with different reach (the paired sourcing drill,
+   Exercise 2). Huntington completes the row in one sentence: civilizations are
+   cultural by definition ("people of the same race can be deeply divided by
+   civilization"), yet his reason (5) — identities "less mutable", "Russians cannot
+   become Estonians" — is where his critics (References) say a fixed essence
+   re-enters by the cultural door (Ref `huntington-clash-of-civilizations`). Where
+   the lesson concedes to the race answer: Toynbee's argument reaches the "fixed and
+   permanent" form; a weaker, probabilistic claim is not touched by counter-instances
+   alone, and Spengler's physiognomic "race" shows a refusal of Gobineau that is not
+   a refusal of heredity as such. Where it holds: none of the module's three
+   authors needed race to explain any of the module's three cases (Rome,
+   Byzantium, the West), each of which all three explain without it. Leave the
+   reader to weigh; no verdict in the course's voice; do not call the question
+   closed — the heredity module reopens it with new evidence.
 8. **What the three cannot answer, and the one check available.** Question: having
    three measures and three accounts, what can the reader now do? Answer: say, of
    any claim that a civilization is great or declining, which measure it uses and
@@ -332,17 +356,20 @@ wrong, or are they measuring different things? The chain:
    is read (Spengler's by definition; Huntington's by the power share chosen;
    Toynbee's open but unmeasurable). The one thing that CAN be checked is a
    prediction, and only Huntington made one with a date: conflict after 1993 will run
-   along civilizational lines. The forward hook (one sentence, Ref
-   `deneen-post-liberalism`): on the third measure the West's liberal ideas are the
-   most widely taken up in history, and the course's last module asks whether that
-   is where "failed because it succeeded" begins.
+   along civilizational lines. Two forward sentences, each with a Ref and no
+   exposition: the third measure need not stay unmeasurable — one can count whose
+   work the world's histories of science and art name, and where and when those
+   people lived (`murray-human-accomplishment`); and on the same measure the West's
+   liberal ideas are the most widely taken up in history, which the course's last
+   module asks may be where "failed because it succeeded" begins
+   (`deneen-post-liberalism`).
 
 Headings as claims: "All three say 'many', and mean three different things" / "Three
 measures of greatness: duration, ideas taken up, power" / "Rome: the same century,
 three verdicts" / "Byzantium: a thousand years as symptom or as achievement" / "The
-West: declining and at its maximum at once" / "Race as the cause of civilization: the
-argument and its history" / "What Toynbee and Spengler said against it" / "What
-cannot be answered, and what can be checked".
+West: declining and at its maximum at once" / "Race as measure and cause: the answer
+the three authors did not give" / "Two refusals: a failed correlation and a denied
+category" / "What cannot be answered, and what can be checked".
 
 ## Set pieces and worked examples to recreate
 
@@ -366,17 +393,19 @@ cannot be answered, and what can be checked".
    Toynbee XVI.4): "Diocletian first of the Caliphs"; "the Pantheon the earliest
    mosque"; Toynbee's East Roman Empire "strangling" Orthodox Christendom in its
    cradle — two readings of one thousand years, quoted short.
-6. **Gobineau's origin story** (Toynbee IV.2, l. 213–260): the revolutionary pamphlets
-   casting the Third Estate as Gauls expelling Frankish lords after "fourteen
-   centuries of subjection"; "to this nonsense Gobineau replied with some more
-   telling nonsense of his own" — accepting the identification and inverting the
-   verdict; "this idol of the Teutonic market-place". Then the race tally (p. 54) as
-   a table.
-7. **The correlation test stated and applied** (Toynbee IV.3, l. 436–470): quote the
-   "fixedly and permanently correlated" sentence; the two theories as two columns
-   (character × physique; character × environment); the test (the same cause
-   elsewhere); the Italy case from XIV (pp. 249–251) as the test applied to the
-   race theory across time instead of space.
+6. **Gobineau's measure in one table row** (Essay ch. XVI and Note, `gobineau/s4-ch14-16.txt`
+   l. 1364–1374; recall by Ref): his ten civilizations ranked and dated by the
+   "impulse of the white races" and their decline by mixture — set as a FOURTH row
+   under the three measures (FIGURE 2), so the reader sees that it is the one answer
+   whose measure and account of decline are the same variable. The origin story
+   (Gauls vs Franks) and the tally were told in the Toynbee lesson; do not retell.
+7. **Two refusals side by side** (Toynbee IV.3 l. 436–470 + XIV pp. 249–251, recalled;
+   Spengler Vol. 2 V(B), new): the "fixedly and permanently correlated" sentence
+   beside "A race does not migrate. Men migrate"; a two-column comparison — what each
+   denies (a correlation / the category), what evidence each uses (counter-instances
+   across space and time / the anthropologists' own classifications, the X-ray,
+   migration and landscape), what each leaves standing (a probabilistic claim /
+   Spengler's own physiognomic "race").
 8. **"A race does not migrate"** (Spengler Vol. 2 V(B), l. 5694–5700): the two
    sentences on Englishmen, Germans and Americans; the X-ray; "classifying as
    autobiography" — and, in the same section, the writer shows Spengler's own
@@ -390,20 +419,19 @@ cannot be answered, and what can be checked".
 ## Pitfalls / subtleties to flag
 
 - **This is a synthesis (type: synthesis):** no new author is taught; every theory
-  is recalled with a `<Ref>` and one clause (L0e, L11d). The temptation is a recap
+  is recalled with a `<Ref>` and one clause (L0e, L11d) — Spengler's race chapter is
+  the one passage read here for the first time. The temptation is a recap
   of three lessons; the guard is that every section argues a comparison the earlier
   lessons could not make because they had only one theory each. If a paragraph
   could have appeared in one of the three earlier lessons, it is a re-teaching and
   gets cut.
-- **Terms to anchor (L11):** most are recalled; new at first mention here:
-  *hereditarian* (the view that a trait is inherited biologically — define at link
-  6); *Aryan* and *Nordic* as the race theorists' terms (gloss as their labels, in
-  quotation marks; one clause on the linguistic origin of "Aryan" and its misuse);
-  *anthropometry* (measurement of skulls and bodies — Toynbee's
-  "dolichocephalic"); *Gobineau* (French diplomat and novelist, 1816–82);
-  *Chamberlain* (English-born writer settled in Germany, Wagner's son-in-law,
-  1855–1927); *Hippocrates* (Greek physician, 5th c. BC; *Airs, Waters, Places*
-  as the first climate theory); *Montesquieu* (one clause, References); *Leo the
+- **Terms to anchor (L11):** most are recalled; *Gobineau*, *Chamberlain*, *Grant*,
+  *Aryan*, *Nordic*, `racial-theory-of-history` and `degeneration-by-mixture` were
+  anchored in the crowd-race-nation module and are recalled with Refs and a clause,
+  not re-anchored. New at first mention here: *anthropometry* (measurement of skulls
+  and bodies — Spengler's target in V(B)); *physiognomic* (Spengler's sense:
+  read from the look and bearing of a living type, not measured); *Hippocrates*
+  (Greek physician, 5th c. BC; *Airs, Waters, Places* as the first climate theory); *Montesquieu* (one clause, References); *Leo the
   Syrian* (Leo III, Byzantine emperor 717–41, if Toynbee's dating of the "ghost" is
   used); *Justinian* (527–65); *Ch'ien Lung* (recalled from the Toynbee lesson or
   re-anchored); *Constantinople 330 / 1453*.
@@ -418,44 +446,50 @@ cannot be answered, and what can be checked".
   anti-racialist; a lesson that quotes only "blood" misrepresents him as a race
   theorist. Show both, in his words, and let the reader see that his objection to
   Gobineau is not Toynbee's.
-- **Toynbee's "underlying unity":** he refutes the unity of civilization in III.2 and
+- **Toynbee's "underlying unity":** he denies the unity of civilization in III.2 and
   affirms an underlying unity in XII and a single progressive history of religion in
   XXVI. Flag the tension as his; it is why "one or many" has a scale (link 1).
-- **Huntington on race:** cultural by definition; do not put him on the hereditarian
-  side. The critics' essentialism charge attaches to reason (5) and is an
-  objection to him, not his view. Sen in References only.
-- **The hereditarian account is taught as an argument with a history and its
-  objections — never as settled, never moralised (course tone; outcome
-  `co-contested`).** No adjectives of condemnation or approval; no "discredited",
-  no "pseudo-"; equally no "suppressed truth". State what it claimed, who claimed it
-  and when, what the mechanism was, what counts against it (the correlation test,
-  the tally, Italy, "a race does not migrate"), and what the refutation does not
-  reach (a probabilistic form). The reader weighs. The same discipline governs
-  `murray-strange-death-of-europe` on replacement; say so in one clause of the
-  hand-off.
-- **No misconception slot** in the L13 sense: the hereditarian account is a
-  historical position argued against by the module's authors, not a popular
-  misconception the lesson refutes in its own voice. Keep the refutations
+- **Huntington on race:** cultural by definition (and *Who Are We?* ch. 2 later
+  separates culture from ancestry explicitly — that book belongs to
+  `albions-seed-and-who-are-we`; at most a clause); do not put him on the race side.
+  The critics' essentialism charge attaches to reason (5) and is an objection to
+  him, not his view. Sen in References only.
+- **The race answer is recalled as an argument with a history and its objections —
+  never as settled, never moralised (course tone; outcome `co-contested`).**
+  The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+  State what Gobineau claimed (recalled), what his measure was, what counts
+  against it (the correlation test, the tally, Italy, "a race does not migrate"),
+  and what those arguments do not reach (a probabilistic form; Spengler's own
+  physiognomic sense). The reader weighs. Toynbee's words for Gobineau ("telling
+  nonsense") are not repeated here; the Toynbee lesson quoted them with attribution.
+- **Hold the modern debate for the heredity module.** No IQ, no heritability, no
+  national averages, no genetics, no ancient DNA in this lesson: one forward sentence
+  with `<Ref>` to `hereditarian-case-iq-and-nations` says that the question returns
+  there with measurement in place of history. The same discipline (argument,
+  history, evidence, objections) governs `powell-raspail-and-camus` on replacement;
+  say so in one clause of the hand-off at most.
+- **No misconception slot** in the L13 sense: the race answer is a historical
+  position argued against by two of the module's authors, not a popular
+  misconception the lesson refutes in its own voice. Keep the arguments against it
   attributed to Toynbee and Spengler (whose texts are the material); the course's
   own voice only arranges them.
-- **L8a:** Gobineau and Chamberlain are named as the authors of the position studied
-  (named objects — the argument is theirs as Hobbes's is his) and may appear in the
-  body; Grant, Montesquieu, Hippocrates may be named as texts in the history; Geyl,
-  Trevor-Roper, Sen, Said, Fawcett — References only. "Deneen" appears once in the
-  forward hook as the author of a later lesson's material, or not at all.
+- **L8a:** Gobineau, Chamberlain and Grant are thinkers whose texts are the course's
+  material (each has a lesson) and may be named with their Refs; Montesquieu and
+  Hippocrates may be named as texts in the history; Geyl, Trevor-Roper, Sen, Said,
+  Fawcett — References only. "Murray" and "Deneen" appear once each in the forward
+  sentences as authors of later lessons' material, or not at all.
 - **Numbers (L12):** keeper numbers are three — Byzantium's thousand years
   (330–1453), Toynbee's "half the civilizations" drawn from more than one race, and
   Huntington's "peak of power" expressed as a relation (the West runs the Security
   Council and the IMF), not as a share. No power indices in prose: Huntington's 1993
   article gives none beyond the trade shares; do not import figures from the 1996
   book (not read).
-- **Dossier thinness:** Gobineau, Chamberlain, Grant, Montesquieu, Hippocrates are not
-  in the dossier — the writer states their theses in one or two sentences each from
-  general knowledge, dated, and cites them; Toynbee IV.2 is the dossier's account of
-  Gobineau and the writer should rely on it for the set piece. Huntington's power
+- **Dossier thinness:** Gobineau, Chamberlain and Grant are now in the dossier
+  (indices 101–103) and have their own lessons; this lesson recalls them and does
+  not need their texts beyond the two Gobineau pointers under Sources. Montesquieu
+  and Hippocrates are not in the dossier — one clause each, cited. Huntington's power
   indices are in the 1996 book (not read) — the lesson uses the 1993 article's
-  qualitative statement only. Fawcett's Appendix C may lack Gobineau/Chamberlain
-  entries — check before citing.
+  qualitative statement only.
 - **The comparison table must not become the lesson:** per L0e sections argue;
   the table states what the prose has argued, row by row, and appears once.
 
@@ -469,7 +503,10 @@ cannot be answered, and what can be checked".
    what declines (living form / creativity / power share), what is therefore measured
    (duration / what is handed on / indices of control), the author's own phrase
    ("scrap-material" / "sole sure beneficiary" / "peak of power"). Defines
-   `measures-of-greatness`.
+   `measures-of-greatness`. A fourth row, set off by a rule and added at link 6:
+   Gobineau — what declines (the founding race's share of the blood), what is
+   measured (whose "impulse" a civilization carries), his phrase (the pledge) — the
+   one row in which the two columns are the same variable.
 3. `draw:` `<FigureSequence>` (4 frames) — **"Many" at three scales**: frame 1 the
    single Enlightenment ladder (savagery → barbarism → civilization) with all peoples
    on it; frame 2 Spengler's eight sealed circles; frame 3 Toynbee's genealogy
@@ -486,16 +523,20 @@ cannot be answered, and what can be checked".
    after), Toynbee's label (ghost of Rome raised too soon; Orthodox Christendom
    arrested), Huntington's (origin of the Slavic-Orthodox civilization; the 1500
    line).
-6. `draw:` single `<Figure>` — **The hereditarian argument's history as a chain with
-   its objections**: Hippocrates → Aristotle VII.7 → Bodin V.1 (with his own
-   "not of the order of necessity") → Montesquieu → Gobineau 1853 → Chamberlain 1899
-   → Grant 1916, as a timeline with spans; beneath, the objections placed where they
-   struck (Toynbee IV 1934; Spengler V(B) 1922; the correlation test). Adjacency is
-   not causation — the caption says the lower row answers the upper, in prose.
-7. `draw:` single `<Figure>` — **The correlation test as a 2×2**: cause present /
-   absent × civilization arose / did not; Toynbee's cases in the cells (Nile: Egypt;
-   Colorado: none; steppe: Scythians; prairie: cowboys; "Nordic" stock: here a
-   civilization, there none). The test's logic made visible.
+6. `draw:` single `<Figure>` — **Natural causes of civilization, a timeline with its
+   answers**: Hippocrates → Aristotle VII.7 → Bodin V.1 (with his own "not of the
+   order of necessity") → Montesquieu → Gobineau 1853 (rejecting climate, putting
+   race in its place) → Chamberlain 1899 → Grant 1916, as a timeline with spans;
+   beneath, the answers placed where they were made (Spengler V(B) 1922; Toynbee IV
+   1934), and a dashed arrow off the right edge labelled with the heredity module's
+   question (measured intelligence, 1994–), no content. Adjacency is not causation —
+   the caption says the lower row answers the upper, in prose.
+7. `draw:` single `<Figure>` — **Two refusals compared**: two columns (Toynbee /
+   Spengler) × three rows (what is denied: a fixed correlation / the race
+   theorists' category; the evidence: counter-instances in space and time / the
+   classifications themselves, migration, landscape; what is left standing: a
+   probabilistic claim / a physiognomic "race" of blood and breeding). Replaces the
+   correlation 2×2, which the Toynbee lesson already drew.
 8. `source: no pool candidate — hunt:` a photograph of **Hagia Sophia's interior
    dome** (Istanbul; Wikimedia Commons, many CC BY-SA files — choose one showing the
    dome and the ring of windows) — the Magian "cavern" Spengler reads Byzantium
@@ -525,11 +566,14 @@ cannot be answered, and what can be checked".
    civilization that conquers everything and leaves no idea anyone adopts (Toynbee's
    Assyria, "a corpse in armour"). Solution: the measures rank the two cases in
    opposite orders, which is the lesson's thesis made exact.
-4. **Claim to refute:** "Toynbee's tally — half the civilizations drew on more than
-   one race — refutes any racial account of civilization." Name the step it fails
-   to reach (a probabilistic or 'leading element' version) and the Toynbee argument
-   that reaches further (Italy across time; the same stock, four outcomes). State
-   what would still have to be shown for the probabilistic version to fail. The
+4. **Claim to refute:** "Between them, Toynbee's tally and Spengler's 'a race does
+   not migrate' dispose of every racial account of civilization." Name what each
+   argument actually reaches (a fixed correlation; the anthropologists' category)
+   and what neither reaches (a probabilistic or 'leading element' version — and,
+   for Spengler, his own physiognomic race). State what would still have to be
+   shown for the probabilistic version to fail, and say in one sentence which later
+   module takes the question up with different evidence (Ref
+   `hereditarian-case-iq-and-nations`; a pointer, not the FORWARD exercise). The
    solution refuses to close the question and says why.
 5. **Derivation the lesson did not do (E3 spiral):** Augustine's two definitions of a
    people (Ref `augustine-two-cities`, XIX.21 and 24) supply a fourth measure —
@@ -564,9 +608,10 @@ cannot be answered, and what can be checked".
 
 ## Nietzsche cross-course links (where his ideas enter)
 
-- `nietzsche/the-nazi-appropriation` — one clause, at link 6/7, where Toynbee's
-  "blond beast" aside and Chamberlain's Teutonic thesis would otherwise invite the
-  reader to connect Nietzsche to the hereditarian account: the Nietzsche course
-  shows what the appropriation took and what it falsified. Ref only; no exposition.
+- `nietzsche/the-nazi-appropriation` — only if not already used in
+  `chamberlain-and-grant` or the Toynbee lesson for the same point; one clause, at
+  link 6/7, where Chamberlain's Teutonic thesis would otherwise invite the reader to
+  connect Nietzsche to the race answer: the Nietzsche course shows what the
+  appropriation took and what it falsified. Ref only; no exposition.
 - `nietzsche/order-of-rank` — one clause if the writer contrasts rank by type
   (Nietzsche) with rank by race (Gobineau), to prevent the conflation. Optional.
