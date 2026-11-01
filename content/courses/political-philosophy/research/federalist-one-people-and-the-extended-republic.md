@@ -41,14 +41,18 @@ goal: Analyze the Federalist's argument that a large republic of representatives
   sets beside this Jay's claim in Federalist 2 that Americans were already one people
   and asks how the two fit: one people in loyalty, many factions in interest.
 - **Hands off:** Jay's "same ancestors … same language … same religion" is a
-  factual claim about 1787, and the next lessons test it: was the people one, and
-  what held a people of many ancestries together afterwards?
-  `albions-seed-and-who-are-we` takes it — four British peoples rather than one,
-  and a political scientist who opens his account of American identity with Jay's
+  factual claim about 1787. This lesson finds it a strong claim about the
+  English-speaking Protestant majority and a political argument, not a census; the
+  verdict on it is passed in `albions-seed-and-who-are-we` — false as stated (four
+  British regional cultures, plus Africans, Indians, Germans and Dutch; strong) —
+  which also asks what held a people of many ancestries together afterwards, opening
+  on a political scientist who begins his account of American identity with Jay's
   very sentence. Two later readings of the extended republic are named only as
   forward Refs: that it dissolves local loyalty by design
   (`deneen-post-liberalism`) and that a nation's unity can be maintained by
-  institutions alone (`miller-strangers-in-our-midst`; `the-argument-assembled`).
+  institutions alone — the premise judged in `hungarys-fundamental-law` (liberal
+  principles necessary and, on balance, not sufficient) and carried into
+  `the-argument-assembled`.
 - **Spine step:** "The live question: what a nation is and who may join it — Scruton and Miller on the pre-political loyalty, America as England's heir from the Federalist to Who Are We?, the prophecies of displacement from Powell to Camus, Carens and Miller on borders, Murray on Europe — and 2015 as the test"
 
 ## Sources to consult
@@ -410,7 +414,7 @@ one place.
    named, not taught. Where the lesson concedes: the extended-republic argument holds
    against majority faction in legislation where interests cut across one another;
    where one cleavage coincides with geography it fails (Exercise 3); and it rests on
-   Jay's premise, which the next lesson tests.
+   Jay's premise, which the next lesson judges false as stated.
 
 Headings fall out as: "Why every republic had been small"; "Faction cannot be cured,
 only controlled"; "The majority is the danger"; "Representation and the extended
@@ -446,7 +450,7 @@ many factions"; "Brutus, the census and the later critics".
 
 ## Pitfalls / subtleties to flag
 
-- **The register rule.** The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+- **The register rule.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Terms to anchor (L11), three per section at most:** Articles of Confederation;
   Shays's Rebellion; the Philadelphia Convention and ratification; "Publius";
   Anti-Federalists (opponents of ratification — not a party, a family of objections);

@@ -43,8 +43,12 @@ goal: Analyze Waldron's argument that historic injustices can be superseded by c
   fading of entitlements; supersession, where a claim lapses "without ever
   having been wrong". Then a second question kept separate from the first:
   whether guilt, as distinct from a claim, passes between generations — the
-  "tyranny of guilt" case and the partnership-of-generations reply.
-- **Hands off:** Two open ends. Whether a particular remedy — admission to a
+  "tyranny of guilt" case and the partnership-of-generations reply. Then the
+  verdict on each (see VERDICT): guilt does not pass; liability can;
+  counterfactual rectification of old wrongs cannot be carried out; wrongs done
+  to the living are owed repair; supersession is possible, not automatic.
+- **Hands off:** Decided here: the four findings above, each strong. What passes
+  on is two further questions. Whether a particular remedy — admission to a
   country as reparation — is the right form of repair is `miller-strangers-in-
   our-midst` ch. 7 (restoration in place vs compensation by admission; the
   Gurkhas); the forward exercise lands there. And every reparations
@@ -52,6 +56,64 @@ goal: Analyze Waldron's argument that historic injustices can be superseded by c
   `auditing-the-case-for-colonialism` reads three of the studies such claims
   cite.
 - **Spine step:** "The West judges its own conquests: Vitoria's titles, Locke's waste land, Burke's impeachment of Hastings, Mill's tutelage, the colonial balance sheet, and whether guilt is inherited"
+
+## VERDICT
+
+Binding: research/verdicts/REGISTER.md, module 14, `inherited-guilt-and-reparations`.
+
+- **Claim judged.** What justice now requires of a wrong done then, in four
+  parts: (a) whether guilt passes between generations; (b) whether liability
+  passes; (c) whether counterfactual rectification of wrongs centuries old can
+  be carried out; (d) whether wrongs done to people now alive are owed repair.
+- **Verdict.** (a) **Guilt does not pass**: it attaches to a will. Grade:
+  **strong**. (b) **Liability can pass**, through estates, corporations and
+  states that persist; Burke's partnership of generations implies it. Grade:
+  **strong**. (c) Counterfactual rectification of wrongs centuries old **cannot
+  be carried out** (indeterminacy, non-identity, choice of baseline). Grade:
+  **strong**. (d) Wrongs done to people now alive **are owed repair** on the
+  continuing-injustice model. Grade: **strong**. Supersession is **possible,
+  not automatic**.
+- **What decides it.** (a) Confession, penitence and atonement are acts only
+  the wrongdoer can perform (Scruton's conditions of forgiveness); a
+  descendant can regret and repair, not confess. (b) Debts, treaties and
+  obligations pass with estates and with states that persist (Boxill's estate
+  argument; a nation's treaties and debts); Burke's partnership of the dead,
+  the living and the unborn, which inherits the estate, inherits its
+  encumbrances — and his "immortal for the good of the members, not for their
+  punishment" bars punishment, not repayment. (c) Waldron's problems: the
+  aunt's will (free choices are indeterminate), non-identity, contagion, and
+  the holism of any baseline. (d) The stolen-car model needs no
+  counterfactual where the wronged person is alive. The example to use is the
+  Federal Housing Administration's refusal, from its start in the 1930s, to
+  insure mortgages in the low-income urban neighbourhoods where most urban
+  Black Americans lived — not the Home Owners' Loan Corporation's maps, which
+  Fishback, Rose, Snowden & Storrs find "had little effect on the geographic
+  distribution of either program's mortgage market activity" (NBER WP 29244,
+  2021; abstract at `research/texts/verdict-audit/nber-w29244-abstract.txt`).
+  Supersession: Waldron's savanna shows a claim can lapse when circumstances
+  change; his own qualifications (some injustices remain "crying"; an honest
+  attempt at prospective justice is required) show it does not lapse by time
+  alone.
+- **Strongest objection.** From the restrictionist side: separating liability
+  from guilt is a distinction without a difference in practice — a nation
+  that pays for a wrong is treated, and treats itself, as guilty, so the
+  "tyranny of guilt" follows from (b). From the reparations side: (c)
+  concedes too much — the wealth gap is a present effect of slavery itself, so
+  rectification need not be counterfactual.
+- **Why it does not overturn the verdict.** Against the first: the law
+  distinguishes the two every day — an heir pays a parent's debts and is not
+  guilty of the parent's fraud; a state pays a predecessor regime's debts
+  without confessing its crimes. That the public runs them together is a
+  reason to keep them apart, not to merge them. Against the second: where the
+  present effect runs through wrongs done to the living (the FHA's exclusion,
+  contract selling), (d) already gives it; where it runs through slavery
+  itself, measuring it needs the counterfactual that (c) shows cannot be run.
+- **What would overturn it.** For (a), an account of guilt that does not
+  attach to a will; for (b), a reason why a persisting state's obligations
+  lapse at a change of generation but its assets do not; for (c), a
+  counterfactual baseline for a centuries-old wrong that is determinate and
+  not arbitrary; for (d), evidence that the wrongs to the living were not
+  wrongs.
 
 ## Sources to consult
 
@@ -141,8 +203,16 @@ goal: Analyze Waldron's argument that historic injustices can be superseded by c
   stated fairly from its own texts:** Ta-Nehisi Coates, "The Case for
   Reparations", The Atlantic, June 2014 (Clyde Ross and the contract-buying
   scheme in North Lawndale, Chicago, 1960s; redlining under the FHA from the
-  1930s; the wealth gap; H.R. 40, the bill to study reparations, introduced by
-  John Conyers from 1989); Bernard Boxill, "A Lockean Argument for Black
+  1930s — the FHA's own exclusion, not the HOLC maps: see Fishback below; the wealth gap; H.R. 40, the bill to study reparations, introduced by
+  John Conyers from 1989); **Fishback, Rose, Snowden & Storrs, "New Evidence on
+  Redlining by Federal Housing Programs in the 1930s", NBER WP 29244 (2021)**
+  — abstract staged at `research/texts/verdict-audit/nber-w29244-abstract.txt`
+  (abstract only; read the paper before quoting more than the abstract): the
+  FHA from its inception did not insure mortgages in the low-income urban
+  neighbourhoods where most urban Black Americans lived, before the HOLC maps
+  existed; the HOLC lent broadly to such neighbourhoods and to Black
+  homeowners, and its maps "had little effect". This decides which 1930s
+  programme the lesson names as the continuing-injustice instance; Bernard Boxill, "A Lockean Argument for Black
   Reparations", Journal of Ethics 7 (2003), 63–91 (the unpaid debt owed to the
   enslaved passes to their heirs as part of an estate — a Lockean inheritance
   argument); Janna Thompson, Taking Responsibility for the Past (2002); the
@@ -269,7 +339,10 @@ return what was stolen. The lesson's first set piece tests it.
    federal mortgage insurance from the 1930s and the contract-selling schemes
    of the 1950s–60s (Clyde Ross in Chicago) were done to people who are alive
    — this is Waldron's own continuing-injustice model, not the counterfactual
-   one; the racial wealth gap is the present effect that, by Waldron's second
+   one. Name the instrument exactly: the FHA's refusal, from the 1930s, to
+   insure mortgages in the neighbourhoods where most urban Black Americans
+   lived; the HOLC maps that popular accounts call "redlining" had little
+   effect (Fishback et al. 2021); the racial wealth gap is the present effect that, by Waldron's second
    qualification, makes reparation and prospective justice coincide. (b) The
    Lockean argument: the enslaved were owed wages and their liberty; an unpaid
    debt is part of an estate and passes to heirs as any other asset does — the
@@ -280,8 +353,8 @@ return what was stolen. The lesson's first set piece tests it.
    counterfactual; slavery itself needs one and meets the non-identity
    problem); the baseline and the holism problem return for any monetary
    calculation; and who pays — a taxpayer who arrived in 1990 inherits no
-   estate from a slaveholder. Leave the reader with the strongest version of
-   each.
+   estate from a slaveholder. State the strongest version of each; the
+   weighing in link 8 decides between them.
 
 6. **Hereditary guilt — the "tyranny of guilt" case.** Question: separate
    from any claim, does guilt pass? The restrictionist argument (Murray and
@@ -322,17 +395,42 @@ return what was stolen. The lesson's first set piece tests it.
    included. So the lines do not fall where the reader expects: the partnership
    of generations supports liability without guilt; the individualist premise
    denies liability and is embarrassed by the inheritance of benefits it
-   accepts. The lesson's close lays the three positions side by side —
-   supersession with its qualifications; the reparations case in its
+   accepts.
+
+8. **The weighing — guilt does not pass, liability can, and the living are
+   owed repair.** The lesson's last body section lays the three positions side
+   by side — supersession with its qualifications; the reparations case in its
    continuing-injustice and estate forms; the tyranny-of-guilt case with the
-   liability/guilt distinction applied — and states what each must concede.
-   The reader weighs.
+   liability/guilt distinction applied — and reaches the verdict (see
+   VERDICT), one finding at a time, each **strong**. (a) Guilt attaches to a
+   will and does not pass: confession is the wrongdoer's act. (b) Liability
+   passes with estates, corporations and states that persist; Burke's
+   partnership implies it, and his "not for their punishment" bars punishment,
+   not repayment. (c) Counterfactual rectification of wrongs centuries old
+   cannot be carried out (indeterminacy, non-identity, baseline). (d) Wrongs
+   done to people now alive are owed repair on the continuing-injustice model
+   — the FHA's exclusion, not the HOLC maps (Fishback et al. 2021). And
+   supersession is possible, not automatic. Set the strongest objection from
+   each side (liability is guilt by another name; the wealth gap makes the
+   counterfactual unnecessary) and answer each as the VERDICT does. Say what
+   would overturn each finding.
 
 Headings fall out as: "Why judge the past at all"; "What would have happened:
 rectification and its six problems"; "The stolen car: continuing injustice and
 fading"; "Supersession: a claim can lapse without ever having been wrong"; "The
 case for reparations"; "Can guilt be inherited?"; "If we inherit the glory, do
-we inherit the debt?"
+we inherit the debt?"; "Guilt does not pass, liability can, and the living are
+owed repair".
+
+**Conclusion.** States the verdict in plain words with its grades: guilt does
+not pass between generations, because it attaches to a will (strong);
+liability can, through estates, corporations and states that persist (strong);
+rectifying wrongs centuries old by what would have happened cannot be done
+(strong); wrongs done to people still alive are owed repair (strong); and a
+historic claim can be superseded by changed circumstances, but not by time
+alone. Then the hand-off: what form repair should take (Miller's "repair where
+the harm occurred, admission as second best"), and what the studies behind the
+present-effect claims actually found (`auditing-the-case-for-colonialism`).
 
 ## Set pieces and worked examples to recreate
 
@@ -358,8 +456,9 @@ we inherit the debt?"
    "immortal for the good of the members, not for their punishment" (S3
    l.268–278).
 8. **Clyde Ross's contract** (Coates 2014, if obtained): the continuing-
-   injustice model instantiated in a living person; otherwise the FHA
-   redlining maps (public record, NARA) as the instance.
+   injustice model instantiated in a living person; otherwise the FHA's
+   underwriting exclusion of the 1930s (Fishback et al. 2021) as the instance —
+   not the HOLC maps, which had little effect.
 
 ## Pitfalls / subtleties to flag
 
@@ -371,8 +470,9 @@ we inherit the debt?"
   References); Maori land confiscations (New Zealand, after the wars of the
   1860s; 1865 is Waldron's date); the Treaty of Waitangi (1840) and the
   Tribunal (1975); Japanese-American internment (1942–45; the 1988 Act);
-  redlining (the federal mortgage-insurance maps of the 1930s that marked
-  Black neighbourhoods ineligible); contract selling; H.R. 40; CARICOM; Sorry
+  redlining (here: the FHA's refusal from the 1930s to insure mortgages in the
+  neighbourhoods where most urban Black Americans lived; the HOLC's maps, the
+  usual picture, came later and had little effect — Fishback et al. 2021); contract selling; H.R. 40; CARICOM; Sorry
   Day and the 2008 Australian apology (Rudd); the 1965 declaration (Nostra
   aetate); Banjul (the capital of the Gambia). Three per section at most.
 - **Keep the three questions apart.** Was it unjust / what is owed / who owes.
@@ -396,8 +496,8 @@ we inherit the debt?"
   provocative rhetorical moves" — do not use it. Equally, the reparations case
   is not presented as "guilt" by the course: its own authors frame it as debt
   and acknowledgment.
-- **No moralising, no verdict.** The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when. The lesson ends with three positions
-  and their concessions.
+- **No moralising; the verdict is on arguments.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. The lesson lays out three positions
+  and their concessions, then gives the four findings of the VERDICT section.
 - **Numbers:** $20,000 (1988) bound; dates 1865, 1942–45, 1965, 1988, 1992,
   2006, 2014. No wealth-gap figures unless the writer has the source and binds
   it (Coates gives several; one at most, with its base).
@@ -500,6 +600,17 @@ Balance: 6 draw / 1 source — an analytic argument.
    between them. The solution says the next module's Miller lesson gives the
    answer "repair where the harm occurred, admission as second best" with the
    oil-spill analogy and the Gurkhas, `<Ref>`.
+9. **Attack the verdict.** The lesson concludes that liability can pass
+   while guilt cannot (strong on each). State the strongest objection in its
+   best form: a duty to repair that falls on people who did nothing wrong is
+   a penalty, and a penalty without fault is what "inherited guilt" means;
+   the distinction is a renaming. Then say what evidence or argument would be
+   needed to overturn the verdict: a case in which an heir or a successor
+   state paying a predecessor's debt is thereby judged to share its fault, or
+   an account of why a persisting state keeps its predecessors' assets and
+   treaties but not their obligations. The solution tests the objection on
+   the heir who pays a parent's debts and on a state honouring a previous
+   regime's bonds.
 
 ## Nietzsche cross-course links (where his ideas enter)
 

@@ -1,468 +1,737 @@
-# Research brief: gould-and-harden-on-heredity (Gould and Harden: the objections to hereditarian explanation)
+# Research brief: gould-and-harden-on-heredity (What follows from heredity: Gould's reification, Harden's genetic lottery and Murray's reply)
 
 status: planned
 module: heredity-and-civilization
 type: core
-goal: Analyze the main objections to hereditarian explanations of group differences — reification, the within/between fallacy, the history of the measures (Gould) — and Harden's argument that genes matter for individual inequality but not for group comparisons, and evaluate both against the hereditarian replies
+goal: Analyze how the same factual premise — that genes cause part of the differences between individuals — supports opposite political conclusions in Harden and Murray, set beside Gould's charge that ranking people by one number is itself the political error, identify the value premise that decides each conclusion, and judge whether the factual answer about group gaps would settle the policy question on either side
+
+Register rule (binding on the lesson): The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
+
+This lesson is the module's one normative lesson. The six lessons before it tested the premises of the hereditarian argument against evidence; this one asks what would follow from any answer they could give. It states no factual conclusion of its own about the cause of any group gap: where a position leans on a fact, the lesson names the fact, gives the dossier's status for it in one clause and Refs the lesson that tested it. The three positions — Gould's, Harden's, Murray's — are each given at full strength, then their strongest objection; none gets the last word by position.
 
 ## ARC (L10)
 
-- **Inherits:** From `the-cognitive-elite`: g (the common factor behind the positive correlations
-  among mental tests), heritability (a within-population share of variance in given environments),
-  the AFQT data and the predictive power of IQ for social outcomes. From
-  `hereditarian-case-iq-and-nations`: the four-link hereditarian argument as The Bell Curve (ch. 13)
-  and IQ and the Wealth of Nations state it — a measured gap; heritability within groups; the step to
-  between groups with its stated limits; the Bell Curve's "resolutely agnostic" conclusion; the Flynn
-  effect introduced as a fact the hereditarian case itself discusses; the objections "named here,
-  developed next". From `reich-ancient-dna-and-the-indo-europeans`: Reich's argument that average
-  genetic differences in cognitive traits between populations are likely, direction unknown, and his
-  education predictor built in people of European ancestry. From `chamberlain-and-grant`: Grant's
-  Nordic–Alpine–Mediterranean scheme and the 1924 immigration act. From
-  `kallipolis-and-the-philosopher-king`: the noble lie (the myth of the metals). From
-  `rawls-theory-of-justice`: the natural lottery — "no one deserves his greater natural capacity".
+- **Inherits:** From `the-cognitive-elite`: g, heritability, the Bell Curve's Parts I–II, and — the
+  move this lesson extends — "one finding, three conclusions" (Rawls: talent is undeserved, so
+  compensate; Lasch: the able have seceded; Herrnstein and Murray: equal rights and "valued places",
+  not redistribution), with ch. 22 and the 1995 Afterword's "Rawlsian egalitarian state" passage already
+  read there. From `rawls-theory-of-justice`: `natural-lottery` ("No one deserves his greater natural
+  capacity"), the difference principle, pure procedural justice as the reply to "distributed by whom?".
   From `ressentiment-and-envy`: the charge that egalitarian demands institutionalise envy, and Rawls's
-  reply.
-- **Contributes:** The one move: lay the hereditarian argument out as a chain of links and attach each
-  objection to the link it attacks, with the hereditarian reply at the same link — so the reader can
-  see which objections are logical (and so conceded by the hereditarians themselves), which are
-  empirical (and so open), and which are historical (and so bear on motive rather than truth). Then
-  the newest objection: a geneticist who accepts more of the genetics of individual differences than
-  the older critics did, and still denies that it reaches the gaps between groups, and turns the
-  genetic lottery into an argument for equality.
-- **Hands off:** If genetics within populations cannot, on present evidence, settle the gaps between
-  them, what does explain the gap between nations? Two rival explanations that never mention genes —
-  geography and institutions — take that question in `geography-or-institutions`. The evidential
-  question — what each side's key dataset can bear — is the module's application,
-  `national-data-audited`.
-- **Spine step:** "Heredity as an explanation of the gaps between peoples, at full strength (The Bell Curve, national IQ, ancient DNA), met by its objections (Gould, Harden) and by the rival explanations from geography and institutions — and the key datasets audited"
+  excusable envy. From `chamberlain-and-grant`: Grant's Nordic scheme and the 1924 immigration act.
+  From `kallipolis-and-the-philosopher-king`: the myth of the metals. From the module so far:
+  `reification` in its psychometric form and the reply that a general factor returns one level up
+  (`what-intelligence-tests-measure`); `within-between-fallacy`, `hereditarian-hypothesis`, the seed
+  corn and the 1.58-SD argument (`heritability-within-and-between-groups`,
+  `hereditarian-case-iq-and-nations`, which also gave Facing Reality's "two truths" framing and the
+  Bell Curve's "resolutely agnostic"); the US gap's size and movement and the Flynn effect
+  (`us-gap-size-trend-and-environment`); adoption evidence (`adoption-studies-across-groups`);
+  admixture, `polygenic-index`, `pgs-portability` and "what would settle it"
+  (`admixture-and-polygenic-scores`).
+- **Contributes:** The one move: an argument about policy has the form *factual premise + value premise
+  → conclusion*; when two authors accept the same factual premise and reach opposite conclusions, the
+  disagreement lives in the value premise, and it can be found and stated. The lesson shows this on
+  three positions — Gould (the political error is ranking persons by one number at all), Harden (genes
+  matter for individual outcomes; they are undeserved; so, with Rawls, share more), Murray (genes and
+  environment both matter; treat persons as individuals; stop reading unequal group outcomes as proof
+  of discrimination) — lays the value premises side by side, and works for each position what would
+  change if the group gap proved partly genetic or wholly environmental. Concepts introduced:
+  `genetic-lottery`, `difference-without-hierarchy`. The history of measurement in politics (the army
+  tests, Brigham, 1924, the 1930 retraction; Morton and the 2011 re-measurement) is taught as Gould's
+  evidence for his charge, with its limit.
+- **Hands off:** Harden answers, by name, a geneticist's 2018 prediction that genetic studies will find
+  average differences between populations in many traits. The argument she answers — and the evidence of
+  ancient DNA on which it rests — is `reich-ancient-dna-and-the-indo-europeans`: the reader meets her
+  answer here, before the argument. The rival explanations of national gaps that never mention genes are
+  `geography-or-institutions`; the module's closing status is `national-data-audited`. What this lesson
+  decides: the factual answer about the gap does not settle the policy question, on either side
+  (**strong**); Gould's charge against Morton's measurements fails (**strong**); the 1920s army-test
+  ranking of European nationalities failed on its author's retraction (**established**). Which value
+  premise is right (what equality is, the unit of justice) is not decided here: it is the question
+  `rawls-theory-of-justice` and `the-cognitive-elite` left **open** (Rawls's reciprocity route untested).
+- **Spine step:** "Heredity as an explanation of the gaps between peoples, tested premise by premise — what the tests measure, what heritability can and cannot imply, the hereditarian case at full strength, then the US gap, adoption, admixture and polygenic scores on the step from a real gap to a genetic one — then what follows politically whatever the answer, what ancient DNA shows, the rival explanations from geography and institutions, and the key datasets audited"
+  (this lesson is "what follows politically whatever the answer").
+
+## VERDICT
+
+- **Claims judged:** (a) that the factual answer about group differences settles the policy question, on
+  either side ("if the gap is genetic, preferences are wrong"; "if it is environmental, group remedies are
+  owed"); (b) Gould's charge that Morton's measurements were bent by bias; (c) the 1920s army-test ranking
+  of European nationalities.
+- **Verdicts.** (a) **Fails.** Grade: **strong**. Gould, Harden and Murray accept overlapping facts and
+  reach opposite policies; each built a principle meant to survive either factual answer (Bell Curve
+  l.3233–3247; FR l.492; Harden l.954–960), and the value premises (what equality is, the unit, what the
+  state may do, worth) decide the conclusions. One conclusion does follow on any factual outcome, and the
+  lesson states it with its scope: the tests predict equally for both groups and the groups differ on them
+  (`what-intelligence-tests-measure`; dossier §2), so treating individuals the same at the point of
+  selection will not produce equal group outcomes, and an unequal outcome there is not by itself proof of
+  discrimination. That says nothing about earlier causes of the difference in scores, which this module
+  finds partly environmental (`us-gap-size-trend-and-environment`). (b) **Fails**: the 2011 re-measurement
+  of the surviving skulls found Morton's measurements largely accurate (Lewis et al. 2011); whether his
+  ranking followed from them is a separate question, argued again afterwards (Weisberg 2014). Grade:
+  **strong**. (c) **Failed on its author's retraction**: Brigham withdrew the 1923 ranking in 1930 (Gould
+  l.11459–11460). Grade: **established**.
+- **Strongest objection to (a):** facts do bite: a gap shown to be wholly environmental and movable would
+  weaken Murray's "indefinitely", and a genetic share would remove the claim that group gaps reflect only an
+  unjust history. It does not overturn the verdict: those are the auxiliary premises (permanence, the
+  meaning of an unequal outcome, what interventions can do), and the verdict is about the principles, which
+  each author built to survive either answer. Section 7 states exactly which auxiliary premise moves with
+  which answer. To (b): Lewis et al. may themselves have erred, as the 2014 reply argues; the reply
+  contests the ranking's inference, not the accuracy of the measurements, so (b) stands.
+- **What would overturn it:** for (a), a policy conclusion that one of the three authors draws and that
+  reverses when the genetic share changes while his or her stated value premises stay fixed; for (b), a
+  re-measurement showing Morton's capacities systematically shifted in the direction of his ranking.
+- **Not decided:** which value premise is right. The lesson says so as a finding with its reason: the
+  dispute is about equality and worth, and the course has not tested Rawls's reciprocity route
+  (`the-cognitive-elite`, module verdict: **open**).
 
 ## Sources to consult
 
-All paths below are under
+All paths are under
 `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/`.
+All four books are in copyright: one sentence per quotation, paraphrase otherwise. Line numbers below were
+checked in the staged files on 2026-11-01.
 
-- **S. J. Gould, The Mismeasure of Man (rev. ed. 1996)** — summary index 57 (full; read in full).
-  `gould/mismeasure-of-man.txt` (line numbers are this file's; text is indented, one line per printed
-  line). In copyright: quote a sentence at most. Pointers:
-  - Introduction to the revised edition l.1040–1240: the four errors (reductionism, reification,
-    dichotomization, hierarchy); the recurrence thesis — "resurgences of biological determinism
-    correlate with episodes of political retrenchment" (l.1230–1231); heritability is not
-    immutability — eyeglasses correct a fully inherited defect (l.1491).
-  - Ch. 1 l.2195–2215: Plato's myth of the metals as prototype; "Metals have ceded to genes"
-    (l.2208); "Socrates knew that he was telling a lie."
-  - Ch. 2 (Morton) l.3550–4130 and the closing footnote: Morton's 1839–49 skull tables ranking
-    races by cranial capacity; Gould's re-analysis; Table 2.5 (l.3920); "All groups rank between 83
-    and 87 cubic inches, and Caucasians share the pinnacle" (l.4122); the four kinds of bias, read as
-    unconscious, not fraud; his own error — a value of 89 "smudged to look like an 80 on my copy"
-    (l.4333; repeated l.22893 in the reprinted essays).
-  - Ch. 5 part 1, l.7690–7745: the two hereditarian fallacies — heritable ≠ inevitable; "The
-    confusion of within- and between-group heredity" with the height example: two groups of men, 5
-    ft 10 in a prosperous American town, 5 ft 6 in a starving village, heritability ~95% in each
-    (l.7722–7731); "The two phenomena are simply separate" (l.7740–7745). This is the lesson's
-    opening case.
-  - Ch. 5 part 2, l.9677–11470: the Army Alpha and Beta tests of 1917 (1.75 million recruits);
-    protocol failures, the spike at zero; mental age rising with years of residence in the US, 11.29
-    to 13.74 (l.10775, l.10839); Gould's own replication on fifty-three Harvard students
-    (l.9950, l.10389–10390); Brigham 1923, the 1924 Restriction Act and its 1890 census base
-    (l.11362–11400); "BRIGHAM RECANTS" (l.11406–11460): "One of the most pretentious of these
-    comparative racial studies—the writer's own—was without foundation (Brigham, 1930, p. 165)"
-    (l.11459–11460).
-  - Ch. 6 l.11507–12210: factor analysis by geometry; "The error of reification" (l.12048–12060:
-    "The first principal component is a mathematical abstraction that can be calculated for any
-    matrix of correlation coefficients; it is not a 'thing' with physical reality"); the nonsense
-    matrix (age, population of Mexico, price of Swiss cheese); g at 50–60% of the information vs 97%
-    for a size factor in fossil reptiles; g compatible with hereditarian and environmentalist
-    readings alike (l.12128–12136); "Rotation and the nonnecessity of principal components"
-    (l.12141–12200): the same test vectors resolved into verbal and arithmetic factors with g gone
-    and no information lost (Gould's Figs. 6.6–6.7).
-  - Ch. 7 l.15185–15195: the 1972 apportionment (85.4% of variation within local populations).
-  - "Critique of The Bell Curve" l.15684–15760: the four premises — intelligence "depictable as a
-    single number, capable of ranking people in linear order, genetically based, and effectively
-    immutable. If any of these premises are false, the entire argument collapses" (l.15749–15751);
-    the R² point. "Ghosts of Bell Curves Past" l.16158ff (Gobineau and the Bell Curve both argue
-    from means of masses) — optional backward link to `gobineau-inequality-of-races`.
-- **R. Herrnstein & C. Murray, The Bell Curve (1994) with Murray's Afterword (1995)** — summary index
-  71; `herrnstein-murray/the-bell-curve.txt`. Backward Ref for the case itself; this lesson uses the
-  hereditarian REPLIES: ch. 13 l.3122–3124 (Gould's facts about blurred racial lines "can be true,
-  and yet" groups can differ genetically); l.3134 (the authors' own seed-corn example: "two handfuls
-  of genetically identical seed corn… one in Iowa, the other in the Mojave Desert" — they grant the
-  within/between logic); l.3136–3140 (the reply: with 60% heritability and a one-SD gap, the
-  average Black environment would have to sit at the 6th percentile of white environments, "1.58
-  standard deviations", which they judge implausible; the gap is larger at higher SES; other groups
-  who faced discrimination score higher); l.3174 (the "asymmetry": they do not claim genes explain
-  everything; their opponents deny any role); l.3198–3208 (Flynn effect: "Couldn't the mean of
-  blacks move 15 points as well through environmental changes? There seems no reason why not—but
-  also no reason to believe that white and Asian means can be made to stand still"); l.3210–3214
-  (the transracial adoption study, read by both sides); l.3227 ("resolutely agnostic"). Afterword
-  l.5222ff: l.5270 (Gould's New Yorker claim quoted: g "cannot have inherent reality"); l.5276 ("You
-  can make g hide, but you can't make it go away"; Thurstone's later acceptance of a second-order
-  general factor); l.5280–5282 (g as a construct like energy; three possibilities — noise,
-  surrogate, biological — tested by prediction); l.5346–5356 (the R² dispute: in logistic
-  regression the reported R² understates fit; "Stephen Jay Gould fell into the same error").
-  In copyright: one sentence per quotation.
-- **K. P. Harden, The Genetic Lottery (2021)** — summary index 78 (full; ch. 3 not summarised but
-  present in the staged file). `harden/the-genetic-lottery.txt` (one paragraph per line). In
-  copyright. Pointers:
-  - Ch. 1 (l.147–375): the two lotteries of birth; l.294–306 — the Bell Curve's half-page passage
-    about "compensating benefits for the least advantaged", set beside Rawls's natural lottery, and
-    Harden's account of their retreat; l.316–318 — the 2000 claim that humans are 99.9% identical and
-    her reply: "Building a commitment to egalitarianism on our genetic uniformity is building a house
-    on sand"; l.322 — her definition of what is and is not eugenic.
-  - Ch. 2 (l.376–536): recombination, "one in 70 trillion" (l.485), polygenic inheritance, the
-    within-family logic; ch. 3 (l.537–776): how a GWAS and a polygenic index are built.
-  - Ch. 4 (l.777–990): ancestry (process) vs race (pattern) (l.846); non-portability — "About
-    three-quarters of genetic variants are found only in a single continental group" (l.885), linkage
-    differences (l.887), the education index explaining "more than 10 percent of the variance" in
-    European-ancestry samples and much less in African Americans (l.889); 16% of the world vs ~80% of
-    GWAS participants (l.898); "Ecological Fallacies and Racist Priors" (l.908–937): Robinson's 1950
-    correlations, +.12 individual and about −.5 state-level (l.919), the Mississippi/California
-    misinference (l.921–925), "One of them does not give information about the other" (l.929), the
-    Bayesian prior (l.933–937 — her label; quote only with attribution); her answer to Reich and
-    Sam Harris (l.946–958): skepticism about their prior, agreement that equality must not rest on
-    genetic sameness ("genetics-proof", l.960).
-  - Ch. 5–6 (l.991–1330): thin vs thick causes; siblings as a natural experiment; heritability is
-    about differences in a population; the twin meta-analysis (2015: over 2,000 papers, ~17,000
-    traits) — seven domains of inequality about one-quarter to one-half heritable (Fig. 6.3, l.1240–
-    1250); within-family polygenic-index studies (attenuated but non-zero).
-  - Ch. 8 (l.1565–1765): heritability is not a ceiling on change (eyeglasses, PKU diet); Lewontin's
-    two gardens of genetically diverse corn seed (l.1614–1616) — the garden example illustrates why
-    "differences between groups … might be entirely caused by environmental factors, even when
-    differences within groups are caused by genetic differences" — and the twist that a uniformly
-    rich environment raises both average and inequality.
-  - Ch. 10 (l.1941–2116): the "free will coefficient" (non-shared environment) and the politics of
-    luck (conservatives resist luck attributions). Ch. 11 (l.2117–2295): difference without hierarchy;
-    "Socially Valued, Not Inherently Valuable" (l.2182ff); deafness as the model (l.2264–2268). Ch. 12
-    (l.2296ff): eugenic / genome-blind / anti-eugenic; merit and desert ("None of us deserves his or her
-    genetics"); Rawls's veil and difference principle applied to the genetic lottery.
-- **Backward Refs only:** Rawls (index 80) via `rawls-theory-of-justice`; Scheler/Schoeck via
-  `ressentiment-and-envy`; Plato's myth of the metals via `kallipolis-and-the-philosopher-king`;
-  Lynn & Vanhanen (index 82) via `hereditarian-case-iq-and-nations`.
-- **Public papers not in the dossier** (the brief names them; the writer states their arguments as
-  the course's own and lists them in References; verify each): J. E. Lewis et al., "The Mismeasure
-  of Science: Stephen Jay Gould versus Samuel George Morton on Skulls and Bias", PLoS Biology 9(6)
-  (2011), e1001071 (open access, CC BY) — re-measured Morton's surviving skulls, found his
-  measurements largely accurate, and argued Gould's re-analysis was itself biased; M. Weisberg,
-  "Remeasuring Man", Evolution & Development 16 (2014) — argues Gould made errors but that Morton's
-  ranking was not supported either; J. M. Kaplan, M. Pigliucci & J. A. Banta, Studies in History and
-  Philosophy of Biological and Biomedical Sciences 52 (2015) — what the dispute can and cannot settle.
-  W. T. Dickens & J. R. Flynn, "Heritability estimates versus large environmental effects: the IQ
-  paradox resolved", Psychological Review 108 (2001) — the gene–environment multiplier, an answer to
-  the Bell Curve's "1.58 SD" argument; J. M. Wicherts et al., "Are intelligence tests measurement
-  invariant over time? Investigating the nature of the Flynn effect", Intelligence 32 (2004) — the
-  hereditarian-side rejoinder that Flynn gains differ in kind from the group gaps. A. R. Jensen's 1982
-  review of Mismeasure (Contemporary Education Review 1) and J. B. Carroll, Human Cognitive Abilities
-  (1993) — the psychometric reply on g (Murray's Afterword points to Carroll). G. Coop & M. Przeworski,
-  "Lottery, luck, or legacy", a review of The Genetic Lottery, Evolution 76 (2022) — the objection that
-  within-family estimates and heritability carry less causal weight than Harden gives them (verify
-  title and volume). C. Murray, Human Diversity (2020) — the hereditarian-side reading of the same
-  genomic literature (not in the dossier; mention only as the opposing book, verify before citing).
+- **S. J. Gould, The Mismeasure of Man (rev. ed. 1996)** — summary index 57; `gould/mismeasure-of-man.txt`
+  (one printed line per file line, indented). Read for the POLITICAL charge and the history; the
+  psychometric argument (factor analysis, rotation, ch. 6 l.11507–12210) belongs to
+  `what-intelligence-tests-measure` and is recalled by Ref only.
+  - l.2200–2203: the book's theme stated — "the claim that worth can be assigned to individuals and
+    groups by measuring intelligence as a single quantity". This is the sentence the lesson's Gould
+    section turns on: the error he names is moral-political (assigning worth), carried by a measurement.
+  - l.2208–2212: "Metals have ceded to genes"; "Socrates knew that he was telling a lie." Ref
+    `kallipolis-and-the-philosopher-king`.
+  - l.2250–2255: he does not contrast "evil determinists" with open-minded critics; he criticises "the myth
+    that science itself is an objective enterprise" — his stated epistemic position.
+  - l.1222–1236 (intro to the revised edition): the recurrence thesis — "resurgences of biological
+    determinism correlate with episodes of political retrenchment" (l.1230–1231), and the question what
+    argument against social change could be more effective than the claim that the established order
+    reflects innate capacities (l.1233–1236).
+  - l.1615–1625: Gould's own limit on his charge: the speech he would respect from Murray — "I know that
+    the argument of The Bell Curve meshes well with my politics … But I remain capable of being fair with
+    data" (l.1619–1621). Gould grants that political commitment and fair use of data can coexist. (Note:
+    at l.1617 Gould names Murray's 1984 book "Common Ground"; it is *Losing Ground*. Do not repeat the
+    slip.)
+  - l.1491: heritability is not immutability — eyeglasses correct a defect "that is 100 percent"
+    inherited.
+  - l.15740–15755 ("Critique of The Bell Curve"): the four premises — intelligence "must be depictable as
+    a single number, capable of ranking people in linear order, genetically based, and effectively
+    immutable. If any of these premises are false, the entire argument collapses" (l.15749–15751); the
+    eyeglasses again (l.15753).
+  - The army tests, ch. 5 part 2: Yerkes persuaded the army to test 1.75 million men (l.7766; l.9498);
+    the Alpha (written) and Beta (pictorial) scheme (l.9459ff); the zero-score spike (l.9754); mental age
+    by years of residence in the US, 11.29 for under five years to 13.74 for over twenty (the values at
+    l.10775 and l.10839, in Gould's table); Gould's own administration of Beta to fifty-three Harvard
+    students (l.9950ff; results l.10389–10390 per the earlier brief — re-check before use). Brigham's
+    1923 *A Study of American Intelligence* (l.2223; l.11362ff), the Immigration Restriction Act of 1924
+    and its 1890 census base: quotas of 2 percent of each nationality "recorded in the 1890 census"
+    (l.11387–11400, with Gould's "Why 1890 and not 1920" at l.11398). "BRIGHAM RECANTS" (l.11406–11460):
+    "One of the most pretentious of these comparative racial studies—the writer's own—was without
+    foundation (Brigham, 1930, p. 165)" (l.11459–11460).
+  - Ch. 2 (Morton): Gould's re-analysis of Morton's tables, "All groups rank between 83 and 87 cubic
+    inches, and Caucasians share the pinnacle" (l.4122); the bias he alleges is unconscious, not fraud
+    (ch. 2 conclusion, l.~3613: "unconscious finagling"); his own misreading, a value of 89 "smudged to
+    look like an 80 on my copy" (l.4333).
+- **R. Herrnstein & C. Murray, The Bell Curve (1994) with Murray's Afterword (1995)** — summary index 71;
+  `herrnstein-murray/the-bell-curve.txt` (one paragraph per line). The lesson reads the POLICY side; the
+  ch. 13 evidence is `hereditarian-case-iq-and-nations`.
+  - Ch. 13 introduction l.2897: even if the race differences "were entirely genetic (which they surely
+    are not), it should make no practical difference in how individuals deal with each other"; l.2903:
+    "the differences among individuals are far greater than the differences between groups".
+  - Ch. 13 l.3227: "resolutely agnostic" (recall only). l.3229–3231: the false dilemma the authors
+    reject — genetic-and-dreadful vs environmental-and-temporary; "it matters little whether the genes are
+    involved at all" (l.3231).
+  - **Ch. 13 l.3233–3247, the thought experiment** — "Imagine that tomorrow it is discovered that the B/W
+    difference in measured intelligence is entirely genetic in origin" (l.3233); the hypothetical
+    questions answered one by one (treatment of individuals l.3234; education spending l.3236; employers'
+    screening — "The existence of the difference has many intersections with policy issues. The source of
+    the difference has none that we can think of" l.3238; "harder to change?" l.3240–3242; "passed down?"
+    l.3244); conclusion l.3247: "nothing of any significance should change", and knowing the cause were
+    100 percent environmental "would not suggest a single program or policy that is not already being
+    tried". This is the lesson's central text for "what would change".
+  - Ch. 22 "A Place for Everyone" l.5017–5221: the opening question l.5019 ("people differ in
+    intelligence for reasons that are not their fault"); l.5022–5024: the twentieth-century answer
+    (equality of condition) and "the material in this book is tailor-made for their case"; l.5026: the
+    Rawlsian half-page — "economic pragmatism about how to produce compensating benefits for the least
+    advantaged members of society" (note 1, l.8489: "The phrasing draws from Rawls 1971, pp. 14-15");
+    l.5027: "an older intellectual tradition"; l.5074: "equality of rights is crucial while equality of
+    outcome is not"; l.5084: "valued place" defined; l.5208: the "fourth answer" — group differences "can
+    only be handled—by a return to individualism. A person should not be judged as a member of a group but
+    as an individual"; l.5218: dignity made accessible, not given. Ch. 22 was read in `the-cognitive-elite`
+    — recall in a clause; the NEW use here is l.5208 and its link to ch. 13's thought experiment.
+  - Chs. 19–20 (l.4396ff, l.4640ff): affirmative action in higher education and the workplace; l.4413
+    names the question "must the American ideal of individualism be permanently modified for the collective
+    needs of members of certain groups?" One clause; no data from these chapters in the lesson.
+  - Afterword l.5236: "the most obvious political implication is that we need a Rawlsian egalitarian state
+    … Neither of us thought that the most obvious implication was the right one" (read in
+    `the-cognitive-elite`; recall). l.5298: "there is just one authentic policy implication … that people
+    are to be treated as individuals, not as members of groups."
+- **C. Murray, Facing Reality: Two Truths about Race in America (2021)** — staged,
+  `heredity-papers/murray-facing-reality.txt` (whole book; 2,662 lines). The ch. 3 data are
+  `hereditarian-case-iq-and-nations` and `us-gap-size-trend-and-environment`; this lesson reads chs. 1, 7
+  and the framing.
+  - Ch. 1 l.243–245: the American creed; immigrants "judged on who they were as individuals". l.265–267:
+    the Civil Rights Act and Johnson's "equality as a fact and equality as a result" as the "wedge".
+    l.271: identity politics' "core premise" stated in his words. **l.279**: the policy he opposes "is
+    based on the premise that all groups are equal in the ways that shape economic, social, and political
+    outcomes … That premise is factually wrong. Hence this book" — the factual premise on which his
+    political conclusion leans. l.283: "I want America to return to the ideal of treating people as
+    individuals, so I have to write a book that treats Americans as groups." l.285: mean differences
+    "will be with us indefinitely". l.293: he argues "from a center-right position".
+  - Ch. 2 l.492: the existence of the differences is a fact "no matter what the causes of the differences
+    might be"; l.886: "Causes are as irrelevant to the purposes of this chapter" (said of crime; ch. 3
+    likewise does not discuss causes — dossier §2). Murray's political argument is built to be
+    cause-independent.
+  - Ch. 3 l.812–816: the overlap figure "should also serve as an object lesson in the necessity of
+    judging people as individuals, not members of groups" (l.812), and the group consequences at the right
+    tail "are not just possible. They are inevitable" (l.814–816). This is the cognitive-ability pair the
+    title's "two truths" names; the book's explicit "two truths" statement (l.1776–1786) is about violent
+    crime and is NOT used in this lesson.
+  - Ch. 7 l.1855: treating people as individuals is "unnatural"; the garden image (l.1851–1861,
+    references to another writer — References only); l.1940–1948: "The solution. Eliminate all forms of
+    government-sponsored preferential treatment by race"; l.1956–1968: the "partial solution" — restore the
+    creed by declaring it.
+  - Labels: from ch. 3 to ch. 6 Murray calls American groups "Europeans, Africans, Latins, Asians"
+    (l.492–498, his reasons). The lesson uses the census categories (Black, White) inside his claims and
+    says once that he relabels them and why.
+- **K. P. Harden, The Genetic Lottery (2021)** — summary index 78; `harden/the-genetic-lottery.txt` (one
+  paragraph per line).
+  - Introduction: l.259 (heredity's use for "racist and classist ideologies" — her sentence); l.294–306:
+    where she diverges from the Bell Curve; l.296: what she shares with Herrnstein and Murray (tests
+    measure something relevant to success; twin studies tell us something about genetic causes); l.298:
+    the Bell Curve's half-page quoted, "compensating benefits for the least advantaged"; l.300: the two
+    ideas in it (no one deserves disadvantage from DNA; society organised for the least advantaged), which
+    "sound like they come straight out of" Rawls; l.302–304: the natural lottery; l.306: "after their
+    tantalizing half-page dalliance with egalitarianism, Herrnstein and Murray retreat to a profound
+    inegalitarianism", quoting l.5066/5074 of the Bell Curve. l.310–312: inegalitarianism defined (via
+    another philosopher's definition — References only) and eugenic ideology defined as DNA determining
+    "intrinsic worth and rank". l.316–318: the 99.9 percent sameness claim of 2000 and her objection to
+    resting equality on it. l.322–324: what is not eugenic; the anti-eugenic project.
+  - Ch. 4 l.946–960 (her answer to the 2018 prediction): l.946 quotes the geneticist's sentence ("How
+    should we prepare for the likelihood that … these traits will differ on average across human
+    populations?"); l.950 her scepticism of its premise; l.954: racial groups "differ in genetic ancestry"
+    and "it is a grave mistake to stake claims for equity, or inclusion, or justice … on the absence of
+    genetic differences"; l.958: equal treatment "regardless of those differences" is not enough —
+    "Treating everyone exactly the same right now cannot help but reproduce inequalities of the past";
+    l.960: equality made "genetics-proof". The evidence side of ch. 4 (portability l.885–898; the
+    ecological fallacy l.908–937) belongs to `admixture-and-polygenic-scores`; recall her refusal of
+    group inference in one clause and Ref.
+  - Ch. 10: "Identical Twins and the Free Will Coefficient" (l.2017) and "The Free Will Coefficient in
+    Education" (l.2046) — non-shared environment and luck; the source of the right's desert objection.
+  - Ch. 11 "Difference without Hierarchy" (l.2120ff): l.2162 (inegalitarianism again); "Socially Valued,
+    Not Inherently Valuable" (l.2182); deafness as the model (l.2264); Rawls on the "pattern of human
+    action" (l.2272–2282; neurodiversity, armies employing people with autism).
+  - Ch. 12: the three positions — eugenic, genome-blind, anti-eugenic (l.2328: eugenic as "a naturalizer
+    of inequality"; genome-blind "seeks not to know"); l.2392: the maths-track example worked for all
+    three; l.2425–2435: anti-classification vs anti-subordination; l.2460–2474: desert, "break up with
+    the idea that America is or could ever be the sort of 'meritocracy'…"; l.2480–2490: the pilot —
+    selection on ability is "instrumentally useful" but not "a sign of the pilot's moral creditworthiness";
+    l.2496: "None of us deserves his or her genetics"; l.2513–2541: the veil of ignorance and the
+    difference principle applied.
+- **G. Coop & M. Przeworski, "Lottery, luck, or legacy. A review of 'The Genetic Lottery: Why DNA matters
+  for social equality'", Evolution 76(4) (2022) 846–853** — dossier §5 [full, relevant sections]; full
+  text at the Europe PMC URL in the dossier (PMC9313868). Points used (checked 2026-11-01 via that
+  URL; the writer re-checks wording before quoting): the lottery analogy holds only for differences
+  between siblings, since unrelated people's environments are not randomised; standard GWAS mix direct
+  effects with parental, assortative-mating and stratification effects; sibling validation shows some
+  within-family causation and says little about differences between families; "no bright line"
+  between within- and between-ancestry comparisons (the real issue is uncontrolled environmental
+  confounding); the authors support the redistributive conclusions and doubt what genetics adds to them
+  — current scores "neither interpretable nor particularly meaningful" for explaining or redressing
+  inequality. Harden's 2022 reply [abstract, dossier §5] agrees present scores do not support
+  between-group inference. Names in References only.
+- **Public paper outside the dossier (verify before use):** J. E. Lewis et al., "The Mismeasure of
+  Science: Stephen Jay Gould versus Samuel George Morton on Skulls and Bias", PLoS Biology 9(6) (2011),
+  e1001071 (open access) — re-measured Morton's surviving skulls, found his measurements largely
+  accurate, argued Gould's re-analysis was itself biased. Optional, if obtained: M. Weisberg,
+  "Remeasuring Man", Evolution & Development 16 (2014) — Gould erred, but Morton's ranking was not
+  supported either. References only.
+- **Backward Refs only (no new reading):** Rawls (index 80) via `rawls-theory-of-justice`;
+  Scheler/Schoeck via `ressentiment-and-envy`; Scruton's "distributed by whom?" via
+  `rawls-theory-of-justice` (where it is stated as a question); Grant and the 1924 act via
+  `chamberlain-and-grant`; Plato via `kallipolis-and-the-philosopher-king`; Nietzsche via
+  `nietzsche/order-of-rank` (cross-course).
 - **Strauss–Cropsey:** no chapter covers this material.
 
-Names ONLY in References (L8a): Lewontin (the gardens and the 1972 apportionment are stated as the
-course's own examples), Robinson (the 1950 ecological-correlation example is stated as an example),
-Flynn as a person (the "Flynn effect" is a named effect and may be used as such, like a named law),
-Dickens, Wicherts, Lewis et al., Weisberg, Kaplan et al., Carroll, Jensen, Thurstone, Spearman (may be
-named as the inventors of the methods under study, as historical actors — "Spearman's g" is a named
-object — but never as authorities), Polderman, Coop, Przeworski, Anderson, Sam Harris, Kendi. The body
-may name Gould and Harden (their texts are the material), Herrnstein and Murray and Reich (material of
-the two preceding lessons), Rawls and Plato (thinkers the course teaches), and the historical actors
-whose measurements are the subject: Samuel Morton (Philadelphia physician, skull collector,
-1840s), the army psychologists of 1917 and Carl Brigham (the 1923 book and the 1930 retraction).
+**Factual authority:** `C/research/heredity-evidence-review.md` (the dossier). This lesson cites it for
+every factual clause it uses: within-group heritability (§1), the gap and its movement (§2), PGS
+portability and within-family shrinkage (§5), the status of the group question (Overall answer 3–4, 7),
+expert opinion (§8).
+
+Names in the body (L8a): Gould, Harden, Herrnstein and Murray (their texts are the material); Rawls
+and Plato (thinkers the course teaches); the historical actors whose measurements are the subject —
+Robert Yerkes (who ran the army testing), Carl Brigham (the 1923 book and the 1930 retraction), Samuel
+Morton (Philadelphia physician, skull collector, 1830s–40s); Reich only as the author of the 2018
+sentence Harden answers and of the next lesson's material. Names ONLY in References: Coop, Przeworski,
+Lewis et al., Weisberg, Lewontin, Anderson (Harden's source for "inegalitarianism"), Kamin, Sam Harris,
+the writer whose garden image Murray borrows, Myrdal, Huntington (as Murray's sources).
 
 ## EXPLANATION PLAN (L0)
 
-Opening (course.yaml, verbatim): "Suppose the heritability of height within a village is high and the
-next village is shorter on average. Does it follow that the difference between the villages is
-genetic? It does not, if one village was starved. The objections to the hereditarian case begin from
-this point and go further: whether intelligence is a single thing that can be measured, and whether
-the history of its measurement shows science following prejudice. One recent critic accepts much of
-the genetics and still rejects the group conclusion. The lesson sets out the objections and the
-hereditarian replies."
+Opening (course.yaml, verbatim): "Suppose it were settled tomorrow how much of the difference in measured
+intelligence between people, and between groups, is genetic. Would anything follow for how a society
+should treat its members? A palaeontologist who attacked intelligence testing argued that the political
+error lay in ranking people by a single number at all, whatever the genetics turned out to be. A
+geneticist who accepts that genes shape differences between individuals argues that this is a reason to
+share more; a political scientist who accepts much the same facts argues that it is a reason to stop
+expecting equal outcomes from groups. The lesson sets the three positions side by side and finds where
+they part."
 
-Anchors (L11): Stephen Jay Gould (1941–2002), Harvard palaeontologist and essayist; The Mismeasure of
-Man (1981; revised 1996 with a critique of The Bell Curve). Kathryn Paige Harden, behaviour
-geneticist at the University of Texas; The Genetic Lottery (2021). Both declare their politics (Gould
-in his introduction, Harden as an egalitarian); the lesson says so once and then judges their
-arguments, as it did the hereditarians'.
+Anchors (L11), one sentence each at first mention: Stephen Jay Gould (1941–2002), Harvard palaeontologist
+and essayist, *The Mismeasure of Man* (1981; revised 1996 with a critique of *The Bell Curve*); Kathryn
+Paige Harden, behaviour geneticist at the University of Texas, *The Genetic Lottery* (2021); Charles
+Murray, political scientist, co-author of *The Bell Curve* (1994, recall `the-cognitive-elite`) and
+author of *Facing Reality* (2021). Each states his or her politics (Gould on the left, l.1615–1625 and
+the recurrence thesis; Harden as an egalitarian; Murray "center-right", libertarian, FR l.293); the lesson
+says so once and judges the arguments.
 
-0. **The chain (frame for the whole lesson).** Recall in one paragraph (Ref
-   `hereditarian-case-iq-and-nations`) the hereditarian argument as four links: (L1) intelligence is a
-   single measurable quantity, g; (L2) it is substantially heritable within populations; (L3) groups
-   differ in its measured average; (L4) therefore part of the difference between groups is probably
-   genetic. Gould's own summary of what The Bell Curve needs — single number, linear ranking, genetic
-   basis, effective immutability — maps onto it. Draw the chain once (Figure 1); every section pins
-   an objection and a reply to one link. Seam: the oldest objection is to the last step, and the
-   hereditarians themselves state it.
-1. **From within to between (L2→L4).** The opening case worked: two villages, heritability of height
-   about 95% in each, a four-inch gap made by famine. Why does high heritability within each village
-   say nothing about the gap? Because heritability measures how far differences among individuals in
-   one population track their genes, in that population's range of environments; a cause that acts
-   on everyone in one village (famine) moves its average without changing who is tall relative to
-   whom. Same point with seed: genetically identical corn in rich soil and in desert. State the
-   striking fact plainly: The Bell Curve itself makes this argument with seed corn in Iowa and the
-   Mojave (ch. 13). Name the error: the within/between fallacy (concept introduced).
-   - **Hereditarian reply (full strength):** the logic is granted, but then an environment large
-     enough must be named. With 60% heritability and a one-SD gap, the average Black American
-     environment would have to be worse than 94% of white environments (the 6th percentile, 1.58 SD);
-     the gap is not smaller among the better-off; groups that also met discrimination (Chinese, Jewish
-     Americans) score above average. An environmental account must say what this environment is.
-   - **Counter-reply:** (a) Gould: the link is logical, not probabilistic — within- and between-group
-     heredity "are not tied by rising degrees of probability"; (b) the Flynn effect (Ref — introduced
-     in the previous lessons as a fact the hereditarian case discusses): whole national populations
-     gained about a standard deviation in a few decades, with no genetic change and no agreed cause —
-     so an environmental difference of the size required exists in the record even when no one can
-     name it; (c) the gene–environment multiplier: if abler children seek and receive richer
-     environments, small initial differences are amplified, so high heritability and large
-     environmental effects are compatible (2001 argument; References).
-   - **Hereditarian rejoinder:** the Flynn gains do not behave like the group gaps when tests are
-     checked for whether they measure the same thing across groups (a 2004 analysis found the gains
-     are not "measurement invariant" across cohorts while the Black–white gap largely is); and white
-     and Asian means do not stand still while Black means rise. Close the section by stating what
-     evidence would decide (designs that separate ancestry from environment: within-family variation
-     in ancestry, adoption across groups — Ref the transracial adoption study, which both sides read —
-     and genetic predictors validated across ancestries). Seam: the hereditarian and the critic agree
-     on the logic and disagree on what has been shown; the next objection goes to the first link.
-2. **Is intelligence one thing? (L1, reification).** The problem in the reader's terms: scores on
-   vocabulary, arithmetic, puzzles and memory all correlate positively; does a single quantity in the
-   head cause the correlations? First attempt (Spearman's, Ref `the-cognitive-elite`): extract the
-   common factor and call it g. Gould's objection in three steps, each drawn: (a) the first
-   principal component is a summary computable for any correlation table, including a nonsense one
-   (age, population of Mexico, price of Swiss cheese); (b) the same test results can be described
-   with the general axis rotated away into two group factors (verbal, arithmetic) with no
-   information lost — so the data alone do not choose g; (c) a positive correlation among all tests is
-   predicted by an environmental story too (good schooling, enough food, books at home raise all
-   scores). Answer he draws: treating g as a thing is reification (concept introduced) — "a
-   temptation that we must resist". Plato recalled: the myth of the metals (Ref) — "Metals have ceded
-   to genes".
-   - **Hereditarian reply (full strength):** rotated group factors are themselves correlated, and a
-     general factor reappears one level up — "You can make g hide, but you can't make it go away"; g is
-     a construct as energy is a construct, and constructs are justified by what they predict; g
-     predicts school, job performance and the social outcomes of the previous lessons better than
-     education or parental status do (Ref `the-cognitive-elite`); Gould's low-R² point misreads
-     logistic-regression statistics.
-   - **Where it stands:** the reification objection bears on what g is, not on whether test scores
-     predict; predictive validity is common ground; whether g is a biological property is the open
-     part. Seam: if the logic and the mathematics are contested, perhaps the history of the measures
-     shows something; Gould thinks it does.
-3. **Has the measurement followed prejudice? (the history).** Two cases, each a scene with its
-   numbers. (a) Morton's skulls (Philadelphia, 1839–49): races ranked by cranial capacity with
-   Caucasians on top; Gould re-analysed Morton's own tables and found every group between 83 and 87
-   cubic inches once the samples were weighted for sex and stature — unconscious bias, not fraud. (b)
-   The army tests of 1917: 1.75 million recruits; illiterate men given the written test, a spike of
-   zero scores, average mental age rising with years in America (11.29 to 13.74); Carl Brigham's 1923
-   book read the results through Grant's Nordic–Alpine–Mediterranean races (Ref `chamberlain-and-grant`)
-   and fed the debate over the 1924 quotas; Brigham's 1930 retraction, quoted.
-   - **Reply (full strength), on (a):** in 2011 a team re-measured Morton's surviving skulls and found
-     his measurements largely accurate and Gould's re-analysis itself biased in the direction Gould
-     wanted (Gould's own misreading of 89 as 80, which he reported, is the small instance); later
-     work argued that Gould's statistical point partly survives. The case turns back on the critic:
-     bias in a scientist who knows the answer he wants is a hazard on every side — Gould's own thesis,
-     applied to Gould. On (b): modern tests are built and checked differently; the question whether
-     they predict equally well for different groups (test bias) was examined in the previous lesson
-     (Ref) — the course states the finding as given there.
-   - **Gould's recurrence thesis and its limit:** he argues that hereditarian theories return in times
-     of political retrenchment, not of new data. Reply: the origin or motive of an argument does not
-     settle its truth — Gould himself rejects pure relativism and insists data can be treated fairly.
-     History can show a field's hazards; it cannot by itself refute a present claim. Seam: the most
-     recent critic grants far more of the genetics than Gould did.
-4. **Harden's concession: genes matter for individuals.** The problem: if genes made no difference
-   to schooling or income, egalitarians could ignore them; do they? Her evidence, step by step:
-   meiosis shuffles each parent's DNA so that siblings differ genetically at random — a natural
-   experiment free of family background; twin studies across tens of thousands of traits find the
-   domains of inequality (cognition, education, income, health) about a quarter to a half heritable;
-   a polygenic index (concept introduced: the summed small effects of very many variants, estimated
-   in a large sample) built for years of schooling explains over a tenth of the variance in European-
-   ancestry samples, and within-family studies show part of that is causal, not family background.
-   She grants more than Gould granted. Heritability still is not a ceiling (eyeglasses; a diet that
-   prevents the damage of an inherited disease) and causation is "thin" (probabilistic, mechanism
-   unknown).
-5. **Harden's refusal: not for groups.** Three reasons. (a) Portability: about three-quarters of
-   variants are confined to one continental group, and correlations among variants differ, so an
-   index built in Europeans loses much of its power in African-ancestry samples; four-fifths of
-   genetic study participants have been of European ancestry. (b) The ecological fallacy: the 1950
-   example — being foreign-born went with illiteracy among individuals (+.12) but states with more
-   immigrants had less illiteracy (about −.5) — shows an individual-level correlation gives no
-   information about a group-level one; the Mississippi/California misinference worked through.
-   (c) So a genetic explanation of group gaps is, on present evidence, a prior and not a finding
-   (she labels the prior; quote her with attribution and date or paraphrase without the label). She
-   also concedes that ancestry groups differ genetically and asks what follows "if, next year…".
-   - **Hereditarian reply (full strength):** the non-portability that blocks a genetic explanation
-     equally blocks a confident denial — the evidence licenses agnosticism, which is the Bell Curve's
-     stated position; the phenotypic gaps persist after controls for parental status (Ref); Reich's
-     argument (Ref) that tens of thousands of years of separate selection make some average
-     differences likely; and calling a hypothesis a prior does not refute it. Harden's reply: priors
-     are not evidence, and the burden lies on the claim. State the disagreement as one about burden
-     of proof and about which future evidence each side would accept.
-6. **Harden's politics: the genetic lottery as an argument for equality.** Problem: if genes cause
-   part of the inequality between individuals, does that justify the inequality (the eugenic reading)
-   or condemn it? Her answer, derived: genes are an accident of birth like the family one is born to —
-   Rawls's natural lottery (Ref): no one deserves his genes, so inequalities rooted in them are as
-   arbitrary as inequalities rooted in class; she quotes The Bell Curve's own half-page on
-   "compensating benefits for the least advantaged" and says its authors retreated from it. Hence her
-   three positions — eugenic (difference as hierarchy of worth), genome-blind (ignore genetics),
-   anti-eugenic (use genetics to reduce inequality) — and "difference without hierarchy": a trait can
-   be socially valued without being a measure of a person's worth (deafness as her model). Against
-   Reich's "equal rights regardless" she argues equal treatment reproduces unequal outcomes.
-   - **OBJECTION from the right (full strength):** if no one deserves his genes or, by her "free will
-     coefficient", much of his effort, desert and responsibility vanish — the conservative's
-     "distributed by whom?" (Ref `rawls-theory-of-justice`) and the charge that the luck argument
-     licenses envy (Ref `ressentiment-and-envy`); the same facts support the opposite politics — accept
-     natural differences and give everyone a valued place without equalising (the Bell Curve's own
-     final chapter, "a place for everyone" — Ref `the-cognitive-elite` for the policy chapters); and the order-of-rank view that difference in quality is
-     difference in worth (Ref `nietzsche/order-of-rank`) is the position her "difference without
-     hierarchy" must answer, not assume away.
-   - **OBJECTION from the left (full strength):** geneticising social outcomes risks naturalising them
-     whatever the author intends; the within-family effects are small and partly indirect, and the
-     causal weight Harden gives them is overstated (2022 review; References); polygenic indices are
-     useful mainly as statistical controls.
-   - The course passes no verdict.
-7. **Close (Conclusion).** What the reader can now do: place each objection on its link, say which is
-   logical (within/between, conceded by both sides), which empirical (size and source of the gap;
-   portability), which historical (Morton, the army tests) and which political (the lottery). Open:
-   if genes do not, on present evidence, explain the gaps between groups within one country, what
-   explains the larger gaps between nations? Two answers that never mention genes come next.
+Where the module stands, in one paragraph before link 1 (the factual frame every position will be tested
+against; dossier "Overall answer" 1–4, stated as recall with Refs, never re-derived): within groups,
+measured intelligence is substantially heritable (`heritability-within-and-between-groups`); the US
+Black–White gap is real on invariant measures (`what-intelligence-tests-measure`,
+`us-gap-size-trend-and-environment`); whether any of it is genetic is not known; it is not wholly genetic
+as it stands, and no evidence excludes a genetic share (`admixture-and-polygenic-scores`). The opening's
+"suppose it were settled" is therefore a real hypothetical: the lesson asks what each answer would do.
+
+0. **The shape of a political argument from heredity.** Problem: when someone says "the genetics shows
+   that …" and ends with a policy, what has been shown? Obvious attempt (held on both sides in public
+   debate): the fact settles the policy by itself — if differences are genetic, inequality is natural and
+   remedies are futile; therefore, to defend equality, one must deny the genetic differences. Why it
+   fails: no conclusion about what a society *should* do follows from a fact alone; a premise about what
+   matters (desert, the worst-off, the individual, worth) has to be added, and different such premises
+   turn the same fact into opposite conclusions. The answer, as a working tool: write each argument as
+   *factual premise + value premise → conclusion* (Figure 1 frame, filled in across the lesson). Because:
+   the three authors of the opening accept overlapping factual premises; if their conclusions differ, the
+   tool locates the difference. State the test the lesson will run on each position at the end: change
+   the factual premise (gap partly genetic / wholly environmental) and see which conclusions move.
+
+1. **Gould's charge: the error is the ranking.** Problem: Gould attacked the psychometrics (Ref
+   `what-intelligence-tests-measure`, one clause: reification in its statistical form, and the reply that
+   a general factor returns one level up). But he says the deeper error is political: "the claim that
+   worth can be assigned to individuals and groups by measuring intelligence as a single quantity"
+   (l.2200–2203). The obvious reading — that Gould only denies a fact (that g exists or is heritable) —
+   fails, because his charge is stated so as to survive the fact: the four premises he says the Bell Curve
+   needs (single number, linear ranking, genetic basis, effective immutability, l.15749–15751) are partly
+   empirical and partly not; the second — that a single number can *rank people* — is a claim about what
+   a measure licenses, and the myth of the metals (Ref `kallipolis-and-the-philosopher-king`; "Metals have
+   ceded to genes", l.2208) is his model of the move: a story about natures that fixes stations. His value
+   premise, extracted: a person's worth (and the station a society assigns) must not be read off one
+   measured quantity. His recurrence thesis (l.1230–1236): such arguments return in periods of political
+   retrenchment, because nothing defends an established order better than the claim that it mirrors
+   innate capacities. Heritability is not immutability (eyeglasses, l.1491). Seam: a charge about how
+   measures are *used* needs evidence of use; Gould supplies a history.
+
+2. **The measures in politics: 1917–1930.** Problem: did a measured ranking of groups ever decide policy?
+   One scene with its numbers (FigureSequence 3). 1917: Yerkes persuaded the army to test 1.75 million
+   recruits (l.7766) — the written Alpha for the literate, the pictorial Beta for the rest; men who
+   could not read given Alpha; a spike of zero scores (l.9754). The results by origin: average mental age
+   of foreign-born recruits rose with years in the United States, 11.29 for under five years to 13.74 for
+   twenty or more (Gould's table, l.10775–10839) — read by the testers as a decline in the quality of
+   recent immigrants, by critics as familiarity with the language and the culture the tests assumed
+   (Figure 2). 1923: Brigham's *A Study of American Intelligence* read the army data through the Nordic,
+   Alpine and Mediterranean races (Ref `chamberlain-and-grant`). 1924: the Immigration Restriction Act set
+   quotas at 2 percent of each nationality recorded in the 1890 census (l.11387–11400) — before the
+   southern and eastern European migration peaked. 1930: Brigham's retraction, quoted (l.11459–11460).
+   What this history establishes, said plainly: a ranking by test score was used to argue for a law, and
+   the tester who made the ranking withdrew it six years after the law. What it does not establish: that
+   today's tests mismeasure. The modern tests' factor structure, predictive validity and invariance were
+   tested on their own evidence (Ref `what-intelligence-tests-measure`: invariance tenable in the main
+   US datasets, dossier §2) — the history cannot overrule that evidence, and the evidence cannot erase the
+   history. Seam: Gould's history includes a second case, and it turned on him.
+
+3. **Morton, and the charge turned on the critic.** Problem: is bias in measurement a hazard of one side?
+   Morton (Philadelphia, 1830s–40s) ranked races by cranial capacity; Gould (1978/1981) re-analysed
+   Morton's own tables and argued that unconscious bias produced the ranking — corrected, "All groups rank
+   between 83 and 87 cubic inches" (l.4122). In 2011 a team re-measured the surviving skulls, found
+   Morton's measurements largely accurate, and argued that Gould's re-analysis was itself biased in the
+   direction he expected (outside the dossier; References; verify). Gould had reported one slip of his own
+   — a value of 89 he read as 80 (l.4333). State both at full strength (Figure 4) and the narrow
+   conclusion each side's best reading supports: Morton's measurements were better than Gould said;
+   whether Morton's *ranking* followed from them was argued again afterwards (Weisberg 2014, optional,
+   References). The verdict, in the course's voice: Gould's charge that the measurements were bent by
+   bias fails (**strong**); the ranking's inference is a separate question. And on the army tests:
+   the 1923 ranking of European nationalities failed on its author's own retraction (**established**). The use for this lesson: Gould's thesis that scientists' commitments shape their results
+   (l.2250–2255) applies to Gould. And Gould states the limit himself: he would respect a hereditarian who
+   said his politics fit his data and that he had therefore been "especially vigilant" (l.1615–1621).
+   The answer the section reaches: the recurrence thesis and the history are evidence about *motive and
+   hazard*, which is a reason to check a claim twice; neither is evidence about whether a present claim is
+   true. Because: the origin of an argument and its truth are different questions — the course has
+   applied this rule to every author (`ressentiment-and-envy` applied it to the envy charge). Seam: what
+   if one accepts the genetics of individual differences in full and still refuses the ranking of worth?
+
+4. **Harden's genetic lottery.** Problem: if genes cause part of the differences between individuals in
+   schooling and income, does that justify the differences? Harden's factual premise, stated as hers and
+   with the dossier's status: genes make a causal difference to individual outcomes, shown most cleanly
+   by comparing siblings, whose genetic differences are randomised by meiosis (her ch. 2; the within-family
+   estimates are real and smaller than population estimates — dossier §1, §5; Ref
+   `heritability-within-and-between-groups` and `admixture-and-polygenic-scores`, one clause). She shares
+   more of the factual ground with Herrnstein and Murray than Gould did (l.296). Her value premise is
+   Rawls's natural lottery (Ref `rawls-theory-of-justice`: "No one deserves his greater natural capacity")
+   applied to DNA: "None of us deserves his or her genetics" (l.2496). Conclusion: inequalities that
+   flow from the genetic lottery are as arbitrary as those that flow from the family one is born into,
+   and are a reason to arrange institutions to the benefit of the least advantaged (l.2513–2541). Concept
+   introduced: `genetic-lottery`. Her map of positions (Figure 5): eugenic (genes as "a naturalizer of
+   inequality", DNA fixing worth and rank), genome-blind (seek not to know), anti-eugenic (know, and use
+   the knowledge to reduce inequality), worked on her own example of maths tracks (l.2392). Then
+   **difference without hierarchy** (concept introduced): a trait can be socially valued without being a
+   measure of a person's worth — "Socially Valued, Not Inherently Valuable" (l.2182); deafness as her
+   model (l.2264); the pilot (l.2480–2490): select pilots for flying ability, because it is
+   instrumentally useful, without treating it as moral credit. Notice that this is a partial answer to
+   Gould: ranking for a purpose is kept; ranking of worth is refused. On groups: present genetic data do
+   not support group inferences (her ch. 4; Ref `admixture-and-polygenic-scores` for why, one clause:
+   portability, dossier §5 Status) — and, the step that matters here, her commitment is built so as not
+   to depend on that: equity must not rest "on the absence of genetic differences" (l.954); equality made
+   "genetics-proof" (l.960). Seam: the authors she quotes against themselves read the same half-page
+   another way.
+
+5. **Murray's reading of the same facts.** Problem: Herrnstein and Murray wrote that people differ in
+   intelligence "for reasons that are not their fault" (l.5019) and granted the Rawlsian case for
+   "compensating benefits for the least advantaged" (l.5026, note at l.8489) — Harden's premise, in their
+   words. Why do they not reach her conclusion? Recall the individual-level answer from
+   `the-cognitive-elite` in one clause (equal rights, valued places, redistribution as cash rather than
+   programmes, l.5074, l.5084, l.5186). The new step here is the GROUP level, in two texts. (a) The Bell
+   Curve's ch. 22 "fourth answer": group differences "can only be handled—by a return to individualism.
+   A person should not be judged as a member of a group but as an individual" (l.5208); the Afterword's
+   "one authentic policy implication" (l.5298). (b) *Facing Reality* (2021): the American creed — equality
+   before the law, persons judged as individuals (l.243–245) — against policies that "dispense favors and
+   penalties according to the group to which individuals belong" (l.279); the factual premise he says
+   those policies rest on — that "all groups are equal in the ways that shape … outcomes", so that unequal
+   group outcomes prove discrimination — and his claim that "That premise is factually wrong" (l.279);
+   the paradox he names (l.283); the overlap figure as "an object lesson in the necessity of judging
+   people as individuals" while group consequences at the tail are "inevitable" (l.812–816); the remedy,
+   ending government preferential treatment by race (l.1948). Murray's value premises extracted: the
+   individual is the unit of justice; equality is equality of rights, not of outcomes; the state may not
+   allocate by group. Two readings of one text, side by side (set piece 3): Harden reads ch. 22 as a
+   "half-page dalliance" followed by a "retreat" (l.306); Murray's Afterword says both authors saw the
+   Rawlsian implication and rejected it "for reasons we describe in Chapter 22" (l.5236). Group labels:
+   say once that Murray relabels American groups as "Africans, Europeans" for his data chapters (l.492–498)
+   and that the lesson keeps the census categories inside his claims.
+
+6. **One factual premise, opposite conclusions: the value premises side by side.** Problem: Harden and
+   Murray accept the same factual premise about individuals; where exactly do they part? Obvious attempt:
+   they disagree about desert. Fails on the texts: both deny that income is deserved by genetic endowment
+   (Bell Curve l.5026: "not of just deserts but of economic pragmatism"; Harden l.2496). The real
+   divisions (Figure 6, a table filled cell by cell): (i) **what equality is** — of rights and dignity
+   (Murray, l.5074, l.5218) or of outcomes for the least advantaged, measured over the basic structure
+   (Harden with Rawls, l.2527); (ii) **the unit** — the individual only (Murray l.5208, FR l.283) or the
+   individual plus the inherited position of groups, because equal treatment now "cannot help but
+   reproduce inequalities of the past" (Harden l.958); (iii) **what the state may do** — remove group
+   preferences (FR l.1948) or use knowledge, including genetic knowledge, to target inequality (Harden's
+   anti-eugenic project, l.324); (iv) **worth** — Gould and Harden both separate measured ability from
+   worth (l.2200–2203; l.2182); Murray's texts do too in words (dignity "accessible to all", l.5218; FR's
+   "inherent human dignity", l.245), and Harden's charge (l.306) is that the Bell Curve's comfort with
+   "some people are superior to other people" (BC l.5066) breaks that separation — state her reading
+   and the text she quotes, with the surrounding sentences of BC l.5066; her reading turns on what
+   "superior" means there, and the course gives no grade to it, because the register judges arguments,
+   not the attitude a reader finds in a sentence. Gould's column: his value premise (no worth from one
+   number) is close to Harden's (iv); his political conclusion (resist the ranking itself) is stronger
+   than hers (keep instrumental ranking). Because: once the value premises are written out, the reader can
+   see that the opening's three conclusions follow from three different answers to (i)–(iv), not from three
+   different readings of the genetics.
+
+7. **What would change if the gap proved partly genetic — or wholly environmental?** Problem: the
+   opening's hypothetical, worked for each position (Figure 7, a 3×2 grid). Start from the strongest text
+   on it, the Bell Curve's own thought experiment (l.3233–3247): if the gap were entirely genetic,
+   "nothing of any significance should change"; if entirely environmental, no new programme would follow
+   and no optimism about the time to close it. Murray's 2021 argument is cause-independent by design
+   (FR l.492). Harden's commitment is "genetics-proof" by design (l.954–960). Gould's value premise is
+   about ranking worth, so it too survives either answer. So the obvious expectation — that the factual
+   answer would decide the politics — fails for all three *principles*. Then find where facts still
+   bite, because each position also carries **auxiliary factual premises**, and these do move:
+   - Murray: that group differences "will be with us indefinitely" (FR l.285) and that unequal outcomes
+     are not, on their own, evidence of present discrimination (FR l.279). If the gap proved wholly
+     environmental *and* movable by known policies, the first premise weakens; the second does not depend
+     on genes at all — it depends on whether the gap exists before the labour market, which the module
+     found it does (`us-gap-size-trend-and-environment`, dossier §2). If partly genetic, the premises are
+     strengthened, the principle unchanged.
+   - Harden: that within-family genetic effects on outcomes are causal (dossier §5: real, smaller than
+     population estimates; Ref) and that equal treatment reproduces past inequality (l.958, an empirical
+     claim). If the group gap proved partly genetic, her principle stands by construction, but the claim
+     that a group gap reflects only an unjust history loses its exclusivity; she would treat the genetic
+     part as more undeserved luck (her l.954–960 says as much in advance). If wholly environmental, the
+     group remedy gains a second ground — rectification of a social cause — which her principle did not
+     need.
+   - Gould: his recurrence thesis contains an empirical half (determinist arguments return with
+     retrenchment, "not" with new data, l.1222–1225); a demonstrated genetic share would not refute his
+     value premise but would refute the expectation that such arguments always lack data. A wholly
+     environmental result would leave his history as it was.
+   - The dossier's limits keep the hypothetical honest, in one sentence: the gap as it stands cannot be
+     wholly genetic (it narrowed within decades, varies with place, moved after 2020), and nothing excludes
+     a genetic share (Overall answer 4); so "wholly genetic" is outside what any position may assume, and
+     the realistic cases are "partly" and "wholly environmental".
+   The answer the section reaches: the value premises decide the conclusions; the facts decide the
+   auxiliary premises — permanence, the meaning of unequal outcomes, what interventions can do. Because:
+   each author built his or her principle to survive the factual answer, and each still makes empirical
+   claims on the way to policy.
+
+8. **The weighing: the facts do not decide the policy, on either side.** (Heading as a claim.) Set the
+   claim that the factual answer settles the policy against the objections below, from both sides, and
+   against the strongest objection to the verdict (VERDICT: facts do move the auxiliary premises). Reach
+   the verdict in the course's voice: the claim fails, **strong**; one conclusion follows on any factual
+   outcome (equal treatment at selection will not produce equal group outcomes, and an unequal outcome
+   there is not by itself proof of discrimination), with the scope clause (it says nothing about earlier
+   causes, partly environmental). The objections, at full strength:
+   - **From the right, to Harden (and to Rawls through her).** (a) Desert and responsibility: if no one
+     deserves his genes, and, by her "free will coefficient" (ch. 10, l.2017–2046), much of the rest is
+     luck too, then effort and character lose their claim — and a society that teaches this loses the
+     motive it relies on. (b) "Distributed by whom?" (Ref `rawls-theory-of-justice`, where it is stated and
+     answered by pure procedural justice): the lottery metaphor presupposes a distributor who could have
+     dealt differently. (c) The envy charge (Ref `ressentiment-and-envy`): luck-egalitarianism dignifies
+     comparison and envy; Rawls's reply recalled in a clause. (d) Order of rank (Ref
+     `nietzsche/order-of-rank`): the view that differences in human quality are differences in worth is
+     the position "difference without hierarchy" must answer rather than define away. Harden's replies
+     where her text gives them: luck does not abolish selection for valued roles (the pilot); recognising
+     luck is the basis of gratitude and obligation (l.2474–2478, her quotation of another writer —
+     paraphrase).
+   - **From the left, to Harden and to Murray.** (a) Naturalising: whatever the author's intent, putting
+     social outcomes in genetic terms tends to make them look fixed — Gould's recurrence thesis used as an
+     objection (Harden reports such fears, l.1732). (b) The causal weight: a 2022 review argues the
+     lottery analogy holds only between siblings, that population GWAS mix direct effects with parental,
+     mating and stratification effects, and that genetics adds nothing the redistributive argument needs —
+     the egalitarian conclusion follows from Rawls without a single polygenic score (References; dossier
+     §5). Harden's reply (2022, abstract): agreement that present scores support no group inference. (c)
+     To Murray: the creed applied to unequal starting positions reproduces them (Harden l.958), and the
+     cause-independence of his argument cuts both ways — if causes are irrelevant to the principle, the
+     book's factual chapters are irrelevant to it too, except to rebut the "all groups equal" premise.
+   - **To Gould, from both sides.** The right: ranking by tested ability for a purpose (pilots, surgeons,
+     admissions) is unavoidable and Harden herself keeps it; the history of 1917–24 is about bad tests and
+     a racial theory, not about ranking as such. The psychometric reply belongs to
+     `what-intelligence-tests-measure` (Ref). The other side: Gould's charge is aimed at worth, not at
+     instrumental selection, and the two are confused in public use — which is his point.
+   - Which of these objections each author answers: Harden answers (a) and (b) from the right in her
+     text (the pilot; luck and gratitude); the envy charge is answered as `ressentiment-and-envy` answered
+     it (envy cannot defeat a principle); Murray's cause-independence answers the left's (c) only by
+     conceding that his factual chapters do no work for his principle; Gould's charge survives the right's
+     reply only as a charge about worth. Then the verdict as above. Which value premise is right the course
+     does not grade here: it is the question module 10 left **open**, and the lesson says so with that reason.
+
+9. **Close (Conclusion).** The verdict in plain words first: the answer to whether the gap is genetic would
+   not settle the political question for any of the three, and the course holds this as **strong**; the one
+   conclusion that holds whatever the answer is that equal treatment at selection will not give equal group
+   outcomes, and that an unequal outcome there is not by itself proof of discrimination. Gould's charge
+   against Morton's measurements fails (**strong**); the army-test ranking of the 1920s fell on its author's
+   retraction (**established**). What the reader can now do: take any argument from heredity to policy, write its
+   factual and value premises, find which premise a disagreement lives in, and say which conclusions a
+   change in the facts would move. Settled for this lesson: the three positions do not differ on the
+   genetics of individual differences as much as public debate suggests; they differ on what equality is,
+   on the unit of justice, on what the state may do, and on worth. Open, and handed on: Harden answers a
+   geneticist's prediction that average genetic differences between populations will be found in many
+   traits; what kind of evidence underlies that prediction — the genomes of the dead — is the next
+   lesson (`<Ref>` reich-ancient-dna-and-the-indo-europeans).
+
+Headings fall out as claims: "A fact and a value make a policy"; "Gould: the error is the ranking";
+"From the army tests to the 1924 quotas"; "Morton's skulls, measured twice"; "Harden: the genetic
+lottery"; "Murray: the individual as the unit"; "Where the two part"; "What a factual answer would
+change"; "The facts do not decide the policy, on either side".
 
 ## Set pieces and worked examples to recreate
 
-1. **The two villages** (Gould l.7722–7731): the opening case worked numerically — two distributions,
-   same spread, means four inches apart, heritability ~95% in each; then the next generation fed, the
-   gap closing with no genetic change. Keeper number: none needed beyond the two means.
-2. **The Bell Curve's seed corn and its 6th percentile** (BC l.3134–3140): quote the seed-corn sentence
-   (one sentence) and state the calculation's inputs and result in prose (60% heritability, 1 SD gap →
-   1.58 SD environmental difference → 6th percentile). Computation appears only as the source's own
-   argument (playbook-history numbers rule 4) and ends in the interpretation and the counter-reply.
-   Keeper number 1: "the 6th percentile".
-3. **Rotation** (Gould ch. 6, Figs. 6.6–6.7; Murray Afterword l.5276): a worked example with four test
-   vectors — g axis plus residual factor vs two rotated factors — then the oblique version where the
-   two factors correlate and a general factor returns one level up. Drawn as a FigureSequence.
-4. **Morton's table and its re-measurement**: Morton's ranking → Gould's corrected 83–87 → 2011 re-
-   measurement → 2014 rejoinder. Keeper number 2: "83 to 87 cubic inches".
-5. **Brigham's retraction** (Gould l.11459–11460): "One of the most pretentious of these comparative
-   racial studies—the writer's own—was without foundation." Metadata first: Brigham, 1930, in a
-   psychological journal, seven years after his book and six after the act.
-6. **Robinson's reversal** (Harden l.919–925): +.12 for individuals, about −.5 for states; the
-   Mississippi/California misinference. Keeper number 3: "+.12 vs −.5".
-7. **Portability numbers** (Harden l.885–898): an education index explaining more than 10% of the
-   variance in European-ancestry samples and much less in African Americans; 16% of the world's people
-   vs ~80% of genetic study participants.
-8. **The Bell Curve's Rawlsian half-page** (Harden l.298–306): the quoted sentence about "compensating
-   benefits for the least advantaged", her reading, and the authors' contrary sentence she quotes — a
-   document-reasoning piece on two readings of one text.
+1. **The Bell Curve's thought experiment** (BC l.3233–3247): "Imagine that tomorrow it is discovered that
+   the B/W difference … is entirely genetic" — the questions answered one by one, ending "nothing of any
+   significance should change". The lesson's central `<Example>`: the reader runs the same thought
+   experiment on Harden's and Gould's positions (link 7). Keep the quotation to the two short sentences
+   (l.3233 opening clause; l.3247 "nothing of any significance should change").
+2. **The army residence gradient** (Gould l.10775–10839): mental age by years of residence, 11.29 →
+   13.74; two readings in one sentence each. Keeper number 1: "11.29 to 13.74". Add the 1890 census base
+   of the 1924 quotas and Brigham's 1930 sentence (l.11459–11460) — metadata first: Brigham, 1930,
+   *Psychological Review*, seven years after his book and six after the act.
+3. **One half-page, two readings** (BC l.5026 + note l.8489; Afterword l.5236; Harden l.298–306): the
+   Bell Curve's sentence granting "compensating benefits for the least advantaged"; Harden's reading
+   ("half-page dalliance … retreat"); Murray's own account a year later ("Neither of us thought that the
+   most obvious implication was the right one"). A document-reasoning piece: the same text, two readers,
+   what each can establish from it.
+4. **Morton measured twice**: Morton's ranking → Gould's 83–87 cubic inches (l.4122) → Gould's 89-read-as-80
+   (l.4333) → 2011 re-measurement → 2014 rejoinder (optional). Keeper number 2: "83 to 87 cubic inches".
+5. **Harden's three positions on one decision** (l.2392): maths tracks — eugenic (track by DNA), genome-blind
+   (refuse to know), anti-eugenic (use genetic information to find and help children at risk). A small
+   worked table; the reader adds Murray's and Gould's answers in the exercise.
+6. **The pilot** (l.2480–2490): select for flying ability; do not treat it as moral credit — the one-line
+   form of "difference without hierarchy", and the point at which Harden partly answers Gould.
+7. **"Genetics-proof"** (l.946–960): the 2018 prediction (one clause, quoted from l.946), Harden's "grave
+   mistake to stake claims for equity … on the absence of genetic differences" (l.954), and her
+   objection to "regardless of those differences" (l.958). This is the hand-off to the next lesson.
+8. **Murray's paradox** (FR l.283): "I want America to return to the ideal of treating people as
+   individuals, so I have to write a book that treats Americans as groups." With l.279's factual premise:
+   the one sentence in which his principle and his facts meet.
 
 ## Pitfalls / subtleties to flag
 
-- **Terms (L11c):** correlation (recall), factor / principal component (draw it before naming it),
-  rotation, reification; heritability (Ref, recall the definition in one clause); variance; within-
-  group vs between-group; Flynn effect (Ref); measurement invariance (one plain sentence: a test
-  measures the same ability in the same way in both groups); the army Alpha (written) and Beta
-  (pictorial, for illiterates) tests; GWAS (scanning the genome for variants associated with a trait in
-  a large sample); polygenic index; linkage (variants inherited together); ancestry vs race (Harden's
-  distinction — Ref the previous lesson's "ancestry"); ecological correlation; eugenics (define with
-  the 1920s sterilisation laws in one clause if needed, Ref `chamberlain-and-grant` for the 1924 act).
-- **Attribution of the seed-corn example:** course.yaml lists "the seed-corn example" under Gould's
-  within/between point. In the dossier the seed-corn image is The Bell Curve's own (ch. 13) and the
-  two gardens of corn are Lewontin's (via Harden ch. 8); Gould's own example is the two villages'
-  heights. The lesson uses all three as the course's own examples and does not attribute the seed corn
-  to Gould.
-- **Real misreading to refute (L13):** "high heritability means a trait cannot be changed" — refute
-  with eyeglasses and the Flynn effect, both conceded by hereditarians. Second real misreading: "if
-  heritability is high within groups, a between-group difference is probably genetic" — the lesson's
-  first section; note that The Bell Curve also calls this a confusion.
-- **Do not give the critics the last word by position.** Every section ends with where the dispute
-  stands, not with the critic's line. The Morton re-measurement in particular must be given at full
-  strength: it is the case where the critic's own bias was alleged.
-- **Labels in the sources:** Gould writes of "scientific racism" and "biological determinism"; Harden
-  of "racist prior[s]" and "eugenic" positions; the Afterword calls Gould's statistics "old news".
-  Register rule: The course passes no verdict of its own on any author or idea: no condemning or
-  approving labels in its own voice. Judgement comes only through argument and evidence; a label may
-  appear only inside a quotation, with who applied it and when. "Hereditarian" and "biological
-  determinism" are used as descriptive names of positions, defined at first use; "eugenic" is used only
-  in Harden's defined sense and attributed to her.
-- **Copyright:** all three books are in copyright; one sentence per quotation; Brigham 1930 is quoted
-  through Gould (one sentence).
-- **Numbers:** keep to the three keepers above plus the portability figures; dates to the decade
-  except 1917 (the tests), 1924 (the act), 1930 (the retraction), which are the sequence.
-- **Do not re-teach:** g and heritability (the-cognitive-elite), the Bell Curve's chapter 13 data and
-  the Flynn effect (hereditarian-case), Reich's argument (previous lesson), Rawls's original position
-  (rawls-theory-of-justice). Each gets a Ref and a clause.
-- **Dossier thin spots:** the 2011 Morton paper, the 2001 multiplier paper, the 2004 invariance paper,
-  Jensen's and Carroll's replies on g, and the reviews of Harden are outside the dossier — named above
-  for the writer to obtain and verify; the writer states each in one or two sentences and cites it in
-  References. The Bell Curve's Afterword (in the dossier) is the main hereditarian reply to Gould; use
-  it. Harden ch. 3 was not summarised (present in the text, l.537–776).
+- **Terms a newcomer will not know (L11c), each defined at first use:** value premise / factual premise
+  (link 0, in plain words); heritability (recall in one clause, Ref); within-family (sibling) comparison
+  and why meiosis randomises it (one clause, Ref `heritability-within-and-between-groups`); polygenic
+  index (recall, Ref `admixture-and-polygenic-scores`); eugenics (the early-twentieth-century programme of
+  improving a population by controlling who reproduces — one clause, with the US sterilisation laws as
+  the example; Harden's own use of "eugenic" is narrower and defined by her, so attribute it); the army
+  Alpha (written) and Beta (pictorial) tests; mental age; quota (immigration by national-origin share);
+  affirmative action / preferential treatment (one clause); disparate impact (one clause: inferring
+  discrimination from unequal outcomes — the premise Murray attacks); the difference principle and the
+  veil of ignorance (recall, Ref); luck egalitarianism (one clause, used only in the objections); "order of
+  rank" (Ref, cross-course).
+- **No re-teaching of the empirical lessons.** Reification's psychometric form, rotation and "you can make
+  g hide" → `what-intelligence-tests-measure`; within/between, seed corn, the 1.58-SD argument →
+  `heritability-within-and-between-groups` and `hereditarian-case-iq-and-nations`; the Flynn effect →
+  `us-gap-size-trend-and-environment`; portability and the ecological fallacy as evidence →
+  `admixture-and-polygenic-scores`. Each gets a `<Ref>` and a clause, at the point a position leans on it.
+  The previous version of this brief carried all of them; the writer must not restore them.
+- **Do not re-read ch. 22 as new.** `the-cognitive-elite` already read the Rawlsian half-page, "valued
+  place" and the Afterword's l.5236 and drew "one finding, three conclusions" at the individual level.
+  This lesson's new matter is: the group level (ch. 13 thought experiment, ch. 22's "fourth answer",
+  *Facing Reality*), Harden as the egalitarian reading of the genetics, Gould's political charge, and the
+  value-premise table.
+- **Facing Reality's scope.** Use chs. 1, 3 (l.812–816 only), 7 and the l.492 statement. Do NOT import the
+  crime chapters (4, 6) or the book's explicit "two truths" passage (l.1776–1786, which is about crime):
+  they are outside this module's question and would need their own evidence. Its ch. 3 data are recalled
+  by Ref (`hereditarian-case-iq-and-nations`, `us-gap-size-trend-and-environment`).
+- **Desert is not the dividing line.** The tempting summary "Harden says genes are undeserved, Murray says
+  people deserve what they get" is false on the texts (BC l.5026; FR l.245). The lesson must show the
+  division at (i)–(iv) of link 6.
+- **Gould's history: evidence of use and hazard, not of present validity.** State the 1917–24 record and
+  the Morton re-measurement at equal strength. Do not let the 1924 story stand as a refutation of modern
+  testing (dossier §2 Status: invariance holds in the main US datasets), and do not let the 2011
+  re-measurement stand as a refutation of Gould's charge about the use of rankings.
+- **Real misreadings to refute (L13), one slot:** "If differences are genetic, they cannot be changed and
+  equality is refuted" — refute with Gould's eyeglasses (l.1491), the Bell Curve's own "harder to
+  change?" answer (l.3240–3242) and Harden's "genetics-proof". The opposite misreading ("to defend
+  equality one must deny genetic differences") is Exercise 3.
+- **Labels in the sources, quotation only, with who and when:** Gould 1981/1996 ("biological
+  determinism", "scientific racism"); Harden 2021 ("eugenic", "inegalitarianism", "racist" in her ch. 4
+  heading on priors — not used here); Murray 2021 ("identity politics", "woke", "the new Red Guards" —
+  do not quote the last; paraphrase as his charge of intimidation if needed); Bell Curve Afterword 1995
+  ("hysteria"). "Hereditarian" is used as the descriptive name of a position defined in
+  `heritability-within-and-between-groups`. "Eugenic" in the course's voice only in its historical sense,
+  defined; Harden's three-position use is attributed to her.
+- **Group labels:** the sources' own census categories inside their claims (Black, White); say once that
+  these are the authors' categories and that Murray substitutes continental labels in his data chapters.
+- **Copyright:** one sentence per quotation; Brigham 1930 through Gould; FR, the Bell Curve and Harden
+  paraphrased otherwise.
+- **Numbers (L12):** keepers — "11.29 to 13.74" (army mental age by residence), "83 to 87 cubic inches"
+  (Morton corrected), "1890 census" (quota base). Dates in sequence: 1917, 1923, 1924, 1930; 1981/2011.
+  No percentage genetic for any gap appears in this lesson, in any voice.
+- **Dossier thin spots:** the 2011 Morton paper is outside the dossier (verify; References). Coop &
+  Przeworski is in the dossier [full, relevant sections]; their objection to Harden's causal weight was
+  checked via the Europe PMC full text — the writer verifies any quoted wording there. Harden's 2022
+  reply is [abstract]. Lynn and Vanhanen, Rushton and Jensen, and Reich's argument do not enter.
+
+### DOSSIER CONSTRAINTS
+
+Status lines the lesson must state in substance (in the "where the module stands" paragraph and again in
+link 7):
+
+- Overall answer 3: "Whether any of it is genetic is not known. No study has measured a genetic
+  contribution with a design that excludes confounding … No study has shown that measured environmental
+  differences account for all of it."
+- Overall answer 4: "Two limits are established. The gap is not wholly genetic as it now stands: it
+  narrowed by several points within decades, varies from near zero to 1.5 SD across school districts, and
+  moved after 2020. And no evidence excludes a genetic share."
+- §5 Status (for Harden's group refusal): current scores "lose most of their accuracy in African-ancestry
+  samples; therefore settled that mean score differences between continental ancestries cannot now be read
+  as genetic-potential differences. Open whether any genetic difference exists."
+- §1 Status (for Harden's individual premise): within-group heritability "settled in direction and rough
+  size for Western samples (twin estimates); DNA-based and within-family estimates are lower and still
+  moving."
+
+"Claims the lessons must NOT make" that bear on this lesson — both directions:
+
+- Hereditarian direction: "The gap is X% genetic" for any X; "High heritability within groups implies the
+  gap is probably genetic"; "Polygenic scores show lower genetic potential in Africans or Black
+  Americans." (Murray's FR does not claim a genetic cause; do not let the lesson's summary of him supply
+  one.)
+- Environmental direction: "Science has shown the gap is entirely environmental" / "genes play no role" —
+  the APA task force said no adequate explanation exists; "Polygenic scores have shown no genetic
+  difference"; "Test bias explains the gap"; "SES explains the gap". (Harden's refusal of group inference
+  is a refusal on present evidence, not a finding of zero; state it so.)
+- Link 7's "wholly genetic" column is a hypothetical the dossier rules out as a description of the gap as
+  it stands; the lesson says so when it fills that column.
 
 ## FIGURE PLAN
 
-1. **draw: the hereditarian chain with objections pinned (frame; reused at section ends).** Four boxes
-   L1→L4; each objection (reification; within/between; history of measures; portability/ecological)
-   drawn as a pin on its link, each reply as a counter-pin. Shown complete in the Conclusion. Idea:
-   Gould's four premises (l.15749–15751) mapped onto the previous lesson's chain.
-2. **draw: two villages / two soils.** Two height distributions with equal spread and different means;
-   under each "heritability ≈ 95%"; arrow "famine" on the lower. Second panel: the next generation fed,
-   the gap closed. Idea Gould ch. 5 (and Gould's figure idea list); drawing ours.
-3. **draw: `<FigureSequence>` rotation (link 2).** Frame 1: four test vectors and the g axis through
-   their middle; frame 2: the same vectors with two rotated axes (verbal, arithmetic) and no g; frame 3:
-   the two axes drawn oblique (correlated), a second-order general factor above them. One change per
-   frame. Idea Gould Figs. 6.6–6.7; frame 3 from Murray's Afterword.
-4. **draw: the Morton dispute as a before/after bar set.** Morton's published means by group; Gould's
-   corrected means (83–87); a note on the 2011 re-measurement and 2014 rejoinder as a timeline strip
-   beneath. Idea Gould Tables 2.1–2.5; dates ours.
-5. **draw: the army tests' residence gradient.** Mental age by years of US residence (11.29 → 13.74),
-   with the caption stating that the testers read it as a decline in immigrant quality and the critics
-   as familiarity with the language. Idea Gould ch. 5 pt 2.
-6. **draw: the ecological fallacy scatter.** Left: individuals, a weak positive slope (+.12); right:
-   states, a negative slope (about −.5). Idea Harden ch. 4 (Robinson 1950).
-7. **draw: portability bars.** Variance in schooling explained by the same index in European-ancestry
-   vs African-American samples; beside it, share of the world's people vs share of genetic-study
-   participants (16% vs ~80%). Idea Harden ch. 4.
-8. **draw: the positions table.** Columns: eugenic, genome-blind, anti-eugenic (Harden ch. 12), plus a
-   fourth "hereditarian inegalitarian / order of rank" column stated in its own terms; rows: do genes
-   cause individual differences? are group gaps genetic? does difference imply worth? what policy
-   follows? Each cell in the position's own words.
-9. **source: no pool candidate — hunt: a page of the army Beta test (picture completion or maze).**
-   Where: R. M. Yerkes (ed.), Psychological Examining in the United States Army, Memoirs of the National
-   Academy of Sciences vol. 15 (1921), scans on archive.org / HathiTrust. Must be visible: the pictorial
-   items (e.g. a house missing its chimney, a face missing a mouth) that men who could not read were
-   asked to complete. Licence: US publication 1921, public domain (verify the scan's terms). Placement:
-   section 3, at the army tests.
+1. `draw:` `<FigureSequence>` **the shape of the argument** (link 0, reused at link 6): frame 1 — one box
+   "factual premise" with an arrow to "conclusion", crossed out ("a fact alone"); frame 2 — the value-premise
+   box added; frame 3 — three parallel chains (Gould, Harden, Murray) sharing one factual box and splitting
+   at the value boxes into three conclusions. One change per frame. Idea ours.
+2. `draw:` **the army residence gradient** — mental age of foreign-born recruits by years of US residence
+   (the five bands of Gould's table, 11.29 → 13.74), bars; caption gives the testers' reading and the
+   critics' reading in one sentence each. Idea Gould ch. 5 pt 2; values from his table (writer copies the
+   five band values from l.10760–10840).
+3. `draw:` **1917 → 1930 timeline** — 1917 army testing (1.75 million); 1923 Brigham's book; 1924 act with
+   the 1890 census base drawn as an arrow back to 1890; 1930 retraction. A horizontal strip; FigureSequence
+   optional (one event per frame). Idea Gould ch. 5.
+4. `draw:` **Morton measured twice** — three small panels: Morton's published ranking by group; Gould's
+   corrected means (83–87, l.4122 and his Table 2.5); a note-strip for the 2011 re-measurement and the
+   2014 reply. Values from Gould's tables (l.~3920); the 2011 values only if verified, otherwise a text
+   strip. Idea Gould ch. 2.
+5. `draw:` **Harden's three positions** — table-figure: rows eugenic / genome-blind / anti-eugenic; columns
+   "what genetic differences mean", "what to do with genetic data", "the maths-track decision" (l.2328,
+   l.2392). Each cell in her words, paraphrased.
+6. `draw:` **the value-premise table** (link 6) — columns Gould, Harden, Murray; rows (i) what equality is,
+   (ii) the unit of justice, (iii) what the state may do, (iv) measured ability and worth, (v) the factual
+   premise each accepts. Each cell a short phrase with its line pointer in the caption list. The lesson's
+   main figure.
+7. `draw:` **what would change** (link 7) — a 3×2 grid: positions × {gap partly genetic, gap wholly
+   environmental}; in each cell two marks — principle (unchanged, by design) and auxiliary premise
+   (strengthened / weakened / unaffected), with the premise named. A third, greyed column "wholly genetic"
+   with the caption: ruled out as a description of the gap as it stands (dossier Overall answer 4).
+8. `source: no pool candidate — hunt:` **a page of the army Beta test** (picture completion or maze).
+   Where: R. M. Yerkes (ed.), *Psychological Examining in the United States Army*, Memoirs of the National
+   Academy of Sciences vol. 15 (1921), scans on archive.org / HathiTrust. What the reader must see: the
+   pictorial items given to men who could not read (a face missing a mouth, a house missing a chimney).
+   Licence: US publication 1921, public domain (verify the scan's terms). File stem: `army-beta-1921`.
+   Placement: float right beside link 2. Optional; drop if no clean scan.
 
 ## EXERCISE PLAN (E6/E7 + playbook-history mix)
 
-1. **Retrieval (warm-up, spaced):** state the four links of the hereditarian chain and attach to each
-   the objection this lesson pinned to it and the reply; one line each.
-2. **Boundary probe (E6a):** in the two-village case, set heritability to 0% in both villages, then to
-   100%. What does each extreme imply about the four-inch gap between them? (Solution: nothing in
-   either case — the gap's cause is independent of within-village heritability — which is why the
-   inference fails at every value.)
-3. **Claim to refute (E6b), against the hereditarian reading:** "Since heritability of IQ within white
-   and Black Americans is high, the gap between them is probably mostly genetic." Name the failing step
-   and say which hereditarian authors agree that the step fails.
-4. **Claim to refute (E6b), against the environmental reading:** "The Flynn effect proves the
-   Black–white gap is environmental." State what the Flynn effect does show (environmental change of
-   that size is possible), what it does not (that this gap has that cause), and the measurement-
-   invariance rejoinder.
-5. **Document reasoning (sourcing drill, corroboration):** Gould's 1981 re-analysis of Morton and the
-   2011 re-measurement. Metadata first; what each can establish about Morton's data, about Morton's
-   bias, about Gould's; what the episode shows about the claim that history of science refutes a
-   present theory.
-6. **Research-shaped (E6d):** design the study that would distinguish a genetic from an environmental
-   account of a measured gap between two groups in one country. Choose a design (within-family
-   variation in ancestry; adoption across groups; a genetic index validated in both ancestries) and
-   name the confound each must defeat (colour-based treatment; selective placement; portability).
-7. **Synthesis, spaced (E3):** Harden's "genetic lottery" argument borrows Rawls's natural lottery (Ref).
-   Write a claim–evidence–reasoning paragraph: does her conclusion need Rawls's premise that natural
-   assets are undeserved, and how does the charge from `ressentiment-and-envy` (Ref) bear on it?
-   Solution presents the conservative objection and Rawls's reply, and passes no verdict.
-8. **FORWARD (E7) → `geography-or-institutions`:** the town of Nogales is split by the US–Mexico border;
-   the people on both sides share ancestors, yet household income on the north side is about three
-   times that on the south. What does this case show about the cause of a gap between two halves of
-   one population — and what does it NOT show about gaps between populations of different ancestry?
-   Solution: it isolates an institutional cause where genes and geography are held fixed; it cannot by
-   itself test a genetic difference that is absent by construction — the next lesson's case and its
-   limit, with a `<Ref>`.
+1. **Retrieval (the one warm-up, spaced):** for each of Gould, Harden and Murray, write the factual premise
+   and the value premise in one line each, and say which of `natural-lottery` (Ref) and `reification` (Ref)
+   each position uses.
+2. **Boundary probe (E6a):** suppose the module's question were settled at the degenerate case — the US
+   group gap is exactly zero tomorrow. Which of the three positions loses anything? (Solution: Harden's
+   lottery and Gould's charge concern individual differences and stand untouched; the Bell Curve already
+   said individual differences dwarf group ones, l.2903; Murray's FR loses its factual rebuttal of the
+   disparate-impact premise but not its principle. So the group gap matters to the politics only through
+   one auxiliary premise.)
+3. **Plausible false claim to refute (E6b), environmental direction:** "To defend racial equality, one must
+   hold that there are no genetic differences between groups." Name the failing step and the author in
+   this lesson who rejects it in so many words (Harden l.954–960); then say what Murray's l.3247 thought
+   experiment adds from the other side.
+4. **Plausible false claim to refute (E6b), the other direction:** "Harden and Murray disagree because one
+   accepts the genetic evidence and the other does not." Refute from the texts (Harden l.296; BC l.5019,
+   l.5026) and locate the disagreement in rows (i)–(iv) of the value table.
+5. **Document reasoning — sourcing drill and corroboration:** the Bell Curve's ch. 22 half-page (l.5026),
+   Harden's reading of it (l.306) and Murray's Afterword account (l.5236). Metadata first (who, when, for
+   whom, after what reception); what each can establish about the authors' intentions in 1994; what the
+   later Afterword can and cannot corroborate; use, not bias.
+6. **Research-shaped task (E6d) — the history drill:** Gould's case that the army tests fed the 1924 act.
+   List what you would need to open to test the link (the 1923 book; the congressional hearings of
+   1923–24; the act's text with its 1890 base; Brigham's 1930 paper), predict what each could show, and
+   say what Brigham's retraction does and does not prove about the act's causes (the quotas had other
+   sources — Ref `chamberlain-and-grant`).
+7. **Synthesis — claim–evidence–reasoning (spaced, E3):** "The genetic-lottery argument needs genetics."
+   Argue for (Harden: the within-family evidence makes the lottery literal, and closes the escape that
+   talent is earned) and against (the 2022 review's objection: Rawls's natural lottery already covers every
+   undeserved talent whatever its cause), then say what the right's desert objection (Ref
+   `rawls-theory-of-justice`, `ressentiment-and-envy`) does to both sides of the dispute. The solution says
+   what the lesson's verdict implies: the egalitarian principle does not need the genetics (Rawls's natural
+   lottery covers every undeserved talent, whatever its cause), and the within-family evidence bears only on
+   the auxiliary premise that the lottery is literal; whether the principle itself is right is the open
+   question carried from module 10.
+9. **Attack the verdict:** The lesson holds as **strong** that the factual answer would not settle the policy
+   question for any side. State the strongest case against it: name a policy (say, group-targeted
+   remedies in school admissions) whose justification in public argument rests on the gap having an
+   unjust social cause, and argue that a demonstrated genetic share would remove that justification. Then
+   say what evidence would overturn the verdict. The solution shows the case attacks an auxiliary premise,
+   not the principles of Gould, Harden or Murray, and names the register's falsifier: a conclusion one of the
+   three draws that reverses with the genetic share while the stated value premises stay fixed.
+10. **FORWARD (E7) → `reich-ancient-dna-and-the-indo-europeans`:** Harden quotes a 2018 prediction that
+   genetic studies will show average differences between human populations in many traits (l.946). Using
+   the value table, state what each of the three positions says should follow if that prediction were
+   confirmed for some cognitive trait; then say what kind of evidence the prediction rests on, and why
+   evidence from people living today alone cannot show how populations came to differ. Solution: the
+   principles survive by design and the auxiliary premises move as in link 7; the prediction's author
+   reads the genomes of the dead, which show that present-day populations are recent mixtures — the next
+   lesson's material and its author's own argument (`<Ref>`).
 
 ## Nietzsche cross-course links
 
 - `nietzsche/order-of-rank` — the clearest statement of the view that differences in human quality are
-  differences in worth; it is the position Harden's "difference without hierarchy" must answer (section
-  6, right-side objection). Ref with one clause; do not re-teach.
+  differences in worth; it is the position "difference without hierarchy" must answer rather than assume
+  away (link 8, the right's objection (d)). Ref with one clause; do not re-teach.

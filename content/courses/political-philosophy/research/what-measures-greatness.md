@@ -40,11 +40,18 @@ goal: Compare Spengler's, Toynbee's and Huntington's answers to whether civiliza
   HERE for the first time, since the Spengler lesson reserved it) — and the lesson
   asks what each refusal reaches and what it does not. The modern, statistical form
   of the debate (IQ, heritability, ancient DNA) is explicitly held for the heredity
-  module; this lesson says so in one sentence and does not anticipate it. Never
-  settled and never moralised (course outcome `co-contested`).
-- **Hands off:** The three measures agree on nothing, so the lesson closes without a
-  verdict and with one check available: Huntington's theory predicts, and
-  `testing-the-clash` runs the count. Three forward Refs, one sentence each, no
+  module; this lesson says so in one sentence and does not anticipate it. What the
+  lesson does settle is a fact about the arguments: Toynbee's refusal reaches
+  Gobineau's claim and defeats it by Gobineau's own pledge (judged established in
+  `toynbee-challenge-and-response`), Spengler's reaches the anthropologists'
+  category, and neither reaches a probabilistic claim, which the heredity module
+  weighs. Never moralised (course outcome `co-contested`).
+- **Hands off:** The three measures agree on nothing, and the lesson's finding is
+  that this is a choice of what to count, which no record can settle; what can be
+  settled is handed on — Huntington's dated prediction is judged in
+  `testing-the-clash` (module verdict there), and the measure "ideas others take
+  up", turned into a count, is judged in `murray-human-accomplishment` (strong for
+  the sciences after 1400). Three forward Refs, one sentence each, no
   exposition: (1) the third measure — ideas others take up — can be turned into a
   count of whose work the world's histories of science and art name, and
   `murray-human-accomplishment` (why-the-west module) builds exactly that count;
@@ -292,7 +299,11 @@ wrong, or are they measuring different things? The chain:
    says so himself in a different tone ("the universal civilization" the Rest
    resists is Western) — so the West is simultaneously declining (Spengler: form;
    Huntington: power share) and at its maximum (Toynbee/Ortega: ideas taken up).
-   State this as the module's result, without a verdict.
+   State this as the lesson's finding, in plain words: on this case the three
+   disagree about what to count, not about what happened, and no record can decide
+   between measures; the parts that can be checked are checked later (the power
+   forecast in `testing-the-clash`, the count of ideas in
+   `murray-human-accomplishment`).
 6. **A fourth answer, recalled: race as the measure and the cause.** Question: the
    three authors measure greatness by duration, by what is handed on, by power — is
    there an answer that makes the measure and the cause of decline one and the same
@@ -344,9 +355,14 @@ wrong, or are they measuring different things? The chain:
    alone, and Spengler's physiognomic "race" shows a refusal of Gobineau that is not
    a refusal of heredity as such. Where it holds: none of the module's three
    authors needed race to explain any of the module's three cases (Rome,
-   Byzantium, the West), each of which all three explain without it. Leave the
-   reader to weigh; no verdict in the course's voice; do not call the question
-   closed — the heredity module reopens it with new evidence.
+   Byzantium, the West), each of which all three explain without it. State the
+   result as a fact about the arguments: Gobineau's claim, held to his own pledge,
+   fails — Toynbee's counter-instances defeat it (established; recall the verdict
+   of `toynbee-challenge-and-response` with a Ref, do not re-argue it); Spengler's
+   refusal reaches the anthropologists' category and not heredity as such; neither
+   reaches a probabilistic claim. That claim is a different argument with different
+   evidence, and the heredity module weighs it (forward Ref
+   `hereditarian-case-iq-and-nations`; no grade anticipated here).
 8. **What the three cannot answer, and the one check available.** Question: having
    three measures and three accounts, what can the reader now do? Answer: say, of
    any claim that a civilization is great or declining, which measure it uses and
@@ -455,12 +471,16 @@ category" / "What cannot be answered, and what can be checked".
   The critics' essentialism charge attaches to reason (5) and is an objection to
   him, not his view. Sen in References only.
 - **The race answer is recalled as an argument with a history and its objections —
-  never as settled, never moralised (course tone; outcome `co-contested`).**
-  The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+  never moralised (course tone; outcome `co-contested`); settled only as far as
+  the Toynbee lesson's verdict reaches (Gobineau's claim), and no further.**
+  The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
   State what Gobineau claimed (recalled), what his measure was, what counts
   against it (the correlation test, the tally, Italy, "a race does not migrate"),
   and what those arguments do not reach (a probabilistic form; Spengler's own
-  physiognomic sense). The reader weighs. Toynbee's words for Gobineau ("telling
+  physiognomic sense). The course states that reach in its own voice — Gobineau's
+  claim fails by his own pledge (established, in the Toynbee lesson); the
+  probabilistic form is untouched here and weighed in the heredity module.
+  Toynbee's words for Gobineau ("telling
   nonsense") are not repeated here; the Toynbee lesson quoted them with attribution.
 - **Hold the modern debate for the heredity module.** No IQ, no heritability, no
   national averages, no genetics, no ancient DNA in this lesson: one forward sentence
@@ -574,7 +594,8 @@ category" / "What cannot be answered, and what can be checked".
    shown for the probabilistic version to fail, and say in one sentence which later
    module takes the question up with different evidence (Ref
    `hereditarian-case-iq-and-nations`; a pointer, not the FORWARD exercise). The
-   solution refuses to close the question and says why.
+   solution states that Gobineau's own claim fails (Toynbee lesson, established) and
+   that the probabilistic version is not decided by either argument, and says why.
 5. **Derivation the lesson did not do (E3 spiral):** Augustine's two definitions of a
    people (Ref `augustine-two-cities`, XIX.21 and 24) supply a fourth measure —
    justice, or "what a people loves". Run Rome, Byzantium and the West through it and

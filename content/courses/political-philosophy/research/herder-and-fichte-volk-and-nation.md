@@ -29,13 +29,16 @@ goal: Analyze Herder's account of peoples as distinct cultures each with its own
   Volk and its language and makes three changes: language becomes the criterion of a nation and
   of its right to govern itself; one language is "living at the root" and the others "dead"; and
   the state becomes the instrument by which a nation educates itself into an earthly eternity.
-  The lesson locates the exact step at which plurality becomes rank, and puts to it the strongest
-  objection — Herder's own humanitarianism — and Fichte's strongest reply.
-- **Hands off:** (i) `hegel-ethical-life-and-the-state` (next; prerequisite): Fichte puts the
+  The lesson locates the exact step at which plurality becomes rank, puts to it the strongest
+  objection — Herder's own humanitarianism — and Fichte's strongest reply, and judges the ranking
+  (see `## VERDICT`: it fails, strong).
+- **Hands off:** The lesson decides that Fichte's ranking of living over dead languages fails
+  (strong): his reply answers the charges of racial nationalism and conquest, not the charge of
+  rank. What passes on: (i) `hegel-ethical-life-and-the-state` (next; prerequisite): Fichte puts the
   nation above the state and makes the state its means; Hegel answers that the state is "the
   actuality of the ethical Idea", the place where a people's ethical life becomes rational —
   absorbing both Burke's inheritance and the Volk. (ii) The criterion question — does a language,
-  a descent, a memory or a will make a nation? — is left open and taken up in
+  a descent, a memory or a will make a nation? — is not decided here; it passes to
   `renan-what-is-a-nation` (the daily plebiscite against language and race) and
   `barres-and-maurras-integral-nationalism` (the nation accepted, not chosen). (iii) Herder's
   "no races, only peoples" is the baseline against which `gobineau-inequality-of-races` and
@@ -47,6 +50,35 @@ goal: Analyze Herder's account of peoples as distinct cultures each with its own
   Rousseau's general will; when France tries to frame a government from principles, Burke,
   Maistre and Donoso Cortés answer that no generation knows enough, Herder and Fichte put the
   people before the state, and Hegel absorbs both sides into the rational state"
+
+## VERDICT
+
+- **Claim judged:** Fichte's step from Herder's plurality of peoples to rank: German is a living
+  original language, and the neo-Latin languages are "dead at the root" (Addresses, para 55),
+  so the Germans hold "the seed of human perfection" (para 231).
+- **Verdict:** the ranking fails. Grade: **strong**.
+- **What decides it:** (1) Fichte's reply (descent disclaimed, para 45; membership open to anyone
+  who believes in freedom, para 107; universal monarchy and remoulding others rejected, paras
+  204, 206) answers the charges of racial nationalism and of conquest. It does not answer the
+  charge of rank: para 55 withdraws its own disclaimer ("between life and death there is no
+  comparison") and para 231 makes one nation the bearer of mankind's hope. (2) The criterion
+  "living / dead at the root" has no stated test: Fichte names no observation that would show a
+  speaker thinking more "livingly". (3) His own example cuts against it. *Humanität*, his
+  specimen of a dead, laundered foreign word (para 53), is the word Herder made the end of
+  history (Ideas XV.III). And *Menschlichkeit*, the "living" German word he offers in its place,
+  was itself formed in the sixteenth century as a translation of Latin *hūmānitās* (Pfeifer,
+  *Etymologisches Wörterbuch des Deutschen*, via DWDS: "16. Jh., Übersetzung von lat. hūmānitās").
+  By his own test the living word is a calque on the dead one.
+- **Strongest objection:** Fichte's claim is about history, not about words: a people that kept
+  its language continuously keeps its images for invisible things transparent, whatever the
+  origin of a given word, so one calque proves nothing; and the ranking is the rhetoric of a
+  conquered people's self-defence, not a programme. **Why it does not overturn the verdict:**
+  continuity of a language is a fact; that continuity makes its speakers think more "livingly"
+  is the claim, and Fichte offers no test of it beyond his examples, of which the chosen one
+  fails. The defensive context explains the rhetoric and is granted (Fichte's reply holds against
+  the conquest charge), but para 231 claims more than defence needs.
+- **What would overturn it:** a measurable sense in which speakers of a continuously inherited
+  language think more "livingly" than speakers of an adopted one.
 
 ## Sources to consult
 
@@ -215,6 +247,14 @@ goal: Analyze Herder's account of peoples as distinct cultures each with its own
   - Fourteenth Address para 231 (l.11165–11200): "you are of all modern peoples the one in whom
     the seed of human perfection most unmistakably lies… If you perish… there perishes together
     with you every hope of the whole human race".
+- **Pfeifer, Etymologisches Wörterbuch des Deutschen, entries "Menschlichkeit" and "Humanität"**,
+  via DWDS, https://www.dwds.de/wb/Menschlichkeit — staged at
+  `research/texts/verification-2026-11/dwds-menschlichkeit-etymology.txt`. *Menschlichkeit*: "16.
+  Jh., Übersetzung von lat. hūmānitās", current since the eighteenth century; *Humanität*: a
+  sixteenth-century borrowing from *hūmānitās*, "seit der Klassik (Herder)" the word for the
+  fullest cultivation of humanity. Yields the decisive point of the weighing (link 8): Fichte's
+  living word is a translation of his dead one. Cite Pfeifer/DWDS in References; in the body,
+  "a sixteenth-century translation of the Latin word".
 - **Berlin, The Crooked Timber of Humanity** — `C/research/texts/berlin/crooked-timber.txt`
   ("The Pursuit of the Ideal", l.~595–640: Herder's centre of gravity; pluralism, not
   relativism — members of one culture can understand another's values without sharing them;
@@ -359,7 +399,11 @@ lives under? And if each people has its own measure, can any people be better th
    serves this: it "completely destroys freedom of will" and produces "strict necessity in the
    decisions of the will" (para 14); children are "entirely separated" from parents (para 138);
    the state may compel parents as it conscripts soldiers (para 170).
-8. **Where does plurality become rank? The OBJECTION at full strength, from Herder.** Locate the
+8. **THE WEIGHING. Heading as the verdict: "Fichte's ranking of languages fails his own test"
+   (or "Plurality becomes rank, and the rank has no test").** The last body section: it sets the
+   ranking against Herder's objection, Fichte's best reply and the evidence, and reaches the
+   verdict of `## VERDICT` (strong). **Where does plurality become rank? The OBJECTION at full
+   strength, from Herder.** Locate the
    step precisely, as a `<FigureSequence>` (Figure 5): Herder — every people its own centre and
    standard; Fichte keeps language as the mark of a people (continuity); then says one language is
    alive and the rest dead at the root (the step); then that this people holds "the seed of human
@@ -369,8 +413,10 @@ lives under? And if each people has its own measure, can any people be better th
    Fichte spoke: to esteem the Germans "God's chosen people in Europe… would be to display the base
    pride of a barbarian" (XVI.VI); each nation "bears in itself the standard of its perfection,
    totally independent of all comparison with that of others" (XV.III). Note the irony the lesson
-   should state flatly, without comment: the word Fichte picks as his example of a dead, laundered
-   foreign word, *Humanität*, is the word Herder made the end of history. A second objection, from
+   should state flatly: the word Fichte picks as his example of a dead, laundered foreign word,
+   *Humanität*, is the word Herder made the end of history — and *Menschlichkeit*, the living word
+   he sets against it, was formed in the sixteenth century as a translation of Latin *hūmānitās*
+   (Pfeifer via DWDS). This is evidence, used in the verdict below. A second objection, from
    the liberal side, one sentence: Constant, of the Fichtean circle in 1804, that their "Spartan
    ideals" amid modern commerce would "begin Robespierre all over again" if they came to power
    (quoted as Constant's; source in References).
@@ -386,14 +432,24 @@ lives under? And if each people has its own measure, can any people be better th
    philosophy — those who believe otherwise are "non-German… and it is to be wished that he would
    separate himself from us completely" — and para 231 makes one nation the bearer of mankind's
    hope. And Herder has his own unsettled tension (link 2): a universal Humanität that lets him
-   condemn the slave trade sits beside incommensurable standards. State the result as a judgment,
-   not a score: Herder's pluralism needs some universal standard to condemn anything; Fichte
-   supplied one and gave it to one people.
-9. **Close (Conclusion).** What the reader can now do: say what Herder means by a Volk and why
+   condemn the slave trade sits beside incommensurable standards. **The verdict, in the course's
+   voice:** the ranking fails (strong). Fichte's reply answers racial nationalism and conquest, not
+   rank; "living / dead at the root" has no stated test; and his own example cuts against it
+   (*Menschlichkeit* is a calque on *hūmānitās*). State the strongest objection — the claim is
+   about a language's continuous history, not about the origin of single words — and why it does
+   not save the ranking (continuity is a fact; that it makes thought more "living" is the
+   unsupported step). Say what would overturn the verdict: a measurable sense in which speakers of
+   a continuously inherited language think more "livingly". Then the wider result: Herder's
+   pluralism needs some universal standard to condemn anything; Fichte supplied one and gave it to
+   one people.
+9. **Close (Conclusion).** First the verdict in plain words with its grade: Fichte's step from
+   many peoples to one living people fails — strong — because the rank has no test and his own
+   example refutes it; his reply holds only against the charges of race and conquest. Then what
+   the reader can now do: say what Herder means by a Volk and why
    peoples cannot be ranked; reconstruct Fichte's criterion (language), his nation-above-state and
    his national education; point to the step at which plurality becomes rank. What stays open: if
    the nation stands above the state, what is the state? — `hegel-ethical-life-and-the-state`
-   (next). One closing sentence on reception, without verdict: the Addresses were invoked by the
+   (next). One closing sentence on reception, as fact: the Addresses were invoked by the
    liberators of 1813, by the first president of the Weimar Republic in 1919 for a democracy of
    "equality of all humanity" (translators' Introduction, p. xxii — the phrase at l.626), and by the
    nationalism of the twentieth century. Whether language, descent or will makes a nation is the
@@ -402,7 +458,8 @@ lives under? And if each people has its own measure, can any people be better th
 Headings as claims (suggested): "Every age has its own centre of gravity"; "Pluralism is not
 relativism"; "Prejudice holds a people together"; "A people is made by its language, not its
 blood"; "A people before the state"; "A conquered nation must make itself anew"; "Living and dead
-languages"; "The nation as earthly eternity"; "Where plurality becomes rank".
+languages"; "The nation as earthly eternity"; "Fichte's ranking of languages fails his own test"
+(the weighing).
 
 ## Set pieces and worked examples to recreate
 
@@ -430,9 +487,7 @@ languages"; "The nation as earthly eternity"; "Where plurality becomes rank".
 
 ## Pitfalls / subtleties to flag
 
-- **Register rule.** The course passes no verdict of its own on any author or idea: no condemning
-  or approving labels in its own voice. Judgement comes only through argument and evidence; a label
-  may appear only inside a quotation, with who applied it and when.
+- **Register rule.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Terms to anchor (L11), no more than three per section:** *Volk* (German "people"; keep the
   German word once, then "people"); *Humanität* (Herder's "humanity" as the end of human nature:
   reason and equity — not "humanitarianism"); *Bildung* (formation, education — in the 1774 title);
@@ -589,6 +644,17 @@ languages"; "The nation as earthly eternity"; "Where plurality becomes rank".
    people's will is not a criterion in paras 191/198) and says in one sentence that this is the case
    a French scholar's 1882 lecture answers by making a nation a matter of shared memory and present
    consent, with a `<Ref>` to `renan-what-is-a-nation`.
+9. **Attack the verdict.** The lesson judged that Fichte's ranking of living over dead languages
+   fails (strong). State the strongest objection in its best form — Fichte's claim concerns a
+   language's unbroken history and the transparency of its images for abstract things, so the
+   origin of one word (*Menschlichkeit* as a sixteenth-century calque on *hūmānitās*) proves
+   nothing; and German, unlike French, did keep its own stock of roots for such words — then say
+   what evidence would be needed to overturn the verdict. The model answer grants the
+   distinction between a word and a language, then asks what observation would show that a
+   speaker "sees through" his words to images more than another speaker does, notes that Fichte
+   names none, and states the overturning evidence: a measurable difference in some cognitive or
+   linguistic performance between speakers of continuously inherited and adopted languages, of
+   the kind Fichte's thesis predicts.
 
 ## Nietzsche cross-course links
 

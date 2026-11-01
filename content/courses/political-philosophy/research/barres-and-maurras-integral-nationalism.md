@@ -35,7 +35,12 @@ goal: Analyze Barrès's nationalism as acceptance of a determinism and Maurras's
   lesson states the doctrines and their antisemitic component as doctrine, and leaves the
   case (Barrès at Rennes, Déroulède's "France is innocent", treason judged by consequences,
   the forged document) to the application. Barrès's definitions of treason and of "the
-  intellectual" are taught here only so far as the doctrine needs them. (ii) Forward:
+  intellectual" are taught here only so far as the doctrine needs them. What this lesson
+  decides (see `## VERDICT`): membership is received rather than chosen, against consent as
+  an account of origins (strong); the steps from that to a hereditary king and to private
+  rights only for the naturalised do not follow (strong). What passes to the Dreyfus lesson
+  is the test of integral nationalism by its own criterion — consequences for the nation.
+  (ii) Forward:
   Maurras's later course — the "divine surprise" of 1940, Vichy, the 1945 conviction — is
   stated as fact in one paragraph and carried into `the-right-after-1945`. (iii) The
   organized minority that integral nationalism presupposes (who decides what "serves the
@@ -46,6 +51,42 @@ goal: Analyze Barrès's nationalism as acceptance of a determinism and Maurras's
   peoples: the crowd (Taine, Le Bon), the race (Gobineau, Chamberlain, Grant), the nation as
   will or as inheritance (Renan, Barrès, Maurras) — and the Dreyfus Affair puts them to the
   test"
+
+## VERDICT
+
+Recorded in `research/verdicts/REGISTER.md`, module 6, `barres-and-maurras-integral-nationalism`.
+
+- **(a) Claim judged:** membership of a nation is received rather than chosen — against
+  consent as an account of origins. **Verdict: holds.** Grade: **strong**.
+- **(b) Claim judged:** the steps from "received" to "therefore a hereditary king"
+  (Maurras's theorem) and to "therefore the naturalised hold private rights only" (Barrès,
+  §18e; the Programme de Nancy). **Verdict: do not follow.** Grade: **strong**.
+
+**What decides it.** For (a): the newborn argument (Maurras, Preface I) — no one consents to
+being born into a family, a language or a country — and Renan's own definition, whose
+"legacy" half is received, not chosen: "the ancestors made us what we are" (Renan l.101)
+concedes it. For (b): each step needs a premise the doctrine does not argue. The theorem
+needs premises about parties (that they necessarily divide), about heredity (that it aligns
+the ruler's interest with the nation's) and about who embodies the nation; the restriction
+on the naturalised needs a premise about blood ("the blood persists in following the order
+of nature against oaths, against laws", §18e l.1940) that Barrès's own §6 denies ("We are
+not a race but a nation"). The camp's own record agrees: Barrès praised Maurras's reasoning
+and said "Je ne suis pas monarchiste" (§19f l.2697); and Barrès applied his determinism
+selectively — to the Alsatians born German after 1871 he did not say "accept the soil and
+the dead", but "remain a pebble of France under the invader's boot" (Livre III §34 l.6934).
+
+**Strongest objection to the verdict on (b).** Maurras's reply: the chain is not a logical
+deduction but an empirical one — "organising empiricism" reading the French record, in which
+elected regimes fell and the dynasty built the country. It does not overturn the verdict:
+the record of a regime's past is evidence about that regime, not a premise that makes
+monarchy follow from received membership; the premises about parties and embodiment are
+still needed and still unargued, and Maurras himself presents the result as a "theorem",
+which is the claim judged. Nor does the strength of (a) carry over to (b): the conclusion
+the camp needed was not that membership is received but what follows from it.
+
+**What would overturn it.** An argument from received membership to monarchy (or to a
+restriction of the naturalised) that smuggles in no premise about blood or about who embodies
+the nation.
 
 ## Sources to consult
 
@@ -297,7 +338,9 @@ on race, which both deny.
    he is "our guest", owed "security" but not "a place in the powers of the country" (§18e
    l.1940); the Programme de Nancy would give the naturalised private rights only
    (Appendix 41). The reader is asked to state where the conglomerate's "mortar" stops and
-   "blood" begins — the line the Dreyfus lesson will test. Do not resolve it for them.
+   "blood" begins — the line the Dreyfus lesson will test. The lesson's own finding on it
+   comes in the weighing (link 9): the restriction needs the premise about blood that §6
+   denies.
 4. **What follows for politics? — "by relation to France".** Barrès's method: "Nationalism
    is to resolve each question by relation to France" (§18e l.1766); "They [the
    'intellectuals'] judge everything by the abstract. We shall judge each thing by relation
@@ -368,8 +411,9 @@ on race, which both deny.
    grounds in 1952. Facts from the dossier's survey (Fawcett pp. 262–263) — verify dates
    and the wording of the charge against a standard history; Ref forward to
    `the-right-after-1945`.
-9. **The OBJECTIONS at full strength, and where the lesson stands.** Each from where it
-   comes:
+9. **The OBJECTIONS at full strength — the weighing.** Heading as the verdict: "A nation is
+   received, but no king follows from it". Each objection from where it comes, then the
+   register's verdict (see `## VERDICT`), with whether Barrès and Maurras answered each:
    (a) **From Renan's side (liberal):** acceptance is itself a choice. Barrès chose
        nationalism after a "cult of the self" — his own biography is a counterexample to
        "there are no personal ideas"; and if the dead decide, Alsatians born German after
@@ -392,21 +436,39 @@ on race, which both deny.
    (d) **From the record:** "politics first" and "the interest of the Nation" as the only
        denominator leave no standpoint from which a court can say the nation's interest
        was served by a lie — the Dreyfus lesson will put this to the test with a forged
-       document Maurras defended. State the objection here in abstract form only.
+       document Maurras defended, and decide it there. State the objection here in
+       abstract form only.
+   Answered or not, as facts about the argument: (a) not answered — the selective
+   application stands in Barrès's own text; (b) not answered in the texts studied; (c)
+   answered by Barrès himself against the theorem.
    Where the lesson concedes: the newborn argument is strong against a contract theory of
    ORIGINS — no one consents to being born into a family or a language, and Renan's own
    definition concedes the legacy is received; Barrès and Maurras show that consent cannot
-   be the whole story. What their argument does not show, and the lesson says so plainly,
-   is the step from "received, not chosen" to "therefore a hereditary king" or "therefore
-   the naturalised hold private rights only" — those steps need further premises (about
-   blood, about parties, about who embodies the nation), and the reader is asked to name
-   them (Exercises 3, 5).
+   be the whole story — membership is received, as an account of origins (**strong**).
+   What their argument does not show, and the lesson says so plainly, is the step from
+   "received, not chosen" to "therefore a hereditary king" or "therefore the naturalised
+   hold private rights only" — those steps need further premises (about blood, about
+   parties, about who embodies the nation), and they do not follow (**strong**). Give
+   Maurras's best reply (the theorem as "organising empiricism", read off the French
+   record) and say why it does not rescue the step: a regime's record is evidence about
+   that regime, not a premise from which monarchy follows. The reader names the missing
+   premises (Exercises 3, 5).
+
+**Conclusion.** State the verdict in plain words with its grades: Barrès and Maurras are
+right against consent as an account of where membership comes from — a nation is received
+before it is chosen, and Renan's own sentence concedes it (**strong**); they are wrong that
+anything about kings or the naturalised follows — both steps need a premise about blood or
+about who embodies the nation that the doctrine never argues, and Barrès himself declined
+the theorem (**strong**). What would overturn the second: an argument from received
+membership to monarchy that smuggles in no such premise. Hand-off: the doctrine judged
+questions "by relation to France" and treason by consequences; the next lesson judges the
+doctrine by that criterion, on the Dreyfus record.
 
 Headings as claims (suggested): "The self is made by its dead"; "Renan's sentence with a
 cemetery in it"; "Not a race, but a nation — and then blood"; "Every question by relation
 to France"; "Society begins with a newborn, not a contract"; "Politics first in time, not
 in dignity"; "From patriotism to the king, as a theorem"; "The foreigner of the interior";
-"What acceptance cannot prove".
+"A nation is received, but no king follows from it".
 
 ## Set pieces and worked examples to recreate
 
@@ -469,15 +531,15 @@ in dignity"; "From patriotism to the king, as a theorem"; "The foreigner of the 
   religion or morality" — refuted by Maurras's own definition (first in time, not in
   dignity). (2) "Barrès's nationalism is racial" — he denies race in §6 and his conglomerate
   is anti-racial; the record of §18e and of the Rennes chapter shows blood returning. The
-  lesson presents both texts and lets the reader see the tension; it does not settle it as
-  "really racial" or "really not". One slot each, no strawmen beyond these.
+  lesson presents both texts and states its finding about the argument, not a label for
+  the man: the restriction on the naturalised rests on a premise about blood that §6
+  denies, so that step does not follow (verdict (b)). It does not class Barrès as "really
+  racial" or "really not". One slot each, no strawmen beyond these.
 - **Do not teach the Affair here.** The course.yaml notes hold it for the application.
   Name it as the occasion (both books were made in it: Barrès's subtitle-material and
   Maurras's "four states" footnote date from 1898–99) and stop; no bordereau, no Rennes, no
   "France is innocent".
-- **Register:** The course passes no verdict of its own on any author or idea: no
-  condemning or approving labels in its own voice. Judgement comes only through argument
-  and evidence; a label may appear only inside a quotation, with who applied it and when.
+- **Register:** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
   The antisemitic passages are quoted as doctrine, with their date and context, at the
   length the argument needs; no adjective in the course's voice either way. Where to class
   the two men among the later movements of the right is a scholars' debate; if mentioned,
@@ -540,8 +602,8 @@ in dignity"; "From patriotism to the king, as a theorem"; "The foreigner of the 
 3. **Claim to refute (E6b):** "Barrès's nationalism is simply a racial theory like
    Gobineau's." Refute with §6 (not a race; the conglomerate) and §24a (the institutional
    definition), then state what §18e's naturalisation sentence adds that the refutation must
-   still account for. The model answer argues both sides with the texts and names the
-   premise on which the reader's verdict turns.
+   still account for. The model answer argues both sides with the texts, names the premise
+   about blood that the naturalisation sentence needs, and shows that §6 denies it.
 4. **Boundary probe (E6a):** apply "la terre et les morts" to a child born in Metz in 1880
    to French parents who stayed after the annexation and sent him to German schools. Whose
    dead, which soil? Show that the formula gives two answers and that Barrès needs an extra
@@ -558,7 +620,15 @@ in dignity"; "From patriotism to the king, as a theorem"; "The foreigner of the 
    vs Burke's Church) and one it gets right (the inheritance against the contract; the
    newborn argument as a form of the partnership of generations). Ref `burke-reflections`
    and `maistre-and-bonald` (the genealogy to Action française).
-7. **FORWARD (E7) → `dreyfus-affair-as-test`:** using only Barrès's two principles — every
+7. **Attack the verdict:** the lesson concludes that monarchy does not follow from received
+   membership (strong). State the strongest objection in its best form — Maurras's
+   "organising empiricism": the French record itself (elected regimes falling, the dynasty
+   building the country) as the evidence that makes the theorem — and say what evidence or
+   argument would be needed to overturn the verdict: what the record would have to show,
+   and which of the missing premises it would have to establish without assuming it. The
+   solution shows that the record can at most support a comparative claim about regimes,
+   not the step from received membership.
+8. **FORWARD (E7) → `dreyfus-affair-as-test`:** using only Barrès's two principles — every
    question "by relation to France" (§18e) and treason "measured by consequences, not
    intentions" (§7) — decide what a nationalist must say about a court-martial verdict
    against an officer when serious evidence later points to another man, and whether the

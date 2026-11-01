@@ -38,7 +38,47 @@ goal: Evaluate the thesis that America's present condition continues England's o
   "never chosen" immigration) are pieces of Murray's argument, which his own lesson
   reconstructs. (iii) `deneen-post-liberalism`: the claim that liberalism declines *by
   succeeding* is the strongest later form of the "cause in the culture" premise. (iv)
-  `the-argument-assembled`: whether a nation can survive on liberal principles alone.
+  `the-argument-assembled`: whether a nation can survive on liberal principles alone. What
+  this lesson decides: the broad forecast of contraction is not borne out so far (on balance,
+  and no firmer until the output and military series are bound). What it passes on: the
+  narrow thesis — an elite that cannot say why its inheritance deserves defence — is open, with
+  the series that would settle it named; its religious half meets the Böckenförde question in
+  `murray-strange-death-of-europe` and module 16.
+
+## VERDICT
+
+**Claim judged:** the assembled `anglosphere-decline-thesis`, in two forms. (1) The broad
+forecast: the United States will contract as Britain did, because it inherited the causes.
+(2) The narrow thesis: the two countries share an elite and an ideology that cannot say why
+their own inheritance deserves defence.
+
+**Verdict on (1): not borne out so far. Grade: on balance.** The measure decides the answer.
+The US share of world output has been roughly stable since 1990 at market exchange rates and
+has fallen at purchasing-power parity [UNVERIFIED: IMF World Economic Outlook series to be
+bound]. The reach of US arms (spending, alliances, bases) has to be weighed against the
+withdrawals from Iraq and from Afghanistan (2021). And decline has been forecast in every
+generation since 1918 (Spengler; Burnham 1964) with no reversal counted against it — the
+reversal of Burnham's own atlas after 1989 among them. **The grade may not rise above on
+balance until both output measures and a military series (SIPRI) are bound.**
+
+**Verdict on (2): open.** What would settle it: series on religious practice, on the gap
+between elite and public opinion on national identity, and on the assimilation of
+immigrants, with a horizon fixed in advance — the table of link 8.
+
+**Strongest objection to the verdict on (1):** the thesis is about will and belief, not
+power, so power indicators cannot refute it; and the PPP series and the withdrawals already
+show contraction. It does not overturn the verdict. The forecast the thesis takes from
+Britain's path is contraction of reach (link 4), which is measured by exactly these
+indicators; a thesis that retreats to will and belief alone is the narrow thesis, judged
+open. The PPP decline and the withdrawals are why the grade is on balance and not strong:
+one output measure falls, the other does not, and arms reach has both a retreat and a
+spending lead. **Would be overturned by:** a fall in the US share of world output on both
+measures together with a contraction of its alliances and military reach, over a horizon
+stated before the data are read.
+
+**Sources for the verdict:** IMF WEO output shares at market rates and at PPP; SIPRI
+Military Expenditure Database [both UNVERIFIED until bound — neither is staged under
+`texts/`]; Burnham l.484, l.2575 and the post-1989 record (objection (d)).
 - **Spine step:** "The live question: what a nation is and who may join it — Scruton and
   Miller on the pre-political loyalty, America as England's heir from the Federalist to Who
   Are We?, the prophecies of displacement from Powell to Camus, Carens and Miller on borders,
@@ -174,7 +214,11 @@ All text paths are relative to
   expenditure (SIPRI Military Expenditure Database — free to cite with attribution); total
   fertility rates (UN World Population Prospects, CC BY 3.0 IGO); religious attendance and
   affiliation (Gallup's US church-membership series, which fell below half of adults around
-  2020; British Social Attitudes religion series, NatCen). The empire's extent around 1920 and
+  2020; British Social Attitudes religion series, NatCen). **Required for the verdict** (the
+  register names them): IMF World Economic Outlook, US share of world GDP at market exchange
+  rates and at PPP, 1980 to latest; SIPRI military expenditure series for the US and its
+  largest rivals [both UNVERIFIED until bound; not staged under `texts/` — fetch and stage
+  before writing any figure]. The empire's extent around 1920 and
   its dissolution 1947–1968 need dates only, not area figures.
 - **Names ONLY in References (L8a):** Young, Castells, Wiener, Barnett, Tomlinson, Edgerton,
   Kennedy, Maddison. Burnham, Huntington, Lasch, Scruton, Spengler, Toynbee and Murray are
@@ -298,9 +342,11 @@ authors and tests it.
    narrowing — so the objection is strongest for the twentieth century and weaker for the
    twenty-first.
    (c) *Demography and power.* America's population has kept growing (by immigration and,
-   longer than Europe, by fertility); its share of world output has stayed roughly constant for
-   decades and its military spending exceeds that of the next several powers combined (writer
-   fetches the series; numbers bound in the sentence or the figure). Britain's relative decline
+   longer than Europe, by fertility). Its share of world output has been roughly stable since
+   1990 at market exchange rates and has fallen at purchasing-power parity — the measure
+   decides the answer, and the lesson shows both (IMF WEO; to be bound before any number is
+   written). Its military spending exceeds that of the next several powers combined (SIPRI; to
+   be bound), against which the withdrawals from Iraq and Afghanistan (2021) are weighed. Britain's relative decline
    showed in these numbers well before 1914; America's, so far, mostly does not. Reply from the
    thesis: these are measures of power, and the thesis is about will and belief — which
    returns to objection (a).
@@ -318,11 +364,12 @@ authors and tests it.
    l.8007ff), the federal structure — have no English counterpart. An English observer in 1968
    called American race relations "that tragic and intractable phenomenon" that Britain was
    about to import (next lesson) — the direction of inheritance can run the other way.
-   Where the lesson concedes: (a) and (d) are strong against the thesis as a forecast of
+   What the objections establish: (a) and (d) are strong against the thesis as a forecast of
    *contraction*; (b) is strong for the twentieth century and weakening; the thesis survives
    best in its narrow form — that the two countries share an elite and an ideology that
    find it hard to say why their own inheritance deserves defending.
-8. **What evidence would decide it?** Burnham's own test, turned on Burnham: the mark of an
+8. **The weighing: the broad forecast of contraction is not borne out so far; the narrow
+   thesis is open.** Burnham's own test, turned on Burnham: the mark of an
    ideology, he wrote, is that its holder "can't lose"; ask "what evidence might conceivably
    prove you wrong?" (ch. 6, summary). Apply it: the thesis must name indicators, the direction
    each should move if it is true, and a horizon. Build the table with the reader (FIGURE PLAN
@@ -331,16 +378,28 @@ authors and tests it.
    cohesion of the union (the UK's devolution against any American analogue). For each row,
    what the thesis predicts, what the objections predict, and what the record since 1964 (or
    2004) shows so far. Answer: the narrow thesis (shared elite, shared ideology) is testable
-   only through measures of belief and allegiance, which move slowly and are measured badly;
-   the broad thesis (America will contract as Britain did) has so far been contradicted by the
-   power indicators. The lesson stops there and hands the immigration premise to the next
-   lesson.
+   only through measures of belief and allegiance, which move slowly and are measured badly.
+   Then the weighing, in the course's voice (as in ## VERDICT): the broad forecast is set
+   against its strongest objection — that will and belief, not power, are its subject, and that
+   the PPP series and the withdrawals already show contraction — and the evidence (output on
+   both measures; arms reach against the withdrawals; a century of unfalsified decline
+   forecasts). Verdict: the broad forecast is **not borne out so far, on balance**, and the
+   lesson says why the grade can rise no higher until the series are bound. The narrow thesis
+   is **open**: the lesson names the three series and the fixed horizon that would settle it.
+
+   **Conclusion.** State the verdict in plain words with its grade: the forecast that America
+   would contract as Britain did is not borne out so far (on balance — the answer depends on
+   the measure, and the measures are not yet bound); whether the two countries share an elite
+   that cannot say why its inheritance deserves defence is open, and the lesson has named what
+   would settle it. Hand-off: of the thesis's four premises, one — immigration nobody chose —
+   is checkable with censuses; the next lesson checks the three prophecies that made it the
+   whole story.
 
 Headings as claims (suggested): "Britain lost four different things"; "An heir inherits a
 decline only if the cause is in the culture"; "Four causes the critics found in the culture";
 "The forecast: contraction and fragmentation"; "Spengler: the same winter, not an inherited
 illness"; "Toynbee: the unit is the West, and the leader changes"; "Five objections";
-"What would show it wrong".
+"The forecast of contraction is not borne out so far; the narrow thesis is open".
 
 ## Set pieces and worked examples to recreate
 
@@ -414,14 +473,13 @@ illness"; "Toynbee: the unit is the West, and the leader changes"; "Five objecti
   to about 1920).
 - **Dates:** "Britain in 1900 ruled a quarter of the world" is course.yaml's; the body gives
   the c. 1920 peak if it gives a figure at all.
-- **Register.** The course passes no verdict of its own on any author or idea: no condemning
-  or approving labels in its own voice. Judgement comes only through argument and evidence; a
-  label may appear only inside a quotation, with who applied it and when. "Decline",
+- **Register.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. "Decline",
   "suicide", "contraction" are the authors' words — attribute them; the lesson's own sentences
   use neutral verbs ("lost", "gave up", "fell").
 - **Contested claim (co-contested):** whether America is declining is a live empirical and
-  political quarrel. The lesson does not decide it; it decides which version of the claim the
-  evidence so far bears on and which it does not.
+  political quarrel. The lesson decides what the evidence so far supports: the broad forecast
+  not borne out (on balance, capped there until the series are bound), the narrow thesis open
+  with its settling evidence named. It does not grade more firmly than that.
 - **Dossier thin:** stated in THE DOSSIER GAP above. The writer must not fill the gap with
   remembered quotations from books outside the dossier.
 
@@ -505,7 +563,16 @@ illness"; "Toynbee: the unit is the West, and the leader changes"; "Five objecti
    practice in Britain did fall, and in America has been falling since about 2000) and state
    what would have to be true for the claim to survive (that decline talk is equally frequent in
    periods that later proved to be decline and periods that did not).
-8. **FORWARD (E7) → `powell-raspail-and-camus`:** of the thesis's four premises, one —
+8. **Attack the verdict:** State in its best form the case that America is already
+   following Britain's path — the fall in its share of world output at PPP, the withdrawals
+   from Iraq and Afghanistan, the fall in religious membership since about 2000 — and argue
+   that "not borne out so far" understates it. Then say what evidence would be needed to
+   overturn the verdict: which output measure and why, which military or alliance series, over
+   what horizon fixed in advance, and what result. The solution grants that the PPP series
+   counts against the verdict (which is why it is on balance), shows that the market-rate
+   series and the alliance record count the other way, and states that the verdict falls only
+   when both output measures and the reach of US arms decline together over a stated horizon.
+9. **FORWARD (E7) → `powell-raspail-and-camus`:** of the thesis's four premises, one —
    immigration nobody chose — is checkable with censuses rather than surveys of belief. In 1968
    an English politician forecast that Britain's "Commonwealth immigrants and their
    descendants" would number three and a half million within fifteen or twenty years and five

@@ -5,7 +5,7 @@ module: why-the-west
 type: core
 goal: Analyze the rival thesis that Europe's lead came late, from coal and colonies (Pomeranz), and that the story of Western uniqueness misreads a long Eurasian exchange (Goody), and evaluate it against the exceptionalist case
 
-Register rule (binding on the lesson): The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+Register rule (binding on the lesson): The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 
 The rival thesis is stated as its authors state it: an account of when and how Europe diverged, and a claim about how the West's history was written. It is never phrased as a charge against Europe or against the reader ("Europe stole", "the West owes", "denial"), and the exceptionalist reply is given at the same strength.
 
@@ -34,8 +34,16 @@ The rival thesis is stated as its authors state it: an account of when and how E
   free city, democracy, even romantic love) were defined with Europe in view and then found
   missing elsewhere; looked for without that frame, each has Eurasian parallels, and leads
   alternate. Then the exceptionalist reply, from the module's own earlier lessons and from the
-  economic historians who re-measured the numbers.
-- **Hands off:** The concrete record the two sides argue over in the abstract — which techniques
+  economic historians who re-measured the numbers — and the weighing, part by part: Pomeranz's
+  regional parity around 1750 **fails, on balance**; north-western Europe already led China *as a
+  whole* before 1800 (**strong** — the same finding, which also bears on the cores); his windfall argument for why industrialisation came in
+  Britain and so fast **survives, on balance**; Goody's claim of no categorical Western
+  difference is **open**.
+- **Hands off:** The lesson decides what the dating evidence can decide (above) and passes on
+  two things: when the lead opened and what caused it, which the module's closing lesson
+  judges with the borrowings on the table (`the-borrowing-ledger`: broad late luck fails on
+  timing, strong; lead opening in the late Middle Ages, on balance; cause open). The concrete
+  record the two sides argue over in the abstract — which techniques
   actually moved across Eurasia, with what evidence, and what Europe did with them — is
   `the-borrowing-ledger` (the module's application). The colonial half of Pomeranz's thesis (the
   New World as "ghost acres", the slave plantation as a new kind of periphery) is a forward Ref to
@@ -43,6 +51,50 @@ The rival thesis is stated as its authors state it: an account of when and how E
   reasons of heredity, geography or institutions is the next module (`hereditarian-case-iq-and-nations`,
   `geography-or-institutions`).
 - **Spine step:** "Why the West? Weber, Landes, Murray and Henrich argue for Western exceptionalism from religion, fragmentation, accomplishment and kinship; Pomeranz and Goody answer that the West was one link in a long chain of exchange; the borrowing ledger tests both"
+
+## VERDICT
+
+The lesson stages four disputes and judges each separately; no single grade covers the
+rival thesis.
+
+1. **Pomeranz: the core regions (Yangzi delta; England and the Netherlands) were alike around
+   1750.** → **Fails, on balance.** Decided by the national gap: Broadberry, Guan & Li's national accounts
+   (*JEH* 78, 2018; abstract `texts/verdict-audit/broadberry-guan-li-2017-abstract.txt`) are for
+   China as a whole; their abstract allows that "parts of China were still on a par with the
+   richest parts of Europe" at the earlier date it discusses (1300) and holds that "by 1750 the
+   gap was too large to be bridged by regional variation within China" — an inference from the
+   national gap, not a measured delta series, which is why the grade is on balance and not strong. Li & van Zanden's direct comparison (*JEH* 72,
+   2012), which finds the Netherlands' output per head nearly twice the delta's, is measured in
+   the 1820s, after Pomeranz's date, and points the same way. What would overturn it: like-for-like
+   output estimates for the delta in 1750 close to England's.
+2. **North-western Europe led China as a whole before 1800.** → **Strong.** China "led the world
+   in living standards during the Northern Song dynasty, but had fallen behind Italy by 1300";
+   its output per head trended down through the Qing (Broadberry, Guan & Li). This goes against
+   the broad late-luck view that the gap opened only after 1800; its bearing on Pomeranz's claim
+   about the cores is item 1.
+3. **Pomeranz's windfall argument, as an account of why industrialisation came in Britain and
+   so fast.** → **Survives, on balance.** His argument is about conjunction and location: coal
+   beside navigable water, artisans and a firewood-short market (ch. 1 pp. 59–66), with New World
+   land relieving an economy near its land constraint (ch. 6). The exceptionalist objection
+   "Spain had the New World and China had coal" attacks a version he did not hold: China's coal
+   lay in the north-west, far from the delta, and Spain lacked the coal. The cotton famine of
+   1861–65 is his check that no substitute for American land existed.
+4. **Goody: parallels across Eurasia show no categorical Western difference.** → **Open.** It
+   turns on whether institutions are compared by function or by name: Goody's own authority on
+   the madrasa distinguishes the self-governing corporation from the charitable trust; Goody
+   answers that such differences are technical. What would settle it: a comparison of
+   institutions by function — what each could do without its founder's or ruler's leave.
+
+- **Strongest objection to these verdicts.** Pomeranz's reply to the wage series: they compare
+  unlike workers and miss women's textile earnings, which on his estimates out-earned male farm
+  labour (App. E) — so the "strong" finding against China as a whole rests on numbers that
+  undercount the delta. Why it does not overturn it: the national-accounts estimates do not rest
+  on wage series; the reply narrows the regional gap, which is why the regional verdict is on balance
+  and not strong, but it does not touch China as a whole.
+- **What would overturn them.** For (2): national accounts showing China as a whole at
+  north-western Europe's output per head in 1750. For (3): a case where coal and colonial land
+  were present together and industry did not follow, or Britain industrialising at the same pace
+  without one of them. For (1) and (4): the settling evidence named above.
 
 ## Sources to consult
 
@@ -110,6 +162,15 @@ The rival thesis is stated as its authors state it: an account of when and how E
   Europe" (`C/research/texts/murray-charles/human-accomplishment.txt` l.1590–1660: the DoSB
   triangulation, Sivin vs Landes, "A Challenge" with its "firsts" proviso); Henrich (index 86) for
   the timing of the psychological change; Weber's Author's Introduction (index 108).
+- **Staged for the verdict (name in References only):** S. Broadberry, H. Guan & D. D. Li,
+  "China, Europe, and the Great Divergence: A Study in Historical National Accounting,
+  980–1850", *Journal of Economic History* 78:4 (2018) — abstract of the 2017 CAGE working paper
+  staged at `C/research/texts/verdict-audit/broadberry-guan-li-2017-abstract.txt` (quote the
+  abstract's sentences; the paper itself is not staged), and the authors' 2021 restatement of
+  the series; Y. Li & J. L. van Zanden, "Before the Great Divergence? Comparing the Yangzi
+  Delta and the Netherlands at the Beginning of the Nineteenth Century", *Journal of Economic
+  History* 72 (2012) — the 1820s delta comparison (not staged; state its date and direction
+  only). Per-head dollar figures from either paper are [UNVERIFIED]: do not state them.
 - **Public scholarship not in the dossier (the strongest replies on the numbers; name in
   References only):** S. Broadberry & B. Gupta, "The early modern great divergence: wages,
   prices and economic development in Europe and Asia, 1500–1800", *Economic History Review*
@@ -233,8 +294,11 @@ Is there one?
    farm surveys, household budgets and deliberately conservative estimates; his critics' from
    price and wage series in archives.
    (b) *Why only Britain could use the windfalls.* Spain and Portugal had the New World first;
-   China had coal; neither industrialised. A windfall is used only by a society that can turn it
-   into machines — which returns the question to knowledge and its institutions: the invention
+   China had coal; neither industrialised. Pomeranz answered this in advance, and the lesson says
+   so: his claim is about the conjunction of both windfalls in one place — Spain lacked the coal,
+   and China's coal lay in the north-west, far from the delta's artisans and markets (link 4) —
+   so the objection attacks a thesis he did not hold. What survives of it is a narrower reply:
+   a windfall is used only by a society that can turn it into machines — which returns the question to knowledge and its institutions: the invention
    of invention and the fragmentation that let no one stop it (Ref `landes-european-exceptionalism`),
    the concentration of scientific figures in Europe from 1400 (Ref `murray-human-accomplishment`
    — the ~97 percent share and the challenge to name the missing non-European "firsts"), a
@@ -246,19 +310,40 @@ Is there one?
    to its founder's terms; political philosophy itself — argued, written, transmitted theory of
    who should rule — is the Greek difference Goody concedes (Ref `greek-miracle`). Goody's
    answer: such differences are technical, not categorical, and selecting the one that later
-   mattered is the teleology he names. The lesson does not decide; it states what evidence would
-   decide each strand (wage series that compare like workers; a case where coal or colonies
-   without the knowledge institutions produced industry; a comparison of institutions by function
-   rather than name).
+   mattered is the teleology he names.
+9. **The weighing: China as a whole fell behind early; the cores fall behind by 1750, the categories stay open;
+   the windfalls survive.** Set each part of the rival thesis against its strongest objection and
+   the evidence (VERDICT section), in this order. (i) *China as a whole*: the national accounts —
+   China ahead under the Northern Song, behind Italy by 1300, falling through the Qing — refute the
+   broad view that the gap opened after 1800: **strong**. (ii) *The cores around 1750*: the
+   national accounts hold that by 1750 the gap was too large to be bridged by regional variation
+   within China; the only direct delta comparison is for the 1820s and points the same way, and
+   the national accounts reach the regions by inference; Pomeranz's women's-earnings reply narrows
+   the gap further. **Fails, on balance**; it would be overturned by like-for-like output
+   estimates for the delta in 1750 close to England's. (iii) *The windfalls*: the "Spain and
+   China" objection misses the conjunction argument (link 8b), the cotton famine supports it, and
+   what remains of the objection is the knowledge reply, which explains who could use the
+   windfalls, not why industry came in Britain when it did. **Survives, on balance.** (iv)
+   *Goody's categories*: madrasa against university shows the dispute turns on function against
+   name, and no comparison by function is in the course. **Open.**
    Seam to close: both sides agree Europe borrowed heavily before 1500 — Landes's own sentence
    "Europe was a learner" (via Murray ch. 11) — so the dispute moves to the record of particular
    borrowings: `the-borrowing-ledger`.
+
+**Conclusion** (the `<Conclusion>` block): states the verdicts in plain words with their
+grades — Europe's north-west was ahead of China as a whole before coal and colonies (strong),
+so the broadest form of the late-luck story fails; that the richest Chinese and European
+regions were alike in 1750 fails, on balance; Goody's claim that the West's categories have
+Eurasian equivalents is open; Pomeranz's coal-and-colonies account of why industry came in Britain and
+so fast survives, on balance. Then the hand-off: both sides agree Europe borrowed before 1500,
+and the next lesson grades what it borrowed and what it did with it.
 
 Headings as claims: "Compare like with like: England and the Yangzi delta"; "In 1750 the cores
 were alike"; "China's markets were nearer the textbook than Europe's"; "Every core was running
 out of land"; "Coal and the New World: the ghost acres"; "The categories were drawn with
 Europe in view"; "What the rival thesis concedes"; "The exceptionalist reply: numbers, knowledge,
-institutions".
+institutions"; "China fell behind early, and the cores with it; the windfalls
+stand".
 
 ## Set pieces and worked examples to recreate
 
@@ -312,10 +397,11 @@ institutions".
 - **The phrasing rule.** "Theft" is Goody's metaphor for a way of writing history; the lesson
   says so at first use and never extends it ("Europe stole", "appropriated from") in its own
   voice. The rival thesis is a claim about evidence and dating, not an accusation; the
-  exceptionalist reply is a claim about evidence and causes, not a defence of honour. The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
-- **Present the contested as contested.** The dating of the divergence is an open empirical
-  dispute (the 2006–2018 wage and GDP reconstructions vs Pomeranz). Do not state "the gap opened
-  after 1800" as settled; state whose evidence says so and whose says otherwise.
+  exceptionalist reply is a claim about evidence and causes, not a defence of honour. The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
+- **State each dating claim at its own grade.** "The gap opened after 1800" for China as a
+  whole is refuted (strong; the national accounts); for the cores it fails on balance. Do not merge the
+  two in either direction: never "Pomeranz was refuted", never "the gap opened after 1800" as
+  settled. State whose evidence says what, for which units and which decade.
 - **Numbers (L12):** keepers — "alike until c. 1750–1800"; "ghost acres 25–30 million vs ~17
   million arable (c. 1830)"; "about 93% of Chinese land freely saleable vs about half of
   English". Life-expectancy and calorie series go into one figure, not prose. Do not quote
@@ -329,8 +415,9 @@ institutions".
   prevalent misreading; otherwise plain prose).
 - **Where the dossier is thin:** Goody's ch. 9 and parts of ch. 10 carry 2003–05 opinion on
   Iraq and Guantanamo (pp. 244–247) — period argument, not material for this lesson; leave out.
-  The exceptionalist numbers that answer Pomeranz (2006–2018) are not in the dossier; the
-  writer must obtain the papers named above before stating their dates. Goody's evidence is
+  The exceptionalist numbers that answer Pomeranz (2006–2018) are not in the dossier beyond the
+  Broadberry–Guan–Li abstract; the writer quotes that abstract for the verdict and must obtain
+  the other papers before stating their dates. Goody's evidence is
   often second-hand and asserted (summary 83 `pedagogy`); quote him where he argues, not where he
   asserts.
 - **Copyright:** both books in copyright — a sentence at most per quotation, paraphrase the rest.
@@ -376,39 +463,43 @@ institutions".
 
 ## EXERCISE PLAN (E6/E7 + playbook-history mix)
 
-1. **Retrieval and chronology (the one warm-up):** place on one timeline the dates each
-   exceptionalist cause in the module acts (Henrich's Church program from c. 500; the Reformation
-   1517; Landes's medieval invention of invention; Murray's 1400–1950 concentration) and the
-   date Pomeranz gives for the divergence; state which causes the late date makes unnecessary
-   and which it leaves possible.
-2. **Document reasoning (sourcing drill):** Pomeranz's sugar estimate for China c. 1750
+1. **Document reasoning (sourcing drill):** Pomeranz's sugar estimate for China c. 1750
    (ch. 3 pp. 120–123: built from cash-crop acreage × share in cane × yield, then divided by
    population). Metadata first; what the estimate records, argues, omits; what it can be used to
    establish (that Chinese sugar consumption c. 1750 was probably no lower than continental Europe's) and
    what it cannot (a precise per-head figure); how his stated rule of biasing assumptions against
    his own thesis changes its use.
-3. **Claim to refute (E6b):** "Pomeranz shows that Europe grew rich from colonial plunder." Name
+2. **Claim to refute (E6b):** "Pomeranz shows that Europe grew rich from colonial plunder." Name
    the step that fails (he values the New World as land and energy, not treasure; the silver
    flowed largely to China) and state what his argument would need instead for "plunder" to be
    right.
-4. **Boundary probe (E6a):** remove one windfall. Using ch. 1 p. 68 and ch. 6, say what Pomeranz
+3. **Boundary probe (E6a):** remove one windfall. Using ch. 1 p. 68 and ch. 6, say what Pomeranz
    predicts for Britain with coal but no New World, and with the New World but no coal, and which
    real case each counterfactual resembles (Denmark's labour-intensive path; Spain). The solution
    shows that the thesis needs both, and that this is exactly where the exceptionalist "only
    Britain could use them" reply bites.
-5. **Corroboration (paired sources):** Goody on the madrasa and the university (ch. 8 pp. 227–232:
+4. **Corroboration (paired sources):** Goody on the madrasa and the university (ch. 8 pp. 227–232:
    fifteen parallels, and the corporation/trust distinction he reports) against Murray's challenge
    (ch. 11) to name non-European "firsts" with the same microscope. State where they agree (both
    accept the institutions existed), where they disagree (whether the difference is categorical),
    and what single comparison would decide it.
-6. **Research-shaped task (E6d):** design the test that would separate the two datings: which
+5. **Research-shaped task (E6d):** design the test that would separate the two datings: which
    series (wages of like workers, output per head, urbanisation) for which regions and decades,
    and what result would support each side. Then look up the 2018 national-accounts paper and
    report its date for the delta falling behind England and the method behind it.
-7. **Synthesis / counter-argument:** "The rival thesis concedes everything that matters, because
+6. **Synthesis / counter-argument:** "The rival thesis concedes everything that matters, because
    it concedes the nineteenth century." Name two things the thesis does not concede (a lead
    before 1750 in living standards; a cause in culture or kinship) and state what would have to
    be true for the claim to survive.
+7. **Attack the verdict (aimed at the course):** The course grades "north-western Europe led
+   China as a whole before 1800" strong. State the strongest objection in its best form (the
+   wage series compare unlike workers and miss women's textile earnings; national accounts for a
+   pre-statistical empire rest on assumptions about output per worker), then say what evidence
+   would be needed to overturn the verdict. Solution: the objection bears on wage series, but the
+   verdict rests on national accounts; to overturn it one would need national-accounts estimates,
+   built independently, that put China as a whole at north-western Europe's output per head in
+   1750 — and the solution says why even that would leave Pomeranz's regional claim where it is
+   (fails, on balance), since it concerns the cores and rests on the national gap by inference.
 8. **FORWARD (E7) → `the-borrowing-ledger`:** Goody lists paper, printing, gunpowder and the
    compass among the techniques Europe received from the east. Before reading on, sort the four
    by how you would expect the evidence of transfer to look (a chain of dated documents; a

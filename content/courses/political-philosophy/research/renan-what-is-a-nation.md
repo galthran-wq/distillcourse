@@ -33,10 +33,18 @@ goal: Analyze Renan's argument that a nation is a soul made of shared memory and
   received, and that consent is a philosopher's abstraction — is stated here at full
   strength (Renan's own 1869 text supplies it) and becomes the next lesson's doctrine:
   `barres-and-maurras-integral-nationalism` (`la-terre-et-les-morts`; Barrès's rewriting of
-  Renan's own formula with "an ancient cemetery" in place of "a legacy of memories"). (ii)
+  Renan's own formula with "an ancient cemetery" in place of "a legacy of memories"). That
+  lesson decides the dispute between consent and inheritance (REGISTER.md module 6):
+  membership is received rather than chosen, as an account of origins — Renan's "the
+  ancestors made us what we are" concedes it — but nothing follows from that for monarchy
+  or for the rights of the naturalised. (ii)
   The plebiscite's problem with people who did not choose — the minority that votes no, the
   colonised who were never asked, the Jew whose belonging another man denies — is carried
-  into `dreyfus-affair-as-test`. (iii) Forward Ref: `ortega-revolt-of-the-masses` (summary
+  into `dreyfus-affair-as-test`, where the outcome is found to fit Renan's civic nation in
+  principle (the family had opted for France; court and statute restored him) but not his
+  procedure (no plebiscite was held). What this lesson itself decides is stated in the
+  plan: the elimination holds (strong); the lecture's universal premise is inconsistent with
+  the 1871 ranking (on balance). (iii) Forward Ref: `ortega-revolt-of-the-masses` (summary
   index 32, ch. XIV.8) re-reads the daily plebiscite as a vote on a common FUTURE rather
   than on a shared past (`nation-as-project`). (iv) Later: `the-nation-and-its-defenders`
   (Scruton's and Miller's pre-political loyalty) and `hazony-virtue-of-nationalism`.
@@ -271,7 +279,7 @@ must say what a nation is.
    Latin is Virgil's "to rule the peoples by command", Aeneid VI — gloss once). Quote it as
    the record, at the length needed to see its argument (colonisation as an outlet for a
    warrior class that would otherwise turn socialist), not as a gotcha. Three readings,
-   each stated at strength, the reader left to weigh:
+   each stated at strength, then weighed:
    (a) **Inconsistency** — consent cannot be a principle for Alsatians and not for
        Algerians; the lecture's universal premise ("reason, justice, the true, the
        beautiful, which are the same for all", l.79) condemns the 1871 hierarchy.
@@ -289,9 +297,18 @@ must say what a nation is.
        argument among several (race, language and history still appear beside it in 1871)
        into the whole definition; the 1882 text is the mature view and its universal
        premises are what later readers used against the colonial passages.
-   The course does not choose; it requires the reader to state what each reading must
-   explain (Exercise 4). Keep it as the record: Renan never published a retraction of
-   the 1871 passages.
+   The weighing, as the course's finding (REGISTER.md module 6, grade **on balance**): the
+   lecture's universal premise is inconsistent with the 1871 ranking. Reading (b) shows how
+   Renan himself held the two together, but it does so by confining the plebiscite to "the
+   European nations as history has made them" — a limit the 1882 premises ("reason,
+   justice … the same for all", l.79; "man is the slave neither of his race nor of his
+   language", l.111) do not state and do not permit; it explains Renan's consistency of
+   intent, not the consistency of the doctrine. Reading (c) is compatible with the
+   finding (the later text is the one whose premises condemn the earlier). Why only "on
+   balance": Renan never applied the lecture to the colonies either way, and never
+   published a retraction of the 1871 passages, so a two-domain doctrine he never
+   restated cannot be ruled out as his settled view. Exercise 4 makes the reader state
+   what each reading must explain.
 8. **The OBJECTION at full strength, and where the lesson concedes.** The strongest
    objection comes from the right and Renan wrote it himself, in 1869 (RIM p. 303): if the
    nation is the present will of its citizens, how can one deny the right of secession?
@@ -313,13 +330,30 @@ must say what a nation is.
    not a procedure that founds nations; Renan himself presents it as a "modest empirical
    solution" that the "transcendents of politics" will laugh at and that the future may
    vindicate — "the way to be right in the future is, at certain hours, to know how to
-   resign oneself to being out of fashion" (l.111). Hand-off: objection (iii) is the next
-   lesson's starting point.
+   resign oneself to being out of fashion" (l.111). Say whether Renan answered each
+   objection — a fact about the argument: (i) he answered it by concession (no principle
+   pushed to excess; nations not eternal); (ii) he did not answer it — the "daily
+   plebiscite" names no procedure, so it cannot settle a disputed border; (iii) he did not
+   answer it and his own sentence concedes it — `barres-and-maurras-integral-nationalism`
+   decides that membership is received as an account of origins (strong); (iv) he did not
+   answer it, which is the inconsistency of link 7. And state the finding the elimination
+   earned (REGISTER.md module 6, grade **strong**): race, language, religion, interest and
+   geography each fail as a ground for a border, each by a single counter-example — the
+   negative half of the lecture holds even where the positive half is weakest. Hand-off:
+   objection (iii) is the next lesson's starting point, and the next lesson decides it.
+
+**Conclusion.** State the two findings in plain words with their grades: the elimination
+holds — none of race, language, religion, interest or geography can draw a border, each
+refuted by one nation that exists without it (**strong**); and the lecture's universal
+premise cannot be squared with the 1871 ranking of races (**on balance**). Then say what the
+lesson has not decided: whether a nation is chosen or received — the inheritance objection
+Renan wrote himself in 1869 — which the next lesson takes up and decides.
 
 Headings as claims (suggested): "Dynasties made the map, but nations survived them"; "Race
 is made and unmade, so it cannot draw borders"; "Language invites union; it does not force
 it"; "What survives the elimination: memory and consent"; "A nation must forget"; "The
-racial hierarchy of 1871"; "What a daily plebiscite cannot do".
+racial hierarchy of 1871"; "The universal premise condemns the ranking"; "What a daily
+plebiscite cannot do".
 
 ## Set pieces and worked examples to recreate
 
@@ -377,11 +411,9 @@ racial hierarchy of 1871"; "What a daily plebiscite cannot do".
 - **"Soul" is not mysticism:** the "spiritual principle" is defined by two observable
   things (memories held in common, a will to continue); say so, since the word misleads.
 - **Not a gotcha:** course.yaml notes require the racial writings be "taught as part of the
-  record, not as a gotcha". The three readings in link 7 are each stated at strength; no
-  verdict in the course's voice. The course passes
-  no verdict of its own on any author or idea: no condemning or approving labels in its own
-  voice. Judgement comes only through argument and evidence; a label may appear only inside
-  a quotation, with who applied it and when.
+  record, not as a gotcha". The three readings in link 7 are each stated at strength, then
+  weighed: the course finds the universal premise inconsistent with the ranking (on
+  balance) — a finding about the doctrine, never a label for Renan. The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Do not re-teach** Fichte's living language, Herder's Volk, Gobineau's blood, Burke's
   partnership, Maistre's "no such thing as man" — each a clause and a `<Ref>`.
 - **Do not overclaim the plebiscite's influence:** it became a commonplace of

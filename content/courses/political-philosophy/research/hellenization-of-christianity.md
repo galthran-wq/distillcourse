@@ -170,6 +170,17 @@ goal: Explain how a Jewish movement was remade in Greek concepts and Roman forms
   against Heretics 7 ("What has Athens to do with Jerusalem?") as the one
   contemporary voice against Hellenization — all at New Advent / CCEL
   (NPNF/ANF, PD). Quote short.
+- **Background on what Jesus preached (register source; References only, no
+  name in the body):** Johannes Weiss, *Die Predigt Jesu vom Reiche Gottes*
+  (1892; Eng. *Jesus' Proclamation of the Kingdom of God*, 1971), and Albert
+  Schweitzer, *Von Reimarus zu Wrede* (1906; Eng. *The Quest of the
+  Historical Jesus*, 1910). The line since them is the scholarly consensus:
+  Jesus's preaching was eschatological — the kingdom as an imminent act of
+  God, not a kingdom within. State it once, as background, with its
+  minority (the non-eschatological Jesus of some late-twentieth-century
+  scholarship), and say that it bears on Harnack's "kingdom within" as
+  history. It is not a verdict on the staged dispute (see link 7). Not
+  staged in `research/texts/`.
 
 ## EXPLANATION PLAN (L0)
 
@@ -326,7 +337,19 @@ from the start.
    the Gospel" (line 127). The lesson states where each would say the other
    begs the question: Harnack's kernel is selected by a liberal Protestant's
    taste; Nietzsche's "slave revolt" is a psychology no document records.
-   Then the reader is left to weigh — no verdict from the course.
+   Then say, as facts about the arguments, which objections each met.
+   Harnack's pre-answer meets the charge that the Gospel was born of
+   distress; it does not meet Nietzsche's charge, which is about the
+   valuation (the infinite worth of every soul), not about the
+   circumstances of its birth. Nietzsche does not answer the charge that
+   his slave revolt has no document behind it. One sentence of background,
+   not a verdict: on what the historical Jesus preached, the consensus since
+   the 1890s is eschatological (the kingdom as God's imminent act), with a
+   minority dissent — which tells against Harnack's "kingdom within" as
+   history and leaves the staged question where it was. Then say plainly why
+   the course gives no verdict here: which kernel should have survived is a
+   question of value, and no evidence the course holds can settle it. That
+   is the finding, stated once, not a deferral.
 8. **The third reading — what if neither Greek nor Jewish is the right
    frame?** Spengler (`<Quote>`, short): a pseudomorphosis is "an older alien
    Culture [lying] so massively over the land that a young Culture, born in
@@ -435,7 +458,7 @@ verdict"; "Pseudomorphosis: a third reading"; conclusion.
   (31 BC, Octavian defeats Antony and Cleopatra; the Principate follows).
   No more than three new named terms per section (L11c): the lesson is
   term-dense, so sections must be short and many.
-- **Register.** The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+- **Register.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Do NOT re-teach Cicero or Polybius.** Natural law and the civil-religion
   clause are a `<Ref>` to `cicero-res-publica-and-natural-law` plus a clause;
   Roman religion as a civic device is a `<Ref>` to
@@ -448,7 +471,11 @@ verdict"; "Pseudomorphosis: a third reading"; conclusion.
   of Nietzsche's view, attributed, and the Ref for the argument behind it.
 - **Face the tension directly** (course.yaml note): the two agree Europe's
   Christianity was Greek-made; they disagree on what the kernel was and
-  whether it should have survived. Do not soften either; do not adjudicate.
+  whether it should have survived. Do not soften either. Do not adjudicate
+  which kernel should have survived — a question of value the course's
+  evidence cannot settle (register, module 2) — but do say which of each
+  other's objections each answered (link 7), and keep the consensus on
+  Jesus's eschatological preaching as background, not as the verdict.
 - **Harnack is a 1900 liberal Protestant** (summary 47 pedagogy): the
   "kernel" is his selection, Jewish forms and Catholic ritual are "husk" by
   his taste, some of his history is dated (Synoptic sourcing, demons as

@@ -37,7 +37,15 @@ goal: Analyze Michels's iron law of oligarchy and Pareto's theory of the circula
   iron law and its causes, the residue/derivation distinction, the circulation
   of elites, and the strongest answer to "is democracy possible?" that survives
   them: competition among elites, which the voters decide.
-- **Hands off:** Two problems stay open. (i) If what moves men is sentiment and
+- **Hands off:** The lesson decides the iron law: a strong tendency inside
+  mass organisations, not an iron law, and not decisive between parties
+  (strong); Pareto's residues and success-defined elite cannot be falsified.
+  It also decides, from the elite theorists' own texts, that the minority that
+  rules is not as a rule the most capable, though it tends to be where entry
+  is open and rulers removable (on balance) — the elite-theory side of the
+  module-1 verdict in `aristotle-political-animal-and-natural-slavery`.
+  The Weimar record of the SPD's toleration (`article-48-weimar`) uses that
+  verdict. Two problems pass on. (i) If what moves men is sentiment and
   not theory, and if a class needs a belief to fight, then the belief a
   revolutionary class needs is not a programme it can check but an image it can
   live by — `sorel-reflections-on-violence` (next module; Sorel is cited by
@@ -53,6 +61,112 @@ goal: Analyze Michels's iron law of oligarchy and Pareto's theory of the circula
   West's winter, Ortega diagnoses the mass-man, Schmitt names the political as
   friend and enemy and the sovereign as he who decides the exception — and
   Weimar is the case"
+
+## VERDICT
+
+Lesson verdict (REGISTER.md, Module 7). The brief carries it exactly as graded
+there.
+
+- **Claim judged:** "Who says organisation says oligarchy" as an iron law, and
+  Pareto's circulation of elites.
+- **Verdict:** the law **holds as a strong tendency inside mass
+  organisations; fails as an iron law; does not decide outcomes between
+  parties**. Pareto's residues and his success-defined elite cannot be
+  falsified. Grade: **strong**.
+- **What decides it:** Michels's own continuity data (the survival count of
+  SPD congress delegates and officials, Part Two ch. I) show a tendency, not a
+  law. The International Typographical Union is a counter-case: two organised
+  internal parties alternated in office for decades (Lipset, Trow & Coleman,
+  *Union Democracy*, 1956). The competitive answer (Schumpeter's method, via
+  Muller) concedes oligarchy inside each party and denies that it settles the
+  contest between them. Pareto's residues are named after the conduct they
+  explain, and his elite is defined by success, so no conduct and no outcome
+  can count against either.
+- **Strongest objection:** the ITU is one union, unusual in its craft and its
+  printers' culture — its own students treat it as a deviant case whose
+  conditions are rare (bind the wording to *Union Democracy*); so
+  the law stands as a law with one freak. Why it does not overturn the
+  verdict: a law in Michels's sense ("iron") admits no exception; one
+  well-documented counter-case is enough to turn it into a tendency, and the
+  rarity of the conditions is what "strong tendency" already concedes. Nor does
+  the objection touch the second half: even where every party is an
+  oligarchy, voters decide between them.
+- **What would overturn it:** a large, long-lived organisation with
+  competitive internal parties whose leadership nonetheless proves
+  irremovable.
+
+**Second verdict (round 2, the elite-theory side of a module-1 verdict):
+whoever actually rules is the most capable.** The course's verdict on natural
+slavery (`aristotle-political-animal-and-natural-slavery`, four parts) separates
+"the most capable should rule" (common ground — Plato, Aristotle, Mosca and
+meritocratic liberals all hold it) from "whoever actually rules is the most
+capable". This lesson carries the second claim's test from the elite
+theorists' own texts, because they are the authors most often read as saying
+that rulers rule by superiority.
+
+- **Claim judged:** a ruling minority is, as a rule, made of the most capable
+  — so that the fact of rule certifies capacity.
+- **Verdict:** **fails as a general rule; holds where there is competition and
+  removability. Grade: on balance.**
+- **What decides it — the elite theorists against the claim.** (i) *Pareto
+  himself separates the label from the capacity.* At the start "the label
+  corresponded to an actual capacity. But as time goes by, considerable,
+  sometimes very considerable, differences arise between the capacity and the
+  label" (§2052, `texts/pareto/vilfredopare-s1-vol3-ch11-2025-2059.txt`
+  l.525–536); aristocracies "decay also in quality" and are restored only "by
+  families rising from the lower classes" (§2054, l.555–568); "If human
+  aristocracies were like thorough-breds among animals, which reproduce
+  themselves over long periods of time with approximately the same traits, the
+  history of the human race would be something altogether different" (§2055,
+  l.571–580); revolutions come from "accumulations in the higher strata … of
+  decadent elements" while "in the lower strata of society elements of
+  superior quality are coming to the fore" (§2057, l.590–597). And the
+  insecurity is greatest where the elite is closed: "A humanitarian aristocracy
+  that is closed or stiffly exclusive represents the maximum of insecurity"
+  (§2179, `texts/vilfredopare-s2-vol4-ch12-2170-2202.txt` l.266–277). The
+  circularity charge in the first verdict hits Pareto's *definition* of the
+  elite (the highest grades); it does not hit this distinction, which is the
+  one place he sets the governing elite's position against its members'
+  capacity and says they come apart. (ii) *Michels on what an organisation
+  selects for.* Leaders fill gaps "not by way of popular election, but by
+  co-optation", "surround themselves … with a wall, within which they will
+  admit those only who are of their own way of thinking", and "do all in their
+  power to choose these successors for themselves" (Part Two,
+  `texts/michels-political-parties.txt` l.5203–5214); a funded party gets "a
+  body of officials who are loyal and devoted because they are entirely
+  dependent on the party for their means of subsistence" (l.6039–6044); the
+  bureaucracy breeds "place-hunting, a mania for promotion, and
+  obsequiousness towards those upon whom promotion depends" (l.9346–9355); in
+  the mature organisation "administrative aptitudes are now of the first
+  importance" and leaders are "specialists endowed with insight and mastery of
+  routine" (l.14540–14551). So the organisation selects for loyalty and
+  organisational skill — real capacities, but not the capacity to govern well
+  that the claim needs. (iii) *Mosca's own wording* concedes the gap:
+  members of a ruling minority have qualities giving them "a certain material,
+  intellectual or even moral superiority; or else they are the heirs of
+  individuals who possessed such qualities" — an attribute "real or apparent"
+  (`texts/mosca/the-ruling-class.txt` l.810).
+- **Where it holds:** where the able below can enter and the ruling group can
+  be removed. Pareto: an elite that "successfully assimilates" the exceptional
+  men of the subject class is "in the highest degree difficult to overthrow"
+  (§2179, l.274–278); the competitive answer of the first verdict (leaders who
+  must win a contest for votes, and lose office when they lose it) is the
+  institutional form of the same condition. This is the elite-theory side of
+  the module-1 verdict that the mixed regime survives (`sparta-as-test-case`):
+  a share for every part and removable office.
+- **Strongest objection:** this is Pareto's circulation read as a refutation of
+  Pareto. His thesis is that capacity *wins in the end* — the capable below
+  displace the decadent above — so over the long run rule does track capacity.
+  **Why it does not overturn the verdict:** "in the end" is the point. Between
+  the label's drift and the flood that corrects it lie the decades Pareto calls
+  decadence, and his corrective is revolution, not a rule that capacity holds
+  office; a claim true only after the overthrow of the incapable is the
+  verdict's "fails as a general rule". And what makes the correction peaceful,
+  on his own §2179, is openness — the verdict's "holds where".
+- **What would overturn it:** closed hereditary or co-opting elites that kept
+  their capacity across generations — Pareto's "thorough-breds" — shown in the
+  record (a dynasty or a co-opting body whose later members governed as well
+  as its founders with no entry from below).
 
 ## Sources to consult
 
@@ -239,11 +353,14 @@ goal: Analyze Michels's iron law of oligarchy and Pareto's theory of the circula
   the Future of Democracy* (2006). Course.yaml asks for "Michels's own drift
   to Mussolini as a fact bearing on the reception": state it dated, once,
   after checking, and do not let it argue against the book.
-- **Empirical exception to the iron law — NOT in the dossier:** S. M. Lipset,
-  M. Trow and J. Coleman, *Union Democracy* (1956) — the International
-  Typographical Union, whose two organized internal parties alternated in
-  office for decades. References only; the lesson states the case as the
-  course's own counter-instance in link 8.
+- **Empirical exception to the iron law — NOT in the dossier (named by the
+  register as deciding source):** S. M. Lipset, M. Trow and J. Coleman, *Union
+  Democracy: The Internal Politics of the International Typographical Union*
+  (Free Press, 1956) — the International Typographical Union, whose two
+  organized internal parties alternated in office for decades. No staged text;
+  bind the facts used (the two parties, the decades of alternation) to the
+  book before stating them. References only; the lesson states the case as
+  the course's own counter-instance in link 8.
 - **Strauss–Cropsey** — no chapter on Michels or Pareto; not applicable. (The
   Machiavelli chapter covers Prince XVIII if the writer wants to check the
   lion-and-fox image Pareto borrows.)
@@ -350,7 +467,7 @@ the law — a body whose formula, statutes and members all point the other way.
    Reichstag deputies voted for war credits; Michels reads the vote as the
    organization's interest — its treasury and its legal existence — deciding
    against its internationalist programme. Present this as Michels's
-   interpretation (the reader can weigh it in exercise 3). What Michels allows
+   interpretation (exercise 3 shows what the vote can and cannot establish). What Michels allows
    against the law (the exceptions he admits): the "ideological tendency of
    democracy towards criticism and control" as one of "two regulative
    principles" (l.19470), and the waves that "break ever on the same shoal" but
@@ -418,8 +535,8 @@ the law — a body whose formula, statutes and members all point the other way.
    §2235: the analysis is "not condemnation or praise") and let the reader see,
    in the same pages, the contempt for "humanitarianism" (§2471–2474) — the
    tension is part of the record, stated without a label.
-8. **What is left of the idea that the many can rule?** Three answers at full
-   strength, the reader left to weigh. (a) *Michels's own:* democracy is "the
+8. **The weighing: what is left of the idea that the many can rule?** Three
+   answers at full strength, then the verdict in the course's voice. (a) *Michels's own:* democracy is "the
    least of evils" (l.19490); the treasure in the field (l.19399) — the sons
    dig for a treasure that is not there and improve the soil; the search for
    democracy weakens oligarchy even if it never finds its object. (b) *The
@@ -438,21 +555,71 @@ the law — a body whose formula, statutes and members all point the other way.
    1900s) and slides between "a minority leads" and "a minority escapes
    control"; Pareto's residues are named after the conduct they explain, so no
    conduct can count against them, and his "elite" is circular (those with the
-   highest grades are those who succeed). Then the reception, reported as
+   highest grades are those who succeed). **The verdict, argued:** Michels's
+   own continuity data show a tendency, not a law; the printers' union is a
+   counter-case; the competitive answer concedes oligarchy inside each party
+   and denies that it settles the contest between them — so the law holds as
+   a strong tendency inside mass organisations, fails as an iron law, and does
+   not decide outcomes between parties; Pareto's residues and success-defined
+   elite cannot be falsified (**strong**). The strongest objection at full
+   strength: the printers' union is one freak case, whose own students called
+   its conditions rare. Answer: an iron law admits no exception, and "rare
+   conditions" is what "strong tendency" already concedes. Say what would
+   overturn the verdict: a large, long-lived organisation with competitive
+   internal parties whose leadership nonetheless proved irremovable. **(d) Does
+   the minority that rules rule because it is the most capable?** (the second
+   VERDICT; 250–400 words). The reader arrives from module 1 with Aristotle's
+   distinction between the claim that the most capable should rule (which every
+   author in the course from Plato to Mosca grants) and the claim that whoever
+   rules is the most capable (`<Ref>` `aristotle-political-animal-and-natural-slavery`).
+   Test the second on the elite theorists' own pages: Pareto's label and
+   capacity drifting apart (§2052), aristocracies that "decay also in quality"
+   and are restored from below (§2054), the "thorough-breds" sentence (§2055),
+   superior elements accumulating below (§2057); Michels's co-optation, the
+   officials "loyal and devoted because they are entirely dependent", and the
+   leaders as "specialists … [in] mastery of routine". Verdict in the course's
+   voice: **fails as a general rule; holds where there is competition and
+   removability — on balance** — with Pareto's §2179 (the closed elite "the
+   maximum of insecurity"; the elite that assimilates the able below "in the
+   highest degree difficult to overthrow") as the hinge, and one clause linking
+   it to the module-1 verdict that the mixed regime with removable office
+   survived (`<Ref>` `sparta-as-test-case`). State the strongest objection
+   (capacity wins in the end — that is what circulation means) and the answer
+   ("in the end" means after the decadence and the flood; openness is what
+   makes the correction peaceful). Then the
+   reception, reported as
    dated fact once each and only after the writer has checked them (see
    Sources): Pareto welcomed Mussolini's government in its first months and
    died in 1923; Michels joined the Fascist party and praised the leader as the
-   embodiment of the masses' will. The lesson asks, without answering for the
-   reader: does a theory that democracy is impossible incline its holders to
-   welcome its end, or did these two men's choices follow from something else?
-   (`the-right-in-1933` asks the same of three later thinkers — forward Ref, one
-   clause.)
+   embodiment of the masses' will. The lesson puts the question — does a
+   theory that democracy is impossible incline its holders to welcome its
+   end? — and states the fact about the argument: the verdict just reached
+   means the theory, read correctly, does not say democracy is impossible, so
+   the step to welcoming its end needs a premise the theory does not supply.
+   (`the-right-in-1933` decides the parallel question for three later
+   thinkers — forward Ref, one clause.)
 
 Headings as claims: "Numbers forbid direct rule"; "Expertise makes leaders
 irremovable"; "The members' own needs loosen their control"; "'Who says
 organization says oligarchy'"; "Residues and derivations: the theory comes after
 the sentiment"; "History is a graveyard of aristocracies"; "From the lions to the
-foxes"; "What is left for democracy".
+foxes"; "Oligarchy is a strong tendency, not an iron law, and it does not
+decide between parties" (the weighing; states the verdict), with a subsection
+"The minority that rules is not, as a rule, the most capable" for verdict (d).
+
+**Conclusion.** State the verdict in plain words with its grade: inside a mass
+organisation a minority tends to entrench itself — Michels's own figures show
+it — but the law is not iron (the printers' union), and it does not decide the
+contest between parties, which the voters decide; Pareto's residues and his
+success-defined elite cannot be falsified (strong). Add the second verdict in
+one sentence: on the elite theorists' own evidence, the minority that rules is
+not as a rule the most capable — Pareto's labels drift from capacity and
+Michels's organisations select for loyalty and routine — though it tends to be
+where the able below can enter and the rulers can be removed (on balance).
+Then the hand-off: if
+what moves men is sentiment, a revolutionary class needs an image, not a
+programme (`sorel-reflections-on-violence`); and the next lesson turns from
+who rules to what politics does to a people's inner life (`mann-reflections`).
 
 ## Set pieces and worked examples to recreate
 
@@ -491,10 +658,7 @@ foxes"; "What is left for democracy".
 
 ## Pitfalls / subtleties to flag
 
-- **Register (exact rule).** The course passes no verdict of its own on any
-  author or idea: no condemning or approving labels in its own voice.
-  Judgement comes only through argument and evidence; a label may appear only
-  inside a quotation, with who applied it and when.
+- **Register (exact rule).** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Terms to anchor (L11), at most three per section:** SPD (link 0 anchor);
   party congress / Parteitag (link 2: the annual assembly of delegates that
   elected the executive); executive committee (link 2); oligarchy (link 1 —
@@ -643,7 +807,24 @@ foxes"; "What is left for democracy".
    and his choice of democracy as the least of evils), and state what would have
    to be true for the claim to survive (that the competing elites collude — a
    "réunion des élites" between parties as well as within them).
-8. **FORWARD (E7) → `sorel-reflections-on-violence`:** Pareto says men act from
+8. **Attack the verdict:** The lesson concludes that Michels's law is a strong
+   tendency, not an iron law, because of the printers' union. State the
+   strongest objection in its best form: one craft union with a unique
+   culture is an exception that confirms the rule; every mass party and
+   every large union studied since has an entrenched leadership, and the
+   competitive answer only moves the oligarchy up a level (a cartel of party
+   leaderships). Then say what evidence would be needed to overturn the
+   verdict: for the first half, a large, long-lived organisation with
+   competitive internal parties whose leadership nonetheless proved
+   irremovable; for the second, evidence that competing party leaderships
+   collude so that elections do not change who governs. Solution: the first
+   would restore the "iron"; the second is exercise 7's condition, and the
+   record of governments removed by elections does not show it. Part (b) of
+   the same exercise, on the second verdict: state at full strength the
+   reading of Pareto on which rule does track capacity (circulation means the
+   capable win in the end), and say what evidence would show that a closed
+   elite keeps its capacity — Pareto's "thorough-breds" (§2055) in the record.
+9. **FORWARD (E7) → `sorel-reflections-on-violence`:** Pareto says men act from
    residues and justify themselves with derivations, and that a subject class
    wins when it keeps the faith and the readiness for force its rulers have lost.
    Suppose you led a workers' movement and accepted both claims. What would you

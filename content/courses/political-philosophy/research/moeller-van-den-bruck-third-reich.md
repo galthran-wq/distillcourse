@@ -37,9 +37,12 @@ goal: Analyze Moeller van den Bruck's argument for a conservative revolution aga
   (conservative/reactionary, conservative/liberal, German socialism/Marx, nation/party)
   and to say why an idea its author called "misty, indeterminate, charged with feeling"
   could be taken as the name of a state he did not foresee.
-- **Hands off:** (i) The book names no regime and no leader, and its author died in
-  1925: what the Third Reich idea became when a party claimed it is reported here as
-  fact and judged in `the-right-in-1933`. (ii) Moeller's conservatism still rests on
+- **Hands off:** (i) This lesson decides that a revolution cannot be kept conservative
+  by the intentions of those who call for it (**strong**): the book names no regime,
+  no programme and no leader, and its author died in 1925, so a movement he disdained
+  took its name. What passes on is the wider question — whether the radical right's
+  doctrines gave its thinkers any ground to refuse the movement in power — decided in
+  `the-right-in-1933`. (ii) Moeller's conservatism still rests on
   history and the nation; `evola-revolt-against-the-modern-world` asks for a standard
   that condemns all of history at once. (iii) The three-age shape of the idea — first,
   second, third empire — is traced to a medieval prophecy of a third age in
@@ -49,6 +52,34 @@ goal: Analyze Moeller van den Bruck's argument for a conservative revolution aga
 - **Spine step:** "The radical right turns from conserving to revolution — Sorel's myth,
   Jünger's front and Worker, Moeller's Third Reich, Evola's Tradition — and in 1933 its
   thinkers have to choose: Schmitt and Heidegger join, Spengler refuses"
+
+## VERDICT
+
+- **Claim judged:** a revolution can produce what is worth conserving and stay
+  conservative — Moeller's "conservative revolution", with the Third Reich as its idea.
+- **Verdict:** fails. Grade: **strong**.
+- **What decides it:** (1) The argument: a conservatism that creates its values has
+  given up the reasons conservatism gave for conserving — that inherited institutions
+  carry more knowledge than any designer and that change should be slow because its
+  consequences are unknown (Ref `burke-reflections`). Moeller concedes it: conservative
+  ends may be reached "by revolutionary means" (l.4270); "a conservative's function is
+  to create values which are worth conserving" (l.4833). (2) The record: his own
+  warning that the Third Reich idea was "misty, indeterminate, charged with feeling"
+  and "might well be the most fatal of all the illusions" (Prefatory Letter, l.64–70)
+  was borne out. The idea had no institution, no programme and no leader — "the Third
+  Party" is a name, not a mechanism — so after his death (1925) and the reissues of
+  1930–31 a movement he disdained took its name as the name of its state (Stern, *The
+  Politics of Cultural Despair*, 1961, Part III, for the 1922 meeting and his
+  judgement of Hitler — as reported, verify before stating detail).
+- **Strongest objection:** the authors of an idea are not answerable for its theft;
+  Moeller's distinction between the conservative and the reactionary is real and was
+  used by later writers on both sides, and he showed no National Socialist intention.
+  This is conceded and does not overturn the verdict, which is about the claim, not
+  the man: the claim was that the revolution could be kept conservative, and the book
+  supplies nothing that could keep it so. Moeller named the danger himself.
+- **What would overturn it:** a mechanism in the book that holds the "Third Party" to
+  conservative ends against a mass movement — an institution, a rule of selection, a
+  check — rather than the intentions of those who call for the revolution.
 
 ## Sources to consult
 
@@ -164,6 +195,9 @@ goal: Analyze Moeller van den Bruck's argument for a conservative revolution aga
   supervised the German Dostoevsky edition; breakdown and suicide). Paraphrase; Fawcett,
   Mohler and the critic (Fritz Stern) in References only.
 - **Strauss–Cropsey** — no Moeller chapter (checked). Not used.
+- **Required by the verdict register:** F. Stern, *The Politics of Cultural Despair*
+  (1961), Part III — no staged text under `C/research/texts/`; obtain the pages before
+  stating any detail of the 1922 meeting (see the next item).
 - **NOT in the dossier (name, do not quote; verify before stating detail):** F. Stern,
   The Politics of Cultural Despair (1961), Part III on Moeller — the standard account of
   the June Club (Juniklub, 1919), of Hitler's visit to it in 1922, and of Moeller's
@@ -273,9 +307,11 @@ German word for empire or realm; the First Reich is the medieval Holy Roman Empi
    "Germany has proved TOO GOOD for parliaments" (l.2821); "a democracy with a
    leader—not parliamentism" (l.2868); "a people must first be nationalized before it is
    democratized" (l.4663). Answer: democracy as national self-assertion under a leader,
-   representation by estates and professions. The open problem the lesson states, not
-   solves: who decides what the people's will is, if not a count? (The text answers:
-   leaders "whose party is Germany", trusted rather than elected, VII.9.)
+   representation by estates and professions. The problem the lesson states: who decides
+   what the people's will is, if not a count? The text's answer — leaders "whose party
+   is Germany", trusted rather than elected (VII.9) — names who decides but gives no
+   way to tell the true leader from a claimant; the lesson says Moeller did not answer
+   the question, and link 7 shows what that gap cost.
 6. **The Third Reich as an idea.** The name: "an old German conception … It arose when
    our First Empire fell; it was early quickened by the thought of a millennium" (Letter,
    l.50–54) — a third empire that is not a restoration of the first or second but a new
@@ -288,8 +324,10 @@ German word for empire or realm; the First Reich is the medieval Holy Roman Empi
    sentence (the course's own statement): a third age after two, as in the twelfth-century
    prophecy of Joachim of Fiore and in the Russian idea of Moscow as the "Third Rome",
    which Moeller met while editing Dostoevsky; forward Ref `voegelin-gnosticism`.
-7. **The OBJECTIONS at full strength, and the thinker's own difficulty.** Three, each
-   stated as the course's own. (a) From the conservative side (Ref `burke-reflections`;
+7. **Weighing — "A revolution cannot be kept conservative by the intentions of those
+   who call for it."** The section sets the claim against its strongest objection and
+   the evidence and reaches the verdict (see VERDICT). Three objections, each stated as
+   the course's own. (a) From the conservative side (Ref `burke-reflections`;
    `what-conservatism-is` will name it): a conservatism that creates its values has
    discarded the reasons conservatism gave for conserving — that inherited institutions
    carry more knowledge than any designer, that change should be slow because
@@ -311,14 +349,28 @@ German word for empire or realm; the First Reich is the medieval Holy Roman Empi
    his: to beat the republic he needed a mass movement; to stay conservative he needed
    it to want what he wanted; nothing in "the Third Party" could make it do so. Where the
    lesson concedes: Moeller's distinction between the conservative and the reactionary
-   is a real distinction, used by later writers on both sides (`what-conservatism-is`);
-   what fails is the claim that a revolution can be kept conservative by the intentions
-   of those who call for it.
+   is a real distinction, used by later writers on both sides (`what-conservatism-is`),
+   and the book shows no National Socialist intention; the authors of an idea are not
+   answerable for its theft. The weighing: the concession is about the man, the verdict
+   about the claim. The claim was that the revolution could be kept conservative, and
+   nothing in the book could keep it so — Moeller named the danger himself. Verdict, in
+   the course's voice: the conservative revolution, as argued here, fails (**strong**).
+   State what would overturn it: a mechanism in the book that holds the "Third Party"
+   to conservative ends against a mass movement.
+
+Conclusion: state the verdict in plain words with its grade — a revolution that
+creates what it would conserve has given up the reasons for conserving, and Moeller's
+idea, by his own warning misty and without institution, programme or leader, was taken
+by a movement he disdained; the claim fails (strong). Then the hand-off: Moeller's
+conservatism still rests on history and the nation, and
+`evola-revolt-against-the-modern-world` asks for a standard that condemns all of history
+at once; whether these doctrines gave their holders any ground to refuse the movement in
+power is decided in `the-right-in-1933`.
 
 Headings as claims (suggested): "A war may be lost; a revolution must be won"; "The
 reactionary restores, the conservative creates"; "Liberalism as the principle of no
 principle"; "Every people its own socialism"; "A democracy with a leader"; "The third
-empire as an idea"; "What the idea could not control".
+empire as an idea"; "A revolution cannot be kept conservative by intentions".
 
 ## Set pieces and worked examples to recreate
 
@@ -352,10 +404,7 @@ empire as an idea"; "What the idea could not control".
 
 ## Pitfalls / subtleties to flag
 
-- **The register rule.** The course passes no verdict of its own on any author or idea:
-  no condemning or approving labels in its own voice. Judgement comes only through
-  argument and evidence; a label may appear only inside a quotation, with who applied it
-  and when. (In particular, the critic's phrase "annihilation by labels" may appear only
+- **The register rule.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. (In particular, the critic's phrase "annihilation by labels" may appear only
   as a quotation with its author and date — and since the author is a scholar, L8a sends
   him to References: state the objection in the course's words, link 7 b.)
 - **"Third Reich" / "Third Empire" / "Das dritte Reich".** The 1934 translation renders
@@ -492,6 +541,15 @@ empire as an idea"; "What the idea could not control".
    one other modern political movement of the course (Ref `marx-manifesto`) that shares
    the shape. The solution says in one sentence that a postwar lesson reads this shape —
    the immanent "third age" — as the mark of modern mass movements, with a `<Ref>`.
+9. **Attack the verdict (E6b):** the lesson judged that a revolution cannot be kept
+   conservative by the intentions of those who call for it (strong). State the
+   strongest objection in its best form — that Moeller cannot be judged by a theft
+   after his death, that his conservative/reactionary distinction is sound, and that
+   any idea can be taken by a movement its author disdains — and say what evidence
+   would be needed to overturn the verdict: a passage in the book that gives the "Third
+   Party" a mechanism (institution, selection rule, check) holding it to conservative
+   ends, or a conservative revolution elsewhere that stayed conservative because of such
+   a mechanism.
 
 ## Nietzsche cross-course links
 

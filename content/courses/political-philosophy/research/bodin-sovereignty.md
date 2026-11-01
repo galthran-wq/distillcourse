@@ -28,7 +28,7 @@ goal: Analyze Bodin's definition of sovereignty and its attributes, and explain 
   the sovereign becomes a contradiction, and toleration of two religions becomes a policy of the
   state's survival rather than a concession to conscience. The lesson reconstructs the
   incommunicability argument and tests it on Rome, Venice and England as Bodin did.
-- **Hands off:** Two problems stay open. (i) Bodin's sovereign holds his power from God,
+- **Hands off:** Two problems pass on. (i) Bodin's sovereign holds his power from God,
   modelled on the father, and commonwealths begin in force (I.6) — so WHY would equals ever
   submit, and what makes force into obligation? `hobbes-state-of-nature-and-covenant` derives
   the sovereign from the subjects' own fear and consent; `filmer-patriarcha`, two lessons later,
@@ -38,7 +38,9 @@ goal: Analyze Bodin's definition of sovereignty and its attributes, and explain 
   covenants and property yet lets no subject judge him — the unresolved tension between right
   and fact (a tyranny counts as a commonwealth though the definition says "rightly ordered");
   `hobbes-sovereign-and-liberty` removes the limits, `english-revolution-as-test` watches a
-  kingdom whose two bodies each claim to make law. The one-sentence forward hook to the crisis
+  kingdom whose two bodies each claim to make law and decides the module question there: Bodin
+  is right that a kingdom with no settled answer to "who decides" goes to war, and wrong that no
+  mixed or limited state can stand (strong). The one-sentence forward hook to the crisis
   module: the twentieth-century jurist who will say Bodin's decisive passage is not "absolute
   and perpetual" but the marks of sovereignty in I.10, because they settle who decides when the
   law is suspended (`schmitt-political-theology`).
@@ -283,9 +285,11 @@ act.
    what follows for the subject? Bodin: nothing but remonstrance (III.4–5: the magistrate
    refuses what is against God and nature, remonstrates repeatedly, then obeys — or refuses to
    help enact a new iniquitous law at registration) — the covenant binds, but no subject judges
-   whether it is broken. The lesson concedes the tension Tooley names, stated as the course's
-   own observation: a tyranny is counted a commonwealth though the definition says "rightly
-   ordered", while a robber band is not; right and fact never meet.
+   whether it is broken. Say plainly that Bodin does not answer the objection: he grants the
+   covenant binds the prince and gives the subject no way to hold him to it, so the binding is
+   real only before God. The lesson states the tension Tooley names as the course's own
+   observation: a tyranny is counted a commonwealth though the definition says "rightly
+   ordered", while a robber band is not; right and fact never meet in the text.
 7. **Two religions in one kingdom.** Obvious attempt (the parties'): enforce the true one. Bodin
    (IV.7): factions ruin every state and worst a popular one; forbid religious DISPUTATION,
    since argument inflames; "prefer toleration to coercion"; "no one can be forced to believe
@@ -391,9 +395,7 @@ tolerate, because the state must survive".
   Luther/Calvin chapter, is the nearest); no Bodin secondary beyond Tooley; no Smith lecture;
   the Strauss–Cropsey volume has no Bodin chapter. Say in References that the lesson's close
   reading rests on Tooley's abridgement.
-- **Register:** The course passes no verdict of its own on any author or idea: no condemning or
-  approving labels in its own voice. Judgement comes only through argument and evidence; a label
-  may appear only inside a quotation, with who applied it and when.
+- **Register:** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 
 ## FIGURE PLAN
 

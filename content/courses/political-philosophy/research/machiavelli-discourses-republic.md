@@ -27,17 +27,50 @@ goal: Analyze Machiavelli's republican teaching — that class conflict produced
   together — then show that this is the SAME standard as The Prince applied to a different
   question (how a city stays free, not how a man holds it), so that the two books answer each
   other rather than contradict.
-- **Hands off:** Open problem: Machiavelli's Rome is a mixture (senate, consuls, tribunes) kept
-  free by tension; the rest of this module denies that any such thing exists — Bodin says
-  sovereignty is indivisible and Rome was a popular state governed aristocratically; Hobbes says
-  "mixed government" is three factions; Filmer reads the same four centuries of Roman tumult as
-  an "ocean of blood" that ended, as it had to, in a monarchy (Patriarcha II.11–12) — the
-  opposite verdict on the same evidence. `bodin-sovereignty` takes it. The "founder" theme (I.9, III.1)
+- **Hands off:** This lesson decides one dispute (see VERDICT): on the record of the Republic,
+  the quarrel of nobles and people made Rome free while it ran through institutions, and
+  destroyed it once it left them (after 133) — so the classical view of faction, and the
+  royalist reading of the same centuries as an "ocean of blood" (Filmer, Patriarcha II.11–12,
+  taught three lessons on), fit only the last century. What passes on is the structural
+  question: Machiavelli's Rome is a mixture (senate, consuls, tribunes) kept free by tension; the
+  rest of this module denies that any such thing exists — Bodin says sovereignty is indivisible
+  and Rome was a popular state governed aristocratically; Hobbes says "mixed government" is
+  three factions. `bodin-sovereignty` takes it, and the module verdict decides it in
+  `english-revolution-as-test`. The "founder" theme (I.9, III.1)
   is inherited much later by `carlyle-heroes` and `ortega-revolt-of-the-masses` — forward clause
   only.
 - **Spine step:** "Christendom builds a law above kings; Machiavelli breaks it; the wars of
   religion force one sovereign power above every faction — Bodin's definition, Hobbes's
   derivation from fear, Filmer's from fatherhood — and the English Revolution tests them"
+
+## VERDICT
+
+- **Claim judged:** Discourses I.4 — the quarrel of nobles and people was the source of Roman
+  liberty — against the classical view of faction as the disease of cities (Aristotle, Politics
+  V; Cicero; Augustine) and the royalist reading of the same centuries as an "ocean of blood"
+  (Filmer, Patriarcha II.11–12).
+- **Verdict — grade: on balance.** Conflict channelled through institutions (the tribunes, public
+  accusation) produced the laws of liberty at little cost: "eight or ten" exiles and very few
+  deaths from the expulsion of the Tarquins to the Gracchi (I.4). Conflict outside institutions
+  destroyed the Republic, as Machiavelli himself concedes (I.37: the agrarian law, revived by
+  the Gracchi, "finally overthrew the liberty of Rome"; the factions "resorted to arms and
+  bloodshed" and each set up a chief). Filmer's reading fits only the century after 133.
+- **What decides it:** Machiavelli's own two chapters read together — I.4 (the cost of the
+  quarrel before the Gracchi, l.1041–1152) and I.37 (its cost after, l.3720–3732) — and Filmer's
+  own list (Patriarcha II.11–12, filmer text l.845–864): before 133 he names only "seditions
+  about usury, about marriages, and about magistracy"; every bloodshed he names (the Gracchan,
+  Apuleian and Drusian seditions, the Social War, Marius and Sulla, Caesar and Pompey, the
+  triumvirs) falls after 133. The two readers agree on the facts and differ on the period they
+  generalise from.
+- **Strongest objection:** "eight or ten" exiles is Machiavelli's premise, not a modern count;
+  Livy's early books are late, patriotic and partly legendary, so the low cost of the conflict
+  of the orders may be a story Rome told about itself, and the quarrel that ended in civil war
+  after 133 may be the same quarrel, merely grown up. This is why the grade is on balance, not
+  strong. It does not overturn the verdict, because Filmer's own list, written to show the
+  bloodshed, finds none before the Gracchi, and because I.37 identifies what changed: the
+  quarrel left the tribunate and the courts and went to arms.
+- **What would overturn it:** evidence of large-scale bloodshed in the conflict of the orders
+  before 133.
 
 ## Sources to consult
 
@@ -66,7 +99,10 @@ goal: Analyze Machiavelli's republican teaching — that class conflict produced
   chickens punished); I.16 l.2261ff (freed people as a caged animal l.2270; Clearchus); I.17–18
   l.2477ff (corruption; good customs need good laws and laws customs; a corrupt city needs a
   quasi-monarchical hand); I.34 l.3462ff (dictatorship conferred, limited, did good); I.35–40
-  (Decemvirate); I.55 l.4993ff (government easy where the people are uncorrupted; Germany's tax
+  (Decemvirate); I.37 l.3720–3732 (the agrarian law: the quarrel "remained in abeyance down to
+  the time of the Gracchi; but being by them revived, finally overthrew the liberty of Rome";
+  "regardless of all civil restraints, they resorted to arms and bloodshed" — Machiavelli's own
+  concession, and the second half of the weighing in link 7); I.55 l.4993ff (government easy where the people are uncorrupted; Germany's tax
   by oath; "gentlemen" l.5064–5066 — republic impossible where they exist, princedom impossible
   where equality prevails); I.58 l.5239–5400 ("a people is wiser and more constant than a
   prince"; "the prince who can do what he pleases is a madman, and the people which can do as it
@@ -79,6 +115,15 @@ goal: Analyze Machiavelli's republican teaching — that class conflict produced
   exemplary punishment "every ten years" l.9462; "Saint Francis and Saint Dominick" l.9477);
   III.3 l.9585ff ("slay the sons of Brutus"; Soderini); III.9 l.10690ff (fit to the times;
   republic outlasts a prince by diversity of citizens); III.30 (Moses killed the envious).
+- **Filmer, Patriarcha II.11–12** — index 90;
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/filmer/patriarcha-constitution-org.txt`
+  l.845–864 (Windows-1252: `iconv -f windows-1252 -t utf-8`): Rome "could not find upon what
+  form of government to rest"; "the dissensions which were daily between the Nobles and the
+  Commons bred those memorable seditions about usury, about marriages, and about magistracy";
+  then the Gracchan ("Grecian"), Apuleian, Drusian seditions and the civil wars, which "shed an
+  ocean of blood within Italy and the streets of Rome". The rival reading for link 7; quote two
+  sentences with attribution ("an English royalist writing before the civil war"), forward
+  `<Ref>` to `filmer-patriarcha`. Public domain.
 - **Machiavelli, The Prince IX, XV, XVIII** — same file set;
   `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/machiavelli/prince.txt`.
   Only to recall the two humours and the standard (`<Ref>` to the previous lesson); and
@@ -219,16 +264,41 @@ produce a theory of freedom?
    where "a free government cannot be maintained" and a quasi-monarchical hand is required
    (I.18, I.55). The reading on which The Prince warns a people against princes (the republican
    reading of the seventeenth and eighteenth centuries — References) is stated and weighed: it
-   fits the humours and I.58, it does not fit the Dedication. Then the forward seam: the
-   Discourses praise Rome's mixture; the next lesson's author will say there is no such thing —
-   Rome was a popular state and the quarrel of nobles and people was not a mixture but a
-   question of who made law, answered by the people.
+   fits the humours and I.58, it does not fit the Dedication.
+7. **THE WEIGHING — "Conflict inside institutions made Rome free; conflict outside them
+   destroyed it".** Set I.4 against its strongest objection and the evidence and reach the
+   verdict (see VERDICT; grade **on balance**). The two rival readings of the same centuries at
+   full strength: the classical one (faction is the disease — Ref Aristotle, one clause) and
+   the royalist one, quoted in two sentences from a later reader (Filmer, Patriarcha II.11–12:
+   Rome's tumults "shed an ocean of blood within Italy and the streets of Rome"; forward `<Ref>`).
+   Then the evidence, dated: before 133 BC — the secessions, the tribunes, the laws on debt,
+   intermarriage and office, and by Machiavelli's count "eight or ten" exiles (I.4); after 133 —
+   Tiberius Gracchus killed by senators, the agrarian law fought with arms, Marius and Sulla, and
+   Machiavelli's own admission (I.37) that the revived quarrel "finally overthrew the liberty of
+   Rome" once the factions went "regardless of all civil restraints" to arms and each set up a
+   chief. Filmer's own list confirms the split: before the Gracchi he names seditions, not
+   blood. Then the objection: the count is Machiavelli's, from Livy, who is late and patriotic —
+   which is why the grade is on balance; and it does not overturn the verdict, because the
+   hostile witness finds no bloodshed before 133 either. The section states the result as a
+   claim about the argument: Machiavelli answered the classical objection for conflict that
+   runs through institutions, and conceded it for conflict that leaves them; Filmer's reading
+   is right about the last century and wrong about the first three. What would overturn it:
+   evidence of large-scale bloodshed in the conflict of the orders before 133.
+
+`<Conclusion>`: states the verdict in plain words with its grade — on balance, Machiavelli was
+right that the quarrel of nobles and people made Rome free while the tribunes and the courts
+carried it, and his own I.37 shows it destroyed Rome once it left them; the "ocean of blood"
+belongs to the century after 133. Then the hand-off: the Discourses praise Rome's mixture; the
+next lesson's author will say there is no such thing — Rome was a popular state and the quarrel
+of nobles and people was not a mixture but a question of who made law, answered by the people
+(`bodin-sovereignty`).
 
 Headings as claims: "Rome's constitution was made by quarrel, not by a lawgiver"; "Tumults
 produced the laws of liberty: eight exiles in three hundred years"; "Numa did more than Romulus:
 religion as the fear that holds laws up"; "Christianity made the world weak — and Machiavelli
 blames the interpreters"; "Corruption, gentlemen and the return to beginnings"; "A people is
-wiser and more constant than a prince"; "One standard, two books".
+wiser and more constant than a prince"; "One standard, two books"; "Conflict inside
+institutions made Rome free; conflict outside them destroyed it".
 
 ## Set pieces and worked examples to recreate
 
@@ -289,9 +359,7 @@ wiser and more constant than a prince"; "One standard, two books".
 - **The II.2 hedge** must be reported fairly: Machiavelli blames the interpretation, praises
   renewal (III.1), and uses religion instrumentally (I.12) — the lesson states this as a tension
   in the text, not as a secret atheism to be unmasked.
-- **Register:** The course passes no verdict of its own on any author or idea: no condemning or
-  approving labels in its own voice. Judgement comes only through argument and evidence; a label
-  may appear only inside a quotation, with who applied it and when.
+- **Register:** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Dossier thin:** no secondary beyond Smith L11, Strauss's pages and the Strauss–Cropsey
   chapter (OCR); the Florentine Histories, where Machiavelli condemns Florence's factions as the bad
   kind, are NOT in the dossier — the writer must not cite them, and should say in References
@@ -378,7 +446,16 @@ wiser and more constant than a prince"; "One standard, two books".
    (Coriolanus, the sons of Brutus, Manlius Capitolinus, the Decemvirate), design the test that
    would check the claim, say what would count as an exile versus an execution, and state why
    the claim's work in the argument survives even if the count is low.
-8. **FORWARD (E7) → `bodin-sovereignty`:** take Rome's constitution exactly as Machiavelli
+8. **Attack the verdict.** The lesson concludes, on balance, that the quarrel of nobles and
+   people made Rome free while it ran through institutions and destroyed it only after 133.
+   State the strongest objection in its best form — the low cost before 133 rests on Livy, a
+   late and patriotic source, and the quarrel after 133 was the same quarrel, so the "two
+   periods" are one disease seen early and late — and say what evidence would be needed to
+   overturn the verdict: large-scale bloodshed in the conflict of the orders before 133
+   (killings in the secessions, mass exiles, battles between citizens), from a source
+   independent of Livy. The solution names what the record has (the stories of Spurius Cassius
+   and Manlius Capitolinus — single executions) and why that is not "an ocean".
+9. **FORWARD (E7) → `bodin-sovereignty`:** take Rome's constitution exactly as Machiavelli
    describes it — the people confirm or annul laws, the senate counsels, the consuls execute,
    the tribunes veto — and answer one question: who, in the end, MAKES law for all? Then say
    whether "a mixture of three" is still the right description once that question is answered.

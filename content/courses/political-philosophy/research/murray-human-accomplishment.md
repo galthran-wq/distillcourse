@@ -28,8 +28,12 @@ goal: Analyze Murray's method of counting significant figures across 2,800 years
   count step by step, reproduces one piece of it, lets Murray's tests for Eurocentric bias run at
   full strength, and then states what the method cannot see: what its sources' canon leaves out,
   what "firsts" reward, and everything it excludes by design — governance, commerce, the
-  subject of this course.
-- **Hands off:** (i) The count says *where* and *when*, not *why*. Murray's own explanation —
+  subject of this course. Then it judges the finding: European dominance of the sciences after
+  1400 holds and is not an artefact of Eurocentric sources (**strong**); for the arts the same
+  claim holds only **on balance**; the count says nothing about causes.
+- **Hands off:** The lesson decides what the count shows (strong for the sciences after 1400; on
+  balance for the arts) and passes on what it cannot: *why*. The cause is judged in
+  `the-borrowing-ledger` (open). (i) The count says *where* and *when*, not *why*. Murray's own explanation —
   purpose, autonomy, the transcendental goods, and Christianity as "one of the most important"
   variables — names a cause without a mechanism; a mechanism for Christianity's effect on
   individual autonomy is `henrich-church-and-kinship` (FORWARD exercise). (ii) The objection that
@@ -42,6 +46,35 @@ goal: Analyze Murray's method of counting significant figures across 2,800 years
 - **Spine step:** "Why the West? Weber, Landes, Murray and Henrich argue for Western exceptionalism
   from religion, fragmentation, accomplishment and kinship; Pomeranz and Goody answer that the West
   was one link in a long chain of exchange; the borrowing ledger tests both"
+
+## VERDICT
+
+- **Claim judged.** Accomplishment in the sciences after 1400 is overwhelmingly European, and
+  the finding is not an artefact of Eurocentric sources; the same for the arts.
+- **Verdict.** Holds for the sciences — **strong** (sciences after 1400). Weaker for the arts —
+  **on balance**. Says nothing about causes.
+- **What decides it.** (1) The sciences rest on checkable "firsts": who first did what is a
+  question historians of every culture can check, and specialists in Chinese, Indian and Arabic
+  science are among the sources (ch. 11, l. 1617–1620). (2) The source most carefully corrected
+  with specialists in non-Western science, the *Dictionary of Scientific Biography*, gives the
+  same proportions as the other sources — 81 against 76 percent European, 94 against 91 with
+  North America (l. 1641–1655). (3) Murray's Challenge (l. 1656–1670) — any rule applied evenly
+  that admits a dozen non-Europeans admits hundreds of Europeans — is unmet in the dossier: no
+  source the course has names omitted non-European firsts at a scale that changes the shares.
+  (4) For the arts there is no test outside expert consensus; Murray concedes "no equivalently
+  hard target" (l. 1662), so the canon objection keeps more force there. (5) His causal account
+  (purpose, autonomy, transcendental goods, Christianity) has no mechanism and is labelled by him
+  "more speculative" — so the count decides where and when, not why.
+- **Strongest objection to the verdict.** The sources share one canon, and "firsts" credit a
+  discovery to the culture that systematized or named it (paper, the compass, numerals), so the
+  count measures European historiography as much as European science; before 1400 the
+  sources on Islamic and Chinese work are thinnest. Why it does not overturn the verdict for the
+  sciences after 1400: the corrected source agrees with the rest, the borrowings the objection
+  names are pre-1400 techniques rather than the post-1400 run of scientific firsts, and the
+  Challenge stands unanswered. It does limit the verdict: before 1400 source bias would bite,
+  and the verdict is not extended there; for the arts it keeps the grade at on balance.
+- **What would overturn it.** A documented list of omitted non-European scientific firsts after
+  1400, at a scale that changes the shares.
 
 ## Sources to consult
 
@@ -284,14 +317,30 @@ BC to 1950. Disambiguate in one clause: not the British author of a later lesson
      labels this part "more speculative, and definitely more opinionated". The objection: the
      count cannot test these causes; Murray agrees and leaves them as hypotheses. Hand-off: the
      next lesson offers a mechanism for the Christian part.
-   Where the lesson stands: the count is a reliable record of expert attention; whether attention
-   is the right measure of greatness is a judgment about the sources, which the reader is equipped
-   to make after reproducing one count.
+8. **The weighing: in the sciences after 1400 the lopsided count is real; in the arts it is
+   probable; on causes it is silent.** Set the claim — European dominance is a fact, not an
+   artefact of the counters — against its strongest objection at full strength (one canon;
+   "firsts" credit the systematizer; thin sources before 1400) and the evidence of the VERDICT
+   section: the corrected *Dictionary of Scientific Biography* gives the same shares (81 against
+   76 percent European); in the sciences the firsts are checkable across cultures; the Challenge
+   is unmet. State the verdict: for the sciences after 1400 the finding holds — **strong**; for
+   the arts it holds **on balance**, because there the only test is expert consensus, which is
+   what the canon objection questions; before 1400 the verdict is not extended, because that is
+   where source bias would bite; and the count establishes nothing about causes — Murray's
+   Christianity is a hypothesis without a mechanism. What would overturn it: a documented list
+   of omitted non-European firsts after 1400, at a scale that changes the shares.
+
+**Conclusion** (the `<Conclusion>` block): states the verdict in plain words with its grades —
+the count is a reliable record of expert attention; in the sciences after 1400 it shows a
+European dominance that survives the tests for Eurocentric bias (strong); in the arts the same
+holds on balance; it says nothing about why. Then the hand-off: Murray names Christianity as a
+cause without a mechanism, and the next lesson proposes one (`henrich-church-and-kinship`).
 
 Headings as claims (suggested): "Ranking is unavoidable; the question is how"; "A significant
 figure is one that half the histories name"; "Independent sources agree"; "Europe after 1400, and
 a compact core within it"; "Divided by population, the rate falls after 1850"; "Murray's
-challenge to the charge of Eurocentrism"; "What a count of experts cannot see".
+challenge to the charge of Eurocentrism"; "What a count of experts cannot see"; "After 1400 the
+sciences' count is real; the arts' is probable; the causes are not counted".
 
 ## Set pieces and worked examples to recreate
 
@@ -325,9 +374,7 @@ challenge to the charge of Eurocentrism"; "What a count of experts cannot see".
 
 ## Pitfalls / subtleties to flag
 
-- **The label rule.** The course passes no verdict of its own on any author or idea: no condemning
-  or approving labels in its own voice. Judgement comes only through argument and evidence; a
-  label may appear only inside a quotation, with who applied it and when.
+- **The label rule.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **The author's other book.** The reader met Charles Murray in `the-cognitive-elite`. Do not let
   that colour this lesson in either direction: one neutral clause of identification, nothing
   about reputation or controversy. Ch. 12 (women 2.2 percent of the 4,002; the rise of Jewish
@@ -366,8 +413,9 @@ challenge to the charge of Eurocentrism"; "What a count of experts cannot see".
   Landes's fragmentation (`<Ref landes-european-exceptionalism>`), Weber's ethic (`<Ref
   weber-only-in-the-west>`), Spengler and Toynbee on greatness (`<Ref what-measures-greatness>`).
 - **No moralising either way:** neither "Murray proves Western superiority" nor "Murray's lists are
-  biased": the lesson lets his tests and their limits stand side by side and the exercise lets the
-  reader run one.
+  biased": the lesson sets his tests against their limits and reaches the graded verdict of link
+  8 (sciences after 1400 strong, arts on balance, causes not counted) — a finding about a count,
+  not a ranking of peoples — and the exercise lets the reader run one.
 - **Dossier coverage:** full book; no published critique of *Human Accomplishment* in the dossier.
   The objections in link 7 are the ones Murray states and answers himself plus the rival thesis's
   question about "firsts" (developed next lesson). Do not invent named critics.
@@ -410,11 +458,7 @@ challenge to the charge of Eurocentrism"; "What a count of experts cannot see".
 
 ## EXERCISE PLAN (E6/E7 + playbook-history mix)
 
-1. **Retrieval (warm-up):** state the significant-figure rule, the qualifying-source rule and what
-   the index score measures, in one sentence each; then say which earlier measure of greatness
-   from `<Ref what-measures-greatness>` Murray's count operationalizes and which two it leaves
-   aside.
-2. **Research-shaped task (E6d) — reproduce one inventory count.** The lesson prints a grid the
+1. **Research-shaped task (E6d) — reproduce one inventory count.** The lesson prints a grid the
    writer compiles and verifies from real books: rows = ten thinkers from this course (suggested:
    Plato, Aristotle, Cicero, Augustine, Aquinas, Machiavelli, Bodin, Hobbes, Locke, Rousseau, Burke,
    Maistre, Hegel, Tocqueville — choose ten, include at least two the writer expects to fall below
@@ -429,11 +473,11 @@ challenge to the charge of Eurocentrism"; "What a count of experts cannot see".
    (agreement among these histories) and cannot (excellence). WRITER: the grid must come from the
    real indexes; record the editions in References; if an index cannot be checked, drop that
    source rather than guess.
-3. **Claim to refute (E6b):** "Murray's count shows that Europeans were the most creative people in
+2. **Claim to refute (E6b):** "Murray's count shows that Europeans were the most creative people in
    history at every period." Name the steps that fail: the count runs from 800 BC and 48 percent
    of the top 226 lived before 1400, many in China and India; the rate falls after 1850; the
    sciences count firsts, not creativity; scores are not comparable across inventories.
-4. **Boundary probe (E6a):** apply Murray's method to governance. Design a "governance inventory"
+3. **Boundary probe (E6a):** apply Murray's method to governance. Design a "governance inventory"
    (sources: histories of political thought and constitutional histories in several languages)
    and say at which of the five construction steps it breaks — Murray's own reason (no face
    validity or reliability), and the deeper one he gives in ch. 10: what counts as an advance in
@@ -441,22 +485,32 @@ challenge to the charge of Eurocentrism"; "What a count of experts cannot see".
    from the course where two schools would score the same innovation in opposite directions
    (e.g. universal suffrage: `<Ref maine-and-lecky-on-popular-government>` vs
    `<Ref mill-liberty-and-its-limits>`).
-5. **Document reasoning (sourcing drill, paired):** Sivin's sentence that the historical
+4. **Document reasoning (sourcing drill, paired):** Sivin's sentence that the historical
    discoveries of the last generation leave "no basis for the old myths" of an exclusively European
    science, and Landes's reply ("This was no common stream"), both as quoted by Murray (l.
    1621–1626). Metadata, what each claims as fact and what as evaluation, and Murray's method for
    judging between them (compare the rhetoric with the indexes). Then: what would a historian on
    Sivin's side have to show to meet Murray's Challenge?
-6. **Synthesis (E3, spaced):** Landes predicted that exit and competing authorities protected
+5. **Synthesis (E3, spaced):** Landes predicted that exit and competing authorities protected
    innovators (`<Ref landes-european-exceptionalism>`). Using Murray's ch. 16 results — regime type
    explains nothing, de facto freedom of action does, the despotism effect fragile once countries
    are compared with themselves — write a claim–evidence–reasoning paragraph on how far the count
    confirms Landes, and name the one result that would have refuted him.
-7. **Derivation the lesson skipped (E6c):** Murray says separate non-Western arts inventories
+6. **Derivation the lesson skipped (E6c):** Murray says separate non-Western arts inventories
    *inflate* the non-West. Derive why from the 50 percent rule (a figure need only stand out among
    his own tradition's sources) and estimate the direction of the change if the Western arts were
    split into national inventories (Murray: about 90 Americans instead of 27; British, French and
    German literature would add hundreds). State which way this moves the 74 percent Western share.
+7. **Attack the verdict (aimed at the course):** The course grades European dominance of the
+   sciences after 1400 strong and the arts on balance. State the strongest objection to the
+   sciences verdict in its best form (one canon; "firsts" credit the systematizer, not the
+   maker of the parts; the corrected *Dictionary* was edited in the same Western tradition),
+   then say what evidence would overturn the verdict and what would only lower it. Solution:
+   overturn — a documented list of omitted non-European scientific firsts after 1400, found by a
+   rule Murray's Challenge allows (firsts only, applied evenly to Europe), at a scale that moves
+   the 76–81 percent European share; lower to on balance — a showing that the corrected
+   *Dictionary*'s specialists drew on the same canon as the others. Say why pre-1400 borrowings
+   (paper, numerals) do not touch the verdict as stated (Ref `the-borrowing-ledger`).
 8. **FORWARD (E7) → `henrich-church-and-kinship`:** Murray names Christianity as the source of the
    individual *autonomy* he thinks great work requires, but by his own account Christianity "as
    practiced was not individualistic" in its early centuries and its impetus "took more than a

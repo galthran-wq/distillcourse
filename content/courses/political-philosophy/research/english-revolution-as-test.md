@@ -44,7 +44,10 @@ goal: Apply Hobbes's and Bodin's theories of sovereignty to the documents of 164
   premise at once (the court claimed the people's authority and was an army's purge); Cromwell
   is the armed prophet who could not found; 1660 confirms protection-and-obedience in its speed
   — and the theory cannot explain what was restored: a limited crown.
-- **Hands off:** The rival theory of 1649 — that the people, through their representatives, may
+- **Hands off:** The lesson decides the module question (see VERDICT): a kingdom needs a
+  settled last word, but a composite body can hold it and limits can bind it; Hobbes's claim
+  that a mixed or limited monarchy cannot stand fails on 1660–61 and the post-1689 record. What
+  passes on: the rival theory of 1649 — that the people, through their representatives, may
   judge and remove a king who breaks his trust — is the next module's first lesson
   (`locke-property-and-consent`, 1689 as the revolution that succeeded), which answers Filmer by
   name: Patriarcha was printed only in 1680, in the crisis over whether the king's Catholic
@@ -95,6 +98,36 @@ goal: Apply Hobbes's and Bodin's theories of sovereignty to the documents of 164
     does not predict; (6) religion: Hobbes said the sovereign decides doctrine, and the
     Restoration did so (Act of Uniformity 1662) — yet the settlement failed to hold and
     toleration came in 1689, Bodin's politique road rather than Hobbes's.
+
+## VERDICT
+
+This lesson carries the module verdict (register, module 3). Module question: must sovereignty
+be one and undivided, or can a mixed or limited state stand?
+
+- **Claim judged:** Bodin's and Hobbes's thesis that sovereignty must be one and undivided — in
+  two parts: (a) a kingdom with no settled answer to "who decides" goes to war; (b) Hobbes's
+  further claim (Leviathan XXIX, "Mixt Government") that a mixed or limited monarchy cannot
+  stand at all.
+- **Verdict — grade: strong.** (a) holds: Bodin and Hobbes were right that a kingdom with no
+  settled answer to "who decides" goes to war. In 1642 king and Parliament each claimed marks of
+  sovereignty, neither could say where sovereignty lay, and the result was war, regicide and an
+  army's rule. (b) fails on the same record: the settlement of 1660–61 restored a crown limited
+  by the reforms of 1641, and after 1689 a monarchy limited by Parliament lasted for centuries.
+  The record supports a narrower claim than the theory: there must be a settled last word
+  (king-in-parliament), but a composite body can hold it, and limits can bind it.
+- **What decides it:** the documents of 1642 (Nineteen Propositions; His Majesty's Answer) set
+  against Leviathan XVIII and XXIX and Bodin I.10, II.1 for (a); for (b), the Restoration
+  settlement (Star Chamber stays abolished, Triennial Act, Parliament votes the revenue, feudal
+  tenures commuted) and the post-1689 record in outline — the Bill of Rights (1689), the Act of
+  Settlement (1701), and annual sessions made necessary by the annual Mutiny Act and annual
+  supply (Hoppit, *A Land of Liberty?*, 2000).
+- **Strongest objection:** Hobbes allows sovereignty to an assembly, so king-in-parliament is a
+  single sovereign and the theory is vindicated. This narrows the verdict but does not overturn
+  it: the restored and post-1689 constitutions kept real division — the Crown's executive,
+  Parliament's purse, independent courts (judges' tenure during good behaviour, Act of
+  Settlement) — which XXIX calls fatal.
+- **What would overturn it:** showing that the limits of 1660 and 1689 were nominal — that the
+  Crown in practice held the purse, the sword and the courts without Parliament.
 
 ## Sources to consult
 
@@ -239,7 +272,18 @@ goal: Apply Hobbes's and Bodin's theories of sovereignty to the documents of 164
     magistrates may resist a tyrant on the people's behalf; the covenant between king and
     people. Needed for ONE paragraph in link 3.
 
-Names ONLY in References: Gardiner, Kenyon, Rushworth, Husbands, Laslett, Sommerville (Filmer's
+- **The post-1689 record in outline (for the weighing, link 6)** — the Bill of Rights (1 Will. &
+  Mar. sess. 2 c. 2, 1689: no suspending power, no tax and no standing army in peacetime without
+  Parliament's consent), the Act of Settlement (12 & 13 Will. III c. 2, 1701: judges hold office
+  during good behaviour, removable only on an address of both Houses), and the annual Mutiny Act
+  (from 1689) with annual supply, which made a session every year a necessity rather than a
+  grant. Statute texts are PD (Statutes of the Realm vols. 6–7; legislation.gov.uk for the Bill
+  of Rights and Act of Settlement as revised). Narrative authority: Julian Hoppit, *A Land of
+  Liberty? England 1689–1727* (Oxford, 2000) — COPYRIGHTED, not in the dossier; use for the
+  outline (annual sessions, the purse, the courts) and paraphrase only. One paragraph of the
+  lesson; not a second narrative.
+
+Names ONLY in References: Gardiner, Hoppit, Kenyon, Rushworth, Husbands, Laslett, Sommerville (Filmer's
 editors — for the dating), Hume (as historian — but see
 Exercise 2, where Hume's text is the document being sourced and is quoted in a `<Quote>` with
 attribution), Maistre, Carlyle (this lesson), Tooley, Smith, Strauss, Cropsey, Hill,
@@ -380,16 +424,43 @@ evidence.
    in a way protection-and-obedience does not predict — it is Bodin's "no subject judges",
    enforced retroactively; and the religious settlement (Act of Uniformity 1662) did what right
    6 prescribes and failed within a generation, so that the toleration of 1689 followed Bodin's
-   politique road rather than Hobbes's. The lesson closes on the judgement the module has
-   earned: the theory of indivisible sovereignty describes 1642–49 as a diagnosis describes a
-   disease, and describes 1660 as a mechanism; it does not describe 1660–89, where a divided
-   constitution held — because, the next module will say, the division was not of sovereignty
-   but of trust (`locke-property-and-consent`, forward clause).
+   politique road rather than Hobbes's. The section ends on what it has established: the theory
+   of indivisible sovereignty describes 1642–49 as a diagnosis describes a disease, and 1660 as
+   a mechanism; whether it describes what came after is the next section's question.
+6. **THE WEIGHING — "A kingdom needs a last word, not an undivided one".** Set the module claim
+   against its strongest objection and the evidence, and reach the verdict (see VERDICT; grade
+   **strong**). First half, the part that holds: the 1642 documents show king and Parliament each
+   claiming marks of sovereignty and neither able to say where sovereignty lay — and war,
+   regicide and an army's rule followed; Bodin and Hobbes were right that a kingdom with no
+   settled answer to "who decides" goes to war. Second half, the part that fails: XXIX says a
+   mixed or limited monarchy cannot stand; the crown of 1660–61 was limited by the reforms of
+   1641, and after 1689 a monarchy limited by Parliament lasted for centuries — one paragraph on
+   the post-1689 record in outline (Bill of Rights 1689: no tax and no peacetime army without
+   Parliament; annual Mutiny Act and supply, so Parliament sat every year; Act of Settlement
+   1701: judges removable only on an address of both Houses). Then the strongest objection at
+   full strength: Hobbes allows the sovereign to be an assembly, so "king-in-parliament" is one
+   sovereign and Hobbes wins. Answer: that narrows the verdict and does not overturn it — inside
+   king-in-parliament the Crown kept the executive, Parliament the purse, the courts their
+   independence, which is exactly the "Mixt Government" XXIX calls three factions. Close the
+   section on the narrower claim the record supports: there must be a settled last word, but a
+   composite body can hold it and limits can bind it; and on what would overturn the verdict
+   (showing the limits of 1660 and 1689 were nominal). One forward clause: why the division held
+   — the next module's answer is that it was a division of trust, not of sovereignty
+   (`locke-property-and-consent`).
+
+`<Conclusion>`: states the verdict in plain words with its grade — Bodin and Hobbes were right
+that a kingdom with no settled last word goes to war (1642), and wrong that a mixed or limited
+monarchy cannot stand (1660–61, 1689 onward); the module's answer, graded strong, is that
+sovereignty needs a settled last word, which a composite body can hold and limits can bind.
+Then the hand-off: the regicides' theory — that a people's representatives may judge a king who
+breaks his trust — is the next module's first lesson, written against Filmer and vindicated in
+1689 (`locke-property-and-consent`).
 
 Headings as claims (precise questions allowed): "Nineteen demands: which marks of sovereignty
 did Parliament claim?"; "The king's own advisers call England a mixture"; "By what authority?
 The regicide read three ways"; "An armed prophet who could not found"; "1660: obedience follows
-protection — and a limited crown comes back".
+protection — and a limited crown comes back"; "A kingdom needs a last word, not an undivided
+one".
 
 ## Set pieces and worked examples to recreate
 
@@ -458,9 +529,7 @@ protection — and a limited crown comes back".
 - **The rival theory must be at full strength:** one paragraph on the Vindiciae's
   covenant-and-magistrates doctrine, not a "some believed". The lesson may say that this is the
   theory 1689 vindicated, as a forward clause.
-- **Register:** The course passes no verdict of its own on any author or idea: no condemning or
-  approving labels in its own voice. Judgement comes only through argument and evidence; a label
-  may appear only inside a quotation, with who applied it and when. For the regicide this means
+- **Register:** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. For the regicide this means
   the lesson reports what each party claimed (the Sentence's words, the king's words) and what
   the documents can establish.
 - **Filmer's dates:** Patriarcha was NOT a published pamphlet of 1642. It was written between
@@ -478,7 +547,9 @@ protection — and a limited crown comes back".
 - **Contested history taught as argument (course tone):** whether the war was caused by the
   constitutional doctrine (Hobbes), by religion, by finance, or by the Scottish and Irish crises
   is contested — Exercise 6 ranks the causes; the body states Hobbes's causal claim as HIS and
-  tests it, never as settled.
+  tests it. The test reaches the verdict in link 6: the absence of a settled last word is borne
+  out as a cause of the war (strong); the lesson does not claim it was the only cause, and the
+  ranking among causes stays with Exercise 6.
 - **Dossier gaps (say so in References):** none of the four artefacts, the Engagement, the
   Instrument, Breda, the Vindiciae, Hume's History or Hobbes's Review and Conclusion is in the
   dossier; the lesson's primary quotations come from the public-domain editions named in
@@ -577,8 +648,9 @@ Up to half sourced (this is a lesson about documents, a trial and a place).
    (the Restoration restored a limited crown that lasted; Bodin's own classification of England
    as a monarchy GOVERNED democratically makes "mixed" a description of government, not of
    sovereignty — so the Answer and XXIX may not even disagree about where the sword lay in 1641)
-   and state what would have to be true for the claim to survive (that 1660–89 was itself only a
-   truce ended by another division — which the next module will test).
+   and state what would have to be true for the claim to survive (that the limits of 1660 and
+   1689 were nominal, the Crown in practice holding purse, sword and courts — which is what the
+   lesson's verdict says would overturn it).
 6. **Causal ranking (second-order concept):** rank as necessary / enabling / precipitating
    among: the doctrine of divided sovereignty (Hobbes's cause), the religious quarrel over the
    Church (Laud's ceremonies; the Scottish rebellion of 1638), eleven years of government
@@ -593,7 +665,16 @@ Up to half sourced (this is a lesson about documents, a trial and a place).
    trials of October 1660; then state what the exceptions establish about the restored
    sovereign's theory of the regicide (Bodin's "no subject judges", applied retroactively) and
    what the ban on "words of reproach" establishes about protection-and-obedience as a policy.
-8. **FORWARD (E7) → `maistre-and-bonald`:** the sequence of 1640–60 as this lesson has fixed it
+8. **Attack the verdict.** The lesson concludes, graded strong, that sovereignty needs a settled
+   last word but not an undivided one. State the strongest objection in its best form — Hobbes
+   allows the sovereign to be an assembly, so king-in-parliament after 1689 is a single
+   sovereign and XXIX is vindicated, not refuted — and then say what evidence would be needed to
+   overturn the verdict: e.g. that the Crown raised money or kept a peacetime army without
+   Parliament after 1689, that judges were removed at the Crown's pleasure despite the Act of
+   Settlement, or that sessions were held only when the Crown chose. The solution grants the
+   objection its narrowing (the "last word" is one body) and shows why it does not reach the
+   division inside that body (executive, purse, courts), which is what XXIX called fatal.
+9. **FORWARD (E7) → `maistre-and-bonald`:** the sequence of 1640–60 as this lesson has fixed it
    — a parliament summoned for money; a quarrel over religion and the sword; a purge; a king
    tried and executed by a body claiming the people's authority; sects; confiscations; an army
    and a general who writes a constitution in four days; a restoration by a general without a

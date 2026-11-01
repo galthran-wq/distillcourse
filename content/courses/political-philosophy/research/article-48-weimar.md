@@ -41,10 +41,19 @@ goal: Apply Schmitt's theory of the exception and his distinction between commis
   that abdicated by procedure, a president who decided nothing, a movement
   that took power legally. The reader leaves able to read a constitutional
   clause with Schmitt's three questions, to say which dictatorship Weimar's
-  was, and to argue both answers to the lesson's question — did the theory
-  describe the collapse or help produce it?
-- **Hands off:** The module ends on a parliament that could not act and a
-  movement that took power legally. The next module asks what the radical
+  was, and to weigh both answers to the lesson's question — did the theory
+  describe the collapse or help produce it? — to the module verdict: the
+  diagnosis held (strong); the commissarial remedy as practised had no
+  criterion that kept it commissarial (on balance); the theory helped produce
+  the collapse in 1930–32 (on balance) and the question is open after July
+  1932.
+- **Hands off:** The module ends on its verdict: Weimar does not show that
+  liberal parliamentary government is impossible; it shows a parliament that
+  would not govern, an exception with no criterion, and a constitution its
+  enemies abolished by its own procedures — while parliaments elsewhere held.
+  What passes on: whether a government could have been formed after July
+  1932 (open), and what the theory's author did once the enemy he named had
+  won. The next module asks what the radical
   right wanted instead of the republic it watched fail. It opens with
   `sorel-reflections-on-violence`: a socialist who argued, a generation before
   Weimar, that a movement which bargains in parliament has already accepted its
@@ -84,7 +93,10 @@ goal: Apply Schmitt's theory of the exception and his distinction between commis
     `iron-law-of-oligarchy` and `circulation-of-elites` (the SPD's toleration
     decided by its Reichstag leadership; a governing class that would neither
     use force nor yield — Pareto's foxes — in the Prussian ministry of July
-    1932); `caesarism` (Spengler's forms-kept-but-dead, tested against a
+    1932); `caesarism` (Spengler's forms-kept-but-dead — note that he dated
+    Caesarism proper to 2000–2200, so what 1930–33 tests is his
+    twentieth-century forecast of parliaments as empty pageantry, per the
+    verdict in `spengler-decline-of-the-west` — tested against a
     leader who came to power through the forms). The course.yaml list of
     reinforced concepts names six; these three are recalls by Ref, not new
     teaching.
@@ -103,7 +115,85 @@ goal: Apply Schmitt's theory of the exception and his distinction between commis
     cannot be split (the commissioner lawful, the deposed ministry still
     Prussia's representative).
 
+## VERDICT
+
+This lesson carries the module verdict (REGISTER.md, Module 7). The brief
+states it exactly as graded there, no more and no less firmly.
+
+- **Claim judged (the module question):** if a minority always rules and the
+  political is friend against enemy, can a liberal parliamentary democracy
+  govern and defend itself? And, for this lesson: did Schmitt's theory of the
+  exception describe Weimar's collapse or help produce it?
+- **Verdict:** Weimar does not show that liberal parliamentary government is
+  impossible. It shows a parliament that would not govern, an exception with
+  no criterion, and a constitution its enemies abolished by its own
+  procedures. Four graded parts:
+  - *The diagnosis held* — grade **strong**. From March 1930 the Reichstag
+    could block but could not form a majority will. It sat and legislated
+    less each year: 98 laws, 5 Article 48 decrees and 94 sitting days in
+    1930; 34, 44 and 41 in 1931; 5, 66 and 13 in 1932 [secondary: citing
+    Bracher 1980 p. 129; bind before stating]. Michels's party leaderships
+    decided the SPD's toleration of Brüning. Schmitt's 1932 warning came
+    true: the "equal chance" the constitution gave its enemies was used to
+    abolish it, through Article 48 and an Article 76 two-thirds vote.
+  - *The commissarial remedy, as practised in 1930–32, had no criterion that
+    kept it commissarial* — grade **on balance**. Decrees were drafted in
+    ministries, a president signed, a circle chose the chancellor, and no
+    end was ever set. The Reichstag could have demanded repeal under §3 in
+    any month and did not. On 20 July 1932 the Prussian ministry yielded to a
+    single police officer and went to court; in October the court split the
+    decision and derived part of it from a norm, which Schmitt says cannot be
+    done, and the Reich obeyed the half it lost. The remedy Schmitt urged at
+    the end — an emergency regime that would keep the NSDAP out (the
+    Schleicher circle) — was never tried: Hindenburg appointed Hitler by the
+    parliamentary route.
+  - *Did the theory help produce the collapse?* For 1930–32, **on balance
+    yes**: a majority without both NSDAP and KPD was still arithmetically
+    possible, and the decree regime taught parliament not to govern. After
+    July 1932 the NSDAP and KPD held 319 of 608 seats [secondary: standard
+    election figures; bind], a negative majority, so no government could
+    command a majority without one of them. For that period the question is
+    **open**.
+  - *Elsewhere the module's own measure holds.* Mosca's juridical defence by
+    competing organised forces, and the competitive account of democracy,
+    survive; parliamentary government lasted through the same years in
+    Britain, Scandinavia and the Low Countries.
+- **What decides it:** the counts (Bracher 1980, p. 129); the text of Article
+  48 and the unused §3; the Preussenschlag decree and the Staatsgerichtshof's
+  judgment of 25 October 1932; the 1933 chain of legalities (Articles 53, 48,
+  76; the Enabling Act's 444 to 94); Schmitt's *Legalität und Legitimität*
+  (July 1932) on the equal chance; the Reichstag seat counts of July and
+  November 1932.
+- **Strongest objection:** the presidential regime was the only alternative
+  to collapse, so the theory described a necessity rather than producing
+  one. This is why the causal half is graded on balance for 1930–32 and open
+  after July 1932. It does not touch the diagnosis, and it does not save the
+  remedy from the missing criterion.
+- **What would overturn it:** for the on-balance causal half, evidence that
+  no majority for any government was politically available after September
+  1930 (not merely arithmetically).
+- **Open, and carried:** whether any government could have been formed
+  after July 1932 without the NSDAP or the KPD; the conduct of the theory's
+  author after January 1933 is judged in `the-right-in-1933`.
+
 ## Sources to consult
+
+- **Added for the verdict (REGISTER.md, Module 7):**
+  - Karl Dietrich Bracher (ed.), *Weimar – Selbstpreisgabe einer Demokratie*
+    (1980), p. 129 — the laws / Article 48 decrees / sitting days counts for
+    1930–32. Currently held only at second hand:
+    `research/texts/verification-2026-11/weimar-legislation-counts-wikipedia.txt`
+    [secondary]. Bind to Bracher (or Kolb's reproduction of the table) before
+    any count is stated as the course's own.
+  - Reichstag seat counts for the elections of 31 July 1932 (NSDAP 230, KPD
+    89, of 608) and 6 November 1932 (NSDAP 196, KPD 100, of 584), from an
+    official or standard source (the *Statistik des Deutschen Reichs* returns,
+    or Kolb / Falter, *Wahlen und Abstimmungen in der Weimarer Republik*,
+    1986) — the "negative majority" on which the verdict's open half rests
+    [secondary until bound].
+  - Schmitt, *Legalität und Legitimität* (July 1932), on the equal chance —
+    already used through Schwab l.1209–1249 below; cite the text itself for
+    the verdict's "the equal chance was used to abolish it".
 
 - **Schwab, introduction to Political Theology, section III** — summary index
   34; cached `research/texts/theconcept-s3-political-theology-1.txt`
@@ -345,9 +435,11 @@ the theory.
    the party's Reichstag leadership — the oligarchy Michels described, now
    deciding the fate of the constitution — and members on the party's left who
    rejected it split off in 1931 (the Socialist Workers' Party, SAPD; verify the
-   date and the issue in Winkler or Evans before stating). State it as a case
-   for the reader to weigh against Michels's law (a leadership acting on its own
-   judgment of the members' interest), not as a verdict. Ref
+   date and the issue in Winkler or Evans before stating). State it as the
+   tendency Michels found, borne out (a leadership acting on its own judgment
+   of the members' interest) — and note that a split left the party, so even
+   here the law bent rather than held as iron (Ref the verdict in
+   `michels-and-pareto-oligarchy-and-elites`). Ref
    `ortega-revolt-of-the-masses` (XIV.5): a Parliament that loses tasks loses
    prestige — here it GAVE the tasks away. Heading: "Fewer laws, more decrees:
    the counts and what produced them".
@@ -456,9 +548,9 @@ the theory.
    government is good once established".
    Heading: "January to March 1933: legality against the constitution".
 
-7. **Did the theory describe the collapse or help produce it?** Both readings
-   at full strength, the reader left to weigh (course tone; co-objection).
-   *Described:* the counts are what the 1931 essay said they would be — a
+7. **The weighing: did the theory describe the collapse or help produce
+   it?** Both readings at full strength, then the verdict in the course's
+   voice (course tone; co-contested). *Described:* the counts are what the 1931 essay said they would be — a
    parliament of blocs that can refuse but cannot will; the equal-chance
    warning came true in the one way it foresaw (a party closing the door
    behind itself); the exception DID reveal where authority lay — not in the
@@ -474,10 +566,27 @@ the theory.
    by Schmitt, removed the one government that had the police to resist the
    party he wanted banned; and a theory in which "a wrong decision is still
    valid" and only participants can name the enemy had nothing to say when
-   the participant who named the enemy was the enemy. The honest middle, as
-   the course's own: the theory described a parliament that could not act and
-   prescribed a president who, in the event, did not decide — and so
-   delivered the exception to whoever would. Ref `english-revolution-as-test`:
+   the participant who named the enemy was the enemy. The verdict, argued
+   from the record and stated as the course's: the diagnosis held (**strong**
+   — the counts, the toleration decided by party leaderships, the equal
+   chance used to abolish the constitution); the commissarial remedy as
+   practised had no criterion that kept it commissarial (**on balance** —
+   ministries drafted, a president signed, a circle chose, no end was set, a
+   court split what the theory says cannot be split); and the theory helped
+   produce the collapse in 1930–32 (**on balance** — a majority without both
+   NSDAP and KPD was still arithmetically possible, and the decree regime
+   taught parliament not to govern). Then the strongest objection at full
+   strength: the presidential regime was the only alternative to collapse,
+   so the theory described a necessity. The answer: that is exactly why the
+   causal half is on balance and not strong, and after July 1932 — NSDAP and
+   KPD together 319 of 608 seats, a negative majority — the question is
+   **open**; the objection does not touch the diagnosis. Say what would
+   overturn the on-balance half: evidence that no majority for any
+   government was politically available after September 1930. Close the step
+   on the module's own measure: parliamentary government lasted through the
+   same years in Britain, Scandinavia and the Low Countries, and Mosca's
+   juridical defence by competing organised forces survives — Weimar shows a
+   parliament that would not govern, not one that could not exist. Ref `english-revolution-as-test`:
    the reader has seen a sovereignty theory confirmed by a civil war it did
    not cause; here the author was in the room. Ref `mann-reflections`: Mann's
    German who prefers Obrigkeit to politics is one explanation offered for
@@ -485,23 +594,37 @@ the theory.
    reader may test against the election figures (the presidential election
    of 1932 re-elected Hindenburg with the SPD's votes, against Hitler), not as
    established. Two further readings from this module, each a clause with its
-   Ref, for the reader to weigh rather than for the lesson to adopt: Spengler's
-   (Ref `spengler-decline-of-the-west`) — the presidential cabinets as the
-   predicted stage in which the constitutional forms are kept and power becomes
+   Ref, each answered from the record: Spengler's
+   (Ref `spengler-decline-of-the-west`; he dated Caesarism proper to
+   2000–2200, so this is his twentieth-century forecast of dead parliaments,
+   not the Caesar) — the presidential cabinets as the predicted stage in which the constitutional forms are kept and power becomes
    personal; against it, that the power went not to a Caesar of money or the
    army but to a mass party through an election and a two-thirds vote. Pareto's
    (Ref `michels-and-pareto-oligarchy-and-elites`) — a governing class that would
    neither use force nor yield (the Prussian ministry that yielded "only to
    force" and to one officer) displaced by a movement willing to use it; against
    it, that the Reich did use force against Prussia, and that the decisive
-   transfers were legal. Heading: "Diagnosis or prescription? Two readings of the
-   record".
+   transfers were legal. Heading (states the verdict): "A true diagnosis, a
+   remedy without a criterion: what Weimar shows and what it does not".
+
+**Conclusion.** State the verdict in plain words with its grades: the
+diagnosis held (strong) — a Reichstag that could block but not will, and an
+equal chance its enemies used to abolish the constitution by its own
+procedures; the commissarial remedy as practised had no criterion that kept
+it commissarial (on balance); the theory helped produce the collapse in
+1930–32 (on balance), and after July 1932, with a negative majority, whether
+anything could have saved the parliament is open. Weimar does not show that
+liberal parliamentary government is impossible: it lasted in Britain,
+Scandinavia and the Low Countries. Then the hand-off: the author of the
+theory joined the party that ended the Reichstag — whether his doctrine gave
+him any ground to refuse is `the-right-in-1933`'s question; the next module
+opens with `sorel-reflections-on-violence`.
 
 Headings as claims: "Article 48 as written: a controlled gate and an open
 field"; "Fewer laws, more decrees: the counts and what produced them"; "Who
 decided? Three bodies and no decision"; "Which dictatorship was it?"; "20 July
 1932: the exception argued before a court"; "January to March 1933: legality
-against the constitution"; "Diagnosis or prescription?".
+against the constitution"; "A true diagnosis, a remedy without a criterion".
 
 ## Set pieces and worked examples to recreate
 
@@ -541,8 +664,10 @@ against the constitution"; "Diagnosis or prescription?".
    briefs reconstructed as arguments (Reich: the guardian judges the Land's
    failure; Prussia: no one judges his own cause — Ref
    `locke-property-and-consent`, "judge in his own cause", and Ref
-   `bodin-sovereignty`). The reader judges which theory of sovereignty the
-   court applied — and whether it applied one at all.
+   `bodin-sovereignty`). Then say what the court did: it applied no single
+   sovereign's decision — it split the decision and derived part of it from
+   a norm, which Schmitt says cannot be done, and the Reich obeyed the half
+   it lost (the verdict's evidence that the remedy had no criterion).
 7. **The 1933 chain of legalities** — Article 53 (appointment); Article 25
    (dissolution); Article 48 §2 (the decree of 28 February, with the seven
    articles listed and their content: person, home, post, speech, assembly,
@@ -613,10 +738,7 @@ against the constitution"; "Diagnosis or prescription?".
   the context; the lesson is about the constitution, not the economy, and
   the Borchardt debate on Brüning's room for manoeuvre (Muller note 5) goes in
   References at most.
-- **Register (exact rule).** The course passes no verdict of its own on any
-  author or idea: no condemning or approving labels in its own voice.
-  Judgement comes only through argument and evidence; a label may appear only
-  inside a quotation, with who applied it and when. Applied here: the two
+- **Register (exact rule).** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. Applied here: the two
   readings of link 7 are both the course's own and both complete; Schmitt's
   1933 membership is reported, dated and once; the SPD's toleration policy is
   given with the reason the SPD gave for it (a worse Reichstag after any
@@ -632,7 +754,10 @@ against the constitution"; "Diagnosis or prescription?".
   Hitler the chancellorship in August and November 1932, and did appoint him
   in January 1933. State the departure as the course's own reading ("the
   decisions that mattered were who to appoint, and were taken by a circle"),
-  give the counter-evidence, and let the reader weigh.
+  give the counter-evidence, and say why the reading holds: the refusals and
+  the appointment were decisions about persons, not about the exception —
+  decrees were drafted in ministries, no end was set, and the remedy had no
+  criterion that kept it commissarial (verdict, on balance).
 - **Scholars live in References only:** Bracher, Mommsen, Kolb, Evans,
   Winkler, Bendersky, Kennedy, Dyzenhaus, Harold James, Borchardt, Fawcett,
   Muller, Schwab, Strong, Agamben. Anschütz, Thoma, Heller, Brecht, Nawiasky,
@@ -770,8 +895,8 @@ against the constitution"; "Diagnosis or prescription?".
    state which of the six the theory of the exception predicts and which it
    cannot see. Then (E3) say which of the six Michels's law (Ref
    `michels-and-pareto-oligarchy-and-elites`) and Spengler's Caesarism (Ref
-   `spengler-decline-of-the-west`) would each rank first, and why the record
-   does not settle between them.
+   `spengler-decline-of-the-west`) would each rank first, and which ranking
+   the record supports.
 7. **Research-shaped task:** Using the digitised Reichsgesetzblatt 1932 Teil I
    (ALEX), count the ordinances headed as issued by the Reich president "auf
    Grund des Artikels 48" and compare with the published figure of 66. Report
@@ -779,7 +904,21 @@ against the constitution"; "Diagnosis or prescription?".
    amending decree count? does a decree under §1 count?). Then state what the
    discrepancy shows about every published series — and whether the lesson's
    claim survives a range of ±5.
-8. **FORWARD (E7) → `sorel-reflections-on-violence`:** Between 1930 and 1932
+8. **Attack the verdict:** The lesson concludes that the decree regime helped
+   produce the collapse in 1930–32 (on balance). State the strongest
+   objection in its best form: the presidential regime was the only
+   alternative to collapse — after September 1930 no party coalition could
+   be held together, the SPD would not join a Brüning cabinet, the DNVP
+   under Hugenberg would not tolerate one, and a Reichstag that demanded
+   repeal would only have been dissolved into a worse one. Then say exactly
+   what evidence would be needed to overturn the verdict: not the seat
+   arithmetic (which shows a majority without NSDAP and KPD existed until
+   July 1932) but evidence that no such majority was politically available —
+   party resolutions, coalition talks that failed on terms no leader could
+   accept. The solution says why the July 1932 figures (319 of 608) already
+   turn the question open for the later period, and why the objection leaves
+   the diagnosis (strong) untouched.
+9. **FORWARD (E7) → `sorel-reflections-on-violence`:** Between 1930 and 1932
    the largest socialist party in Europe tolerated decrees that cut wages and
    benefits, to keep a worse Reichstag from being elected; in the same years
    the two parties that promised a final struggle rather than a programme of

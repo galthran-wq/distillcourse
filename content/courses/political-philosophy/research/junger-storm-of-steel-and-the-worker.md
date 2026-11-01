@@ -34,8 +34,9 @@ goal: Analyze how Jünger turned the experience of the Western Front into a poli
   individual at each step and where the memoir contradicts the theory.
 - **Hands off:** (i) The Worker is a ruling type without a regime: Der Arbeiter calls
   dictatorship "only a transitional form" and names no party. What happens when a party
-  claims to be the transition is `the-right-in-1933`'s question (Jünger refused the
-  Nazis' offers; Heidegger, who read the book in seminar, joined). (ii) Jünger's
+  claims to be the transition is decided in `the-right-in-1933`, where Jünger's conduct
+  is weighed beside the module verdict (Jünger refused the Nazis' offers; Heidegger,
+  who read the book in seminar, joined). (ii) Jünger's
   conservatism is a conservatism with nothing left to conserve; the next lesson,
   `moeller-van-den-bruck-third-reich`, states the programme of a conservatism that must
   first CREATE what it would conserve. (iii) The postwar fate of the book and its author
@@ -318,8 +319,14 @@ battle of materiel — defined at first use.
    is the version that removed the nationalist editorial. The concession: the record
    shows distance from the Nazi party, not from the total state the book called for; the
    reply Jünger gave — that neither Nazis nor opponents could use the book — is a claim
-   about use, not about content. Forward: `the-right-in-1933` puts the same question to
-   Schmitt, Heidegger and Spengler.
+   about use, not about content, so it does not answer the charge about content: the
+   lesson says so plainly. What the course cannot settle here is the reception question
+   (how far the book moved its readers toward the regime); it says that this is a
+   question of influence the documents do not measure, and states what would settle it
+   (evidence of readers who cite the book as their reason). Jünger's own conduct in
+   1933 — and whether his doctrine gave him a ground to refuse — is weighed in
+   `the-right-in-1933`, which puts the same question to Schmitt, Heidegger and
+   Spengler.
 
 Headings as claims (suggested): "The front selects the few"; "What the diary leaves
 out"; "The soldier's standard turned on the republic"; "War as the labour of whole
@@ -357,10 +364,7 @@ conservatism that welcomes the end of what it conserved"; "The charge and the re
 
 ## Pitfalls / subtleties to flag
 
-- **The register rule.** The course passes no verdict of its own on any author or idea:
-  no condemning or approving labels in its own voice. Judgement comes only through
-  argument and evidence; a label may appear only inside a quotation, with who applied it
-  and when.
+- **The register rule.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Which text the reader is reading.** Hofmann translates the last revision (1961), not
   the 1920 diary-book; any sentence quoted from it is quoted as "in the final version".
   The reflective, elegiac passages (l.2351, l.2487) may be later additions; the dossier

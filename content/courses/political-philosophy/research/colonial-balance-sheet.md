@@ -35,16 +35,113 @@ goal: Evaluate the argument that colonialism was on balance beneficial and legit
   critique; a method of counterfactual cost–benefit; a test of legitimacy by
   revealed behaviour; a proposal), the strongest replies from the critics' own
   texts, what the two sides measure differently, and the controversy's record
-  as data about how such claims are adjudicated. Nothing settled, nothing
-  moralised, in either direction.
-- **Hands off:** Two problems stay open. Even if a ledger could be balanced,
+  as data about how such claims are adjudicated — and then a verdict on each of
+  the Case's three charges (see VERDICT). Nothing moralised, in either
+  direction; the same burden of a counterfactual on both sides.
+- **Hands off:** Decided here: the "no counterfactual" charge holds against the
+  polemical catalogues and fails against the critical literature; the
+  never-colonised comparators prove nothing; behaviour shows graded legitimacy,
+  not consent (each strong). Whether colonial rule was a net benefit or a net
+  harm overall is not decided here; the module verdict in
+  `auditing-the-case-for-colonialism` weighs the ledger. Two problems pass on.
+  Even if a ledger could be balanced,
   does a debt — or a credit — pass to the descendants of those who incurred
   it? `inherited-guilt-and-reparations` takes that. And both sides' numbers
   rest on cited studies that can be read: `auditing-the-case-for-colonialism`
   reads three of them.
 - **Spine step:** "The West judges its own conquests: Vitoria's titles, Locke's waste land, Burke's impeachment of Hastings, Mill's tutelage, the colonial balance sheet, and whether guilt is inherited"
 
+## VERDICT
+
+Binding: research/verdicts/REGISTER.md, module 14, `colonial-balance-sheet`.
+
+- **Claim judged.** The Case for Colonialism's three charges: (a) "the critics
+  never ran a cost–benefit against a counterfactual"; (b) "the never-colonised
+  comparators (China, Ethiopia, Liberia, Libya, Saudi Arabia, Thailand, Haiti,
+  Guatemala) show colonialism was no handicap"; (c) "behaviour reveals that
+  the colonised treated colonial rule as legitimate".
+- **Verdict.** (a) **Holds against the polemical catalogues; fails as a
+  description of the critical literature.** Grade: **strong** on each half.
+  (b) **Fails.** Grade: **strong**. (c) **Fails as proof of consent**; it shows
+  legitimacy was graded. Grade: **strong**.
+- **What decides it.** (a) A catalogue of railways or of massacres is not a
+  balance, and the polemics on both sides are catalogues. But the critical
+  literature has run counterfactual designs since 2001: Acemoglu, Johnson &
+  Robinson — cited in the Case's own note 4 (`research/texts/gilley/case-for-colonialism-original-AQ2018.txt`:
+  "they do not control for the presence or absence of colonialism (for
+  instance in a highly cited study by Acemoglu and colleagues). [4]"); Nunn on
+  the slave trades (`research/texts/audit-right-shading/nunn-2007-slave-trades-mpra-wp.txt`);
+  Heldring & Robinson, NBER WP 18566 (2012), a review against stated
+  counterfactuals (`research/texts/verification-2026-11/heldring-robinson-2012-nber-w18566.txt`),
+  which the Response itself concedes "measures up well to the highest standards
+  of scientific inquiry" (`research/texts/gilley/response-to-my-critics-AQ2022.txt`). (b) The
+  comparators are not comparable (Ethiopia occupied 1936–41; Liberia a settler
+  state; Haiti paying an indemnity to France; Thailand a buffer under unequal
+  treaties), survivorship selects them (the places left uncolonised were the
+  hardest to take), and the Case concedes the counterfactual is unobservable —
+  which removes the comparators' power to prove anything. (c) Compliance under
+  power is not consent (Vitoria on the requerimiento); but low force relative
+  to population, collaborators and Sarawak show acceptance varied, so
+  legitimacy was graded, not nil.
+- **Strongest objection.** On (a): the cited designs compare colonies with
+  colonies (settler mortality, kinds of rule), so they do not supply the
+  counterfactual of no colony — the Case's own point in note 4, which
+  `national-data-audited` also reached. So the charge stands against the
+  literature too.
+- **Why it does not overturn the verdict.** The charge as made is that the
+  critics "never" ran a cost–benefit against a counterfactual. Heldring &
+  Robinson state counterfactuals and weigh mechanisms against them, and Nunn
+  estimates an effect of the slave trades against their absence. That their
+  counterfactuals are disputable is a point about the quality of the designs,
+  not a proof that none were run. Feyrer & Sacerdote (NBER w12546) and
+  Easterly & Levine (NBER w18162), designs whose results favour the Case's
+  side, show the same literature is not one-directional.
+- **What would overturn it.** For (a), showing that the cited designs state no
+  counterfactual at all; for (b), comparators matched on the conditions that
+  made them hard to colonise; for (c), evidence of consent given by those
+  ruled, under conditions in which refusal was possible.
+- **Objection (author's review) — required.** "All the colonies became much
+  better after being colonised and much worse after independence." It is the
+  Case's own fourth argument ("The Costs of Anti-Colonialism") pushed to a
+  uniform claim, and the lesson states it at full strength at link 4 with the
+  post-independence collapses named and bound to data (Zimbabwe, the Congo,
+  Guinea-Bissau, Uganda, Mozambique, Angola, Ghana, Sierra Leone). It does not
+  bear on the three charges judged here; it is a claim about the ledger, and
+  the ledger is weighed in `auditing-the-case-for-colonialism`, where the
+  uniform claim is answered with the counter-cases (India under British rule
+  1870–1947 and after 1991; Singapore, Botswana and South Korea after
+  independence; the Congo Free State) and the module verdict names the
+  collapses. This lesson gives the objection and one paragraph of answer, and
+  hands the weighing on. Data: `research/texts/empire-round2/`
+  (Maddison Project Database 2023 extract; World Bank life expectancy).
+
 ## Sources to consult
+
+- **The counterfactual literature the verdict cites (named in the register):**
+  Heldring & Robinson, "Colonialism and Economic Development in Africa", NBER
+  WP 18566 (2012), full text `research/texts/verification-2026-11/heldring-robinson-2012-nber-w18566.txt`
+  — a qualitative review against stated counterfactuals (abstract l.40–56;
+  "a very subjective and speculative view", l.936; "very heterogeneous
+  effects" in the world context, l.45); state design and hedge whenever it is
+  used. Feyrer & Sacerdote, NBER w12546 (islands; wind patterns as
+  instrument) and Easterly & Levine, NBER w18162 (colonial European settlement,
+  "strong and uniformly positive"), abstracts at
+  `research/texts/verdict-audit/nber-w12546-abstract.txt` and
+  `research/texts/verdict-audit/nber-w18162-abstract.txt`. Nunn, MPRA WP 2007 /
+  *QJE* 2008, `research/texts/audit-right-shading/nunn-2007-slave-trades-mpra-wp.txt`
+  l.780–789 (the slave trades and income). Here they show only that the
+  critical literature runs counterfactual designs, in both directions; their
+  results are weighed in `auditing-the-case-for-colonialism`. References.
+
+- **Post-independence records (author's review, round 2)** — staged in
+  `research/texts/empire-round2/`: Maddison Project Database 2023 extract
+  (`maddison-mpd2023-selected.csv`; GDP per head in 2011 dollars; cite Bolt &
+  van Zanden 2024 and, in any figure showing fewer than twelve countries, the
+  country sources the workbook lists); World Bank WDI life expectancy at birth
+  (`worldbank-life-expectancy-SP.DYN.LE00.IN.csv`); Sanderson, *Population*
+  55:2 (2000), on the Congo's colonial demography; the Wikipedia estimates
+  map for the Free State (`[secondary]`). Used at link 1 (the Free State's
+  range) and link 4 (the objection). References.
 
 - **Gilley, "The Case for Colonialism" (Third World Quarterly, 8 September
   2017, withdrawn; reprinted Academic Questions 31:2, 2018)** — index **7**;
@@ -196,9 +293,9 @@ goal: Evaluate the argument that colonialism was on balance beneficial and legit
 
 ## EXPLANATION PLAN (L0)
 
-Start from the course.yaml opening verbatim. Develop it: the problem is not
-"was colonialism good or bad" — the reader will not be told — but how anyone
-could know. The obvious attempt on each side is a catalogue: railways,
+Start from the course.yaml opening verbatim. Develop it: the problem here is not
+"was colonialism good or bad" — the module's last lesson weighs that and finds
+it open across colonies — but how anyone could know. The obvious attempt on each side is a catalogue: railways,
 hospitals, the end of the slave trade; Amritsar, the Herero, Mau Mau, the Congo.
 Both fail the same way: a list of goods and a list of harms is not a balance
 until someone says what each is worth, and against what alternative. Anchor the
@@ -216,7 +313,19 @@ September 2017) and leave the controversy for link 7.
    the second of two phases of European empire, dated from 1824 — so the
    conquest of the Americas (Vitoria's subject, `<Ref>`), the Atlantic slave
    trade, and Leopold II's Congo Free State (1885–1908, the king's private
-   estate, not a Belgian colony) fall outside it. Give both sides at strength:
+   estate, not a Belgian colony) fall outside it. One sentence binds what the
+   scope excludes, with its uncertainty: no census was taken before 1924, so
+   the Free State's population loss is estimated, from about one million
+   (Sanderson's demographic modelling, 2020, which takes the low end as the
+   most plausible) to about ten million (Hochschild 1998, following the
+   Belgian commission of 1919, which said the population had been "reduced by
+   half"); Sanderson (*Population* 55:2, 2000) shows that the colonial
+   literature's depopulation figures rested on impressions, not counts
+   (`research/texts/empire-round2/sanderson-2000-population-congo-belge-mythe-realite.txt`
+   l.130–171, 845–859; the 1–5 million range and the 2020 study are
+   `[secondary]` via `research/texts/empire-round2/wikipedia-atrocities-congo-free-state.txt`
+   l.112–116 — the writer cites Sanderson 2020 only after reading it). Give
+   both sides at strength:
    the critics' charge that excluding the Congo is convenient; the author's
    reply that scholars should know the difference between a private estate and
    a state, and that the Free State is "the best argument for colonialism"
@@ -288,7 +397,47 @@ September 2017) and leave the controversy for link 7.
    hundred thousand people, rice output fell from its late-colonial peak to
    under half by 1980, and the gain in life expectancy slowed (bind every
    number in its sentence; verify each against the text before using; two
-   keepers at most). The critics' replies: a hard case chosen (Portugal's was
+   keepers at most).
+   **Objection (author's review) — state it at FULL STRENGTH here, in its best
+   form, before any reply.** "All the colonies became much better after being
+   colonised and much worse after independence." Its best author is the Case
+   itself (original, "The Costs of Anti-Colonialism":
+   "Guinea-Bissau seems like an extreme case. It is not. Of the eighty
+   countries that threw off the colonial 'yoke' after World War II, at least
+   half experienced similar trauma while most of the rest limped on"; the
+   World Bank's 1996 finding that "the majority had better capacity at
+   independence than they now possess"). Then name the collapses plainly and
+   bind each to the Maddison Project Database 2023 (GDP per head in 2011
+   dollars, `research/texts/empire-round2/maddison-mpd2023-selected.csv`):
+   **Zimbabwe** — $2,369 in 1998, $1,198 in 2008, a halving in ten years
+   after the land seizures of 2000, and still $1,704 in 2022, below the $2,275
+   of 1974 under the Rhodesian government; **the Congo** — $1,192 in 1960, the
+   year of independence, $414 in 2002 after the Congo crisis, Mobutu and the
+   wars of 1996–2003, and $844 in 2022, still 29% below 1960; **Guinea-Bissau**
+   — $1,458 in 1974, $1,207 in 1980; **Uganda** — $1,382 in 1970, $858 in 1986
+   (Amin and the second Obote government); **Mozambique** — $2,778 in 1970,
+   $1,482 in 1992 at the end of the civil war, $1,088 in 2022; **Angola** —
+   $2,818 in 1970, $1,384 in 1990; **Ghana** — $1,978 at independence in 1957,
+   $1,487 in 1983; **Sierra Leone** — $1,635 in 1990, $829 in 2000 after the
+   civil war. Say plainly: these are real collapses, and no account of the
+   ledger may leave them out. Two cautions bound to the same sources, stated after the
+   objection and not instead of it: the late-colonial figures for Mozambique
+   and Angola are for economies with large settler populations who left at
+   independence, so GDP per head fell partly because the richest residents
+   departed; and life expectancy did not follow income down — in the Congo it
+   rose from 40.8 years in 1960 to 61.9 in 2023, in Guinea-Bissau from 41.6 in
+   1974 to 64.1 (World Bank WDI, `research/texts/empire-round2/worldbank-life-expectancy-SP.DYN.LE00.IN.csv`;
+   on the current UN series Guinea-Bissau's gain after independence is faster
+   than in the colonial war years, so the Case's own life-expectancy figures
+   for it should not be repeated without that check). One paragraph of answer
+   here, the weighing in the module's last lesson: the claim as the author
+   states it is uniform, and a uniform claim falls to counter-cases — India,
+   Singapore, Botswana, South Korea (`<Ref>` auditing-the-case-for-colonialism,
+   one sentence) — while the collapses it names are real and stand. The Case
+   itself is less uniform than the objection ("the independence era has not
+   been an unalloyed bad. A few postcolonial states are in reasonable
+   health"); quote that sentence too.
+   The critics' replies: a hard case chosen (Portugal's was
    the last and most violent decolonisation; the war is the cost of the
    refusal to leave, not of leaving); post-colonial failure as colonial legacy
    (Taylor) against "everything is rooted in antecedents tells us nothing about
@@ -348,21 +497,49 @@ September 2017) and leave the controversy for link 7.
    is that it ended in a withdrawal and a reply five years later in another
    journal.
 
-8. **The proposal, briefly, and what stays open.** The normative claim is
+8. **The proposal, briefly.** The normative claim is
    separable from the empirical: colonial governance borrowed "as an attic to
    ransack"; shared sovereignty (RAMSI in the Solomons, GEMAP in Liberia) called
    by its name; charter cities and the Galinhas thought experiment — a
    ninety-year lease to Portugal at a dollar a year, "A hundred years of
    disaster is enough." Consent as the precondition the author himself calls
    "a tall order". Vitoria's condition (`<Ref>`) and Mill's test return as the
-   questions the proposal has to answer. Close on what the data cannot decide:
-   the weights, the scope, and whether a credit or a debt passes to the living
-   — the next lesson's question.
+   questions the proposal has to answer. One paragraph; the weighing follows.
+
+9. **The weighing — the Case is right about the catalogues, wrong about the
+   literature, and its other two proofs fail.** The lesson's last body section
+   reaches the verdict (see VERDICT) on each charge in turn, with the same
+   burden on both sides. (a) Grant the charge against the polemical catalogues
+   — both sides' lists of goods and harms are not balances. Then show the
+   critical literature: Acemoglu, Johnson & Robinson cited in the Case's own
+   note 4; Nunn's slave-trade estimate; Heldring & Robinson's review against
+   stated counterfactuals, conceded in the Response. Set the strongest
+   objection (colony-against-colony designs do not give the no-colony
+   counterfactual) and answer it: that is a dispute about the designs'
+   quality, not evidence that none were run. Strong on each half. (b) The
+   comparators: not comparable, selected by survival, and the Case concedes the
+   counterfactual is unobservable. Strong. (c) Behaviour: compliance under
+   power is not consent; acceptance varied, so legitimacy was graded. Strong.
+   Then say what is not decided here: the net ledger itself, which the module's
+   last lesson weighs with designs on both sides (the island and settlement
+   studies; Heldring & Robinson; Nunn); and what data cannot decide: the
+   weights and the scope.
 
 Headings fall out as: "What the claim names"; "Compared to what?"; "Did the
 governed accept it?"; "The costs of leaving"; "What each side measures"; "Two
-older ledgers"; "A withdrawal is not a refutation"; "What the data cannot
-decide".
+older ledgers"; "A withdrawal is not a refutation"; "The proposal and its
+conditions"; "Right about the catalogues, wrong about the literature".
+
+**Conclusion.** States the verdicts in plain words with their grades: the
+charge that no one weighed colonial rule against a counterfactual is true of
+the catalogues on both sides and false of the critical literature, which has run
+such designs since 2001 (strong on each half); the never-colonised comparators
+prove nothing, because they were selected by their resistance to conquest and
+the Case concedes the counterfactual is unobservable (strong); and the
+behaviour of the governed shows that legitimacy was graded, not that it was
+consented to (strong). Then the hand-off: whether a debt or a credit passes to
+the living (`inherited-guilt-and-reparations`), and what the cited studies
+actually found (`auditing-the-case-for-colonialism`).
 
 ## Set pieces and worked examples to recreate
 
@@ -432,8 +609,9 @@ decide".
   not carry them, do not use them.
 - **No settling, no moralising, no "some believe".** The tone rule names this
   lesson's subject by name. The course's own sentences state what each side
-  claims, what evidence each gives, and what each must concede; the verdict is
-  the reader's. The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+  claims, what evidence each gives, and what each must concede, and then gives
+  the verdict on each of the Case's three charges as the register records it,
+  with the same burden of proof on both sides. The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Do not re-teach** Burke's trust or Mill's test (one Ref clause each), nor
   the institutional account, the reversal of fortune or the settler-mortality
   audit (`<Ref>` geography-or-institutions, `<Ref>` national-data-audited — one
@@ -544,6 +722,18 @@ Balance: 7 draw / 1 source.
    paragraph each, evidence named), then state in two sentences what remains a
    judgment the data cannot make (the weight of a war against a trend in life
    expectancy; the baseline for a decolonisation that came otherwise).
+9. **Attack the verdict.** The lesson finds that the "no counterfactual"
+   charge fails against the critical literature (strong). State the
+   strongest objection in its best form: every design the lesson cites
+   compares colonies with colonies, or pre-1824 slave exports with their
+   absence, so none of them weighs colonial rule as the Case defines it
+   (six powers, 1824 onward) against no colonial rule — the Case's note 4
+   was right. Then say what evidence would be needed to overturn the verdict:
+   a reading of Heldring & Robinson (NBER WP 18566) showing that it states no
+   counterfactual for the colonies the Case covers, and no other design in
+   the literature that does. The solution checks the paper's stated
+   counterfactuals and its own hedge ("very subjective and speculative"), and
+   says why a speculative counterfactual is still a counterfactual run.
 
 ## Nietzsche cross-course links (where his ideas enter)
 

@@ -30,8 +30,9 @@ goal: Analyze how Kirk's canons of conservative thought and Nisbet's account of 
   canons), Nisbet a diagnosis (modern loneliness is the result of the state's absorption of the
   functions of family, church, guild and locality; totalitarianism is the community offered to the
   uprooted). Both name the same enemy — the centralised state and the abstract individual it faces —
-  and both leave open whether the free market, which the movement they founded would defend, is the
-  ally of the intermediate associations or another solvent of them.
+  and neither decides whether the free market, which the movement they founded would defend, is the
+  ally of the intermediate associations or another solvent of them — the question is carried to
+  `deneen-post-liberalism`.
 - **Hands off:** (i) The third founding figure of the National Review circle answers a question
   both books raise and neither answers: if the planned state is growing, WHO runs it? Kirk himself,
   in his last chapter, calls the coming order what "James Burnham called the 'managerial
@@ -39,7 +40,9 @@ goal: Analyze how Kirk's canons of conservative thought and Nisbet's account of 
   document in `udhr-read-against-the-right` (Kirk's own objection to the Declaration's "right to
   marry"). (iii) Later: `scruton-meaning-of-conservatism` (authority before freedom; autonomous
   institutions), `lasch-revolt-of-the-elites`, `deneen-post-liberalism` (market and state as twin
-  solvents of the communities Nisbet defends), `the-nation-and-its-defenders`.
+  solvents of the communities Nisbet defends — the founding tension between tradition and the market,
+  reconstructed here, is carried there and weighed in the after-liberalism module's verdict, which
+  `hungarys-fundamental-law` closes), `the-nation-and-its-defenders`.
 - **Spine step:** "After 1945 fascism has discredited the right, and it rebuilds in new registers:
   Jouvenel's history of Power, Oakeshott's disposition, Strauss's natural right, Voegelin's diagnosis
   of Gnosticism, Kirk's and Nisbet's American conservatism, Burnham's managers — tested on the
@@ -299,8 +302,10 @@ added later (see Pitfalls) — say so in one clause where the lesson first quote
      Kirk's own page concedes "Human slavery is bad ground for conservatives to make a stand upon"
      while proposing "to keep clear" of the controversy (l.4935–4938). Nisbet's reply is his own
      condition: freedom in the interstices requires a real exit from any one authority — which a
-     slave or a segregated citizen did not have. The lesson states the condition and lets the reader
-     weigh whether it saves the thesis.
+     slave or a segregated citizen did not have. Say what the condition does, as a fact about the
+     argument: it saves the thesis by narrowing it — the defence covers only groups a member can
+     leave, so it does not reach the plantation or the segregated county, and Nisbet's text does not
+     claim it does; Kirk's "keep clear" is no answer to the objection, and the lesson says so.
    - *Objection 3 (from the record — the prediction):* civic membership in America rose to a peak in
      the 1950s–60s and fell from about 1970 (Carroll's essay, with sourced data in References) — after
      Nisbet wrote; the decline came both with a larger state and with television, the car and the
@@ -312,8 +317,10 @@ added later (see Pitfalls) — say so in one clause where the lesson first quote
      canons are not a doctrine, and judges by thinkers, not by tests.
    Where the lesson concedes and holds: the books founded a movement (reception, 1953–57, is a fact);
    the thesis that the state's absorption of functions weakens groups is supported by the caste and
-   family cases; whether its remedy is compatible with the free market the movement championed is the
-   open question the lesson hands on.
+   family cases, and with Nisbet's exit condition it holds only for groups a member can leave; whether
+   its remedy is compatible with the free market the movement championed is not decided here — the
+   lesson hands it to `deneen-post-liberalism`, which restates it as market and state as twin
+   solvents, and the after-liberalism module's verdict weighs it.
 
 Headings as claims (suggested): "A tradition denied"; "Six canons, not a doctrine"; "A revolution
 that conserved"; "Groups hold their members by their functions"; "The state against the group";
@@ -348,9 +355,7 @@ that conserved"; "Groups hold their members by their functions"; "The state agai
 
 ## Pitfalls / subtleties to flag
 
-- **Register rule:** The course passes no verdict of its own on any author or idea: no condemning or
-  approving labels in its own voice. Judgement comes only through argument and evidence; a label may
-  appear only inside a quotation, with who applied it and when.
+- **Register rule:** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Edition trap (real, and easy to miss):** the dossier's Kirk is the 7th edition (1986). The 1953
   book was subtitled "from Burke to Santayana"; ch. XIII as we have it (Eliot, the pages on Nisbet,
   the "managerial revolution" passage, the 1980s remarks) was written or revised later. Never present
@@ -390,7 +395,7 @@ that conserved"; "Groups hold their members by their functions"; "The state agai
   source.
 - **Balance:** Kirk's and Nisbet's case at full strength first (a reader should feel the force of the
   family example), then the objections from the liberal-consensus side, from the civil-rights record
-  and from the data. The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+  and from the data. The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 
 ## FIGURE PLAN
 

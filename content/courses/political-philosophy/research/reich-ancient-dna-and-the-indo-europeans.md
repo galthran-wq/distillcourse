@@ -5,6 +5,18 @@ module: heredity-and-civilization
 type: core
 goal: Explain what ancient DNA has shown about the population history of Europe and India — the farmer migrations, the steppe expansion behind the Indo-European languages — and analyze Reich's argument about genetic differences between populations
 
+Register rule (binding on the lesson): The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
+
+Factual authority for everything this lesson says about genetic differences in cognitive traits:
+`research/heredity-evidence-review.md` (the dossier), §5 (polygenic scores, the height-selection artefacts,
+Akbari et al. 2026) and "Claims the lessons must NOT make". The migration and mixture findings come from
+Reich and the ancient-DNA papers named below; the dossier does not cover them.
+
+Revised 2026-11-01 for the restructured module: this lesson now comes eighth, after the four premises of the
+hereditarian argument have been tested (lessons 1–6) and after `gould-and-harden-on-heredity`. What it used to
+leave "for the next lesson" (the within/between point, portability) is now recalled by `<Ref>`, and it hands
+off to `geography-or-institutions`.
+
 ## ARC (L10)
 
 - **Inherits:** From `chamberlain-and-grant`: Chamberlain's Teutonic thesis (race made by breeding,
@@ -17,10 +29,17 @@ goal: Explain what ancient DNA has shown about the population history of Europe 
   From `gobineau-inequality-of-races`: the Aryan as the civilizing type; degeneration by mixture,
   mixture as both the engine and the end of civilization. From `renan-what-is-a-nation`: the
   argument that every European people is of mixed blood, so race cannot found a nation. From
-  `the-cognitive-elite`: heritability defined (a within-population statistic, not fixity). From
-  `hereditarian-case-iq-and-nations` (the prerequisite): the hereditarian hypothesis, the measured
-  gaps, the Bell Curve's declared agnosticism on genes vs environment, the Flynn effect, and the
-  objections "named here, developed next".
+  the module so far: heritability, twin and SNP-based (`heritability-within-and-between-groups`),
+  with the within/between point and the default hypothesis; the hereditarian case at full strength
+  (`hereditarian-case-iq-and-nations`: the measured gaps, the Bell Curve's declared agnosticism on the
+  mix); the US gap's size and movement and the Flynn effect (`us-gap-size-trend-and-environment`);
+  admixture regression, polygenic scores, their shrinkage within families, their loss of accuracy across
+  ancestries, and the 2019 finding that the height-selection signals in Europeans were inflated by
+  population structure (`admixture-and-polygenic-scores`: `polygenic-index`, `pgs-portability`); and,
+  immediately before, Harden's refusal of group inferences on present evidence and Murray's and Harden's
+  opposite political uses of the same genetics (`gould-and-harden-on-heredity`). Harden answers Reich by
+  name: the reader has met her answer before meeting the argument it answers, and this lesson puts the two
+  together.
 - **Contributes:** The one move: a new kind of evidence — the genomes of the dead — settles questions
   the nineteenth-century race theorists and the twentieth-century archaeologists argued from skulls,
   pots and words, and it settles them in a way that fits neither side's expectation. People moved, in
@@ -32,13 +51,48 @@ goal: Explain what ancient DNA has shown about the population history of Europe 
   inference, contested from both sides, and taught as such.
 - **Hands off:** Reich concludes that average genetic differences between populations in cognitive
   traits are likely to be found, direction unknown, and that they should not change how individuals
-  are treated. Two problems stay open: (i) whether genetic findings about individuals within one
-  population (Reich's education predictor, built in people of European ancestry) can say anything
-  about the average gap between two populations — the within/between and portability questions,
-  taken up at once by `gould-and-harden-on-heredity`, whose second author answers Reich by name;
-  (ii) whether any of this explains the gaps between nations, against the rival explanations from
-  geography and institutions (`geography-or-institutions`).
-- **Spine step:** "Heredity as an explanation of the gaps between peoples, at full strength (The Bell Curve, national IQ, ancient DNA), met by its objections (Gould, Harden) and by the rival explanations from geography and institutions — and the key datasets audited"
+  are treated; the module's own lessons have shown why no current design can yet find them (Ref
+  `admixture-and-polygenic-scores`). What this lesson decides: old pure races and "pots, not people"
+  are both refuted (**established**); Reich's inference to cognitive differences is **open**, with the
+  design that would settle it named (`admixture-and-polygenic-scores`, section 10). The question this
+  lesson passes on is the one the module turns to
+  next: even granting that peoples have moved, mixed and been selected, does anything inherited explain
+  the gaps between NATIONS — or do two explanations that never mention genes, geography and
+  institutions, explain them better (`geography-or-institutions`)? The steppe herders' expansion is
+  itself the bridge: why one population spread over others is a question Diamond answers with horses,
+  wheels and germs.
+- **Spine step:** "Heredity as an explanation of the gaps between peoples, tested premise by premise — what the tests measure, what heritability can and cannot imply, the hereditarian case at full strength, then the US gap, adoption, admixture and polygenic scores on the step from a real gap to a genetic one — then what follows politically whatever the answer, what ancient DNA shows, the rival explanations from geography and institutions, and the key datasets audited"
+
+## VERDICT
+
+- **Claims judged:** (i) two opposite views of Europe's past: that peoples descend from old, pure races
+  formed in isolation (Grant, Chamberlain, Kossinna); and that cultures spread as ideas, "pots, not
+  people", without mass movement (the postwar consensus). (ii) Reich's inference that average
+  differences between populations in cognitive traits are likely to be found.
+- **Verdicts.** (i) **Both refuted.** Mass migrations replaced most of the earlier ancestry of whole
+  regions (about three-quarters steppe-related ancestry in Corded Ware Germany; about 90% of Britain's
+  earlier ancestry gone after the Beaker period; Reich l.1002–1004, l.1030), and every migrating people
+  was itself a recent mixture (the Yamnaya formed about 5,000 years ago from a northern and a southern
+  people; the northern European look is a Bronze Age composite). Grade: **established**. Iberia, where
+  Beaker pots spread without new people, shows both processes occurred, which refutes "pots, not
+  people" as a rule, not as a possibility. (ii) Reich's inference: **open**.
+- **What decides (i):** the ancient-genome record as Reich reports it (the passages listed under Sources) and the
+  primary papers the brief cites; the test of the race theories in section 7.
+- **Strongest objection to (i):** the record supports parts of the old picture (an eastern homeland
+  near Grant's grasslands; a male-led spread; Reich's own "uncomfortable support", l.1058), so the race
+  theories were partly right. It does not overturn the verdict: what was confirmed is migration and
+  dominance by a mixed population; what is refuted is purity and fixity, which is what the theories
+  claimed as their foundation.
+- **Why (ii) is open, and what would settle it:** the premise that selection had time to act is supported
+  (and the 2026 ancient-genome study shows selection on cognition-linked scores is detectable within one
+  region); the step to present differences between populations runs through the within/between gap and
+  through scores that do not travel across ancestries (`heritability-within-and-between-groups`,
+  `admixture-and-polygenic-scores`). The strongest objection to "open", from the hereditarian side
+  (the measured phenotypic gaps already point one way), fails because those gaps do not show their cause
+  (module verdict); from the other side ("will be found" is not evidence), it fails because no evidence
+  excludes a genetic share either. What would settle it: within-family genome-wide studies of cognition in
+  large non-European samples, scores validated within families in each ancestry, then compared; and the
+  sibling admixture design.
 
 ## Sources to consult
 
@@ -144,6 +198,15 @@ goal: Explain what ancient DNA has shown about the population history of Europe 
   inflated by uncorrected population structure; the open letter "How Not To Talk About Race And
   Genetics" (BuzzFeed News, 30 March 2018, 67 signatories) replying to Reich's New York Times
   op-ed of 23 March 2018, and Reich's reply.
+- **Akbari et al. 2026, *Nature* (doi 10.1038/s41586-026-10358-1)** — dossier §5 and §9, read at
+  ABSTRACT level only: about 15,836 ancient West Eurasian genomes; one-SD changes over ten millennia in
+  combinations of alleles that today predict higher cognitive performance (and other traits); the
+  authors' own caveat — "it remains unclear how these relate to phenotypes that were adaptive in the
+  past". It says nothing about present African–European differences, and it does not test the
+  neutrality assumption behind the 2021 upper bound taught in `admixture-and-polygenic-scores`; it shows
+  that directional selection on such scores is detectable (dossier §5, Bird 2021 paragraph). Used in
+  one paragraph of link 8, as the newest datum on Reich's step (c); the writer must read the full paper
+  before stating any number beyond the abstract's.
 - **Strauss–Cropsey, History of Political Philosophy:** no chapter covers this material (the volume
   runs Thucydides to Heidegger; grep finds no Gobineau, Chamberlain or Grant).
 
@@ -293,7 +356,10 @@ themselves can be read.
    - Undecided by this evidence: anything about the mental qualities of the migrants, or why they
      prevailed. Seam to link 8: the same scientist who demolished purity draws a further conclusion
      that the race theorists' critics did not expect.
-8. **From the findings to differences: Reich's argument (contested — label it so).** Reconstruct in
+8. **The weighing: pure races and "pots, not people" are both refuted; Reich's inference is open.**
+   (Heading as a claim; the reconstruction follows.) First state verdict (i) in the course's voice, from
+   section 7: **established**, with the strongest objection (the old picture partly confirmed) and why it
+   fails. Then Reich's argument, labelled contested. Reconstruct in
    steps, at full strength. (a) The consensus since the 1940s (race a social category) was hardened
    in 1972 by the finding that about 85 percent of human genetic variation lies within populations,
    with the conclusion that racial classification has no genetic significance; Reich calls what
@@ -313,24 +379,44 @@ themselves can be read.
    differences between the sexes. Reich rejects both the "orthodoxy" and the scientists who say they
    know the differences and that they match old stereotypes (he applies a label to them in 2018;
    quote it with attribution or not at all).
+   - **The newest datum on step (c) (dossier §5, abstract only).** A 2026 study of about 15,800
+     ancient West Eurasian genomes reports directional change, over ten thousand years, in combinations
+     of variants that today predict higher scores on cognitive tests — evidence that selection on such
+     scores within one region is detectable. State its own limits in the same paragraph: the authors
+     say it is unclear how these variants related to what was adaptive in the past; it compares ancient
+     and modern West Eurasians, not present-day continental populations; and it does not test the
+     neutrality assumption behind the upper bound of `admixture-and-polygenic-scores` (Ref), only shows
+     that the assumption can fail. It supports Reich's premise that selection had time to act; it says
+     nothing about the direction or size of any present difference between populations.
    - **OBJECTION (from the egalitarian side), at full strength:** steps (c)–(d) move from findings
-     about individuals within one ancestry group to averages between groups; predictors built in
-     Europeans lose most of their power in other ancestries; one strand of (c), the selection-on-
-     height evidence, was weakened in 2019 when the signals were shown to be inflated by uncorrected
-     population structure; and a prediction that differences "will be found" is not evidence that
-     they exist (the 2018 open letter; the next lesson's second author, who answers Reich by name).
+     about individuals within one ancestry group to averages between groups — the step whose hidden
+     premise `heritability-within-and-between-groups` (Ref) laid out; predictors built in Europeans lose
+     most of their power in other ancestries (`pgs-portability`, Ref `admixture-and-polygenic-scores`);
+     one strand of (c), the selection-on-height evidence, was weakened in 2019 when the signals were
+     shown to be inflated by uncorrected population structure (Ref, same lesson — recalled in a clause,
+     not re-taught); and a prediction that differences "will be found" is not evidence that they exist
+     (the 2018 open letter; Harden, whose answer to Reich by name the reader met in
+     `gould-and-harden-on-heredity`, Ref).
    - **OBJECTION (from the hereditarian side), at full strength:** step (e) is itself a prior
      asserted without evidence — the measured phenotypic gaps of the previous lesson (Ref
      `hereditarian-case-iq-and-nations`) are data, not stereotypes; if differences are likely and the
      tests already show gaps, Reich owes a reason why the observed direction is uninformative; and
      his position (differences likely, causes undetermined) is close to the agnosticism for which
-     The Bell Curve was attacked.
+     The Bell Curve was attacked; and the 2026 selection result shows that the neutrality on which
+     upper bounds of a genetic difference rest cannot simply be assumed.
    - **Reply / state of play:** Reich's answer to both is that high-powered studies will decide and
-     that the evidence for cognitive traits does not yet exist; the course reports this and passes no
-     verdict. Close: what the reader can now explain (the two migrations, the mixtures, the caste
-     record, which race-theory claims the record supports and refutes) and the open problem handed to
-     `gould-and-harden-on-heredity` — whether within-population genetics can speak to between-
-     population gaps at all.
+     that the evidence for cognitive traits does not yet exist. The course's verdict: **open**, as a
+     finding: neither objection meets its burden (the observed gaps do not show their cause; "will be
+     found" is not evidence, and nor is its denial), and the lesson names what would settle it
+     (VERDICT). Dossier constraint: the lesson states no claim that ancient DNA or polygenic scores show
+     a difference in genetic potential between present populations, and none that they show there is
+     none ("Claims the lessons must NOT make", both lists). Close (`<Conclusion>`): first the verdicts in
+     plain words: the idea of old pure races and the idea that cultures spread without people both fail
+     on the ancient genomes (**established**); whether populations differ genetically in cognitive traits
+     is **open**, and the lesson says what study would settle it. Then what the reader can now explain (the
+     two migrations, the mixtures, the caste record, which race-theory claims the record supports and
+     refutes, where Reich's inference stands) and the open problem handed to `geography-or-institutions`
+     — whether the gaps between nations need anything inherited to explain them.
 
 ## Set pieces and worked examples to recreate
 
@@ -403,13 +489,12 @@ themselves can be read.
   ch. 12). Say once that the European story is the best documented, which is why the lesson is about
   Europe and India.
 - **Labels.** Reich applies condemning labels to named scientists, to Nazi ideology and to Hindutva;
-  the open letter and the critics apply labels to Reich. Register rule: The course passes no verdict
-  of its own on any author or idea: no condemning or approving labels in its own voice. Judgement
-  comes only through argument and evidence; a label may appear only inside a quotation, with who
-  applied it and when.
+  the open letter and the critics apply labels to Reich. Register rule: The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Do not re-teach:** Grant's three-race scheme, Chamberlain's thesis, Gobineau's ten civilizations,
-  heritability, the Bell Curve's argument — each recalled with a `<Ref>` and a clause. Do not teach
-  the within/between fallacy here (next lesson); name it as the open problem only.
+  heritability, the Bell Curve's argument, the within/between point and the default hypothesis
+  (`heritability-within-and-between-groups`), polygenic scores, their portability and the 2019
+  height-selection correction (`admixture-and-polygenic-scores`), Harden's position
+  (`gould-and-harden-on-heredity`) — each recalled with a `<Ref>` and a clause.
 - **Dossier thin spots:** Reich's book has no images in the text file (captions only, l.1964–2014
   credit the sources); the 2019–2025 papers are outside the dossier. Ch. 10's sex-bias material is
   rich but optional.
@@ -479,18 +564,27 @@ themselves can be read.
 6. **Research-shaped (E6d):** design the study that would tell Reich's two sprinting hypotheses apart
    (higher mean vs wider spread) for any trait: what you would measure, in whom, and which tail
    discriminates; then name the obstacle that arises when the trait is cognitive and the predictor
-   was built in one ancestry group.
+   was built in one ancestry group (Ref `admixture-and-polygenic-scores`: `pgs-portability`).
 7. **Synthesis, spaced (E3):** Renan argued in 1882 (Ref `renan-what-is-a-nation`) that because every
    European people is of mixed blood, race cannot be the basis of a nation. Does the genetic record
    vindicate his premise, his conclusion, both or neither? Write a claim–evidence–reasoning paragraph;
    the solution separates the empirical premise (confirmed) from the inference to what a nation is
    (not decidable by genetics) and notes Barrès's answer that a nation is accepted, not chosen.
-8. **FORWARD (E7) → `gould-and-harden-on-heredity`:** Reich's education predictor separates 96% from
-   37% within a sample of European ancestry. Someone proposes to compute it for samples of two other
-   ancestries and compare their averages. List what would have to be true for the comparison to mean
-   anything (same variants, same correlations between variants, same environments' role). The
-   solution names the two problems the next lesson develops — portability across ancestries and the
-   step from within-group to between-group — with a `<Ref>`.
+9. **Attack the verdict:** The lesson holds as **established** that the ancient genomes refute the old
+   race theories. State the strongest case against that verdict: Grant placed the homeland near the
+   steppe, the spread was male-led and left a ruling layer, and Reich himself calls this "uncomfortable
+   support". Then say what evidence would be needed to overturn the verdict. The solution separates what
+   the theories claimed as foundation (purity, fixity since the Neolithic, a northern homeland) from what
+   was confirmed, and names the overturning evidence: a population sampled across millennia without
+   admixture, whose descendants carried the languages.
+10. **FORWARD (E7) → `geography-or-institutions`:** the Yamnaya-related herders, a thinly spread
+   people, replaced most of the ancestry of central and north-western Europe within a few centuries. A
+   race theorist of 1916 would have explained it by the conquerors' inborn qualities. List the other
+   kinds of cause the lesson's own evidence points to (the wheel, the wagon and the horse; plague
+   bacteria in steppe skeletons; an open grassland niche) and sort them into immediate means and deeper
+   conditions that put those means on one side. The solution states that the next lesson makes exactly
+   this distinction — proximate and ultimate causes — the basis of an explanation of why Eurasians
+   conquered the Americas, with a `<Ref>`.
 
 ## Nietzsche cross-course links
 

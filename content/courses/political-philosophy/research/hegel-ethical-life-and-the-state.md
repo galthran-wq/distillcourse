@@ -44,13 +44,16 @@ goal: Analyze Hegel's argument that freedom is realised only in family, civil so
   derivation of the three spheres from the failures of the two abstractions
   that precede them (abstract right, morality) and the §258 critique of the
   contract.
-- **Hands off:** Two objections stated, one argued later, and one refusal. (a)
+- **Hands off:** This lesson reconstructs (no register verdict is hosted here); it
+  says, for each objection, whether Hegel's text answers it, and names where it
+  is decided. Two objections stated, one argued later, and one refusal. (a)
   Marx's inversion — civil society, not the state, is the real ground, and the
-  state is its committee (`marx-manifesto`, next module; one paragraph here, and
-  the rabble of §§241–245 as the seam). (b) The historicism charge, stated as the
+  state is its committee (`marx-manifesto`, next module, where Marx's own claims
+  are judged; one paragraph here, and the rabble of §§241–245 as the seam). (b) The historicism charge, stated as the
   course's own with Strauss in References: if world history is the court of
-  judgment, right has no standard outside what wins — argued in
-  `strauss-natural-right-and-history`. (c) The refusal comes next: a Spanish
+  judgment, right has no standard outside what wins — argued and decided in
+  `strauss-natural-right-and-history` (the charge against historicism is upheld
+  there). (c) The refusal comes next: a Spanish
   deputy who visited Berlin in 1849 and was horrified by the Hegelians will deny
   that the age's oppositions can be reconciled at all — Catholicism or
   socialism, the dagger or the sabre — and will ask, of a constitution under
@@ -413,11 +416,20 @@ rebuilds the structure in his order and asks what it concedes to each side.
    the step from Burke's grown constitution to a "standard inherent in the
    process" is the road to this. Give Hegel's reply in his own terms: world
    history is "the necessary development of freedom", not blind might (§342),
-   and the judge is reason, not success. Then the second objection, one
+   and the judge is reason, not success. Then say whether the reply answers the
+   objection, as a fact about the argument: it answers the charge that history's
+   court is blind might, but not the charge that it has no standard outside the
+   process — "the development of freedom" is itself read off the process, and the
+   standpoint that reads it is the "absolute moment" the objection names. The
+   objection is not met here; it is judged in the postwar module (`<Ref>`
+   strauss-natural-right-and-history). Then the second objection, one
    paragraph (`<Ref>` marx-manifesto): Marx keeps Hegel's civil society and its
    rabble and inverts the conclusion — the state is civil society's instrument,
    "a committee for managing the common affairs of the whole bourgeoisie", and
-   §245's admission that civil society cannot cure poverty is the seam.
+   §245's admission that civil society cannot cure poverty is the seam. Say what
+   Hegel's text offers against it (colonisation, §§246–248, and the Corporation,
+   §§250–255) and that he does not claim these cure the rabble — §245 stands as
+   his own concession; whether Marx's inversion holds is judged in his lesson.
 10. **What the structure concedes to each side.** Close by answering the
     opening's question. To the Revolution: the principle of subjective
     freedom, property as personality, law that is public and known, free choice
@@ -428,12 +440,15 @@ rebuilds the structure in his order and asks what it concedes to each side.
     refusal of its ground (Providence, prejudice) as unknowing. What the reader
     can now do: rebuild the three spheres from the failures that force each, and
     state §258 as the answer to Rousseau, and §349 as the answer to Herder and
-    Fichte. What stays open: what happens when the rational constitution's
-    normal case breaks down and someone must decide outside its rules (`<Ref>`
-    donoso-cortes-on-dictatorship, next); whether a state judged only by history
-    has any standard at all (the postwar module); and whether the Revolution's
-    own institutions — the departments and the Code — are "rational actual" or
-    "paper" (`<Ref>` assignats, the module's application).
+    Fichte. What passes on, each to the lesson that decides it: what happens when
+    the rational constitution's normal case breaks down and someone must decide
+    outside its rules (`<Ref>` donoso-cortes-on-dictatorship, next; his dilemma is
+    tested on 1799 in `assignats` and fully on Weimar in `article-48-weimar`); whether a state
+    judged only by history has any standard at all
+    (`strauss-natural-right-and-history`, the postwar module); and whether the
+    Revolution's own institutions — the departments and the Code — are "rational
+    actual" or "paper" (`<Ref>` assignats, the module's application, which finds
+    that designed institutions can last).
 
 ## Set pieces and worked examples to recreate
 
@@ -483,10 +498,7 @@ rebuilds the structure in his order and asks what it concedes to each side.
 
 ## Pitfalls / subtleties to flag
 
-- **Register rule.** The course passes no verdict of its own on any author or
-  idea: no condemning or approving labels in its own voice. Judgement comes only
-  through argument and evidence; a label may appear only inside a quotation, with
-  who applied it and when.
+- **Register rule.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Do not re-teach Herder or Fichte.** The Volk, the plurality of cultures, the
   Urvolk and national education are recalled with a `<Ref>` and a clause each;
   the lesson's new matter is §274 and §349 — the nation as the state's material,

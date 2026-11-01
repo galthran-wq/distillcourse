@@ -41,6 +41,10 @@ goal: Analyze how the Roman Empire and the Church fought over who represented th
   `voegelin-gnosticism`, which only *recalls* what this lesson defines
   (course.yaml notes of `voegelin-gnosticism`: "constantine-and-representation
   introduced the vocabulary; this lesson only recalls it").
+  This lesson passes no verdict of its own (register, module 2): whether
+  the Trinity ended political theology is decided in
+  `schmitt-political-theology`, and the lesson says only what each side's
+  argument does and does not show (link 8).
 - **Spine step:** "A Jewish movement becomes Europe's religion by being remade
   in Greek concepts and Roman forms; Constantine's empire and the Church fight
   over who represents the truth; Augustine denies that any earthly city can be
@@ -310,8 +314,10 @@ exists by being represented.
    maximus) as a consequence (III.5). Augustine will later see only
    flattery here (XVIII.24: the Caesars deified "not through error, but in
    flattery"); Varro saw a city representing itself. The lesson states both
-   and does not decide; it uses Rome as the case where the two layers of
-   representation were *one*.
+   and says why it cannot choose: Varro's theology survives only in
+   Augustine's quotations, so his motive is out of reach of the evidence;
+   what both readings share is the fact the lesson uses — Rome as the case
+   where the two layers of representation were *one*.
 5. **Why the empire's own gods were weakening — syncretism and the edicts.**
    The seam: from the compact Roman answer one would expect a confident
    state cult; the record shows emperors shopping for a god strong enough.
@@ -393,7 +399,13 @@ exists by being represented.
    Christianity" — stated as the course's own thesis, with the question mark
    the course.yaml puts on it: a theology that ends in 381 and returns
    whenever a ruler needs it (Byzantium's emperors, Charlemagne, the "Third
-   Rome" — forward clause only). The reader is left with the open problem:
+   Rome" — forward clause only). Say what the argument shows and what it
+   does not: Gregory's point removes the orthodox doctrinal warrant for one
+   emperor imaging one God; it does not show that the practice ended, and
+   Byzantium's emperors and Charlemagne are the counter-cases to the strong
+   form ("the end of political theology"). The strong form is judged in
+   `schmitt-political-theology` (forward clause). The problem this lesson
+   hands on is the next one:
    if the emperor cannot represent God's truth, and the Church represents a
    truth not of this world, what truth does the Roman *society* now
    represent? The answer the next lesson gives has two cities in it.
@@ -480,7 +492,7 @@ ends political theology (or does it)"; conclusion.
   theology" is his claim; Berkhof's reading of 311–13 is one reading. Name
   Voegelin once as the author of the representation tool; state the Roman
   history as the course's own; Berkhof, Hauriou, Toynbee in References only.
-- **Register.** The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+- **Register.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Dropped slugs.** `cicero-mixed-constitution` and `cicero-natural-law` no
   longer exist; every Cicero recall goes to `cicero-res-publica-and-natural-law`.
 - **Do not re-teach** Polybius's religion-as-device (a `<Ref>` and a
@@ -605,9 +617,10 @@ ends political theology (or does it)"; conclusion.
    emperor as his guidebook." Name two facts the claim fails to account for
    (Gregory's "no analogue"; the noses) and state what would have to be true
    for it to survive (that the theology continued in practice without its
-   doctrinal warrant — which is a claim about symbols outliving arguments,
-   and may well be true). Leave it open; it is the question mark in the
-   heading.
+   doctrinal warrant — which is a claim about symbols outliving arguments).
+   The solution says what the counter-cases do: they tell against the
+   strong form of the thesis, not against the doctrinal point, and the
+   strong form is decided in `schmitt-political-theology`.
 7. **FORWARD (E7)** → `augustine-two-cities`. Take Varro's sentence ("the
    cities are prior to the institutions of the cities") and Scipio's definition of a people (`<Ref>` `cicero-res-publica-and-natural-law`:
    bound by agreement about right). If the city makes its gods, and justice

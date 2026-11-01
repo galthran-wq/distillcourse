@@ -41,10 +41,15 @@ goal: Analyze Mosca's thesis that every society is ruled by an organized minorit
   ends, in 1923, by defending the representative system he had attacked in
   1884. The reader leaves able to restate "who should rule?" as "which
   minority, under what formula, checked by which other forces?".
-- **Hands off:** Two problems stay open. (i) Mosca studied states. Whether an
-  organization FOUNDED on the principle that the many should rule — a
-  democratic party with elective offices — escapes the law, and why ruling
-  classes rise and fall, is `michels-and-pareto-oligarchy-and-elites` (next).
+- **Hands off:** The lesson carries no verdict of its own (REGISTER.md); its
+  conclusion — a minority always rules, and regimes differ in juridical
+  defence and in whether the many can remove the minority — is used in the
+  module verdict in `article-48-weimar`, where Mosca's juridical defence by
+  competing organised forces is found to survive. Two problems pass on. (i)
+  Mosca studied states. Whether an organization FOUNDED on the principle that
+  the many should rule — a democratic party with elective offices — escapes
+  the law, and why ruling classes rise and fall, is
+  `michels-and-pareto-oligarchy-and-elites` (next), which judges the iron law.
   (ii) Mosca's formula is a belief the ruled need; a writer twenty years later,
   knowing nothing of Mosca, calls the binding image of a class a myth —
   `sorel-reflections-on-violence` (next module). Forward, one clause each:
@@ -369,9 +374,14 @@ scandal but a law.
    can be REMOVED by the many without violence — a criterion on which regimes
    differ sharply and which "every regime is an oligarchy" hides. Mosca's reply
    is in his own link 5: elections matter because they force minorities to
-   compete; the democrat's rejoinder is that this concedes the point. Leave the
-   exchange open; Michels and Pareto (next) and the competitive theory of
-   democracy take it up. (b) *From the left — the ruling class is the owning
+   compete; the democrat's rejoinder is that this concedes the point. Say what
+   the exchange shows about the argument: Mosca's reply does concede it —
+   removability by competition is a difference between regimes his own
+   measure has to count, and his 1923 defence of the representative system
+   (link 7) counts it. The thesis survives in the narrower form "a minority
+   always rules, and regimes differ in whether the many can remove it"; the
+   module verdict (`article-48-weimar`) uses that form, and the next lesson
+   judges Michels's harder version. (b) *From the left — the ruling class is the owning
    class, and the formula is its ideology* (Ref `marx-manifesto`: "the ruling
    ideas of each age have ever been the ideas of its ruling class"). Mosca's
    reply (Ch. XVI §3, XI §6): political change without economic change (the
@@ -385,8 +395,10 @@ scandal but a law.
    need it, what is a ruling class to do once it has read Mosca? His answer: the
    ruling class must "become conscious of itself" and raise its competence
    (XVII §6) while the formula keeps the ruled loyal; the difficulty — a class
-   that sees through the principle it asks others to believe — is stated and left
-   for Pareto, who builds his theory on it (next lesson). No verdict.
+   that sees through the principle it asks others to believe — is one Mosca does
+   not answer: his text names the need and gives no account of how a formula
+   survives its rulers' disbelief. Say so, as a fact about the argument; Pareto
+   builds his theory on the same gap (next lesson).
 
 Headings as claims: "The six regimes sort titles, not rulers"; "A hundred in
 concert beat a thousand alone"; "The political formula: why the many obey the
@@ -437,10 +449,7 @@ representative system"; "What the thesis cannot sort".
 
 ## Pitfalls / subtleties to flag
 
-- **Register (exact rule).** The course passes no verdict of its own on any
-  author or idea: no condemning or approving labels in its own voice.
-  Judgement comes only through argument and evidence; a label may appear only
-  inside a quotation, with who applied it and when.
+- **Register (exact rule).** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Terms to anchor at first use (L11), at most three per section:** ruling
   class / political class (Mosca uses both; "political class", *classe
   politica*, is his Italian term — say so once, link 1); organized minority
@@ -488,9 +497,11 @@ representative system"; "What the thesis cannot sort".
 - **Dossier thin:** the 1925 Senate speech, Mosca's 1884 *Teorica* and any
   biography beyond Livingston's paragraph are not in the dossier (see
   Sources). The Burnham framing is not in the dossier.
-- **Do not prejudge the forecast in set piece 8.** Report the sentence and its
-  date; the reader compares it with the record in an exercise; the course does
-  not score it.
+- **The forecast in set piece 8 carries no graded verdict** (none in
+  REGISTER.md). Report the sentence and its date; the reader compares it with
+  the record in an exercise, and the solution states the record as fact (a
+  party minority ruled the Soviet state in the name of the many) without
+  attaching a grade.
 
 ## FIGURE PLAN
 

@@ -43,8 +43,11 @@ goal: Analyze Schmitt's definition of the sovereign as the one who decides on th
 - **Hands off:** The theory names a constitution's emergency clause as the
   place where the sovereign shows himself; Weimar's Article 48 is Schmitt's
   own example (ch. 1). What the clause did between 1930 and 1933, and whether
-  the theory described the collapse or helped produce it, is
-  `article-48-weimar`. The secularisation thesis is re-met in
+  the theory described the collapse or helped produce it, is decided in
+  `article-48-weimar` (the module verdict: the diagnosis held; the
+  commissarial remedy as practised had no criterion that kept it
+  commissarial). This lesson carries no verdict of its own (REGISTER.md); the
+  secularisation genealogy gets none anywhere in the course. The secularisation thesis is re-met in
   `voegelin-gnosticism` as the rival reading of the same modernity, and the
   "decision" returns in `strauss-natural-right-and-history` as the thing
    Weber's fact–value distinction leaves to the will. Whether a man who held
@@ -404,8 +407,9 @@ theology asked about miracles.
    Schwab's three questions (l.1026–1055): who decides the exception exists,
    who decides the measures, who decides it has ended — "his sovereign
    slumbers in normal times but suddenly awakens". Article 48 is, on Schmitt's
-   own account, commissarial. Hands off to `article-48-weimar`: which was
-   Weimar's, in the event?
+   own account, commissarial. Hands off to `article-48-weimar`, which decides
+   which Weimar's was in the event (on balance: a remedy with no criterion
+   that kept it commissarial).
 
 8. **The objections, at full strength.** (a) **The Trinitarian objection**
    (course's own, Ref `constantine-and-representation`): political theology
@@ -416,8 +420,12 @@ theology asked about miracles.
    secularises is not Christian theology but its Eusebian HERESY — the
    structure "one God, one emperor" belonged to the Arian court, and the
    orthodox result was the opposite: the state is temporal and nothing in it
-   is a miracle. Schmitt's reply (1970, Political Theology II, not in the
-   dossier; References) can only be named. (b) **Kelsen's reply**, from
+   is a miracle. Say what the 1922 text does with this: it does not answer
+   it — the book never considers the Trinitarian break; Schmitt's reply came
+   forty-eight years later (1970, Political Theology II, not in the dossier;
+   References) and can only be named. The record the reader already has
+   (`constantine-and-representation`: Byzantium, Charlemagne) tells against
+   the strong form of the thesis. No verdict on the genealogy itself. (b) **Kelsen's reply**, from
    Schmitt's own citation (l.2659–2666): democracy is "political relativism…
    liberated from miracles and dogmas" — and that is its merit; the
    "decision from nothingness" is not an insight but a description of
@@ -427,8 +435,10 @@ theology asked about miracles.
    valid" and "any government is good once established", the theory cannot
    distinguish the commissarial dictator who saves the constitution from the
    sovereign one who destroys it — the distinction Schmitt himself drew in
-   1921 has no criterion inside the 1922 theory. That gap is what the next
-   lesson tests on the record. (d) **The left's adoption** (Aside; Lilla in
+   1921 has no criterion inside the 1922 theory. Schmitt does not answer it
+   in the book — say so, as a fact about the argument. The next lesson tests
+   the gap on the record and finds it real (`article-48-weimar`: on balance,
+   the remedy as practised had no criterion that kept it commissarial). (d) **The left's adoption** (Aside; Lilla in
    References): from the 1980s the thesis was taken up by thinkers of the
    left (Taubes, Agamben) as a description of how all legitimacy works —
    which is either a vindication or a sign that the thesis describes any
@@ -527,10 +537,7 @@ missing criterion".
   `donoso-cortes-on-dictatorship`), Rousseau, Locke's prerogative, Voegelin's
   representation: Ref and one clause each. The lesson's matter is what Schmitt
   DOES with them.
-- **Register (exact rule).** The course passes no verdict of its own on any
-  author or idea: no condemning or approving labels in its own voice.
-  Judgement comes only through argument and evidence; a label may appear only
-  inside a quotation, with who applied it and when. `constantine-and-
+- **Register (exact rule).** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. `constantine-and-
   representation` already introduced "political theology" as a concept id;
   this lesson REINFORCES it and introduces `secularization-thesis` as the
   specifically Schmittian claim.
@@ -665,7 +672,9 @@ missing criterion".
    only in the abnormal one), and state what would have to be true for the
    claim to survive (that Hobbes's "the sovereign judges what is necessary
    for peace" is the same act as deciding the exception — which Schmitt
-   himself asserts at l.2398–2462; the reader weighs it). Ref
+   himself asserts at l.2398–2462 — the solution says the assertion does not
+   meet the first fact: Hobbes's sovereign judges within a covenant that made
+   him, Schmitt's decision presupposes none). Ref
    `hobbes-sovereign-and-liberty`.
 7. **Corroboration (document reasoning):** Two short excerpts — Schmitt's
    "the exception in jurisprudence is analogous to the miracle in theology"

@@ -33,7 +33,9 @@ goal: Derive Hobbes's argument from natural equality through the war of all agai
   objection and carried into the next lesson's reading of Hobbes as a moralist of individuality;
   (iii) the forward objections named only as such: Locke's "judge in his own cause"
   (`locke-property-and-consent`), Rousseau's "he read society into nature"
-  (`rousseau-inequality-and-general-will`), and the thesis that with Hobbes fear of violent
+  (`rousseau-inequality-and-general-will` — where the course judges the empirical premise
+  against the archaeological and ethnographic record: the state lowers lethal violence, so
+  Hobbes's point holds there, while the solitary natural man fails), and the thesis that with Hobbes fear of violent
   death takes the place of the natural end — the frame of `strauss-natural-right-and-history`.
   The nearest forward objection comes from the royalist side, two lessons on
   (`filmer-patriarcha`): grant every right the covenant gives the sovereign, deny that men were
@@ -139,6 +141,14 @@ goal: Derive Hobbes's argument from natural equality through the war of all agai
   acquisition (l.19720). The standard close reading against which to check the derivation;
   copyrighted — paraphrase; Berns in References.
 
+- **Forward only (the judgement of the empirical premise is the one in `rousseau-inequality-and-general-will`,
+  not this lesson's):** Gómez, Verdú, González-Megías & Méndez, "The phylogenetic roots of human
+  lethal violence", *Nature* 538 (2016) 233–237, doi:10.1038/nature19758; Fry & Söderberg,
+  "Lethal Aggression in Mobile Forager Bands and Implications for the Origins of War", *Science*
+  341 (2013) 270–273, doi:10.1126/science.1235675 — both staged in
+  `research/texts/audit-right-shading/`. Named in the forward clause of link 3 only; the
+  lesson reports no figures from them.
+
 Names ONLY in References: Strauss, Smith, Oakeshott, Voegelin, Berns, Skinner, Tuck, Warrender,
 Gauthier (the prisoner's-dilemma reading — the body may DRAW the 2×2 as the course's own device
 without naming game theory's authors), Aubrey (his Brief Life supplies the biography — "fear and
@@ -200,7 +210,11 @@ he will not deny.
    at home though he knows there are laws — "Does he not there as much accuse mankind by his
    actions, as I do by my words?" And the status of the claim: "never generally so, over all the
    world" — but the savage people of America, and sovereign states toward one another "in the
-   state and posture of Gladiators" (l.4068–4079). Consequence: where there is no common power
+   state and posture of Gladiators" (l.4068–4079). One forward clause, no data here: whether
+   life without a state really is more violent is an empirical question the course takes up
+   with Rousseau (`rousseau-inequality-and-general-will`), where the record of rates of
+   violent death in bands, tribes, chiefdoms and states is weighed (Gómez et al. 2016; Fry &
+   Söderberg 2013). Consequence: where there is no common power
    there is no law, no justice, no property — "Force, and Fraud, are in warre the two Cardinall
    vertues". Say the seam: from Glaucon's compact (Ref) one expects Hobbes to conclude that the
    just man is a fool; he will conclude the opposite.
@@ -266,8 +280,9 @@ he will not deny.
    Leviathan is built to humble ("king of all the children of pride") is the passion the
    derivation has to assume is weaker than fear in every subject. Hobbes's reply, from the text:
    the sovereign may punish refusal with death (XXI), and glory-seekers are the few — the
-   commonwealth is built for the many. The lesson concedes: the argument needs an empirical
-   premise about the distribution of courage, and states that the next lesson's reading of
+   commonwealth is built for the many. Say plainly whether the reply answers the objection: it
+   answers it for the many and not for the few, and Hobbes says so himself. The lesson concedes:
+   the argument needs an empirical premise about the distribution of courage, and states that the next lesson's reading of
    Hobbes — as a moralist who knew the proud man and wrote for the tame one — turns on exactly
    this.
 
@@ -338,9 +353,7 @@ about fear".
   is stated from Hobbes's own text (XIV void covenant; XXI substitution).
 - **Numbers (L12):** none needed beyond 1588, 1640, 1649, 1651 and the "nineteen" laws; do not
   inventory laws 4–19 in body prose — a folded table.
-- **Register:** The course passes no verdict of its own on any author or idea: no condemning or
-  approving labels in its own voice. Judgement comes only through argument and evidence; a label
-  may appear only inside a quotation, with who applied it and when. The paradox (absolute power
+- **Register:** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. The paradox (absolute power
   from equality and consent) is stated as the question the next lesson answers.
 - **Dossier thin:** De Cive and the Elements of Law are not in the dossier; Aubrey's Brief Lives
   is not in the dossier (the "twins" line is in Hobbes's own Latin verse autobiography — cite as

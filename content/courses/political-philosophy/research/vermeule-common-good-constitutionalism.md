@@ -49,14 +49,49 @@ goal: Analyze Vermeule's argument that law should be read as an ordinance of rea
   duty to aid failing lower bodies, released "in a state of exception". The next lesson
   (`de-benoist-european-new-right`) gives the same word the opposite direction — authority
   delegated upward only for what the lower level cannot do — and Hazony has already called the
-  EU's version "a euphemism for empire". (ii) The theory's safeguard against abuse is internal to
-  the officials: reasoned ordinances, bona fides, rationality review. Whether that holds when a
-  governing majority writes the constitution itself is the question `hungarys-fundamental-law`
-  takes to a real text — Hungary's Article 28 tells its courts to presume that laws "serve moral
-  and economical purposes which are in accordance with common sense and the public good".
+  EU's version "a euphemism for empire". (ii) This lesson decides the safeguard question (see
+  VERDICT): the theory supplies no check of its own against a common-good determination made in
+  bad faith, and relies on the external checks of the order it works within (on balance). What
+  passes on: `hungarys-fundamental-law` reads a real constitution whose Article 28 tells its courts
+  to presume that laws "serve moral and economical purposes which are in accordance with common
+  sense and the public good" — a text the theory's method fits, but not an application of
+  Vermeule's theory, so the case is not evidence for or against this verdict.
 - **Spine step:** "After liberalism: Deneen says it failed by succeeding, Hazony defends the order
   of national states, Vermeule the common good, de Benoist the right to difference — Hungary's
   constitution as the case — and the whole argument is assembled"
+
+## VERDICT
+
+Register, module 16, lesson verdict.
+
+- **Claim judged:** the safeguard against abuse of the common-good power can be internal to
+  officials — reasoned ordinances, good faith (bona fides), rationality review, and the maxim that
+  bad rule forfeits the right to rule (l.1038).
+- **Verdict: the theory supplies no check of its own against a common-good determination made in
+  bad faith. Grade: on balance.** It relies on the external checks of the order it works within
+  (elections, separated powers), which it does not abolish.
+- **What decides it:** Madison's "Enlightened statesmen will not always be at the helm" (Federalist
+  10, `C/research/texts/federalist-full.txt` l.1930–1932; `<Ref
+  federalist-one-people-and-the-extended-republic>`) and Polybius's checks — each part's "power
+  being checked by the others, no one part should turn the scale" (Histories VI,
+  `C/research/texts/polybius/histories-book6-shuckburgh.txt` l.329, l.603–606; `<Ref
+  polybius-anacyclosis-and-rome>`). A check located in the good faith of the checked is not a
+  check: rationality review is performed by judges who, on the theory, defer to the authority's
+  reasonable determinations, and the forfeiture maxim names no one who declares the forfeit.
+- **Strongest objection, and why it does not overturn the verdict:** Vermeule's replies — (i) "abuse"
+  presupposes a theory of legitimate ends, so there is no neutral baseline (l.1104); (ii) power is
+  conserved, and private power abuses too (l.763); (iii) every polity, liberal ones included,
+  inculcates (l.1040); (iv) positive law is disputed too ("Every June", l.810); and, beneath them,
+  "who guards the guardians?" applies to every system — liberal judicial review also checks itself.
+  These show the liberal state is not neutral, and that every system ends in some unchecked
+  authority. They do not say who corrects a bad-faith authority under this theory; and the liberal
+  order answers the guardians question with external, rival checks, not with the guardians'
+  character. Why only on balance: the theory works inside, and does not propose to abolish, an
+  order that keeps elections and separated powers, so in practice the external checks remain.
+- **Scope:** Hungary's Fourth Amendment (2013) is **not** used as evidence here. It was not made by
+  judges reading through the classical legal tradition, so it is not an application of the theory.
+- **What would overturn it:** a mechanism in the theory itself, not in officials' character, that
+  can block a governing majority's "determination" of the common good.
 
 ## Sources to consult
 
@@ -263,6 +298,15 @@ Cicero, Burke, Mill, Stephen, Oakeshott, Strauss, Schmitt, Jouvenel, Tocqueville
 Ulpian, Papinian, Bartolus and Botero are named as the authors of the maxims the text quotes (the
 material), each anchored at first mention. Judges in quoted opinions (Harlan, Peckham, Holmes) are
 actors in the record.
+- **For the VERDICT (recall, already in the course):** Federalist 10 (Madison), "Enlightened
+  statesmen will not always be at the helm" — `C/research/texts/federalist-full.txt` l.1930–1932
+  (also `federalist-nos-1-2-10-39-51.txt` l.482–484); `<Ref
+  federalist-one-people-and-the-extended-republic>`, public domain. Polybius, Histories VI
+  (Shuckburgh tr.), the mixed constitution's mutual checks — `C/research/texts/polybius/histories-book6-shuckburgh.txt`
+  l.329 ("each power being checked by the others, no one part should turn the scale") and
+  l.603–606; `<Ref polybius-anacyclosis-and-rome>`, public domain. Recall only: one quotation each.
+- **Not used here:** Hungary's Fourth Amendment (2013) and the Venice Commission's opinion on it
+  belong to `hungarys-fundamental-law`; they are not evidence about this theory (VERDICT, scope).
 
 ## EXPLANATION PLAN (L0)
 
@@ -358,12 +402,12 @@ says they are the same school — what could they possibly share?
      a theory of legitimate ends — there is no neutral baseline (l.1104); (ii) power is conserved:
      liberty for one is coercion of another, and private power abuses too (l.763); (iii) every
      polity, liberal ones included, inculcates beliefs — sin taxes, schooling, jury duty (l.1040);
-     (iv) disagreement exists over positive law too ("Every June", l.810). Where the lesson leaves
-     it: replies (i)–(iv) show the liberal state is not neutral; they do not show who corrects a
-     public authority that determines the common good in bad faith. Vermeule's own answer is the
-     rationality review and the maxim that bad rule forfeits the right to rule (l.1038) — the
-     authority's bona fides is the hinge. State that plainly; it is what the module's application
-     tests.
+     (iv) disagreement exists over positive law too ("Every June", l.810). Replies (i)–(iv) show
+     the liberal state is not neutral; whether they answer "who corrects a public authority that
+     determines the common good in bad faith?" is the question link 9 decides. Vermeule's own
+     answer is the rationality review and the maxim that bad rule forfeits the right to rule
+     (l.1038) — the authority's bona fides is the hinge. State that plainly here; weigh it in link
+     9.
    - **(b) Originalist — this is not our law.** At strength: American law is what was enacted and
      ratified; ius is a claim of political morality, not law, and a judge who reads lex "in light
      of" it has made himself legislator (the positivist originalists' position). Vermeule's reply:
@@ -399,14 +443,41 @@ says they are the same school — what could they possibly share?
    fundamentally a positive, empowering principle" — the highest authority's duty to come to the aid
    of failing lower bodies, its "full strength … released in a state of exception" (l.2376–2382);
    Isabella's giant. Ref `<Ref schmitt-political-theology>` for `state-of-exception` in one clause —
-   the reader will see whose vocabulary this is. Close: the module's next writer uses the same word
-   for authority that rises only from below; the module's last case is a constitution written by a
-   two-thirds majority that tells its own courts to presume the public good.
+   the reader will see whose vocabulary this is. Subsidiarity from the top is the theory's own
+   statement of where final power rests — which sets up the weighing.
+9. **The weighing: "A check that lives in the good faith of the checked is not a check."** (The last
+   body section before the Conclusion; L10e.) The claim: the safeguard can be internal to officials
+   (reasoned ordinances, bona fides, rationality review, forfeiture). Set it against Madison's
+   "Enlightened statesmen will not always be at the helm" (Federalist 10, l.1930–1932) and
+   Polybius's mixture, in which each part's power is "checked by the others" (VI) — the course's
+   two standing answers to the guardians question, both external. Then the theory's own pieces:
+   rationality review is done by judges who defer to the authority's reasonable determinations;
+   the forfeiture maxim states a consequence but names no one entitled to declare it; good faith is
+   a property of the ruler, not a constraint on him. Then the strongest objection at full strength
+   — Vermeule's replies (i)–(iv) and "who guards the guardians?", which liberal judicial review
+   faces too — and why it does not overturn the verdict: it shows no system is neutral and every
+   system ends somewhere, but the liberal answer places the end in rival, external powers, and
+   the theory offers nothing in their place. Then the limit that keeps the grade at on balance:
+   Vermeule works inside an order that keeps elections and separated powers and does not propose
+   to abolish them, so the theory borrows external checks it does not supply. State what would
+   overturn it (a mechanism internal to the theory that can block a governing majority's
+   determination). Do not use Hungary's Fourth Amendment here: it was not an application of the
+   theory.
+
+**Conclusion** (L10): in plain words — Vermeule's account of law as reason for the common good
+survives its liberal and originalist critics better than his account of what keeps the rulers
+honest. On that question the verdict is on balance: the theory supplies no check of its own
+against a determination made in bad faith; it relies on the elections and separated powers of the
+order it works within. Hand-off: the next writer (`<Ref de-benoist-european-new-right>`) uses
+"subsidiarity" for authority that rises only from below; the module's last case
+(`<Ref hungarys-fundamental-law>`) is a constitution that tells its courts to presume the public
+good.
 
 Headings as claims (suggested): "Originalists and progressives share one premise"; "Lex is inside
 ius"; "The common good is not a sum"; "Determination leaves the rulers a range, and the judges
 must respect it"; "Harlan, not Holmes"; "Development is not progress"; "Who keeps the rulers
-honest?"; "Subsidiarity from the top".
+honest?"; "Subsidiarity from the top"; "A check that lives in the good faith of the checked is not
+a check".
 
 ## Set pieces and worked examples to recreate
 
@@ -472,10 +543,7 @@ honest?"; "Subsidiarity from the top".
 - **"Integralism"**: Vermeule is often called an integralist (the Catholic position that temporal
   power should be subordinate to spiritual power). The book explicitly brackets the supernatural
   end (l.988–992). Do not attach the label in the course's voice; if it appears, it appears as what
-  critics call him, attributed, in References — or not at all. The label rule: The course passes no
-  verdict of its own on any author or idea: no condemning or approving labels in its own voice.
-  Judgement comes only through argument and evidence; a label may appear only inside a quotation,
-  with who applied it and when.
+  critics call him, attributed, in References — or not at all. The label rule: The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **"Common good" in Vermeule ≠ "common good" in Aristotle/Aquinas exactly.** The concept's earlier
   definition (concepts.yaml `common-good`) is the end that separates correct from deviant regimes;
   Vermeule's is a LEGAL definition (l.1000: conditions, injunction, non-aggregation). Say that the
@@ -587,7 +655,18 @@ honest?"; "Subsidiarity from the top".
    taxes, helmet laws, mandatory schooling, jury duty) would Mill himself accept, and on what
    ground? Show where the harm principle already concedes some of Vermeule's cases (harm to
    others; minors) and where it does not (Casey's sentence; blasphemy).
-8. **FORWARD (E7) → `de-benoist-european-new-right`:** Vermeule says subsidiarity is "fundamentally
+8. **Attack the verdict (E6b):** The lesson holds, on balance, that common-good constitutionalism
+   supplies no check of its own against a determination made in bad faith. State the strongest
+   objection in its best form — e.g. that liberal constitutionalism has no external check on its
+   final court either, so the verdict applies a standard no system meets; or that reasoned-
+   ordinance review, applied by an independent judiciary trained in the classical tradition, is an
+   institutional check and not merely good faith. Then (a) say whether the objection shows a check
+   internal to the theory, or only one borrowed from the order it works within; (b) say what
+   evidence or textual showing would overturn the verdict — a mechanism in Vermeule's book, not in
+   officials' character, that can block a governing majority's "determination" (cite where in the
+   text you would look: the common good framework, l.1334–1338; forfeiture, l.1038; ch. 5); (c) say
+   why Hungary's 2013 amendment cannot serve as the test either way.
+9. **FORWARD (E7) → `de-benoist-european-new-right`:** Vermeule says subsidiarity is "fundamentally
    a positive, empowering principle" whose full strength is released "in a state of exception"
    (l.2376–2382). Write the opposite definition — one in which authority rises only from below and
    the higher level acts only for what the lower cannot do — and say who, under each definition,

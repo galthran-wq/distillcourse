@@ -3,7 +3,7 @@
 status: planned
 module: civilizations
 type: core
-goal: Evaluate Huntington's hypothesis against the published tests of conflict across civilizational lines since 1993 and against the Yugoslav wars, and state where the record supports, qualifies or refutes it
+goal: Evaluate Huntington's hypothesis against the published tests of conflict across civilizational lines and against the Yugoslav and Ukrainian wars, and judge, claim by claim and with grades, how much of it survives
 
 ## ARC (L10)
 
@@ -32,12 +32,19 @@ goal: Evaluate Huntington's hypothesis against the published tests of conflict a
   Chiozza 2002, with Huntington's own reply), of which the lesson reproduces the
   simplest count, and the Bosnian war of 1992–95, Huntington's own first case, read
   for the kin-country syndrome with the counter-cases he himself named. The lesson
-  states where the record supports (Islam–West as a partial exception; some kin-
-  country behaviour in Bosnia), qualifies (more conflict within civilizations than
-  across; the alignments that cut across the lines) and refutes (the Russia–Ukraine
-  corollary) the hypothesis — and names what the tests measure that the hypothesis
-  did not claim.
-- **Hands off:** The module ends here, and the next module (why-the-west) opens with
+  judges the hypothesis claim by claim and closes the module with its verdict (on
+  balance): civilizations are real units of identity, and the clash describes the
+  Islam-centred conflicts of the period well and the rest of world politics badly —
+  frequency fails (on balance), Islam at the centre of cross-line conflict holds
+  (strong), escalation is open, the Ukraine corollary is refuted (strong), Bosnia's
+  alignments fit the first phase and fail after 1994 (on balance). It names what the
+  tests measure that the hypothesis did not claim. And it hosts the liberal forecast
+  check the same tests make possible: Kant's peace among republics and the Schuman
+  Declaration's "materially impossible" war hold (strong).
+- **Hands off:** Decided here: the module verdict (above) and the Kant/Schuman
+  forecast check. Passed on, still open: escalation, which needs a post-2001 UCDP
+  comparison; and the cause of the Islam-centred conflicts, which the verdict leaves
+  outside the claim graded. The module ends here, and the next module (why-the-west) opens with
   `weber-only-in-the-west`. The hand-off is the one premise all three of the module's
   authors share and none of them explains: that the West is singled out — Spengler's
   Faustian Culture in its winter, Toynbee's one civilization "not clearly
@@ -83,15 +90,84 @@ goal: Evaluate Huntington's hypothesis against the published tests of conflict a
     civilization, where the hypothesis allows self-identification, torn countries and
     "possibly African"; (e) the kin-country syndrome is a claim about THIRD PARTIES
     aligning, which a dyadic dispute count does not test and only the case study
-    reaches; (f) the Islam–West partial exception, which some tests find and others
-    do not, depends on how "Islam" is coded and whether intrastate and ethnic
-    conflicts are included. And on the case side: (g) Bosnia's war included a
+    reaches; (f) the place of Islam depends on whether intrastate conflicts are
+    included: the dyadic interstate test finds no Islam–West elevation, while the
+    UCDP conflict-years (civil wars included) put Islamic groups in the majority of
+    post-Cold-War cross-line conflict-years. And on the case side: (g) Bosnia's war included a
     Croat–Muslim war inside the "clash" (1992–94), a Western-brokered Catholic–Muslim
     alliance (Washington, 1994), a Western air war on behalf of a Muslim-led
     government against Orthodox Serbs (1995), and a Russian contingent under NATO
     command (1996) — alignments the kin-country rule does not predict; (h)
     Russia–Ukraine, the intra-civilizational dyad Huntington said "should" stay
     peaceful, did not.
+
+## VERDICT
+
+**Module verdict** (register, module 11, `testing-the-clash`) — **grade: on
+balance.** The theory was checked and gave a mixed answer. Civilizations are real
+units of identity. The clash describes the Islam-centred conflicts of the period well
+and the rest of world politics badly.
+
+- **Frequency** (conflict across civilizational lines more common than within them)
+  → **fails, on balance.** The dyadic tests find within-line conflict at least as
+  common and no post-1989 shift: on disputes 1950–92, pairs split across lines "are
+  no more likely to become engaged in disputes than are other states", and
+  cross-line disputes "became less common, not more so, as the Cold War waned"
+  (Russett, Oneal & Cox 2000, abstract). On UCDP conflict-years 1946–2001 the trends
+  are "unaffected by the end of the Cold War" (Tusicisny 2004). Most of the frequency
+  data predate 1993, hence on balance.
+- **Islam at the centre** of cross-line conflict after the Cold War → **holds.
+  Grade: strong** for the period the studies cover. "The majority of
+  intercivilizational conflict-years during the post-Cold War period have involved
+  Islamic groups", while Sinic–West conflict stayed marginal (Tusicisny 2004). Islam
+  was involved in a disproportionate share of civil wars 1940–2000 (Toft 2007,
+  summary). The record after 2001 (Afghanistan, Iraq, the Islamic State wars, the
+  Sahel, jihadist terrorism in Europe) runs the same way, but the course has not
+  bound a post-2001 count, and the lesson says so.
+- **Escalation** → **open.** Huntington did specify it: intra-civilizational
+  conflicts "are likely to be less intense and less likely to expand than conflicts
+  between civilizations" (1993, staged l.195). Tusicisny finds within-line conflicts
+  less likely to escalate after the Cold War, while between-line intensity stayed
+  at Cold War levels; he finds no significant link between civilizational difference
+  and duration. What would settle it: a post-2001 UCDP comparison of intensity and
+  spread across and within lines.
+- **Russia and Ukraine.** The corollary Huntington stated as a test ("the likelihood
+  of violence between Ukrainians and Russians should be low", l.195) → **refuted.
+  Grade: strong**: annexation in 2014 and the largest European interstate war since
+  1945 in 2022. The same article's fault line "separating the more Catholic western
+  Ukraine from Orthodox eastern Ukraine" (staged l.173) fits the geography of 2014
+  (Crimea, the Donbas) and fails the alignment of 2022, when Orthodox and Catholic
+  Ukrainians fought Russia together and the country turned West → **on balance
+  against.**
+- **Bosnia** as a test of alignment → fits the first phase (Iran, Saudi Arabia and
+  volunteers rallying to the Bosnians, as he records) and fails after the 1994
+  Washington Agreement, when Western power was used for a Muslim-led government
+  against Orthodox Serbs → **on balance.**
+- **Strongest objection,** from two sides. From one: the dyadic tests measure the
+  wrong thing, and the jihadist wars are the clash. From the other: the
+  Islam-centred conflicts are explained by state weakness, oil and outbidding
+  (Toft's own mechanism), not by civilization. Why neither overturns the verdict:
+  the first is met by grading the Islam finding strong and frequency only on
+  balance; the second by leaving the cause outside the claim graded — the verdict
+  says where the conflicts were, not why.
+- **Would be overturned by:** a post-2001 count showing cross-line conflicts no more
+  Islam-centred, and no more intense, than within-line ones.
+
+**Forecast check hosted here** (register: lesson verdict **(forecast check)**) —
+Kant, *Perpetual Peace* (1795): states governed by citizens' consent will not make
+war on one another ("the consent of the subjects is required to determine whether
+there shall be war or not"); and the Schuman Declaration (9 May 1950): war between
+France and Germany "not merely unthinkable, but materially impossible". → **Holds.
+Grade: strong.** Joint democracy and interdependence account for interstate conflict
+1950–92 "much better" than civilizations do (Russett, Oneal & Cox 2000, abstract). No
+war has been fought between members of the European Communities or Union since 1950,
+and the 2022 war in Europe was begun by a non-democracy. Limits: republics have warred
+freely on non-republics, so Kant's mechanism is not shown to be the cause; whether
+democracy, trade or alliance carries the effect is disputed (Rosato 2003, Gartzke 2007
+[not read]); and Kant's federation that is "to extend gradually over all states"
+fails with Fukuyama's (a) (Ref `huntington-clash-of-civilizations`: liberal
+democracy's spread failed from 2006, strong). Would be overturned by: a war between
+two established democracies or two EU members.
 
 ## Sources to consult
 
@@ -136,14 +212,42 @@ goal: Evaluate Huntington's hypothesis against the published tests of conflict a
      (November 2002), pp. 711–734. What to take: the unit (conflict involvement, not
      only disputes), the finding on states of different civilizations, and whether
      the pattern changed after the Cold War.
-  Optional, for the Islam–West exception and intrastate conflict, if the writer wants
+  **Status after the verdict audit:** the Russett, Oneal & Cox abstract is read and
+  staged (`research/texts/liberal-forecasts/kant-peace/russett-oneal-cox-2000-abstract.txt`);
+  Henderson & Tucker (2001) and Chiozza (2002) are [UNVERIFIED] — not read; no
+  finding from either may decide a grade until read and bound.
+  **Required for the verdict (not optional):** Andrej Tusicisny, "Civilizational
+  Conflicts: More Frequent, Longer, and Bloodier?", *Journal of Peace Research* 41:4
+  (2004), pp. 485–498 — abstract staged at
+  `research/texts/verdict-audit/tusicisny-2004-abstract.txt` (UCDP conflict-years
+  1946–2001; trends "unaffected by the end of the Cold War"; post-Cold-War majority of
+  intercivilizational conflict-years involving Islamic groups; escalation and
+  intensity findings; no significant duration link). Monica Duffy Toft, "Getting
+  Religion? The Puzzling Case of Islam and Civil War", *International Security* 31:4
+  (2007), pp. 97–131 — summary staged at
+  `research/texts/verdict-audit/toft-2007-summary.txt` (Islam over-represented in
+  civil wars 1940–2000; "religious outbidding" as mechanism). A post-2001 UCDP count
+  of conflict-years by civilizational pair — [UNVERIFIED until bound]; the lesson
+  states that the post-2001 record has not been counted by the course.
+  **For the forecast check:** Kant, *Perpetual Peace* (1795), Campbell Smith tr. 1903,
+  staged `research/texts/liberal-forecasts/kant-peace/kant-perpetual-peace-campbell-smith-1903.txt`
+  (First Definitive Article "The civil constitution of each state shall be
+  republican" l.3517; the consent-of-citizens passage l.3600–3612; the federation
+  "to extend gradually over all states" l.3915–3923). The Schuman Declaration (9 May
+  1950), staged `…/kant-peace/schuman-declaration-1950.txt` ("not merely
+  unthinkable, but materially impossible" l.295). Sebastian Rosato, "The Flawed
+  Logic of Democratic Peace Theory", *APSR* 97:4 (2003), and Erik Gartzke, "The
+  Capitalist Peace", *AJPS* 51:1 (2007) — [not read], References only, for the
+  dispute over mechanism.
+  Optional, for intrastate conflict, if the writer wants
   the fuller picture (References): Jonathan Fox, "Two Civilizations and Ethnic
   Conflict: Islam and the West", *Journal of Peace Research* 38:4 (2001), pp. 459–472,
   and Fox, *Religion, Civilization, and Civil War* (2004); Andrej Tusicisny,
   "Civilizational Conflicts: More Frequent, Longer, and Bloodier?", *Journal of Peace
   Research* 41:4 (2004), pp. 485–498; Errol A. Henderson, "Mistaken Identity: Testing
   the Clash of Civilizations Thesis in Light of Democratic Peace Claims", *British
-  Journal of Political Science* 34:3 (2004). The course brief's recollection of the
+  Journal of Political Science* 34:3 (2004). (Tusicisny 2004 is no longer optional —
+  see above.) The course brief's recollection of the
   three main findings (more conflict within than across; no post-1989 increase; the
   West–Islam pair elevated in some specifications) is approximate — EVERY figure and
   direction stated in the lesson must be read off the papers' own tables, and the
@@ -259,7 +363,10 @@ chain:
    the next sections supply (Bosnia). The because: this is commitment (i) checked,
    and it is where the published tests converge — conflict within civilizations is
    at least as common as across, and the post-1989 change the hypothesis predicted
-   does not appear in interstate dispute frequency.
+   does not appear in interstate dispute frequency, nor in the UCDP conflict-years
+   that include civil wars (Tusicisny 2004: trends "unaffected by the end of the Cold
+   War"). Verdict on frequency, stated here: fails, on balance (on balance because
+   most of the data predate 1993).
 4. **What the count measures that the hypothesis did not claim.** Question: does the
    count refute the hypothesis? The seam states the expectation and breaks it (L10b):
    from the papers' conclusions one would expect "refuted"; the hypothesis's own text
@@ -269,15 +376,57 @@ chain:
    dyads vs the micro level (Bosnia is not in an interstate dispute dataset as a
    Bosniak–Serb war); the period (most of the data are from the Cold War the
    hypothesis says has ended); the partition (link 2); third-party alignment untested
-   by dyads; and the Islam–West exception, which some specifications find and which
-   Huntington's "Try Again" claimed as the point. Answer: the count refutes
-   commitment (i) as a claim about interstate dispute FREQUENCY and leaves (ii) and
-   (iii) to other evidence; the defenders' reply ("the tests miss what was claimed")
-   is partly right and partly a retreat to the unmeasurable — the lesson says which
-   part is which. The because: the hypothesis's disclaimer ("does not argue … that
+   by dyads; and the place of Islam, which the dyadic test does not find (disputes
+   "between the West and the rest of the world, or with Islam, were no more common",
+   Russett, Oneal & Cox 2000) and the conflict-year data including civil wars do
+   (link 4a). Answer: the count refutes commitment (i) as a claim about FREQUENCY and
+   leaves (ii) and (iii) to other evidence; the defenders' reply ("the tests miss
+   what was claimed") is partly right and partly a retreat — the lesson says which
+   part is which: right about the micro level and Islam (which the conflict-year data
+   bear out), a retreat where it calls intensity unmeasurable, since Huntington
+   specified it himself (l.195) and the conflict-year data measure it. The because: the hypothesis's disclaimer ("does not argue … that
    groups within a civilization will not conflict") protects it from the count at
    the cost of making the count's question — is there MORE across than within? —
    the only one it still answers.
+4a. **Where the clash fits: Islam at the centre of cross-line conflict.** Seam: the
+   count that includes civil wars changes one result and not the other. Answer:
+   after the Cold War "the majority of intercivilizational conflict-years … have
+   involved Islamic groups", while Sinic–West conflict stayed marginal (Tusicisny
+   2004); Islam was involved in a disproportionate share of civil wars 1940–2000
+   (Toft 2007). State the verdict (holds, strong, for the period the studies cover)
+   and its two limits in the same paragraph: the course has not bound a post-2001
+   count (the record of Afghanistan, Iraq, the Islamic State wars, the Sahel and
+   jihadist terrorism in Europe runs the same way, stated as unbound); and the
+   cause — civilization, or state weakness, oil and religious outbidding (Toft's
+   mechanism) — is outside the claim graded. Then escalation, the commitment (ii)
+   Huntington specified (l.195): within-line conflicts less likely to escalate after
+   the Cold War, between-line intensity at Cold War levels, no significant link with
+   duration (Tusicisny 2004) — open, settled only by a post-2001 UCDP comparison of
+   intensity and spread across and within lines.
+4b. **What the tests found instead: the liberal forecast held (forecast check;
+   300–500 words of lesson).** Seam: the test that found no civilizational effect
+   found something else — "the liberal influences of joint democracy and
+   interdependence provide a much better account of interstate conflict" (Russett,
+   Oneal & Cox 2000) — and that is a forecast of its own, older than Huntington's,
+   checked by the same standard. Forecast, dated: Kant, 1795 — where "the consent of
+   the subjects is required to determine whether there shall be war or not", they
+   will "weigh the matter well, before undertaking such a bad business", and a federation of free
+   states will "extend gradually over all states"; the Schuman Declaration, 9 May
+   1950 — pooled coal and steel will make war between France and Germany "not merely
+   unthinkable, but materially impossible". Record: joint democracy and
+   interdependence account for interstate disputes 1950–92 better than civilization
+   does; no war between members of the European Communities or Union since 1950; the
+   2022 war in Europe begun by a non-democracy. Verdict: holds, strong. Limits, in the
+   same section: republics have warred freely on non-republics, so the mechanism is
+   not shown to be the one Kant named; whether democracy, trade or alliance carries
+   the effect is disputed (References); and the federation that was to extend over
+   all states fails with the end of history's forecast (Ref
+   `huntington-clash-of-civilizations`, failed from 2006, strong). Would be overturned
+   by: a war between two established democracies or two EU members. One standard:
+   the liberal forecast is scored here exactly as Huntington's and Fukuyama's are.
+   Set-piece line: "Schuman promised in 1950 that war between France and Germany would
+   be 'materially impossible'; seventy-five years on, no two members of the
+   Communities he founded have fought each other."
 5. **Bosnia 1992–95 read for the kin-country syndrome: what Huntington saw in 1993.**
    Question: commitment (iii) needs a case; Huntington gave Bosnia as his first. What
    did he report? Answer (from l. 192–194, told as his evidence): Germany leading the
@@ -311,8 +460,11 @@ chain:
    civilizational lines" as the conflict continued — is a claim about the direction
    of change over the war, and the direction ran the other way. Where the lesson
    concedes: the volunteers, Iran's and Saudi Arabia's conduct, and Russian
-   nationalist pressure on Yeltsin were real and are what the syndrome names; a
-   reader who weights the first year differently may reach a different verdict.
+   nationalist pressure on Yeltsin were real and are what the syndrome names. The
+   verdict on Bosnia as a test of alignment: fits the first phase, fails after the
+   Washington Agreement — on balance against the syndrome as a rule for the whole
+   war, because the first phase is real and the direction of change is the
+   hypothesis's own criterion.
 7. **The counter-cases Huntington named himself.** Question: the hypothesis's
    corollary was that violence WITHIN a civilization "should be low" — what became of
    its two chosen examples? Answer: Iraq–Kuwait (August 1990) and Iran–Iraq (1980–88)
@@ -321,25 +473,36 @@ chain:
    restraining violence ("two Slavic, primarily Orthodox peoples"), ended in the
    annexation of Crimea in 2014 and the invasion of 24 February 2022 — the largest
    interstate war in Europe since 1945, within one of his civilizations. State it in
-   two sentences, dated, without commentary on the war itself. The because: a
+   two sentences, dated, without commentary on the war itself: refuted, strong. Then
+   the part of the same article that does better: the fault line "separating the
+   more Catholic western Ukraine from Orthodox eastern Ukraine" (staged l.173) fits
+   the geography of 2014 (Crimea, the Donbas) and fails the alignment of 2022, when
+   Orthodox and Catholic Ukrainians fought Russia together and the country turned
+   West — on balance against. The because: a
    corollary the author stated as a test ("If civilization is what counts … should be
    low") is the one place the record gives a clean answer, and the answer is no — or
    rather, that civilization was not "what counts" there; the disclaimer covers
    intra-civilizational fighting in general but was not what the Ukraine sentence
    said.
-8. **Where the record supports, qualifies, refutes — and what the module can now
-   do.** Answer, as a ledger (FIGURE 7) argued in prose: SUPPORTS — the Islam–West
-   pairing shows elevated conflict in some tests and in the intrastate and ethnic
-   conflict literature (bound and sourced); the first year of Bosnia shows kin-country
-   rallying as described. QUALIFIES — conflict within civilizations is at least as
-   frequent as across, so the hypothesis survives only as a claim about intensity
-   and escalation, which the dyadic tests do not measure; coding is where tests and
-   hypothesis part. REFUTES — the corollary about intra-civilizational restraint, on
-   Huntington's own example; and the claim that alignments would run increasingly
-   along civilizational lines "as the conflict continued", on his own first case.
-   Then the module's close: of the three theories, the one that could be checked was
-   checked and gave a mixed answer, with one corollary its author stated as a test contradicted by the record; the two that cannot
-   be checked stand or fall by their measures (Ref `what-measures-greatness`). The
+8. **The weighing — the clash describes the Islam-centred conflicts well and the rest
+   of world politics badly (module verdict, on balance).** Answer, as a ledger
+   (FIGURE 7) argued in prose, each entry with its grade: civilizations are real
+   units of identity; frequency fails (on balance); Islam at the centre of cross-line
+   conflict holds (strong, for the period studied); escalation is open (what would
+   settle it: a post-2001 UCDP comparison); the Ukraine corollary is refuted (strong)
+   and the Ukraine fault line is on balance against; Bosnia fits the first phase and
+   fails after 1994 (on balance). Then the strongest objection, from both sides at
+   once, at full strength: the tests measure the wrong thing and the jihadist wars
+   ARE the clash; or, the Islam-centred conflicts are state weakness, oil and
+   outbidding, not civilization. The answer: the verdict grades the Islam finding
+   strong and frequency only on balance, which meets the first; and it leaves the
+   cause outside the claim graded, which meets the second. What would overturn the
+   verdict: a post-2001 count showing cross-line conflicts no more Islam-centred, and
+   no more intense, than within-line ones. Then the module's close: of the three
+   theories, the one that could be checked was checked and gave a mixed answer, with
+   one corollary its author stated as a test refuted by the record; Toynbee's law was
+   judged unfalsifiable as a law (Ref `toynbee-challenge-and-response`), and the
+   choice among measures stays a choice (Ref `what-measures-greatness`). The
    problem that stays open, stated in the Conclusion: the count tested who fights
    whom, and took for granted what all three authors took for granted — that the
    West is the civilization the others react to, at a "peak of power", carrying
@@ -352,8 +515,20 @@ Headings as claims or questions: "What would count as a test?" / "Which civiliza
 is a state in? The coding problem" / "The count: across the lines and within them" /
 "What the count measures that the hypothesis did not claim" / "Bosnia, 1991–93: the
 kin-country syndrome as Huntington saw it" / "Bosnia, 1993–96: the alignments that
-cut across the lines" / "The counter-cases Huntington named" / "Supports, qualifies,
-refutes".
+cut across the lines" / "The counter-cases Huntington named" / "Where the clash fits:
+Islam at the centre" / "What the tests found instead: Kant's peace held" / "The clash
+fits the Islam-centred wars and little else".
+
+**Conclusion (L10c):** In plain words, with the grade: on balance, the clash of
+civilizations describes the Islam-centred conflicts after the Cold War well (strong
+for the period studied) and the rest of world politics badly — conflict across lines
+is no more frequent than within them, Huntington's own Ukraine test failed (strong),
+and Bosnia's alignments ran across the lines after 1994; whether cross-line conflicts
+escalate more is open until a post-2001 count is made. The liberal forecast the same
+tests examined, peace among democracies, held (strong) within its limits. Hand-off:
+the count took for granted what all three authors took for granted — that the West
+is the civilization the others react to — and the next module asks why it pulled
+ahead (Ref `weber-only-in-the-west`).
 
 ## Set pieces and worked examples to recreate
 
@@ -391,8 +566,11 @@ refutes".
    stated prediction with its condition; the two dated facts (2014; 24 February 2022)
    under it; the disclaimer (l. 216) beside it, and the one-sentence judgment of
    what the disclaimer does and does not cover.
-8. **The ledger** (supports / qualifies / refutes), each entry with its evidence and
-   its source, argued in the last section and stated once in FIGURE 7.
+8. **The ledger** (holds / fails / open), each entry with its grade, its evidence
+   and its source, argued in the last section and stated once in FIGURE 7.
+9. **Kant and Schuman against the record** (link 4b): the two dated sentences (1795;
+   9 May 1950), the record under them (no war between EC/EU members since 1950; the
+   tests' democracy-and-trade finding), the limits beside them.
 
 ## Pitfalls / subtleties to flag
 
@@ -431,27 +609,37 @@ refutes".
   lesson that reports "the tests refuted Huntington" and stops is an inventory; one
   that reports "Huntington's defenders say the tests miss the point" and stops is a
   retreat. State which departures are the tests' fault and which the hypothesis's
-  (frequency vs intensity: the hypothesis's claim was about intensity, so the tests
-  measure the wrong thing — but the hypothesis gave no way to measure intensity;
-  coding: both).
+  (frequency vs intensity: the dyadic tests measure frequency, but Huntington did
+  specify intensity and spread (l.195), and the UCDP conflict-year data measure them
+  — the result there is open, not unmeasurable; coding: both).
 - **No moralising on Bosnia or Ukraine, in either direction.** The lesson reads the
   record for alignments; it does not adjudicate the wars. Srebrenica is stated as
   the ICTY found it, once, because it is what changed Western policy in 1995; nothing
   else about atrocities is needed for the argument.
 - **Do not credit Huntington with predicting Ukraine or blame him for missing it
   beyond what he wrote.** He wrote that violence "should be low" "if civilization is
-  what counts"; the lesson reads that sentence and its disclaimer and stops.
-- **Islam–West is a PARTIAL exception, stated as such:** some tests find the pairing
-  more dispute-prone; others do not; the ethnic/intrastate literature (Fox) finds
-  Islamic groups involved in many conflicts, most of them with other Muslims. The
-  lesson gives the finding as the papers give it, bound, and does not generalise to
-  "Islam has bloody borders" as proven or refuted.
+  what counts", and drew the fault line through Ukraine (l.173); the lesson scores
+  both sentences (refuted, strong; on balance against) and the disclaimer, and
+  stops.
+- **Islam: two findings, kept apart.** The dyadic interstate test finds disputes
+  "between the West and the rest of the world, or with Islam" no more common than
+  others (Russett, Oneal & Cox 2000). The conflict-year data including civil wars
+  find a majority of post-Cold-War intercivilizational conflict-years involving
+  Islamic groups (Tusicisny 2004), and Islam over-represented in civil wars 1940–2000
+  (Toft 2007). The verdict "Islam at the centre of cross-line conflict holds" is
+  graded strong on the second for the period studied; it is a claim about where the
+  conflicts were, not about their cause (Toft's own mechanism is religious
+  outbidding under state weakness and oil), and the lesson says both. The
+  ethnic/intrastate literature (Fox) also finds many conflicts with other Muslims;
+  state it, bound.
 - **Who Are We?** is read (index 76) and belongs to `albions-seed-and-who-are-we`;
   earlier versions of this brief called it a gap — that is wrong. Not used here.
 - **Register rule.**
-  The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
-- **L8a:** Russett, Oneal, Cox, Henderson, Tucker, Chiozza, Fox, Tusicisny, Silber,
-  Little, Malcolm, Burg, Shoup, Holbrooke — References only. In the body the tests
+  The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
+- **L8a:** Russett, Oneal, Cox, Henderson, Tucker, Chiozza, Fox, Tusicisny, Toft,
+  Rosato, Gartzke, Silber, Little, Malcolm, Burg, Shoup, Holbrooke — References only.
+  Kant is a thinker whose text is checked and may be named; the Schuman Declaration
+  is a named document. In the body the tests
   are "the published tests", "one study", "a second"; the datasets (Correlates of
   War, MID, UCDP) and documents (UNSCR 713, the Washington Agreement, Dayton, the
   1996 House report) are named objects and may be named. Huntington is named.
@@ -500,9 +688,9 @@ refutes".
    three presidents at one table under Western sponsorship — the alignment the
    kin-country rule does not predict. Placement: at frame 5 / link 6. Verify PD-USGov
    per file; ≥480 px.
-7. `draw:` single `<Figure>` — **The ledger**: supports / qualifies / refutes as
-   three columns, each entry with its evidence tag (count / paper / case / corollary);
-   stated once, after the prose has argued it.
+7. `draw:` single `<Figure>` — **The ledger**: holds / fails / open as three
+   columns, each entry with its grade and evidence tag (count / paper / case /
+   corollary); stated once, after the prose has argued it.
 8. `source: no pool candidate — hunt:` OPTIONAL — a **published data plot from one of
    the three papers** (e.g. a figure showing dispute rates by dyad type over time) —
    only if the publisher's licence permits reproduction (JPR/SAGE and ISQ/Wiley
@@ -513,7 +701,7 @@ refutes".
 ## EXERCISE PLAN (E6/E7 + playbook-history mix)
 
 1. **Retrieval (warm-up, E3):** For each of these, say which of the hypothesis's
-   three commitments it bears on and whether it supports, qualifies or refutes: the
+   three commitments it bears on and the verdict and grade the lesson gives it: the
    share of disputes across lines vs the base rate; the Washington Agreement; the
    invasion of 24 February 2022; the Islam–West pairing in the tests; the 4,000
    volunteers. Solution places each with one sentence of warrant.
@@ -565,6 +753,18 @@ refutes".
    state interest in NATO's credibility — and defend the ranking from the lesson's
    dated record. Then say which of the module's three measures of greatness (Ref
    `what-measures-greatness`) the intervention counts under, if any.
+7a. **Attack the verdict:** The lesson's verdict is that the clash fits the
+   Islam-centred conflicts and little else (on balance). State the strongest
+   objection in its best form — from either side: that the dyadic tests count the
+   wrong thing and the jihadist wars since 2001 ARE the clash, or that the
+   Islam-centred conflicts are state weakness, oil and outbidding with civilization
+   as a label — and say what evidence would be needed to overturn the verdict.
+   Solution: a post-2001 UCDP count by civilizational pair showing cross-line
+   conflicts no more Islam-centred and no more intense than within-line ones would
+   overturn it; a count showing cross-line conflicts more frequent and more intense
+   after 2001 would raise frequency and escalation toward the hypothesis; and it
+   explains why the cause objection does not touch a verdict that grades location,
+   not cause.
 8. **FORWARD (E7)** → `weber-only-in-the-west`: Huntington lists the ideas he says
    the West has and the Rest resist — individualism, liberalism, constitutionalism,
    human rights, equality, liberty, the rule of law, democracy, free markets, the
