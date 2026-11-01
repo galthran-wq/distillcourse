@@ -31,7 +31,10 @@ goal: Analyze Aquinas's hierarchy of laws and his account of kingship and tyrann
   or to God — so WHO judges the king, and what happens when two authorities (pope and king, king
   and estates) each claim "care of the community"? `machiavelli-effectual-truth` answers by
   changing the question (what works, not what ought); `bodin-sovereignty` answers that no
-  subject judges and the question "who are the rulers" is replaced by "what is a state". Vitoria
+  subject judges and the question "who are the rulers" is replaced by "what is a state"; the
+  module decides it in `english-revolution-as-test`, where a kingdom with no settled answer to
+  "who decides" goes to war, and a settled last word held by a composite, limited body
+  (king-in-parliament) is what lasts. Vitoria
   (`vitoria-right-to-the-americas`, empire module) is this lesson's natural law applied to Spain
   in America, and `vermeule-common-good-constitutionalism` (post-liberal module) takes this
   lesson's definition of law as the anchor of every term it uses — forward hooks only, one
@@ -231,7 +234,12 @@ Christian king needs to know which is true of HIS kingdom.
    unworthy but lawful ruler is obeyed; commands to sin are refused). The reply the course
    states as its own: Aquinas has placed enforcement of the law above kings in a public
    authority he never specifies — a pope (I.15 [110–112]), an electing multitude, a superior
-   lord — and that unspecified judge is what the rest of this module fights over.
+   lord — and that unspecified judge is what the rest of this module fights over. Say plainly
+   whether Aquinas answered the objection: he answers the case for PRIVATE tyrannicide on his
+   own terms (the remedy fails or breeds a worse tyrant, and a licence to kill tyrants is a
+   licence to kill good kings); he does not answer the question it raises, who the public
+   authority is when pope, people and lord each claim it — the gap is in his text, not in the
+   reader's understanding of it.
 
 Headings fall out as claims: "Law is an ordinance of reason, or the prince's pleasure is
 lawlessness"; "Four laws because human law cannot see inside a man"; "Natural law has one
@@ -316,9 +324,7 @@ tyrant worst"; "Who may act against a tyrant: public authority, never a private 
   Marsilius chapter, ll. 13657–14603, which the writer may consult for a one-clause forward
   pointer to a medieval rival who gave the legislative power to the people, but not teach).
   Say in References that the lesson reconstructs from the two primary texts.
-- **Register:** The course passes no verdict of its own on any author or idea: no condemning or
-  approving labels in its own voice. Judgement comes only through argument and evidence; a label
-  may appear only inside a quotation, with who applied it and when. The lesson reports what the
+- **Register:** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. The lesson reports what the
   arguments establish and where they leave the judge of kings unnamed.
 
 ## FIGURE PLAN

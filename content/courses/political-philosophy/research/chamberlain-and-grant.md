@@ -32,20 +32,61 @@ goal: Analyze Chamberlain's racial reading of European history and Grant's Nordi
   partly enacted (1924) and both books were read by men who acted on them. The lesson
   reconstructs both at full strength and then puts the objections — then and since — to
   each step.
-- **Hands off:** (i) `renan-what-is-a-nation` — a nation is not a race; Renan's 1882 lecture
+- **Hands off:** This lesson has decided that the racial classification both books rest on
+  fails (established). What passes on: (i) `renan-what-is-a-nation` — a nation is not a race; Renan's 1882 lecture
   answers the claim these books make, and his own 1871 racial writings show the claim's
   reach. (ii) `reich-ancient-dna-and-the-indo-europeans` — what ancient genomes show about
   the migrations Grant described (the Nordic/Aryan claims are the backward Ref there). (iii)
   `gould-and-harden-on-heredity` — the army tests, Brigham's use of Grant's scheme and his
   1930 recantation. (iv) `hereditarian-case-iq-and-nations` — the twentieth-century form
-  of the hereditarian argument, which shares this lesson's question but not its evidence.
+  of the hereditarian argument, which shares this lesson's question but not its evidence; the
+  heredity module tests it premise by premise (from `what-intelligence-tests-measure` to
+  `admixture-and-polygenic-scores`).
   (v) `powell-raspail-and-camus` — "replacement" as an argument about immigration
-  (`replacement-as-argument`), where `nordicism` returns. (vi) `the-right-in-1933` and
+  (`replacement-as-argument`), where `nordicism` returns; whether a state may choose its
+  future members is not decided here but in the nation-and-immigration module (module 15). (vi) `the-right-in-1933` and
   `the-right-after-1945` — what the right did with these ideas in power and after.
 - **Spine step:** "The late nineteenth century looks beneath institutions for what moves
   peoples: the crowd (Taine, Le Bon), the race (Gobineau, Chamberlain, Grant), the nation as
   will or as inheritance (Renan, Barrès, Maurras) — and the Dreyfus Affair puts them to the
   test"
+
+## VERDICT
+
+Recorded in `research/verdicts/REGISTER.md`, module 6, `chamberlain-and-grant`.
+
+- **Claim judged:** the Teutonic thesis (Chamberlain) and Grant's fixed Nordic, Alpine and
+  Mediterranean types — the racial classification both programmes rest on.
+- **Verdict:** **the racial classification fails.** Grade: **established**.
+
+**What decides it.** (1) Head form, Grant's chief sorting mark, shifted within one generation
+in immigrants' children (Boas, Immigration Commission report, 1911). Even the reanalysis most
+hostile to Boas (Sparks & Jantz, *PNAS* 99, 2002), which finds the change small beside the
+differences between groups and head form largely heritable, leaves the cephalic index short
+of the fixed mark Grant needed; the other reanalysis (Gravlee, Bernard & Leonard, *American
+Anthropologist* 105, 2003) finds the plasticity real. The verdict does not depend on which
+reanalysis is right about the size. (2) Grant's own Mendelian premise means traits pass down
+separately and recombine, so after a few generations of mixture no individual can be assigned
+a "race" by his traits. (3) Chamberlain identifies the Teuton by the virtues he then credits
+him with — a circle. (4) Neither book measured a mental or moral trait; the analyst who read
+the army tests through Grant's three races withdrew his conclusion in 1930. (5) Europe's
+peoples descend from at least three ancient populations (forward Ref
+`reich-ancient-dna-and-the-indo-europeans`): there was no pure stock to preserve or replace.
+
+**Strongest objection to the verdict.** The ancient-DNA record bears out a large Bronze-Age
+migration from the steppe that carried Indo-European languages into Europe — closer to the
+old migrationist picture these books drew on than to the "pots, not people" view that
+replaced it. It does not overturn the verdict: it confirms a migration, not a classification.
+The migrants were themselves a mixture, came from the east rather than a northern homeland,
+and the genomes say nothing of the mental traits Grant assigned; the claim judged here is the
+fixed types and the Teuton's criterion, and both fail.
+
+**What would overturn it.** A classification into Grant's types, by marks fixed in advance,
+that stays stable across generations of mixture and that predicts mental or moral traits —
+none was offered then, and the later evidence runs the other way.
+
+**Not decided here:** whether a state may choose its future members (module 15). The question
+survives the collapse of the racial science and the lesson says so.
 
 ## Sources to consult
 
@@ -178,7 +219,10 @@ goal: Analyze Chamberlain's racial reading of European history and Grant's Nordi
     index from their foreign-born siblings, in opposite directions. The reanalyses: C. S.
     Sparks and R. L. Jantz, PNAS 99 (2002) (the change is small beside differences between
     groups; head form largely heritable); C. C. Gravlee, H. R. Bernard and W. R. Leonard,
-    American Anthropologist 105 (2003) (the plasticity is real). Teach both.
+    American Anthropologist 105 (2003) (the plasticity is real). Teach both. The register
+    names both reanalyses as part of the deciding evidence for the verdict (REGISTER.md
+    module 6): the disagreement is over size, and neither restores a fixed mark [neither
+    staged; cite from the journal].
   - The 1924 Immigration Act (Johnson–Reed Act, 43 Stat. 153): annual quotas of 2 per cent
     of each nationality's foreign-born population in the 1890 census, a national-origins
     formula from 1929, exclusion of immigrants ineligible for citizenship (in practice Asian
@@ -345,16 +389,31 @@ Island and the "new immigration" of 1880–1914 from southern and eastern Europe
    `spengler-decline-of-the-west`). Tocqueville's "pernicious" charge (`<Ref>`
    `gobineau-inequality-of-races`) returns as a question about consequences, with
    the quotas and the sterilization laws as the record to weigh.
-   What the reconstruction leaves for the reader to weigh, stated without verdict: the
-   question both books put — whether a nation is an inheritance of descent, and whether a
-   state may choose its future members — survives the collapse of their racial science;
-   `renan-what-is-a-nation` takes up the first, the nation-and-immigration module the
-   second.
+9. **The weighing — "The racial classification fails".** Set the objections against the
+   strongest case for the books — the steppe migration that ancient DNA confirms — and reach
+   the verdict (see `## VERDICT`): the classification fails, grade **established**. The
+   migration is confirmed; the fixed types, the pure stock and the link to mind are not, and
+   the Teuton's criterion is circular. Boas's result is used at the size its harshest
+   reanalysis grants, which already suffices. State what would overturn the verdict (a
+   classification by marks fixed in advance, stable across mixture, predicting mental
+   traits). Then the scope: the question both books put — whether a nation is an
+   inheritance of descent, and whether a state may choose its future members — survives the
+   collapse of their racial science; `renan-what-is-a-nation` takes up the first, the
+   nation-and-immigration module the second.
+
+**Conclusion.** State the verdict in plain words with its grade: the racial classification
+that Chamberlain's Teutonic thesis and Grant's Nordic programme rest on fails —
+**established** — because the marks were not fixed, the types do not survive Grant's own
+Mendelian premise, the Teuton is defined by the virtues credited to him, no mental trait was
+measured, and Europe's peoples are mixtures of ancient mixtures. The programme of 1924 was
+enacted on that classification; that is a fact about the record, stated without adjectives.
+Hand-off: whether a nation is a race at all — the next lesson; whether a state may choose
+its members — module 15.
 
 Headings as claims, for example: "Races are made, not given"; "The Teuton out of the chaos";
 "A criterion of character"; "The Jew as a way of thinking"; "Three races of Europe and a
 replacement"; "From theory to statute: 1924"; "The readers"; "Five objections, from left and
-right".
+right"; "The racial classification fails".
 
 ## Set pieces and worked examples to recreate
 
@@ -387,12 +446,10 @@ right".
   Bayreuth (Wagner's festival town, centre of a circle of his admirers); the "new
   immigration"; Ellis Island; the Immigration Commission (1907–11); quotas and the
   national-origins formula; Buck v. Bell (1927); the Immigration Restriction League.
-- **The label rule binds hard here.** The course passes no verdict of its own on any author
-  or idea: no condemning or approving labels in its own voice. Judgement comes only through
-  argument and evidence; a label may appear only inside a quotation, with who applied it
-  and when. The dossier summaries use label words for both books; the lesson does not. The
-  consequences (1924, sterilization, the Nazi reception) are stated as facts with dates;
-  the reader judges.
+- **The label rule binds hard here.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. The dossier summaries use label words for both books; the lesson does not. The
+  consequences (1924, sterilization, the Nazi reception) are stated as facts with dates,
+  without adjectives. The arguments are judged: the verdict section states that the
+  classification fails (established).
 - **Reconstruct at full strength first.** Chamberlain's book is long and learned; give the
   reader its genuine moves (race as made, not given; history turning at 1200; the Roman
   legacy of law and state) before the objections. Grant's strongest argument is the
@@ -413,7 +470,8 @@ right".
   it says nothing about the psychological traits Grant assigned. One clause each; the Reich
   lesson teaches it.
 - **Boas's 1911 result is contested in its size** — teach both reanalyses; do not present
-  it as a settled refutation or as overturned.
+  it alone as a settled refutation or as overturned. The verdict on the classification does
+  not hang on it: even the hostile reanalysis leaves the index short of a fixed mark.
 - **Paper (Chamberlain vol. II):** his claim that the Teutons turned a borrowed invention
   into "the banner of a new world" is a racial version of the later argument that the West
   turned borrowings into systems. Not this lesson's matter: no more than a note, so the
@@ -496,7 +554,14 @@ right".
    more useful politically, not less. Compare with the Nazi treatment of Nietzsche
    (`<Ref>` `nietzsche/the-nazi-appropriation`): did these two books need to be clipped or
    forged to be used?
-8. **FORWARD (E7) → `reich-ancient-dna-and-the-indo-europeans`:** Grant's account of the
+8. **Attack the verdict:** the lesson grades the failure of the racial classification
+   "established". State the strongest objection in its best form — the 2002 reanalysis
+   (head form largely heritable, the change small) together with the confirmed steppe
+   migration — and say what evidence would be needed to overturn the verdict: what a
+   classification would have to show, about stability across mixed generations and about
+   mental traits, for Grant's types to stand. The solution shows why neither part of the
+   objection supplies that.
+9. **FORWARD (E7) → `reich-ancient-dna-and-the-indo-europeans`:** Grant's account of the
    Nordics makes three separable claims — a conquering migration carried the "Aryan"
    languages across Europe and Asia; the conquerors were a pure stock; their mental and moral
    traits were fixed and superior. For each, say what kind of evidence could test it and

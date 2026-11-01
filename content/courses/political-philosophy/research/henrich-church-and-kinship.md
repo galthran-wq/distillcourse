@@ -35,11 +35,20 @@ goal: Analyze Henrich's argument that the medieval Church's marriage and family 
   (charter towns, guilds, universities, monastic orders) and later representative government,
   impersonal law and science. The lesson starts from the 2010 finding that Western subjects are
   psychological outliers, follows Henrich's chain link by link, and tests each link against his
-  evidence and the strongest objections.
-- **Hands off:** (i) If a distinctive European psychology and its institutions were in place by
-  1500, Europe's material lead should be visible long before 1800; the claim that it was not — that
-  the most advanced regions of China and England were close around 1750 and that the gap opened
-  with coal and New World land — is `pomeranz-and-goody-the-rival-thesis` (FORWARD exercise);
+  evidence and the strongest objections, saying for each whether Henrich answers it. The lesson
+  grades its own evidence (strongest for present-day kinship ↔ psychology correlations, weaker
+  for dosage → kinship in the Middle Ages, weakest for the links to science and industry); it does
+  not pass a module verdict.
+- **Hands off:** Whether kinship — or fragmentation, a religious ethic, or high-medieval
+  institutions — caused the West's lead is judged in `the-borrowing-ledger`: each is partly
+  supported, none decisive, the cause **open**, with what would settle it (within-Europe designs
+  separating the timing of kin-dissolution, state competition and literacy); the genetic
+  candidate staged here against Henrich (Clark) is graded there **open**, its England-specific
+  form failing **on balance**. (i) If a
+  distinctive European psychology and its institutions were in place by 1500, Europe's material
+  lead should be visible long before 1800; the claim that it was not — that the most advanced
+  regions of China and England were close around 1750 and that the gap opened with coal and New
+  World land — is `pomeranz-and-goody-the-rival-thesis` (FORWARD exercise);
   there too the author who first linked the Church's marriage rules to the dissolution of the
   European family is read for his larger thesis. (ii) Henrich explicitly rejects a genetic
   account of the psychological differences (ch. 14); the hereditarian argument at full strength,
@@ -188,6 +197,16 @@ l. 3154; ch. 11 l. 3397; ch. 12 l. 3657; ch. 13 l. 3904; ch. 14 l. 4155; Appendi
   the dossier; the objections below are built from Henrich's own concessions and endnotes, from the
   course's earlier lessons, and from the next lesson's thesis. Do not invent named critics.
 
+- **Round 2 (author's review) — the genetic rival.** Staged under `C/research/texts/round2-west/`
+  (see `the-borrowing-ledger` Sources for the full list): Clark 2023 *PNAS*
+  (`clark-2023-pnas-inheritance-of-social-status.txt`); *A Farewell to Alms* chs. 6 and 9;
+  Clark 2008 reply (`clark-2008-ereh-response-defense-malthusian.txt` l.562–576); *The Son Also
+  Rises* ch. 1 (l.414–415); Allen, *JEL* 2008 (l.1024 ff., l.1310–1315); Hagen 2009 review of
+  Cochran & Harpending; Akbari et al., *Nature* 2026 (l.177). Henrich's own discussion: staged
+  book l.3510 (interest rates and patience), l.7024 (ch. 9 n.27 on Clark), l.4232–4256 (ch. 14,
+  genes and the urban graveyard). Clark may be named in the body as the author of the rival
+  thesis; the reviewers in References only.
+
 Names ONLY in References: Heine and Norenzayan (co-authors of the 2010 paper — the body says
 "three psychologists in 2010"), Schulz, Enke, Talhelm, Becker and Woessmann, Shaw and Saller,
 Goody (in THIS lesson; he is the next lesson's material), Mitterauer, Ubl, Greif, Hajnal, Berman,
@@ -331,16 +350,64 @@ and author of *The WEIRDest People in the World* (2020).
      kirk-and-nisbet-american-conservatism>`), and what a defender of the clan, the lineage and
      the inherited obligation would count as a loss. Henrich's book records costs too (ch. 14:
      impersonal institutions transplanted into kin-based societies misfire; a WEIRD sense of self
-     can lack meaning). The lesson states both readings and decides neither.
+     can lack meaning), so he does not dispute the description; he answers the objection only by
+     declining to rank. The lesson says so: the two readings agree on the facts, and whether the
+     change was a loss or a gain is a question of value that the evidence in this lesson does not
+     settle.
+   - *The genetic rival: Clark (required — round 2, author's review).* State it at full
+     strength, as a contender for the same explanandum, not as a footnote. Henrich himself
+     cites it (ch. 9 n.27: "Clark suggests that these psychological changes are likely due to
+     genetic changes, but he leaves open the possibility that it's culture"). Clark's case:
+     in English wills 1250–1800 the richest left more than twice as many surviving children as
+     the poorest (*A Farewell to Alms* ch. 6, l.38–39), so the descendants of the prosperous
+     spread through the population, carrying patience, literacy and application "probably
+     mostly culturally, but also potentially genetically" (ch. 9, l.33); falling interest rates
+     (the evidence Henrich borrows for rising patience, l.3510) are part of his record; and in
+     2023 he showed that status in 422,374 related English people, 1600–2022, persists with a
+     correlation falling by only 0.79 a generation, a pattern fitting additive genetic
+     inheritance with assortative mating (*PNAS* 2023, l.24–34). Cochran & Harpending (2009)
+     add the general claim that selection accelerated after agriculture (Hawks et al. 2007).
+     Then what each side has: Henrich's answer (ch. 14, l.4232–4256) — cultural change is fast
+     relative to selection over centuries; the institutions and the new psychology grew in
+     towns that were "genetic death traps" (the urban graveyard: life expectancy up to 50%
+     lower, populations kept up by immigration) and in celibate monasteries, so selection, if
+     anything, ran against the traits; and twentieth-century selection ran against
+     education-associated alleles while schooling rose. The record beyond Henrich: the
+     rich-fertility advantage was not English but European (Allen 2008, l.1310–1315); Clark
+     concedes "no proof here that additive genetic transmission causes social status" (2023,
+     l.84) and in 2008 that "to conclude that the mechanism was genetic changes we need further
+     information"; his own surname persistence is as high in China, Japan and Korea (2014,
+     l.414–415); ancient DNA finds selection on alleles associated with test scores and
+     schooling in West Eurasia, "largely driven by selection before ~2000 BP" (Akbari et al.
+     2026, l.177). Whether Henrich answered it — a fact about the argument: he answered the
+     urban form (the traits concentrated in towns) and showed a mechanism fast enough; he did
+     not answer the rural-elite form Clark actually proposes (the rich were often landed and
+     rural), and his graveyard argument does not touch Clark's 2023 persistence data, which
+     post-date the book. Neither side has the test that would decide between them (dated
+     polygenic scores for English, continental and Chinese lineages 1000–1800). The weighing
+     of the five candidate causes is the module's closing lesson's (`<Ref the-borrowing-ledger>`,
+     one clause): there the genetic candidate is graded **open**, its England-specific form
+     failing **on balance**.
    - *Exceptionalism without superiority (from both sides).* Henrich's West is exceptional but not
      "better": its psychology is a historical accident of one Church's marriage policy, nothing in
      it is fixed or innate (ch. 14 on genes), and the same programme run by a modern state (the
      PRC's Marriage Law of 1950, Meiji and South Korean civil codes) produced similar shifts in
      decades. The exceptionalist can claim the institutions; the rival thesis can claim the
      contingency. State this as the hinge to the next lesson, without reproach either way.
-   Where the lesson stands: Henrich supplies the mechanism Landes's "culture" and Murray's
+   Where the lesson stands, objection by objection — whether Henrich answered it is a fact about
+   the argument, and the lesson states it: *reverse causation* is answered in part (controls,
+   within-country comparisons, the Orthodox contrast, immigrants' children) but not closed, by his
+   own concession that cross-country correlation is a weak guide to cause; *timing* is not
+   answered — his own endnote and Augustine leave open that low cousin marriage predates the
+   bans, and there is no direct medieval count; *scope and measures* he partly concedes, which is
+   why the evidence is graded. Henrich supplies the mechanism Landes's "culture" and Murray's
    "autonomy" lacked, with more evidence than either; his strongest links are the present-day
-   correlations and the regional comparisons, his weakest the medieval timing.
+   correlations and the regional comparisons, his weakest the medieval timing. Whether kinship
+   was *the* cause of the West's lead is not decided here: the module's closing lesson weighs it
+   with fragmentation, Weber's ethic and high-medieval institutions and finds each partly
+   supported and the cause **open** (`<Ref the-borrowing-ledger>`, one clause). The genetic rival is answered in part:
+   Henrich shows culture fast enough and the urban selection running the wrong way, and leaves
+   Clark's rural-elite fertility and his later persistence data unanswered.
 
 Headings as claims (suggested): "Western subjects are outliers — the 2010 finding"; "A world built
 on clans needs a different mind"; "The Church changed the family before cities changed the
@@ -382,9 +449,7 @@ economy"; "Years under a Western bishop predict weaker kinship"; "The south of I
 
 ## Pitfalls / subtleties to flag
 
-- **The label rule.** The course passes no verdict of its own on any author or idea: no condemning
-  or approving labels in its own voice. Judgement comes only through argument and evidence; a
-  label may appear only inside a quotation, with who applied it and when.
+- **The label rule.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **"WEIRD" is an acronym, not a judgment.** The authors say so (endnote 1). The lesson uses it as
   a technical term, defines it once, and never plays on the word.
 - **The 2010 paper vs the 2020 book.** The paper documents the outlier status and *refuses* to say
@@ -412,7 +477,8 @@ economy"; "Years under a Western bishop predict weaker kinship"; "The south of I
 - **Genes:** Henrich's position (ch. 14) is that cultural evolution, not genetic selection,
   explains the differences, and that any genetic push may run the other way. Report it as his
   position; the hereditarian argument and its critics have their own lessons (`<Ref
-  hereditarian-case-iq-and-nations>`, forward). Neither endorse nor dismiss.
+  hereditarian-case-iq-and-nations>`, forward), where the question is weighed with its evidence;
+  this lesson reports Henrich's position and passes no judgment on it.
 - **Borrowings (if the collective-brain material enters):** keep the graded statements — paper
   via the Arab world (secure); gunpowder most likely via Mongol-era contact, no document of the
   transfer, Europeans plausibly unaware of its origin; Gutenberg most probably an independent
@@ -534,14 +600,26 @@ economy"; "Years under a Western bishop predict weaker kinship"; "The south of I
    "family" most conservatives defend) and state what would have to be true for the claim to
    survive (that the lineage, not the household, is the family worth defending — Nisbet's
    intermediate bodies, `<Ref kirk-and-nisbet-american-conservatism>`).
+7b. **Rival explanation (required — round 2):** Clark's genetic account and Henrich's cultural
+   one both predict that the descendants of prosperous medieval English families are more
+   patient and literate today. Specify an observation only the genetic account predicts and one
+   only the cultural account predicts. (Model answer: genetic — the status persistence follows
+   genetic relatedness through maternal and paternal lines alike and survives adoption out;
+   polygenic scores in dated English remains rise between 1200 and 1800 ahead of continental
+   and Chinese comparators. Cultural — the traits track the institutions people lived under
+   rather than their ancestry: immigrants' children converge, and the urban graveyard
+   populations, refilled by rural migrants, carry the traits; Clark's own wealth result, the
+   paternal grandfather's wealth predicting three times the maternal's (2023, l.1118), fits inheritance of
+   property better than of genes.) Then say which existing evidence each side can already cite.
 8. **FORWARD (E7) → `pomeranz-and-goody-the-rival-thesis`:** if Henrich is right that a distinctive
    psychology, voluntary associations and impersonal markets were in place in north-western Europe
    by about 1500, what should a comparison of wages, life expectancy and market development in
    England and the most advanced region of China (the lower Yangzi) show around 1750? State the
    prediction and what result would embarrass it. The solution says in one sentence that the next
-   lesson's rival thesis finds the two regions close in 1750 and the gap opening after 1800, with
-   coal and New World land, and that this is the test the exceptionalist accounts of this module
-   must meet — `<Ref pomeranz-and-goody-the-rival-thesis>`; and that the same lesson reads the
+   lesson's rival thesis claims the two regions were close in 1750 and the gap opened after 1800,
+   with coal and New World land, that the course finds that regional claim open while
+   north-western Europe already led China as a whole before 1800, and that this is the test the
+   exceptionalist accounts of this module must meet — `<Ref pomeranz-and-goody-the-rival-thesis>`; and that the same lesson reads the
    anthropologist who first tied the Church's marriage rules to the European family for a thesis of
    his own.
 

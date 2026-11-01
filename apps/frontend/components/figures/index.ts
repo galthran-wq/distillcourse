@@ -182,6 +182,7 @@ import KernelMachineFamily from "./classical-ml/KernelMachineFamily";
 import Co2KernelLedger from "./classical-ml/Co2KernelLedger";
 import RffIdentityDissected from "./classical-ml/RffIdentityDissected";
 import ClassicalSpineMap from "./classical-ml/ClassicalSpineMap";
+import DoctrineDerivationMap from "./political-philosophy/DoctrineDerivationMap";
 
 export interface FigureComponentProps {
   /** 1-based frame number for multi-frame figures. */
@@ -387,4 +388,5 @@ export const figures: Record<string, RegisteredFigure> = {
   Co2KernelLedger: { component: Co2KernelLedger },
   RffIdentityDissected: { component: RffIdentityDissected },
   ClassicalSpineMap: { component: ClassicalSpineMap },
+  DoctrineDerivationMap: { component: DoctrineDerivationMap },
 };

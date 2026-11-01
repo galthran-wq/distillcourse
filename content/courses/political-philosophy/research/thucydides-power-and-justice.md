@@ -42,9 +42,122 @@ goal: Analyze how Thucydides's speeches set Athens's account of its own freedom 
   (`aristotle-regimes-and-the-middle`, which can recall Thucydides' own praise of the
   Five Thousand's "fusion of the high and the low"). The thesis returns at Rome as Carneades's
   case that Rome grew by taking what was not its own (`cicero-res-publica-and-natural-law`).
+  What this lesson DECIDES: the Athenian thesis between cities. As a description of how cities
+  at war behaved it is borne out on both sides; as a claim that fairness protects no one it
+  fails on the record of 404 (on balance). What passes on is only the question inside the city.
 - **Spine step:** "Political theory began where kingship broke: the Greek polis placed power 'in the middle' of a community of peers, and its own historian recorded both the city's account of its freedom and the argument that the strong do what they can"
 
+## VERDICT
+
+- **Claim judged:** the Athenian thesis at Melos — justice arises only between equals in power,
+  and fairness is worthless to the weak ("the strong do what they can and the weak suffer what
+  they must", V.89; "a necessary law of their nature", V.105).
+- **Verdict:** split. As a description of how cities at war behaved, upheld: it is borne out on
+  both sides. As a claim that fairness protects no one, it fails on the record of 404. Grade:
+  **on balance**.
+- **What decides it:** the description half — Sparta did not come for Melos (V.116); Sparta
+  killed the Plataeans after the siege of 427 (III.68); Athens destroyed Scione and Melos. The
+  claim half — the record of 404, after Thucydides breaks off, in Xenophon's *Hellenica* (Brownson
+  tr., Perseus section numbers): when the news of Aegospotami reached Athens, the Athenians feared
+  they would "suffer such treatment as they had visited upon the Melians" (II.2.3); Lysander
+  restored the Melians to their island (II.2.9); and Sparta refused the Corinthian and Theban
+  demand to destroy Athens, saying "they would not enslave a Greek city which had done great
+  service amid the greatest perils that had befallen Greece" (II.2.19–20). The Melians' first
+  reply — fairness is "our common protection", and "your fall would be a signal for the heaviest
+  vengeance" — is what the record of 404 bears out: the appeal to a common standard and to past
+  service counted when Athens was the weak party.
+- **Strongest objection, and why it does not overturn the verdict:** Sparta's restraint can be
+  read as interest, not fairness — a ruined Athens would have left Thebes and Corinth stronger,
+  so a weakened Athens was a counterweight. On that reading the thesis survives intact: interest
+  spared Athens. It does not overturn the verdict because Sparta's stated ground was Athens's
+  past service, the very kind of appeal the envoys called worthless, and the Athenians' own fear
+  in II.2.3 shows they expected the standard they had denied at Melos to be turned on them. Both
+  motives can be present; the thesis said fairness counts for nothing, and in 404 it counted for
+  something. That the motive is mixed is why the grade is on balance and not strong.
+- **What would overturn it:** a reading of Sparta's restraint in 404 as pure balance-of-power
+  calculation that gives no weight to the appeal to Athens's past service.
+
+## REVISION (what the existing lesson.mdx must change)
+
+The drafted lesson (`C/lessons/thucydides-power-and-justice/lesson.mdx`, 496 lines) states the
+thesis, the Melian replies and the compulsion objection at full strength, and is sound. It stops
+short of a verdict in three places, all in the same words: "Whether the thesis is true of cities,
+and whether it stops at the city wall, the history leaves open" (end of "### The Athenian
+reply"); "leaves the thesis itself unrefuted. No speaker in the history answers the envoys at
+Melos with an argument that defeats theirs" (end of "### The historian's own causes"); and the
+Conclusion's "the thesis is left standing". The revision adds the weighing as the last body
+section and re-aims those three sentences at it.
+
+GAIN:
+1. **New last body section, after "## Who should rule, according to each speaker" and before
+   the Conclusion: "## The thesis describes the war and fails as a rule: the record of 404".**
+   It is the weighing (L10e). Content, in order: (a) the claim, split in two — a description of
+   how cities at war behave, and the claim that fairness protects no one. (b) The description
+   upheld from both sides: Sparta did not come for Melos; Sparta killed the Plataean defenders
+   after the siege of 427, each asked only whether he had done Sparta any service in the war
+   (III.68; one sentence, Crawley); Athens destroyed Scione and Melos. (c) The claim tested on
+   the record after Thucydides breaks off (anchor in one clause: Xenophon, an Athenian who
+   continued the history from 411): after Aegospotami (405) the Athenians feared to "suffer such
+   treatment as they had visited upon the Melians" (Hell. II.2.3); Lysander restored the
+   Melians (II.2.9); Sparta refused Corinth and Thebes, who wanted Athens destroyed, saying it
+   "would not enslave a Greek city which had done great service amid the greatest perils that had
+   befallen Greece" (II.2.19–20). Quote II.2.20 in a `<Quote source="Xenophon, Hellenica
+   II.2.20, trans. C. L. Brownson">`. Tie back to the Melians' first reply, already quoted in
+   "**Fairness as everyone's protection.**" ("your fall would be a signal for the heaviest
+   vengeance"), and to the Athenians' answer there that they did not fear Sparta if they fell.
+   (d) The strongest objection at full strength: Sparta acted from interest, keeping a weakened
+   Athens as a counterweight to Thebes. (e) Why it does not overturn the verdict: Sparta's stated
+   ground was past service, the appeal the envoys called worthless; the Athenians' fear shows
+   they expected the standard to be turned on them; mixed motive, so on balance. (f) The verdict
+   in words, with its grade and what would overturn it (a reading of 404 as pure balance-of-power,
+   with no weight on the appeal to past service).
+2. **End of "### The Athenian reply":** replace "Whether the thesis is true of cities, and
+   whether it stops at the city wall, the history leaves open." with a sentence that splits the
+   two questions: whether the thesis is true of cities is tested on the record at the end of the
+   lesson; whether it stops at the city wall passes to the next lesson.
+3. **End of "### The historian's own causes":** keep "Both readings rest on the text" and the
+   claim that no speaker in the history defeats the envoys' argument (a fact about the speeches);
+   replace "and leaves the thesis itself unrefuted" with "and no speaker refutes the thesis; the
+   test it does meet comes from events after the history breaks off", pointing to the last
+   section without a roadmap.
+4. **Figure caption of `juxtapositions.svg`:** "The text supports both; the reader has to weigh
+   them." → "The text supports both; the historian's own causes tell against the first." (This
+   matches the body, which already says his explanations do not support reading 1.)
+5. **Conclusion, first paragraph:** replace the last sentence ("The historian's arrangement can be
+   read as a verdict on Athens, but his own explanations do not support that reading, and the
+   thesis is left standing.") with: the historian's arrangement can be read as a verdict, but his
+   own explanations do not support that reading; the thesis is judged instead on the record — as a
+   description of how cities at war behaved it held on both sides, and as a claim that fairness
+   protects no one it failed in 404, when the Athenians feared the treatment they gave Melos and
+   Sparta refused to destroy a city "which had done great service"; on balance, because Sparta's
+   restraint also served its interest. The second paragraph (hand-off to Thrasymachus, the
+   question inside the city) stays as it is.
+6. **New exercise, before the FORWARD exercise (current Exercise 8): attack the verdict.** "The
+   lesson judges, on balance, that the Athenian thesis fails as a claim that fairness protects no
+   one, on the record of 404. Make the strongest case that Sparta's restraint was interest alone,
+   using what you know of Thebes and Corinth in 404. Then say what evidence would be needed to
+   overturn the verdict." Solution: a destroyed Athens would have left Thebes and Corinth
+   stronger, and Sparta's later quarrels with both (one clause) fit that reading; to overturn the
+   verdict one would need evidence that the Spartan assembly weighed only the balance and that
+   the appeal to past service was a formula with no weight — e.g. a contemporary account of the
+   debate at Sparta that gives the counterweight as the reason; the Athenians' own fear in II.2.3
+   would still stand as evidence that they did not believe their thesis about themselves.
+7. **References:** add Xenophon, *Hellenica*, trans. C. L. Brownson (Loeb, 1918), II.2.3, II.2.9,
+   II.2.19–20 (Perseus section numbers), with the Perseus URL.
+
+LOSE:
+1. The three withholding sentences listed above.
+2. Nothing else; the compulsion section and the arrangement section stay, since they judge other
+   questions (the thesis's consistency with blame; whether the arrangement is a verdict).
+
 ## Sources to consult
+
+- **Xenophon, *Hellenica* II.2.3, II.2.9, II.2.19–20, tr. C. L. Brownson (Loeb, 1918), as served
+  by Perseus** — `C/research/texts/verification-2026-11/xenophon-hellenica-2-2.txt` (Brownson
+  text with section numbers, followed by Dakyns's unnumbered Gutenberg text #1174, l. 1806–1820,
+  1860–1866, 1934–1950). Cite Brownson's section numbers; Dakyns has none. Yields the weighing
+  section's evidence: the Athenians' fear of Melos's fate (II.2.3), Lysander restoring the
+  Melians (II.2.9), Sparta's refusal to destroy Athens for its "great service" (II.2.19–20).
 
 - **Thucydides, History of the Peloponnesian War, Crawley tr. (1874; Project Gutenberg #7142,
   public domain)** — summaries-all.json index 88 (read whole: key_results, chapter_map, gems,
@@ -442,9 +555,10 @@ briefly, because every quotation depends on what a Thucydidean speech is.
    he gives the plague a natural course, from "the parts of Ethiopia above Egypt" (II.48), and
    says Sicily failed less from miscalculation than from "private cabals" at home after Pericles
    (II.65); and Athens fought on for nine more years. The lesson concedes both are readings of an
-   arrangement, not statements, and leaves the reader to weigh them (figure 6). Bearing: if the
-   work judges, it judges by the course of events, not by a principle stated against the
-   Athenian thesis — which is why the thesis is left standing for Plato to answer.
+   arrangement, not statements, and says that the historian's own causes tell against the first
+   (figure 6). Bearing: if the work judges, it judges by the course of events, not by a principle
+   stated against the Athenian thesis — no speaker refutes the thesis, and the test it meets
+   comes from events after the history breaks off (step 8).
 
 7. **What do the speeches claim about who should rule — and the strongest objection to the
    Athenian thesis.** Collect the answers as a table (figure 7): Pericles — the many, with office
@@ -469,19 +583,32 @@ briefly, because every quotation depends on what a Thucydidean speech is.
    speaking plainly and for moderation — "praise is due to all who … respect justice more than
    their position compels them" (I.76). The lesson concedes: the thesis is consistent as a
    description of what powers do and inconsistent with the language of guilt the same city used;
-   whether it is true of cities, and whether it stops at the city wall, is open. `<Conclusion>`:
-   the reader can now state the Funeral Oration's account of what holds Athens together, the two
-   Mytilene arguments and why the merciful one argued from interest, and the Athenian thesis with
-   the Melians' three replies; he can say how one city held all three positions (equality among
-   equals, power over the rest) and what each speech says about who should rule. Open: whether
-   the law "in the middle" of a city is itself just the interest of the stronger there — the next
-   lesson, where a teacher of rhetoric says so to Socrates.
+   whether it is true of cities is weighed in step 8; whether it stops at the city wall passes to
+   the next lesson.
+
+8. **The weighing: the thesis describes the war and fails as a rule (the record of 404).** See
+   VERDICT and REVISION GAIN 1. Description upheld on both sides (Sparta did not come; Plataea,
+   III.68; Scione and Melos). The claim that fairness protects no one tested on 404 (Xenophon,
+   *Hell.* II.2.3, II.2.9, II.2.19–20): Athens feared Melos's fate, Lysander restored the Melians,
+   Sparta refused to destroy a city "which had done great service". Strongest objection: Sparta's
+   restraint was interest (a counterweight to Thebes). Why it does not overturn: the stated
+   ground was past service, the Athenians' fear shows they expected the standard to be turned on
+   them; mixed motive, hence on balance. What would overturn it: a reading of 404 as pure
+   balance-of-power with no weight on past service. `<Conclusion>`: the reader can now state the
+   Funeral Oration's account of what holds Athens together, the two Mytilene arguments and why
+   the merciful one argued from interest, and the Athenian thesis with the Melians' three
+   replies; he can say how one city held all three positions (equality among equals, power over
+   the rest) and what each speech says about who should rule. The verdict in plain words: as a
+   description of cities at war the thesis held on both sides; as a claim that fairness protects
+   no one it failed in 404 — on balance, because Sparta's restraint also served its interest.
+   Passed on: whether the law "in the middle" of a city is itself just the interest of the
+   stronger there — the next lesson, where a teacher of rhetoric says so to Socrates.
 
 Headings that fall out (claims or precise questions, L-voita 2): "What a speech in Thucydides is"
 · "The Funeral Oration: freedom among equals, and the empire that proves it" · "Mytilene: the
 merciful side argues from interest" · "Melos: justice only between equals in power" · "One
 principle, two domains" · "Does the arrangement judge Athens?" · "Who should rule, according to
-each speaker".
+each speaker" · "The thesis describes the war and fails as a rule: the record of 404".
 
 ## Set pieces and worked examples to recreate
 
@@ -556,7 +683,7 @@ each speaker".
   hand-off if the writer wants the name — preferably as "a teacher of rhetoric". Do not
   re-teach `greek-miracle`: es meson, isonomia, the two equalities, Solon's reply are each a
   clause and a `<Ref>`.
-- **Balance and register.** The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+- **Balance and register.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
   In practice: the Athenian thesis is given at full strength as a consistent account of how
   powers behave, with its evidence (the narrative bore out its predictions about Sparta and
   hope) and its strongest objection (compulsion dissolves blame); the Melians' replies are
@@ -673,7 +800,15 @@ each speaker".
    fails to account for (II.48's natural account of the plague; II.65's account of why Sicily
    failed; VIII.97's praise of an Athenian regime) and state what would have to be true for it
    to survive (that arrangement can carry a judgment the author's explicit causes deny).
-8. **FORWARD (E7) → `thrasymachus-and-the-ring`:** The Athenian envoys say justice is in
+8. **Attack the verdict (new; before the FORWARD exercise):** the lesson judges, on balance, that
+   the Athenian thesis fails as a claim that fairness protects no one, on the record of 404. Make
+   the strongest case that Sparta's restraint was interest alone (Thebes and Corinth in 404), then
+   say what evidence would overturn the verdict. Solution: a destroyed Athens would have
+   strengthened Thebes and Corinth; to overturn the verdict one needs evidence that Sparta weighed
+   only the balance and that the appeal to past service carried no weight (a contemporary account
+   of the debate giving the counterweight as the reason); the Athenians' fear in II.2.3 stands
+   either way as evidence that they did not believe the thesis about themselves.
+9. **FORWARD (E7) → `thrasymachus-and-the-ring`:** The Athenian envoys say justice is in
    question only between equals in power. Apply the thesis INSIDE a city: in Athens's assembly
    the many outnumber the rich; in an oligarchy the rich hold the offices and the arms. On the
    envoys' premise, what would "justice" in each city's laws turn out to be? Solution: the

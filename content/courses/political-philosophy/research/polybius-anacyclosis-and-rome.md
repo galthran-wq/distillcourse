@@ -49,10 +49,52 @@ goal: Explain Polybius's cycle of constitutions and his argument that Rome's mix
   (`federalist-one-people-and-the-extended-republic`). The growth–zenith–decay
   curve of VI.51 returns in `maine-and-lecky-on-popular-government` and
   `spengler-decline-of-the-west` (both reinforce `anacyclosis`).
+  What this lesson decides and does not pass on: the cycle as a natural law
+  with a fixed order fails, and the VI.57 forecast is borne out in outline
+  (both **strong**); the next lesson inherits the question Polybius never
+  asked, whether the commonwealth that won was just.
 - **Spine step:** "Rome turns Greek theory into practice: Polybius explains its
   rise by a mixed constitution that arrests the cycle of regimes, and Cicero
   defines the commonwealth as a people bound by agreed right under a natural
   law above every statute"
+
+## VERDICT
+
+Two claims are judged (research/verdicts/REGISTER.md, module 2, lesson
+verdicts).
+
+- **(a) The cycle of regimes as a natural law with a fixed order (VI.4–9) —
+  fails. Grade: strong.** Decided by the cases the course has already given
+  the reader. Athens went from Solon's reform to democracy, was overthrown
+  by oligarchs in 411 and 404, and ended under Macedon, never passing
+  through Polybius's order; Sparta kept its mixture for centuries and ended
+  by defeat (Leuctra, 371), not by a station of the cycle; Rome reached its
+  mixture, on Polybius's own account, by trial and disaster rather than by
+  the cycle's sequence. The theory survives only if "stage" is read loosely,
+  and read loosely it no longer predicts an order. Polybius's own hedge
+  (ch. 9: the stage, if not the date) concedes the date and still claims the
+  order, which is the part that fails.
+- **(b) The forecast of VI.57, that Rome's mixture would decay through wealth,
+  rivalry for office and a flattered people — borne out in outline. Grade:
+  strong.** Decided by the record after Polybius wrote: a tribune (Tiberius
+  Gracchus) carried a land law over the senate in 133 and was killed by
+  senators; a century of rivalry for office followed (Marius from 107, Sulla
+  82, Caesar 49) and ended in one man's rule (Augustus, 27). The route
+  differs from the forecast: generals with armies loyal to them ended the
+  republic, not mob-rule. The forecast names the causes; it misnames the
+  last station.
+- **Strongest objection:** the late Republic fell to armies, not to the
+  internal decay Polybius describes, so his forecast hit by accident: the
+  decisive cause (soldiers who owed their land to their general) is nowhere
+  in VI.57. It does not overturn the verdict, because the armies were the
+  instruments of the rivalry for office the forecast names: each general
+  marched to win or keep office, and the land question that made the
+  soldiers his was the question of 133. It narrows the hit to the causes,
+  which is why the verdict says "in outline".
+- **What would overturn it:** for (b), an account on which the late
+  Republic's collapse owed nothing to rivalry for office; for (a), a body of
+  ancient constitutions that passed through the six forms in Polybius's
+  order.
 
 ## Sources to consult
 
@@ -213,6 +255,13 @@ goal: Explain Polybius's cycle of constitutions and his argument that Rome's mix
   I.1, XXXI.23–25, XXXVIII.21–22 in the Paton or Shuckburgh translation if
   the writer wants to check. The Gracchi (Tiberius Gracchus, tribune, killed
   by senators in 133) for the objection in link 7.
+- **The sequel to 133 in outline (register source, for the weighing in link
+  7):** Marius's commands from 107 and the army recruited from the landless,
+  Sulla's march on Rome and dictatorship (82), Caesar crossing the Rubicon
+  (49), Augustus's settlement (27) — from a standard account: Ronald Syme,
+  *The Roman Revolution* (Oxford, 1939), or Mary Beard, *SPQR: A History of
+  Ancient Rome* (London, 2015). Not staged in `research/texts/`; dates only,
+  one sentence, no narrative. Name the account in References.
 
 ## EXPLANATION PLAN (L0)
 
@@ -346,8 +395,9 @@ simple regime decays into the next and why he thinks Rome found a way out.
    closes the book (ch. 58): after Cannae the senate refuses to ransom eight
    thousand prisoners and returns the oath-cheating envoy in chains — the
    machine and the customs at work on the worst day.
-7. **OBJECTION at full strength — does the mixture describe Rome?** Two
-   objections, the second Polybius's own.
+7. **THE WEIGHING — "The cycle fails as a law; the forecast of decay holds
+   in outline."** First the objections at full strength, then the verdict.
+   Two objections to the mixture, the second Polybius's own.
    (a) *The mixture is not balanced.* Ch. 51 credits the Hannibalic victory to
    a senate "at the height of its power" against a Carthage where the people
    had become supreme — so the best moment of the mixture is a tilt toward
@@ -367,17 +417,35 @@ simple regime decays into the next and why he thinks Rome found a way out.
    generation after Polybius wrote, a tribune (Tiberius Gracchus, 133)
    carried a land law over the senate and was killed by senators — the
    tribunate, which Polybius mentions once as a veto, became the lever of
-   the conflict his checks were supposed to absorb. Whether that bears the
-   forecast out or refutes the balance is left open; one sentence of
-   anchor, no narrative of the Gracchi.
+   the conflict his checks were supposed to absorb. The lesson decides it:
+   the forecast is borne out in outline (**strong**). One sentence of dates
+   carries the sequel — Marius from 107, Sulla 82, Caesar 49, Augustus 27 —
+   a century of rivalry for office ending in one man's rule; then say where
+   the forecast missed: generals with armies loyal to them ended the
+   republic, not mob-rule. Set the strongest objection (the armies, not the
+   decay, did it) against the answer (the armies were the instruments of the
+   rivalry for office, and the soldiers' land was the question of 133). No
+   narrative of the Gracchi or the civil wars.
+   (b′) *The cycle as law, judged.* Run Polybius's ch. 9 claim against the
+   three cases the reader holds (Athens, Sparta, Rome; exercise 6 rehearses
+   it): none follows his order, and the claim survives only with "stage"
+   read loosely, at which point it predicts no order. Verdict in the
+   course's voice: as a natural law with a fixed order the cycle fails
+   (**strong**); the generational engine (each generation forgets the vice
+   its fathers suffered) remains a usable account of why a simple regime
+   decays, which is what the mixture was built against.
    (c) A forward clause only: later writers will deny that power shared by
    three "sovereign" bodies (ch. 11's own word) can be a state, because when
    they deadlock no one decides (`bodin-sovereignty`).
 8. **Close** (`<Conclusion>`): the reader can now run the cycle with its
    generational engine, state why a mixture of blocking powers arrests it,
    say how Polybius's mixture differs from Aristotle's, and name the two
-   limits — the tilt toward the senate and the forecast of decay. Open
-   problem, one sentence: Polybius judged the constitution by what it won;
+   limits — the tilt toward the senate and the forecast of decay. Then the
+   verdict in plain words, with its grades: the cycle does not hold as a law
+   of nature, since no city the course has examined followed its order
+   (strong); Polybius's forecast of how Rome's mixture would decay held in
+   outline, wrong only about the last station, an army's general rather than
+   a mob (strong). Hand-off, one sentence: Polybius judged the constitution by what it won;
    whether a commonwealth must also be just — and whether Rome was — is the
    question the next lesson's Roman puts in the same circle of friends
    (`cicero-res-publica-and-natural-law`).
@@ -386,7 +454,7 @@ Headings that fall out (questions or noun phrases, the writer's choice):
 "A conquest explained by a constitution"; "Six forms, not three"; "How each
 form breeds the next"; "Rust in iron: why no simple form lasts"; "Rome seen
 three ways"; "Each part needs the others"; "Customs: the army, the funeral,
-the oath"; "Is the mixture balanced, and does it last?". About 30–35% of the
+the oath"; "The cycle fails as a law; the forecast of decay holds in outline". About 30–35% of the
 text on links 3 and 5, which carry the two concepts.
 
 ## Set pieces and worked examples to recreate
@@ -437,7 +505,7 @@ text on links 3 and 5, which carry the two concepts.
 
 ## Pitfalls / subtleties to flag
 
-- **Register.** The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+- **Register.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Terms a newcomer will not know — anchor at first mention (L11), no more
   than three per section:** anacyclosis (Greek "cycling round"; Polybius's own word at VI.9.10,
   which Shuckburgh renders "the regular cycle of constitutional
@@ -458,7 +526,8 @@ text on links 3 and 5, which carry the two concepts.
   Peloponnesian cities Polybius served); Pydna (168, Macedon's defeat);
   Lycurgus (the legendary Spartan lawgiver — the reader has him from
   `sparta-as-test-case`); talent and minae (sums of money: one sentence of
-  scale or none). The Gracchi only in link 7, half a sentence.
+  scale or none). The Gracchi and the sequel to 133 (Marius, Sulla, Caesar,
+  Augustus) only in link 7: one sentence of dates, no narrative.
 - **Polybius is the author of the material**: "Polybius argues" is allowed.
   Names that go only in References: Shuckburgh (translator), Holton and
   Berns (Strauss–Cropsey), Smith, Panaetius (unless Rep. I.34 is quoted, where
@@ -604,7 +673,16 @@ text on links 3 and 5, which carry the two concepts.
    the senate's refusal to ransom (ch. 56, 58). Defend the ranking from the
    text; the solution notes that Polybius's own closing illustration is a
    custom, not a check.
-8. **FORWARD (E7)** → `cicero-res-publica-and-natural-law`. Polybius's test of
+8. *Attack the verdict.* The lesson judges Polybius's forecast of VI.57
+   borne out in outline. State the strongest objection in its best form —
+   that the republic was ended by armies loyal to their generals, a cause
+   VI.57 never names, so the "hit" is a coincidence of outcome — and say
+   what evidence would be needed to overturn the verdict: an account of
+   133–27 on which the collapse owed nothing to rivalry for office (for
+   example, generals who seized power with no office at stake). The
+   solution grants the objection its force on the route and shows why it
+   leaves the causes standing.
+9. **FORWARD (E7)** → `cicero-res-publica-and-natural-law`. Polybius's test of
    a constitution is what it achieves, and by that test Rome beats Sparta
    because it can conquer (ch. 50). Construct the strongest objection a
    philosopher could make to that test using only Rome's record as Polybius

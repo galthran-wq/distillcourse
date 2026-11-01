@@ -43,13 +43,21 @@ goal: Test Burke's and Maistre's predictions about the Revolution's paper money 
   said a currency on confiscated Church land would end as Law's Mississippi had,
   in worthless paper and a state living by force; Maistre in 1797 counted 15,479
   laws and three constitutions in five years and said no society could absorb
-  them, that "to destroy is not to make". The lesson checks both, and then names
-  where the record departs from the critics: the institutions of the Revolution
-  that lasted.
-- **Hands off:** The module closes. What stays open is the question the whole
-  module raised and the next will answer with a fact rather than a theory: if
-  the Revolution's designs partly failed and partly endured, what decides which
-  — and Tocqueville's answer that the levelling the Revolution accelerated is a
+  them, that "to destroy is not to make". The lesson checks both, names where
+  the record departs from the critics (the institutions of the Revolution that
+  lasted, and the American constitution Maistre said would not), and then
+  delivers the module's verdict (see `## VERDICT`): a people cannot redesign a
+  whole society at one stroke without a heavy price, but designed institutions
+  and designed constitutions can last.
+- **Hands off:** The module closes with its question decided: Burke's forecasts
+  were mixed (paper money and the general hits, strong; the departments and
+  France "expunged out of the system of Europe" misses, strong) and his general
+  argument holds on balance; Maistre's forecast for France's constitutions held,
+  and his general thesis that nothing durable is made by deliberation fails
+  (strong). What passes on is a question the verdict does not answer, which the
+  next module takes up with a fact rather than a theory: if the Revolution's
+  designs partly failed and partly endured, what decides which — and
+  Tocqueville's answer that the levelling the Revolution accelerated is a
   "providential fact" no one designed (`tocqueville-equality-and-the-township`).
   The epistemic thesis returns in `what-conservatism-is` and
   `oakeshott-rationalism-in-politics` with this lesson's ledger as its evidence;
@@ -99,11 +107,95 @@ goal: Test Burke's and Maistre's predictions about the Revolution's paper money 
     fits 1799 (a general ended an assembly that could no longer govern) but not
     its sequel: the dictatorship "from above" kept and codified the Revolution's
     civil law rather than restoring the old order, so the sabre preserved what
-    Donoso's dagger had won. State each departure
-    plainly and let the reader weigh which theory the record favours where.
+    Donoso's dagger had won; (g) the American constitution of 1787 —
+    deliberated in a convention, written, ratified by state conventions, and
+    still in force — falsifies Maistre's Washington prophecy (Considerations
+    ch. 7, pp. 107–109: he doubted "the stability of the American government"
+    and bet "a thousand to one" the city would not be built, would not be called
+    Washington, and Congress would not meet there; Congress met there from
+    1800). State each departure plainly, and then weigh them to the module
+    verdict (link 6; `## VERDICT`).
+
+## VERDICT
+
+The module verdict (module question: can a people frame a government for itself
+from principles, or does designed order fail, as Burke and Maistre said it
+would?). Grades: **strong** against Maistre's general thesis; **on balance** for
+Burke's general argument.
+
+- **Claim judged (Burke):** that France, having set out to redesign its society
+  from principles, would pay for it in worthless paper, disorder and a general;
+  and, generally, that no generation can redesign a whole society at once
+  without a heavy price.
+  - *Verdict:* the forecasts were mixed. Hits: the paper money on confiscated
+    land collapsed, and a general took power (1799) — **strong**. Misses: the
+    departments, which he said would be "so many independent republics" that
+    would not obey Paris, became the instruments of Europe's most centralised
+    administration; and France, which he told the Commons on 9 February 1790 was
+    "expunged out of the system of Europe" and would take "much time" to
+    restore (Speech on the Army Estimates), was beating the coalition within
+    four years and dominated the Continent until 1814 — both misses
+    **strong**. His general argument is supported by the record, but the same
+    record holds a rival cause for the worst of the price: the war of 1792,
+    war finance and the Terror's price controls — **on balance**.
+- **Claim judged (Maistre):** that nothing durable is made by deliberation and
+  designed law is "paper".
+  - *Verdict:* his forecast on his own target, the written constitution, was
+    borne out for revolutionary France: the constitutions of 1791, 1793, 1795 and
+    1799 all fell. His general thesis fails — **strong**. The United States
+    constitution of 1787 was deliberated, written, ratified, and has lasted,
+    which falsifies his Washington prophecy (he doubted "the stability of the
+    American government" and bet the capital would not be built or named or
+    used). The departments (1790), the metric system (1795) and the Civil Code
+    (1804) also outlasted every French regime.
+- **The answer to the module question:** a people cannot redesign a whole
+  society at one stroke without paying a heavy price, but designed institutions
+  and designed constitutions can last. Most of France's lasting designs were made
+  under one ruler, on the old monarchy's centralisation, and were not its
+  constitutions.
+- **Strongest objection:** the institutions that lasted were Napoleon's, made by
+  a "legislator who says fiat", so Maistre can claim them as proof that only a
+  single will founds. **Why it does not overturn the verdict:** it narrows it.
+  The departments (1790) and the metric system (1795) were assembly work, made
+  before Bonaparte; and the American constitution was made by a convention and
+  ratified by state conventions — deliberation at every step.
+- **What would overturn it:** evidence that the departments and the metric
+  system continued designs of the old regime, and that the American case is, as
+  Maistre's "four points" claim, inherited English law with nothing designed in
+  it.
+- **Firmness and limits:** the Civil Code is the objection's best case and is
+  conceded to it as a design of one ruler (with the Assembly's content). The
+  rival cause for Burke's price (war from 1792) is why his general argument is
+  on balance, not strong.
 
 ## Sources to consult
 
+- **Burke, Speech on the Army Estimates, House of Commons, 9 February 1790**
+  (Debrett, 1790; PD) — `research/texts/audit-right-shading/burke-army-estimates-1790.txt`.
+  l.10: "France was, at this time, in a political light, to be considered, as
+  expunged out of the system of Europe … most assuredly it would take up much
+  time to restore her to her former active existence"; l.38: the French "the
+  ablest architects of ruin", having pulled down "their army; their navy". The
+  failed forecast beside the hits, from Burke's own mouth in the same year as the
+  Reflections; it goes in the ledger (link 6, figure 7). The record it is set
+  against — the levée en masse (1793), Fleurus (June 1794) and the conquest of
+  the Austrian Netherlands, French dominance to 1814 — is public; verify dates in
+  a standard history and cite in References.
+- **Maistre, Considerations ch. 7, pp. 107–109: the American case and the
+  Washington prophecy** — `research/texts/maistre/cof.txt` l.4429–4486. Maistre
+  concedes "at the most one could mention America", answers with four points
+  (a king never seen; the mother country's democratic element; republican
+  colonists; "the plan of three powers that they received from their ancestors,
+  and not at all tabula rasa"), says that "all those things that are really new
+  in their government, all those things that are the result of popular
+  deliberation, are the most fragile parts of the system", doubts "the
+  stability of the American government", and bets "a thousand to one" that the
+  city "will not be built, that it will not be called Washington, and that the
+  Congress will not meet there". Lebrun's translation is copyrighted: quote the
+  bet and one sentence, paraphrase the four points. The decisive counter-case of
+  the weighing (link 6). The record: Constitution signed 17 September 1787,
+  ratified 1788, in force from 1789; Congress first met in Washington in
+  November 1800 — public; verify and cite a standard reference.
 - **Burke, Reflections (1790)** — summaries.json index 24; text
   `research/texts/burke/reflections-s2.txt`, `reflections-s3.txt`,
   `reflections-s4.txt`, `reflections-s1.txt`. Public domain: quote freely. The
@@ -360,8 +452,16 @@ them. Both forecasts can be checked. The lesson checks them.
    inheritance, the end of feudal tenures) a form that outlasted every French
    regime — but was made under one ruler by a commission of four, not by an
    assembly; Maistre can claim it as a legislator who "says fiat", Burke as the
-   general become master; and yet its content was the Assembly's. The lesson
-   does not resolve this; it names it. Then Donoso's lens, one paragraph
+   general become master; and yet its content was the Assembly's. Name it here
+   as the hardest case; the weighing (link 6) concedes it to the objection and
+   says why the verdict survives it. Then the case Maistre himself chose to
+   answer in advance: America (ch. 7, pp. 107–109; `<Ref>` maistre-and-bonald).
+   He granted it was the one possible counter-example, explained it away by four
+   inherited elements, doubted "the stability of the American government", and
+   bet "a thousand to one" that the new capital would not be built, would not be
+   called Washington, and that Congress would not meet there. Congress met there
+   in 1800; the constitution of 1787 — deliberated in a convention, written,
+   ratified by state conventions — is still in force. Then Donoso's lens, one paragraph
    (`<Ref>` donoso-cortes-on-dictatorship): he called the First Republic "a
    gigantic dictatorship without end" and framed every crisis as a choice
    between a dictatorship from below and one from above. The record of
@@ -371,9 +471,14 @@ them. Both forecasts can be checked. The lesson checks them.
    dictatorship "from above" did not restore what the one "from below" had
    destroyed — it codified the Revolution's civil law and kept the departments,
    now under prefects, the "million ears" of Donoso's thermometer.
-6. **Where theory and record part.** The ledger (the lesson's synthesis figure):
-   forecast / ground / what happened / verdict, for Burke's four and Maistre's
-   two. Then the departures, each stated as a departure from a specific
+6. **THE WEIGHING. Heading as the verdict: "Designs can last; a whole society
+   cannot be redesigned at once" (or "Maistre's thesis fails; Burke's holds on
+   balance").** The last body section and the module's verdict
+   (`## VERDICT`). The ledger (the lesson's synthesis figure): forecast / ground
+   / what happened / verdict, for Burke's five (paper money; gamesters; the
+   departments; the general; France "expunged out of the system of Europe",
+   from the Army Estimates speech of 9 February 1790) and Maistre's three (the
+   laws; the constitutions; America and the Washington prophecy). Then the departures, each stated as a departure from a specific
    premise: (a) Burke's mechanism was financial (land-bank structure); the
    collapse was fiscal-military (war from 1792) — the theory under-predicted the
    cause and over-predicted the social break (France did not dissolve into
@@ -384,14 +489,41 @@ them. Both forecasts can be checked. The lesson checks them.
    recognised as articulating the nation's life — codified law, uniform
    administration, uniform measures — which is neither Burke's inheritance nor
    Maistre's Providence but something a people found rational after the fact.
-   State the course's own conclusion as a judgment, not a verdict: the
-   epistemic case predicts the failure of designs that ignore what a society
-   already is (a currency), and fails to predict the success of designs that
-   give a society tools it then uses (a map, a measure, a code). Let the reader
-   weigh whether that distinction saves Burke or refutes him.
-7. **What the reader can now do, and what stays open.** Read a forecast
-   against a series with the drill applied to both; state which of the module's
-   theses the record bears out and which it breaks. Open: the next module asks
+   Then the verdict, in the course's voice, with grades. *Burke:* hits on the
+   paper and the general (strong); misses on the departments and on France's
+   eclipse as a power (strong — within four years French armies were beating
+   the coalition); his general argument, that no generation can redesign a whole
+   society at once without a heavy price, is supported by the record, but the
+   war of 1792, war finance and price controls are a rival cause for the worst of
+   that price (on balance). *Maistre:* right about France's written
+   constitutions (1791, 1793, 1795, 1799 all fell); wrong in his general thesis
+   that nothing durable is made by deliberation (strong) — the American
+   constitution and the departments, the metric system and the Code refute it.
+   The strongest objection, at full strength: what lasted in France was
+   Napoleon's, the work of a "legislator who says fiat", which is Maistre's own
+   account of founding. The reply: that narrows the verdict and does not
+   overturn it — the departments and the metric system were assembly work before
+   Bonaparte, and the American constitution was a convention's work ratified by
+   conventions. Say what would overturn it (the departments and the metric
+   system shown to continue old-regime designs, and the American constitution
+   shown to be inherited English law with nothing designed in it). The
+   distinction the record draws: the epistemic case predicts the failure of
+   designs that remake what a society already is (a currency, a whole
+   constitution at a stroke), and fails to predict the success of designs that
+   give a society tools it then uses (a map, a measure, a code) — and Burke's
+   argument survives in the first form, not as a rule against design.
+7. **What the reader can now do, and what passes on.** The `<Conclusion>`
+   states the module verdict in plain words with its grades: a people cannot
+   redesign a whole society at one stroke without paying a heavy price, and
+   Burke's general argument to that effect holds on balance (his paper-money and
+   general forecasts were strong hits, his departments and France-expunged
+   forecasts strong misses); but designed institutions and designed
+   constitutions can last, so Maistre's thesis that nothing deliberated endures
+   fails (strong) — and most of France's lasting designs were made under one
+   ruler, on the old monarchy's centralisation, and were not its constitutions.
+   Then what the reader can do: read a forecast against a series with the drill
+   applied to both; state which of the module's theses the record bears out and
+   which it breaks. Hand-off: the next module asks
    not whether the Revolution's designs lasted but what the Revolution was a
    symptom of — a levelling that no one designed and no one stopped (`<Ref>`
    tocqueville-equality-and-the-township).
@@ -435,16 +567,14 @@ them. Both forecasts can be checked. The lesson checks them.
    departments (1790–today), the metric law (1795–today) and the Code
    (1804–today) drawn as the long bars beneath — the figure that states the
    departure.
-9. **The ledger**: six forecasts, ground, outcome, verdict — Burke's paper
-   money, nation of gamesters, departments, general; Maistre's laws, three
-   constitutions.
+9. **The ledger**: eight forecasts, ground, outcome, verdict and grade —
+   Burke's paper money, nation of gamesters, departments, general, France
+   "expunged out of the system of Europe" (Army Estimates speech, 9 Feb 1790);
+   Maistre's laws, three constitutions, the Washington prophecy.
 
 ## Pitfalls / subtleties to flag
 
-- **Register rule.** The course passes no verdict of its own on any author or
-  idea: no condemning or approving labels in its own voice. Judgement comes only
-  through argument and evidence; a label may appear only inside a quotation, with
-  who applied it and when.
+- **Register rule.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Do not re-teach Donoso, Hume or Herder.** Each enters as a lens with a `<Ref>`
   and a clause; the lesson's new matter remains the two artefacts and the
   forecasts of Burke and Maistre. *Fructidor* (September 1797, the Directory's
@@ -492,9 +622,13 @@ them. Both forecasts can be checked. The lesson checks them.
 - **Maistre's 15,479 is a count of acts.** Most were administrative decrees;
   the thesis it is made to carry (volume shows the absence of a legislator) is
   Maistre's inference, not a fact in the table. Say so; do not dismiss it — the
-  number is real and the inference is the argument to weigh.
-- **The Code cuts both ways** and the lesson must say so (link 5) rather than
-  claim it for one side. Likewise the sale of Church lands: Burke's "Never did a
+  number is real, and the inference is weighed in link 6, where the general
+  thesis it serves fails on the American and French designs that lasted.
+- **The Code cuts both ways** and the lesson must say so (link 5): it is the
+  strongest objection's best case (a single ruler's design), conceded to it in
+  the weighing; the verdict against Maistre rests on the departments, the
+  metric system and the American constitution, which were assembly or
+  convention work. Likewise the sale of Church lands: Burke's "Never did a
   state enrich itself by confiscation" is about the state's finances (true: the
   assignat lost the value the lands were meant to secure) while the social fact
   (a new class of proprietors) endured — distinguish the two claims.
@@ -566,9 +700,10 @@ them. Both forecasts can be checked. The lesson checks them.
    departments (1790→), the metric law (1795→), the sale of Church lands never
    reversed (1790→), the Civil Code (1804→) as long bars. The figure that
    states the departure; caption names it.
-7. `draw:` `<Figure>` — **the forecast ledger**: six rows (Burke: paper money;
-   gamesters; departments; the general. Maistre: the laws; the constitutions) ×
-   (ground / what happened / verdict) — the lesson's synthesis, reusing the
+7. `draw:` `<Figure>` — **the forecast ledger**: eight rows (Burke: paper money;
+   gamesters; departments; the general; France "expunged" from Europe's system.
+   Maistre: the laws; the constitutions; America and the Washington prophecy) ×
+   (ground / what happened / verdict and grade) — the lesson's synthesis, reusing the
    `burke-reflections` ledger's layout with the outcome column filled (voita
    rule 2).
 8. `draw:` `<Figure>` — **the departments as a locator sketch**: an outline of
@@ -640,6 +775,23 @@ them. Both forecasts can be checked. The lesson checks them.
    may be one no assembly decreed: a levelling of conditions. The solution says
    in one sentence that the next module's French aristocrat will call exactly
    that a "providential fact" and ask what makes it bearable, with the `<Ref>`.
+9. **Attack the verdict.** The lesson judged that Maistre's thesis — nothing
+   durable is made by deliberation — fails (strong). State the strongest
+   objection in its best form, in Maistre's own terms: what lasted in France was
+   made or remade under one man who "says fiat" (the Code, the prefects who made
+   the departments obey); and America, by his four points, built "on the plan of
+   three powers that they received from their ancestors, and not at all tabula
+   rasa", so its success is inheritance, not design. Then say what evidence
+   would be needed to overturn the verdict. The model answer: the objection
+   narrows the verdict (concede the Code), but the departments (1790) and the
+   metric law (1795) were assembly work before Bonaparte, and the American
+   constitution's convention, written text and ratification are deliberation at
+   every step whatever it borrowed; to overturn the verdict one would need to
+   show that the departments and the metric system continued old-regime designs
+   and that the American constitution added nothing designed to inherited
+   English law — and say which of the American institutions (a written
+   federal constitution, an elected president, judicial review as it developed)
+   tells against that.
 
 ## Nietzsche cross-course links (where his ideas enter)
 

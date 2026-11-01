@@ -30,11 +30,18 @@ goal: Apply the module's accounts of representation, natural law and the two cit
   predicts what the documents say and do. Civil theology predicts Symmachus
   almost sentence for sentence; existential representation predicts Ambrose's
   "you serve God" and nothing of his threats; natural law is claimed by both
-  sides in opposite senses; the two cities (written forty years later)
-  describe the settlement's logic and misdescribe its temper; and the
-  record departs from every idealisation — a bishop who threatens, an emperor
-  who negotiates, a cult that outlived its altar.
-- **Hands off:** The module closes. The forward lines are: a Church that
+  sides in opposite senses and decides nothing; the two cities (written
+  forty years later) describe neither party's conduct; and the record
+  departs from every idealisation — a bishop who threatens, an emperor who
+  negotiates, a cult that outlived its altar. The module question is then
+  answered: the documents bear out the civil-theology account of what held
+  Rome together, and both sides held it — the Christian victory replaced
+  Rome's god without separating the city from public worship (**strong**).
+- **Hands off:** The module closes, having decided its question: what held
+  the commonwealth together was a public worship, and 384 changed which
+  worship, not whether there was one (**strong**; see VERDICT). What passes
+  on is the third body the verdict leaves standing — a Church with its own
+  sanction over the ruler. The forward lines are: a Church that
   claims the emperor "within" it and not above (Aquinas's law above kings,
   `aquinas-law-and-kingship`); the question whether a state can live on
   diverse cults or needs one (Bodin's politique toleration,
@@ -86,6 +93,39 @@ goal: Apply the module's accounts of representation, natural law and the two cit
     its own cult by law for four centuries, and Ambrose says so; (6) XIX.17
     is written forty years AFTER the case it is tested on, by a man who knew
     the outcome.
+
+## VERDICT
+
+Module verdict (research/verdicts/REGISTER.md, module 2), passed in this
+lesson. Module question: what holds a commonwealth together — its
+constitution, its justice, or its gods — and what happened to that bond when
+Rome's gods were replaced?
+
+- **Claim judged:** the civil-theology account — that Rome's commonwealth was
+  held together by its public worship (Polybius VI.56, Varro, Cicero Laws
+  II) — tested on the documents of 384.
+- **Verdict: borne out, and held by both sides. Grade: strong.** Symmachus
+  argues that the ancestral cult is the condition of Rome's existence
+  (Relatio 3 §9–10: "this worship subdued the world to my laws"). Ambrose
+  does not answer that the commonwealth can do without a public worship; he
+  answers that it must have the right one. He reasons do-ut-des himself (the
+  good harvest of 384 against Symmachus's famine of 383, Ep. 18 §17–21), and
+  he backs "the emperor serves God" (Ep. 17 §1) with the threat that the
+  emperor will find no bishop in his church (Ep. 17 §13). The Christian
+  victory replaced Rome's god; it did not separate the city from worship.
+  Augustine's later "the heavenly city preserves the diverse laws and
+  customs of the nations" (XIX.17) describes neither party's conduct in
+  384. Natural law decides nothing in the case, because both sides claim it
+  in opposite senses (Relatio 3 §10, "one road"; Ep. 18 §8, truth by God's
+  voice).
+- **Strongest objection:** the record shows bargaining — a boy emperor, a
+  divided court, a usurper in Gaul — so the outcome may reflect power, not
+  either theory. It does not overturn the verdict: the bargaining was over
+  the cult itself and lasted a decade (391, 393, Prudentius c. 402), and
+  both sides acted as if the public worship were what the commonwealth
+  turned on.
+- **What would overturn it:** evidence that the court treated the altar as a
+  pure patronage question, indifferent to doctrine.
 
 ## Sources to consult
 
@@ -372,33 +412,50 @@ argued.
    endowments — which is NOT what happened: Gratian took everything, and
    Ambrose defended taking everything, arguing from the fisc and from
    "idolatry" rather than from hindrance. Name the departure: **the two
-   cities describe the logic of the settlement (shared earthly peace, no
-   shared religion) and misdescribe its temper** — written forty years later
-   by a man who knew the outcome, it is calmer than either 384 document.
+   cities describe neither party's conduct in 384**: neither side proposed
+   a shared earthly peace with no shared religion — Symmachus asked for the
+   old public cult, Ambrose for a Christian ruler who funds none but the
+   true one. Written forty years later by a man who knew the outcome, XIX.17
+   is calmer than either 384 document and describes a city neither party
+   wanted.
    Augustine's own happy emperor (V.24) "makes his power the handmaid of
    God's majesty"; Ambrose's emperor is told what that handmaid may fund.
-9. **Judgment — which account do the documents bear out?** Lay the four
-   frames against the two texts in a table and let the reader fill the last
-   column. Civil theology: predicts Symmachus wholly, predicts the empire's
-   problem (a city whose oath-gods have been removed), says nothing about
-   what replaces them. Representation: predicts Ambrose's formula and the
-   de-divinized emperor; misses the bishop's sanction and the bargaining.
-   Natural law: claimed by both, decides nothing by itself — the documents
-   show it is the appeal, not the verdict. Two cities: right about the shape
-   of the settlement, wrong about the manner, and written after the fact.
-   The course's own verdict, stated once and left for weighing: the
-   documents bear out civil theology as a description of what Rome was
-   losing, representation as a description of what the emperor became, and
-   neither as a description of what the *Church* became — a third body, with
-   its own sanction, that no theory in the module had predicted. That body
-   is the subject of the next module.
+9. **THE WEIGHING — "Both sides held that Rome stood on its public worship;
+   384 changed the god, not the bond."** Lay the four frames against the
+   two texts in a table (set piece 8). Civil theology: predicts Symmachus wholly —
+   and, the decisive point, predicts Ambrose too: he never argues that the
+   commonwealth can do without a public worship, only that it must have the
+   right one; he argues do-ut-des from the harvest of 384 and backs "you
+   serve God" with the threat of an empty church. Representation: predicts
+   Ambrose's formula and the de-divinized emperor; misses the bishop's
+   sanction. Natural law: claimed by both in opposite senses, so it decides
+   nothing in the case. Two cities: describes neither party's conduct, and
+   is written after the fact. Then the strongest objection at full
+   strength — the outcome was bargaining among a boy emperor, a divided
+   court and a usurper, so power, not any theory, decided it — and the
+   answer: the bargaining was over the cult itself, it went on for a decade
+   (391, 393, Prudentius c. 402), and both sides acted throughout as if the
+   public worship were what the commonwealth turned on. Verdict in the
+   course's voice: the civil-theology account of what held Rome together is
+   borne out, and held by both parties (**strong**); the Christian victory
+   replaced Rome's god and kept the city bound to a worship. Say what would
+   overturn it: evidence that the court treated the altar as a patronage
+   question, indifferent to doctrine. What the verdict leaves standing, for
+   the next module: the body that now held the worship — a Church with its
+   own sanction over the ruler, which no theory in the module predicted.
 
 Headings that fall out: "An altar, a statue, an oath: what Gratian removed";
 "Symmachus's petition: the city's gods as the condition of the city";
 "Many roads to one secret — and why it did not win"; "Ambrose's principle:
 you serve God"; "A bishop who threatens"; "An emperor who negotiates"; "A
-cult that outlived its altar"; "The two cities tested on 384"; "Which account
-the documents bear out".
+cult that outlived its altar"; "The two cities tested on 384"; "Both sides held
+that Rome stood on its public worship; 384 changed the god, not the bond".
+The `<Conclusion>` states the verdict in plain words with its grade — what
+held Rome together was a public worship, both the pagan prefect and the
+Christian bishop argued as if it were, and the Christian victory replaced
+the god without freeing the city from worship (strong) — then hands off:
+the next module opens with that worship's new keeper, a Church that claims
+a law above kings (`aquinas-law-and-kingship`).
 
 ## Set pieces and worked examples to recreate
 
@@ -431,8 +488,10 @@ the documents bear out".
    18 §17–21): Symmachus — sacrilege caused the famine; Ambrose — the famine
    was general and this year's harvest is abundant, so the gods were not the
    cause. Show that Ambrose's refutation accepts the premise (harvests show
-   divine favour) to deny the conclusion; Voegelin's "cheap argument". The
-   reader judges whether it is a refutation or a counter-superstition.
+   divine favour) to deny the conclusion; Voegelin's "cheap argument". Say
+   what that makes it: not a refutation of do-ut-des reasoning but the same
+   reasoning pointed the other way — evidence for the module verdict that
+   both sides held the commonwealth to depend on its worship.
 7. **The Vestals' stipends** (Relatio 3 §11–14; Ep. 18 §11–16): seven virgins
    with privileges and public pay vs the Church's unpaid virgins; Symmachus on
    the sanctity of legacies vs Ambrose on the fisc's right. The only part of
@@ -477,7 +536,7 @@ the documents bear out".
   Symmachus as its advocate, as Ambrose himself says (Ep. 17: the Christian
   senators are the majority) — which is the primary evidence — and leave the
   historiography to References.
-- **Register.** The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+- **Register.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Do not moralise in either direction:** the lesson casts neither man as
   hero or villain; the lesson's job is to say what each asked,
   on what grounds, and which theory predicts it. "No some-believe strawmen":
@@ -602,7 +661,18 @@ the documents bear out".
    Maximus; the Frigidus (394). Defend the ranking; the solution shows that
    the 384 exchange decided less than its fame suggests and the battlefield
    more.
-8. **FORWARD (E7)** → `aquinas-law-and-kingship`. Ambrose told an emperor what
+8. *Attack the verdict.* The lesson judges (strong) that both parties to
+   384 held the commonwealth to stand on its public worship. State the
+   strongest objection in its best form — that the outcome was decided by
+   bargaining at a weak court (a boy emperor, a usurper in Gaul, a bishop
+   who was also the court's envoy), so the documents record the arguments
+   each side thought would work, not what anyone believed held Rome
+   together — and say what evidence would be needed to overturn the
+   verdict: a record that the court handled the altar as patronage,
+   indifferent to doctrine (for example, the stipends restored to a
+   Christian claimant, or the altar traded for the usurper's recognition
+   with no word about worship).
+9. **FORWARD (E7)** → `aquinas-law-and-kingship`. Ambrose told an emperor what
    he might not fund and Augustine told him what his power should serve. State
    in one sentence the principle both presuppose — that a ruler is bound by a
    law he did not make and cannot repeal — and then ask what that law *is*

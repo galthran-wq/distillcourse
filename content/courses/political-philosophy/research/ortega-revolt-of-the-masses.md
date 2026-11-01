@@ -52,7 +52,10 @@ goal: Analyze Ortega's diagnosis of the mass-man and his account of why a civili
   place, obligation or gratitude to the past are, sixty years on, the educated
   elites, not the masses. The FORWARD exercise targets Schmitt; Lasch's
   inversion is a forward clause in the closing and may be a second exercise's
-  solution note.
+  solution note. The lesson carries no verdict (REGISTER.md: diagnosis,
+  carried to Schmitt and Weimar); the module question it feeds — can a
+  liberal parliamentary democracy govern and defend itself? — is decided in
+  `article-48-weimar`.
 - **Spine step:** "Liberal Europe breaks: elite theorists show that a minority
   always rules, Mann sets Kultur against Zivilisation, Spengler foretells the
   West's winter, Ortega diagnoses the mass-man, Schmitt names the political as
@@ -320,8 +323,12 @@ without duties, and he is not a social class.
    no bourgeois" — so the class categories are doing work in his own text
    that "mass" cannot do. Ortega's reply (ch. I and XI): the type cuts across
    class and the heir-aristocrat is its purest case; class explains who has
-   power, not why power is used without standards. The lesson leaves the
-   reader to weigh it.
+   power, not why power is used without standards. Say what the reply
+   achieves, as a fact about the argument: it answers the charge that "mass"
+   is a class in disguise (the scientist and the heir are real cases of the
+   type outside the masses), but it concedes the objection's narrower point —
+   for who owns and uses the State, his own text falls back on class terms,
+   so "mass" explains the manner of power, not its distribution.
 
 7. **If not force, what holds a society and who rules it?** Ch. XIV.1 — the
    premise the whole module will fight over. "Rule is the normal exercise of
@@ -370,9 +377,14 @@ without duties, and he is not a social class.
    mass-man's scheme is all rights and no obligations; "youth" has become a
    form of blackmail; "amorality does not exist" — refusal of norms is
    immorality that keeps the empty form. Hands off: this is where the
-   objection from Schmitt is announced and left for the next lesson — a
+   objection from Schmitt is announced and carried to the next lesson — a
    nation defined by a programme and a rule founded on opinion have, on his
-   account, no answer to the man who names it his enemy.
+   account, no answer to the man who names it his enemy. Ortega's book does
+   not answer it: it treats Fascism and Bolshevism as symptoms of the
+   mass-man, not as organised enemies a liberal State must decide how to
+   resist;
+   whether a liberal parliamentary democracy can defend itself is decided on
+   the record in `article-48-weimar`.
 
 Headings as claims: "The crowd has moved to the footlights"; "Hyperdemocracy:
 to be different is indecent"; "The spoilt child of the nineteenth century";
@@ -478,10 +490,7 @@ commonplace"; "A nation is a plebiscite on tomorrow".
 - **Le Bon and Renan are not re-taught either.** Le Bon's crowd is the
   predecessor Ortega does not name — one clause and a Ref to separate the two
   concepts (link 1); Renan's plebiscite is recalled with a Ref (link 8).
-- **Register (exact rule).** The course passes no verdict of its own on any
-  author or idea: no condemning or approving labels in its own voice.
-  Judgement comes only through argument and evidence; a label may appear only
-  inside a quotation, with who applied it and when.
+- **Register (exact rule).** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Scholars live in References only:** Muller (Schumpeter's text may be
   quoted one sentence as a primary voice in an Aside), Lilla, Sombart (unless
   named as Ortega's cited source), Hume may be named — Ortega cites him and he

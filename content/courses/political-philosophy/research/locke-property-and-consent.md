@@ -34,17 +34,22 @@ goal: Analyze Locke's derivation of property from labour and of legitimate gover
   breaks the trust. The First Treatise's demolition of Filmer is reported in one
   section; the Second Treatise is the lesson. Its centre is the derivation and
   the objections Locke himself raises and answers ("it will be said… I answer").
-- **Hands off:** Three problems stay open. (1) Consent: Locke's "tacit consent"
-  reaches anyone who "barely travels freely on the highway"; the reader will feel
-  it proves too much, and Locke's own answer to "no historical instances" (Sects
-  100–112) is thin. This lesson states the weak point in one paragraph and hands
-  it to the next lesson, `hume-against-the-original-contract`, where it is
-  argued at full strength (the sleeping passenger, conquest and usurpation, the
-  promise regress). (2) Property: Locke makes "this is mine" the first natural
-  act; Rousseau makes it the first crime (`rousseau-inequality-and-general-will`,
-  two lessons on). (3) The right of resistance is the thing Burke
-  (`burke-reflections`) will say England never claimed in 1688 and France is
-  about to misuse. The reading of Locke as Hobbes made respectable (link 8) is
+- **Hands off:** This lesson reconstructs; it judges none of the three claims,
+  and names where each is decided. (1) Consent: Locke's "tacit consent" reaches
+  anyone who "barely travels freely on the highway"; the reader will feel it
+  proves too much, and Locke's own answer to "no historical instances" (Sects
+  100–112) is thin — the lesson says so as a fact about the argument (he answers
+  that history is silent about infancy, which explains the silence and does not
+  supply the instances). It is decided in the next lesson,
+  `hume-against-the-original-contract`: consent as the ground of actual
+  government fails, strong (the sleeping passenger, conquest and usurpation, the
+  promise regress), and survives as a hypothetical test. (2) Property: Locke
+  makes "this is mine" the first natural act; Rousseau makes it the first crime;
+  `rousseau-inequality-and-general-will` (two lessons on) judges the empirical
+  part — inequality rises with property, storage and settlement (strong) — and
+  the America passages are judged in `locke-and-mill-on-empire`. (3) The right
+  of resistance is the thing Burke (`burke-reflections`) will say England never
+  claimed in 1688 and France is about to misuse. The reading of Locke as Hobbes made respectable (link 8) is
   argued again in `strauss-natural-right-and-history`; the America passages are
   held for `locke-and-mill-on-empire`; prerogative ("the power of doing public
   good without a rule", link 7) returns as the liberal tradition's own emergency
@@ -309,11 +314,19 @@ king.
    separation of legislative from executive, a right to resist — because he
    adds a law before the sovereign and a property before the state. Whether
    that law is really a law (it has no earthly promulgator and, Locke admits,
-   no sanction but each man's hand) is the open question Strauss presses:
+   no sanction but each man's hand) is the question Strauss presses:
    strip the theology and what remains is Hobbes's right of self-preservation
    plus a theory of acquisition. The lesson states both readings, says which
    sections each rests on (Sects 6, 13, 135 for the law reading; Sects 7, 11,
-   45–50, 123 for the Hobbesian reading), and leaves the reader to weigh.
+   45–50, 123 for the Hobbesian reading), and then says plainly what Locke did
+   and did not answer: to Hobbes's "law without a sword is but words" he has an
+   answer (every man holds the executive power of the law of nature, Sects 7–8,
+   and the defect of that sanction is what government remedies, Sect. 13); to
+   "does the law survive without its theological ground?" he has none in the
+   Treatise, because his argument never drops the ground (Sect. 6, men as God's
+   workmanship) — the objection is not answered, it is not met. Which reading of
+   Locke's intent is right is not decided here; the reading is taken up again in
+   `strauss-natural-right-and-history`.
 
 ## Set pieces and worked examples to recreate
 
@@ -361,10 +374,7 @@ king.
 
 ## Pitfalls / subtleties to flag
 
-- **Register rule.** The course passes no verdict of its own on any author or
-  idea: no condemning or approving labels in its own voice. Judgement comes only
-  through argument and evidence; a label may appear only inside a quotation, with
-  who applied it and when.
+- **Register rule.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Terms to anchor at first mention (L11):** *state of nature* (recall with
   `<Ref>` to Hobbes, one clause); *law of nature* (distinguish from Hobbes's
   "laws of nature" as theorems of peace — Locke's binds as God's law known by
@@ -402,7 +412,9 @@ king.
 - **The religious ground.** Locke's law of nature rests on men being God's
   workmanship (Sect. 6) and on an afterlife for its sanction; the "Hobbes in
   sheep's clothing" reading turns on whether the argument survives without
-  that ground. Present both readings as readings; the course does not decide.
+  that ground. Present both readings as readings; this lesson does not decide
+  between them, but it does say that the second objection (does the law survive
+  without God?) is one Locke does not answer (link 8).
   Strauss's esoteric-writing thesis (ch. V.B pp. 206–209) is NOT to be taught —
   it needs its own apparatus; one sentence in References at most.
 - **Tacit consent is weak and Locke knows it** — he limits it to "the duration

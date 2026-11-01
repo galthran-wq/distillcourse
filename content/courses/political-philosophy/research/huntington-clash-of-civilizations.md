@@ -3,7 +3,7 @@
 status: planned
 module: civilizations
 type: core
-goal: Analyze Huntington's hypothesis that cultural fault lines will replace ideology as the source of conflict, and lay out the main objections to it
+goal: Analyze Huntington's hypothesis that cultural fault lines will replace ideology as the source of conflict, weigh how far he answered the main objections, and check the end-of-history forecast he rejected against the record
 
 ## ARC (L10)
 
@@ -35,10 +35,13 @@ goal: Analyze Huntington's hypothesis that cultural fault lines will replace ide
   "descriptive, not advocacy"), its definition of a civilization, the six reasons,
   the fault lines, the kin-country syndrome, torn countries and "the West versus
   the rest"; then it develops the three main objections as arguments, each at full
-  strength.
-- **Hands off:** Two problems stay open. The hypothesis is a prediction about
-  conflict after 1993, so it can be checked — `testing-the-clash` reproduces one
-  count from the published tests and reads Bosnia for the kin-country syndrome.
+  strength, and says how far Huntington's replies answer them; and it checks the
+  rival he set aside, the end of history, against what followed.
+- **Hands off:** Decided here: the first rival Huntington rejected, the end of
+  history (1989), is checked against the record and its forecast of liberal
+  democracy's spread fails from 2006 (strong). Passed on: Huntington's own
+  hypothesis is a prediction about conflict after 1993, and `testing-the-clash`
+  judges it against the published counts, Bosnia and Russia–Ukraine.
   And the measure: Huntington measures a civilization by power — indices of
   military, economic and institutional control — so `what-measures-greatness` sets
   that measure beside Spengler's duration and Toynbee's ideas-taken-up. A third,
@@ -49,6 +52,42 @@ goal: Analyze Huntington's hypothesis that cultural fault lines will replace ide
 - **Spine step:** "The question widens from the state to the civilization: against
   Spengler's organisms, Toynbee's challenge and response and Huntington's fault lines
   — three measures of greatness and three accounts of decline, tested on the record"
+
+## VERDICT
+
+One claim is judged here, a forecast check (register, module 11, lesson verdict
+**(forecast check)**). Huntington's own hypothesis is judged in `testing-the-clash`,
+not here.
+
+- **Claim judged:** Fukuyama, "The End of History?" (*The National Interest* 16,
+  Summer 1989), the first rival vision Huntington names and rejects (staged
+  `huntington/clash-1993-foreign-affairs.txt` l.146: "the end of history").
+  - **(a) The spread of liberal democracy → failed from 2006, after holding for
+    sixteen years. Grade: strong.** Freedom House records twenty consecutive years
+    of net decline in global freedom, with Not Free countries rising from 45 to 59
+    (*Freedom in the World 2026*). V-Dem puts 74% of the world's population in
+    autocracies and finds democracy "back to 1978 levels for the average global
+    citizen" (*Democracy Report 2026*).
+  - **(b) China "can no longer act as a beacon for illiberal forces around the
+    world" → failed: no liberalization. Grade: strong.**
+  - **(c) Islam: "it is hard to believe that the movement will take on any
+    universal significance."** As a creed with appeal to non-Muslims it did not, so
+    the narrow claim **holds (on balance)**. As a force that kept history moving it
+    did, so the sentence **failed (strong)**.
+  - **(d) No rival ideal displaces liberal democracy "in the long run" → not
+    testable as stated.** It is protected exactly as Spengler's morphology was (Ref
+    `spengler-decline-of-the-west`), and the course credits no open-horizon clause
+    on either side.
+- **Strongest objection:** Fukuyama's claim was about the ideal, not the count of
+  regimes: liberalism "is as yet incomplete in the real or material world", and
+  the ideal "will govern the material world in the long run" (1989), so a decline in
+  the indices does not touch it. Why it does not overturn (a)–(c): the essay also
+  made dated, checkable claims about the material world (China as no longer a
+  beacon, Islam without universal significance, the spread of liberal states), and
+  those are what is scored; the ideal-only reading is clause (d), which is scored
+  as untestable, not as held.
+- **Would be overturned by:** for (a), the indices returning to their 2005 level;
+  for (b), a competitive election in China.
 
 ## Sources to consult
 
@@ -196,6 +235,17 @@ goal: Analyze Huntington's hypothesis that cultural fault lines will replace ide
   Remaking of World Order* (1996) — the book was NOT read by the swarm; the lesson
   teaches the 1993 article and says so in References. The writer states each objection as a position in the
   course's own voice and cites the author in References only.
+- **For the forecast check (the first rival, checked):** Fukuyama, "The End of
+  History?", *The National Interest* 16 (Summer 1989), pp. 3–18 — staged
+  `research/texts/liberal-forecasts/democracy/fukuyama-end-of-history-1989.txt`
+  (two-column OCR; "in the long run" l.100, "beacon for illiberal forces" l.544,
+  "universal significance" l.656). Freedom House, *Freedom in the World 2026* —
+  `…/democracy/freedom-house-fiw-2026.txt` (20th consecutive year l.72, l.172; Not
+  Free count 45 → 59). V-Dem, *Democracy Report 2026* —
+  `…/democracy/vdem-democracy-report-2026.txt` ("back to 1978 levels" l.88; 74% in
+  autocracies l.109). Fukuyama is named in the body only as the author of the
+  forecast being checked (the object of the check, like a thinker whose text is the
+  material); the indices are cited in References.
 - **Strauss–Cropsey:** no chapter. Not applicable.
 
 ## EXPLANATION PLAN (L0)
@@ -339,15 +389,60 @@ hypothesis so that it could be right or wrong? The chain:
    kin-country syndrome was "limited, but growing"; the macro level IS states
    competing, with culture as the new basis of alignment. Where the lesson
    concedes: the hypothesis's own unit is soft at the edges (the "possibly African";
-   torn countries), and softness at the edges is where the fault lines are. Where it
-   holds: the hypothesis predicts, so it can be checked — which is the next lesson.
+   torn countries), and softness at the edges is where the fault lines are.
+   Whether Huntington answered each objection, stated as a fact about the argument:
+   (a) his disclaimer already grants intra-civilizational conflict, so the objection
+   misses the claim as written; it still reaches the claim that civilizations
+   align states, and that is an empirical question the next lesson's counts decide.
+   (b) Self-identification is in his own definition, so the objection is answered in
+   form; whether the civilizational choice is as constrained as reason (5) says is
+   again a question of record (the torn countries; Ukraine). (c) His own three cases
+   are mixed alignments, and his reply ("limited, but growing") is a forecast, not
+   an answer — it stands or falls with the record after 1993. What all three
+   replies share: the hypothesis predicts, so it can be checked — which is the next
+   lesson.
+9. **The weighing — the end of history, the rival Huntington set aside, failed its
+   own forecast (forecast check; 300–500 words of lesson).** Seam: Huntington's
+   opening sentence names "the end of history" first among the visions it rejects
+   (l.146); a forecast from 1989 can be scored, and this lesson scores the rival
+   while the next scores Huntington — one standard for both. Forecast, dated:
+   Fukuyama, summer 1989 — liberal democracy as the final form of government, the
+   ideal that "will govern the material world in the long run"; China "can no
+   longer act as a beacon for illiberal forces around the world"; Islam unlikely to
+   "take on any universal significance". Record: the spread held through 2005;
+   then twenty consecutive years of net decline (Freedom House 2026: Not Free 45 →
+   59); 74% of the world's population in autocracies, democracy "back to 1978
+   levels for the average global citizen" (V-Dem 2026); China's growth with no
+   liberalization; Islam without converts' appeal, but as a political force that kept
+   history moving (one clause; the conflicts themselves are the next lesson's
+   material). The objection at full strength: the essay's claim is about the ideal,
+   not the count, and the ideal is protected "in the long run". The answer: the
+   essay also made dated claims about the material world, and those are scored; the
+   long-run clause is scored as not testable — the same treatment Spengler's
+   morphology received (Ref `spengler-decline-of-the-west`). Verdict, in the
+   course's voice: the spread of liberal democracy failed from 2006 after holding
+   sixteen years (strong); the China forecast failed (strong); on Islam the narrow
+   claim holds (on balance) and the sentence as a whole failed (strong); "in the
+   long run" is not testable. What would reverse (a): the indices back at their
+   2005 level; (b): a competitive election in China.
+   Set-piece line: "Fukuyama wrote in 1989 that China could 'no longer act as a
+   beacon for illiberal forces'; thirty-five years later it has held no competitive
+   election."
+
+**Conclusion (L10c):** In plain words: the end of history, the rival Huntington set
+aside in his first paragraph, failed its own dated forecasts — strongly for the
+spread of liberal democracy after 2005 and for China; its long-run clause cannot be
+scored. Huntington's alternative is now on the table in his own words, with three
+objections he answered only in part, each turning on the record. Hand-off: the next
+lesson holds his hypothesis to the same test — the published counts of conflict
+across and within civilizations, Bosnia, and his own Ukraine corollary.
 
 Headings as claims or questions: "After ideology: what organises conflict?" / "A
 civilization is the broadest identity a person will fight for" / "Six reasons the
 differences will matter" / "The fault lines: a map drawn from 1500" / "Kin-countries
 and torn countries: how states take sides" / "Why 'universal civilization' is a
 Western idea" / "A hypothesis, not a programme" / "Three objections: ignorance,
-identity, states".
+identity, states" / "The end of history failed its own forecast".
 
 ## Set pieces and worked examples to recreate
 
@@ -400,7 +495,8 @@ identity, states".
   and Montenegro, Macedonia; Bosnia's three peoples — Muslim Bosniaks, Orthodox
   Serbs, Catholic Croats); *Nagorno-Karabakh* (Armenian–Azeri war 1988–94);
   *Transylvania*; *Tours 732*; *the Peace of Westphalia* (1648); *the end of history*
-  (Fukuyama's 1989 thesis, one clause — References for the essay); *Confucian* as a
+  (Fukuyama's 1989 thesis, one clause at link 1; developed only in the forecast
+  check, link 9, where Fukuyama is named as the forecast's author); *Confucian* as a
   civilization name (Huntington's label for China and its cultural neighbours — he
   later wrote "Sinic"); *Slavic-Orthodox*; *kin-country* (Greenway's phrase);
   *bandwagoning* and *balancing* (international-relations jargon: joining the strong
@@ -416,16 +512,18 @@ identity, states".
   one Western nation together, and the nation module reads that argument. The book
   may be cited in References for the two ch. 2 points listed under Sources.
 - **Register rule.**
-  The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+  The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **The 1996 book was not read.** The article is the material. Where the book
   changed terms ("Sinic" for "Confucian", Africa promoted to a civilization, the
   "core state" concept), say nothing or one References sentence; do not import the
   book's maps or claims.
 - **"Descriptive, not advocacy":** report it as Huntington's self-description and
-  then show the policy section — the reader judges. Whether the article describes
-  or provokes is a verdict the lesson leaves open; if a critic's characterisation
-  is reported, it is quoted with its author (References) and date, per the register
-  rule.
+  then show the policy section, with the course's one observation (link 7): the
+  policy half assumes the descriptive half. What the author intended is a question
+  about a person, not an argument, and the course passes no judgement on it; if a
+  critic's characterisation is reported, it is quoted with its author (References)
+  and date, per the register rule. The hypothesis itself is judged on its record in
+  `testing-the-clash`.
 - **Civilization vs race:** Huntington's definition is cultural and he says so;
   reason (5)'s "Russians cannot become Estonians" is about culture and language,
   not blood (and *Who Are We?* ch. 2 later separates culture from ancestry
@@ -444,11 +542,13 @@ identity, states".
   Japan as an offshoot); Huntington adds Latin American and "possibly African" and
   splits Confucian from Japanese. Say "adjusted", not "copied".
 - **Objections are developed as arguments, authors in References (L8a).** Said,
-  Sen, Ajami, Walt, Fukuyama, Kepel, Pye, Lind, Palmer, Wallace, Greenway, Horowitz,
+  Sen, Ajami, Walt, Kepel, Pye, Lind, Palmer, Wallace, Greenway, Horowitz,
   Krauthammer, Triandis, Mahbubani — none in the body as authorities. Where
   Huntington quotes them, the quotation is his evidence and may be given as "an
   official said", "a Saudi editor wrote", with the name in References. The one
-  exception: Huntington himself is the author of the material and is named.
+  exceptions: Huntington himself is the author of the material and is named; and
+  Fukuyama is named once, in link 9, as the author of the forecast being checked
+  (the forecast is the object of the check, not an authority for it).
 - **No misconception slot:** the common misreading ("Huntington wanted a clash") is
   addressed by the disclaimer set piece (link 7) as a reading of the text, not as a
   "some believe" strawman.
@@ -544,8 +644,16 @@ identity, states".
    civilization is what counts") and state what a reader in 2015 and in 2023 would
    conclude about the condition — and what Huntington's own disclaimer (groups within
    a civilization "will conflict with and even fight each other") does and does not
-   save. The solution gives both readings and leaves the verdict to the next lesson's
-   count.
+   save. The solution gives both readings and states, with `<Ref>`, the verdict
+   `testing-the-clash` reaches on the corollary (refuted, strong).
+7a. **Attack the verdict:** The lesson scores the end of history as failed on the
+   spread of liberal democracy (strong). State the strongest objection in its best
+   form (Fukuyama's thesis concerned the ideal, not the regime count, and the
+   ideal governs only "in the long run"), then say what evidence would be needed to
+   overturn the verdict. Solution: the indices (Freedom House, V-Dem) back at their
+   2005 level, or — for the China clause — a competitive election there; and it
+   explains why the ideal-only reading is clause (d), scored as not testable rather
+   than as held.
 8. **FORWARD (E7)** → `testing-the-clash`: Using only the article's own definitions
    (l. 152–153, the list, reason 5), write the rule you would use to classify a war
    between two states as "within" or "across" civilizations — and name two states

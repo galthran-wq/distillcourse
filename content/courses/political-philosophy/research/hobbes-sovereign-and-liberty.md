@@ -33,7 +33,9 @@ goal: Analyze the powers Hobbes gives the sovereign, the liberties he leaves the
   right this lesson lists and reject the premise: no one is born free, every man is born a son
   under a father's command, and paternal power is natural, not (as Leviathan XX says) a
   dominion the child consents to. The FORWARD exercise lands on that premise. (ii) The test —
-  does the record of 1642–1660 behave as XXIX says? `english-revolution-as-test`, after Filmer.
+  does the record of 1642–1660 behave as XXIX says? `english-revolution-as-test`, after Filmer,
+  decides it: the diagnosis of 1642 holds (no settled "who decides", then war), and XXIX's claim
+  that a mixed or limited monarchy cannot stand fails on 1660–61 and after 1689 (strong).
   (iii) The liberal objection, which arrives only in the next module and against BOTH Hobbes and
   Filmer: an absolute sovereign is "judge in his own cause" and so still in the state of nature
   with his subjects (`locke-property-and-consent`) — one clause. (iv) Two forward frames, one
@@ -318,7 +320,9 @@ by — and whether the subject who authorised him has anything left.
    Hobbes himself knew the proud man who "knows how to belong to himself" and called justice "a
    Nobleness or Gallantness of courage (rarely found)" (XV) — and did not build on him because
    such men are rare. The lesson concedes that both readings quote Hobbes correctly, states
-   where they divide (whether "peace" is the end or the means), and hands the question forward.
+   where they divide (whether "peace" is the end or the means). Which reading is right is a
+   question of interpretation the module does not need to decide; what it does decide is
+   XXIX's empirical claim, in `english-revolution-as-test`.
    First, and next: a royalist will accept every right in this chapter and refuse its
    foundation — men are not born equal and unbound but born sons, under command
    (`filmer-patriarcha`; one clause, no exposition). Later: the next module's first author will
@@ -393,9 +397,7 @@ stated".
 - **Numbers (L12):** none beyond the chapter numbers and 1651–52; the "twelve" rights and
   "nineteen" laws are the keepers.
 - **Spelling:** 1651 orthography inside quotations; gloss once.
-- **Register:** The course passes no verdict of its own on any author or idea: no condemning or
-  approving labels in its own voice. Judgement comes only through argument and evidence; a label
-  may appear only inside a quotation, with who applied it and when. The two readings in link 7
+- **Register:** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. The two readings in link 7
   are stated as readings; neither is the lesson's verdict.
 - **Dossier thin:** Behemoth (Hobbes's own history of the war) is NOT in the dossier — do not
   cite; De Cive neither; the Strauss–Cropsey chapter (OCR) and Oakeshott's essay are the

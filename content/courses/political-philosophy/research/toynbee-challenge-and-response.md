@@ -3,7 +3,7 @@
 status: planned
 module: civilizations
 type: core
-goal: Analyze Toynbee's theory of how civilizations arise, grow, break down and disintegrate, and evaluate its method of comparison across twenty-one cases
+goal: Analyze Toynbee's theory of how civilizations arise, grow, break down and disintegrate, and judge whether challenge and response holds as a law and whether his case against Gobineau's racial theory holds
 
 ## ARC (L10)
 
@@ -48,7 +48,10 @@ goal: Analyze Toynbee's theory of how civilizations arise, grow, break down and 
   to Toynbee's own cases (Attica, Sparta, Rome), and then asks of the method the same
   question asked of Spengler's: twenty-one cases, "laws" from selected instances, and
   Toynbee's own admission that the attempt is made "at our own peril".
-- **Hands off:** Open problems: (a) Toynbee keeps a unit — "civilization" — and a list
+- **Hands off:** Decided here: challenge and response fails as a law of genesis,
+  because the golden mean lets every failure be recoded (strong); Toynbee's
+  comparative case against Gobineau's racial theory holds against Gobineau's own
+  claim (established). Passed on: (a) Toynbee keeps a unit — "civilization" — and a list
   of twenty-one; `huntington-clash-of-civilizations` takes that list and makes the
   boundaries between its members the battle lines of the future, with the question
   whether a unit built for the history of growth can serve a theory of conflict. (b)
@@ -63,6 +66,49 @@ goal: Analyze Toynbee's theory of how civilizations arise, grow, break down and 
 - **Spine step:** "The question widens from the state to the civilization: against
   Spengler's organisms, Toynbee's challenge and response and Huntington's fault lines
   — three measures of greatness and three accounts of decline, tested on the record"
+
+## VERDICT
+
+Two claims are judged (register, module 11, lesson verdict).
+
+- **(a) Claim:** civilizations arise when a creative minority responds to a
+  challenge of the right severity, and this holds as a law. **Verdict: fails.
+  Grade: strong.** Deciding argument: the golden mean (VIII) makes the law
+  unfalsifiable. A society that met a challenge and produced nothing is recoded as
+  having met a challenge too hard (Greenland) or too easy (Capua); no outcome is
+  left that the law forbids. Toynbee's own sample caveat ("the comparable units of
+  history remain inconveniently few … at our own peril", III.4) and the moving
+  count (20, 21, then 22–23) add to this but do not carry it: the defect is in the
+  mean, not the sample size.
+  - Strongest objection: unlike Spengler's organism, the mechanism names an agent
+    (the creative minority) and a criterion (self-determination), so it does say
+    what a counter-instance would be: a civilization that kept creating and still
+    broke down, or one murdered in full growth. Why it does not overturn the
+    verdict: that test bears on Toynbee's account of breakdown, not on the law of
+    genesis, and the severity of a challenge is measured only by its outcome, so
+    the optimum is located after the fact by the three-term comparison.
+  - Would be overturned by: a measure of a challenge's severity stated in advance
+    of the outcome (in rainfall, soil yield, military pressure), under which the
+    developed civilizations fall in the middle band and the abortive and arrested
+    ones at its edges.
+- **(b) Claim:** Toynbee's case against Gobineau's racial theory of civilization
+  holds. **Verdict: holds. Grade: established.** Deciding evidence: civilizations
+  arose independently among peoples Gobineau's scheme cannot credit (IV.2's tally:
+  about half the civilizations drew on more than one race, and no race made more
+  than a few), and Gobineau pledged that a
+  single such counter-instance makes "the whole theory on which this book rests"
+  false (Essay ch. XVI, `gobineau/s4-ch14-16.txt` l. 1364–1374). The Italy case
+  (XIV) holds the population fixed and lets the outcome vary.
+  - Strongest objection: the tally counts mixed populations, not the creative
+    element within each, and a weaker, probabilistic claim of racial differences in
+    aptitude is untouched by counter-instances. Why it does not overturn the
+    verdict: the verdict is about the claim Gobineau made, by the standard Gobineau
+    set; the probabilistic claim is a different claim.
+  - Reach: Gobineau's claim only. The modern, statistical form of the hereditarian
+    argument is judged in the heredity module (`hereditarian-case-iq-and-nations`
+    and after), not here.
+  - Would be overturned by: nothing in the record of genesis, since Gobineau's
+    claim is universal and the counter-instances stand.
 
 ## Sources to consult
 
@@ -385,8 +431,8 @@ biological fate (Spengler) or a list of accidents? The chain:
    wheel carrying the chariot of religion". Seam to Augustine (Ref
    `augustine-two-cities`): Toynbee's church inherits the universal state's body;
    Augustine's pilgrim city uses Babylon's peace and inherits nothing — one
-   sentence, the reader judges.
-8. **The objection at full strength: the method.** Where it enters: after the whole
+   sentence stating the difference, no more.
+8. **The weighing — as a law of genesis, challenge and response fails.** Where it enters: after the whole
    apparatus is built. From three sides. (a) Spengler's, already answered in link 5
    but restated as a cost: without the organism there is no prediction, and
    Toynbee's own "rhythm of disintegration" (rout–rally–rout in "three-and-a-half
@@ -404,18 +450,40 @@ biological fate (Spengler) or a list of accidents? The chain:
    distinguish a law from a pattern; Toynbee's arguments against race and
    environment are easier to make than his positive law, because a claimed fixed
    correlation falls to one counter-instance while a law needs them all — and, as
-   link 2 conceded, the counter-instance does not reach a probabilistic claim. Where it replies: unlike Spengler's,
-   Toynbee's mechanism names an agent (the minority) and a criterion (self-
-   determination), so it says what a counter-instance would look like — a
+   link 2 conceded, the counter-instance does not reach a probabilistic claim.
+   The decisive step (the verdict, strong): the golden mean makes the law of
+   genesis unfalsifiable. Severity is measured only by outcome — a society that
+   produced nothing met a challenge "too hard" (Greenland) or "too easy" (Capua) —
+   so no case is left that the law forbids, and the three-term comparison locates
+   the optimum after the fact. The strongest reply, at full strength: unlike
+   Spengler's, Toynbee's mechanism names an agent (the minority) and a criterion
+   (self-determination), so it says what a counter-instance would look like — a
    civilization that kept creating and still broke down, or one murdered in full
-   growth; the reader is asked, in Exercise 6, to look for one.
+   growth. The lesson answers it: that test reaches the account of breakdown, not
+   the law of genesis, whose severity scale is still read off the result. What
+   would overturn the verdict: a severity measure fixed in advance (soil yield,
+   rainfall, military pressure) under which developed civilizations fall in the
+   middle band and abortive and arrested ones at its edges. The section closes
+   by setting the two verdicts side by side: Toynbee's negative case against
+   Gobineau holds against Gobineau's own claim by Gobineau's own pledge
+   (established, link 2), and his positive law does not (strong) — a single
+   counter-instance can break a universal claim, while a law needs a test it could
+   fail.
+
+**Conclusion (L10c):** In plain words: challenge and response fails as a law of how
+civilizations arise — strongly, because the golden mean lets every failure be
+recoded as a challenge of the wrong severity; Toynbee's comparative case against
+Gobineau's racial theory holds, established, against Gobineau's claim as he stated
+it, and reaches no further. Hand-off: Toynbee leaves a unit and a list of twenty-one;
+the next lesson takes the list and makes the borders between its members the lines
+along which states will fight.
 
 Headings as claims: "The smallest unit that explains itself is a civilization" / "Why
 race and environment cannot be the cause" / "Genesis is a response to a challenge" /
 "Too little and too much: the golden mean and the arrested civilizations" / "Growth is
 etherialization, led by a creative minority" / "Breakdown is suicide, not murder" /
-"Disintegration: proletariats, the universal state, the universal church" / "Twenty-one
-cases, at our own peril".
+"Disintegration: proletariats, the universal state, the universal church" / "As a law
+of genesis, challenge and response cannot fail, and so fails".
 
 ## Set pieces and worked examples to recreate
 
@@ -514,13 +582,14 @@ cases, at our own peril".
   do not reproduce them in the course's own voice; do not editorialise on them —
   where Toynbee's own argument tells against race theory, that is the point to make.
 - **Register rule.**
-  The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+  The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
   Toynbee's own words for Gobineau ("telling nonsense", "this idol of
   the Teutonic market-place", "amusing account") are such labels: quote them as
-  Toynbee's, 1934, and let the tally and the correlation test carry the argument. The
-  same applies to the course's wording of the key idea "Race and environment
-  refuted": in the body, "Toynbee argues against" / "Toynbee's test", not "refuted"
-  in the course's voice.
+  Toynbee's, 1934, and let the tally and the correlation test carry the argument.
+  The course's own voice may say that Toynbee's case against Gobineau's claim holds
+  (the verdict, established) — a judgement of the argument, reached by Gobineau's
+  pledge — and must state its reach in the same place: Gobineau's claim only, not
+  the modern statistical argument, which the heredity module weighs.
 - **Do not re-teach Gobineau, Chamberlain, Grant or Spengler.** Each has its own
   earlier lesson; recall each with a `<Ref>` and one clause (L0e, L11d). What this
   lesson adds is Toynbee's comparative test of their claims, nothing of their
@@ -652,6 +721,15 @@ cases, at our own peril".
    have to be true for it to stand (that every civilization that broke down did so
    after about the same span — the reader checks Rome, Egypt and China against this
    from the lesson's dates).
+7a. **Attack the verdict:** The lesson judges that challenge and response fails as a
+   law because the golden mean makes it unfalsifiable. State the strongest
+   objection in its best form (the mechanism names an agent and a criterion, so it
+   says what a counter-instance would be), then say what evidence would be needed
+   to overturn the verdict. Solution: a measure of a challenge's severity fixed
+   before the outcome is known (soil yield, rainfall, military pressure) and a
+   sorting of Toynbee's cases under it, with developed civilizations in the middle
+   band and abortive and arrested ones at the edges; and it notes that the
+   objection's test reaches breakdown, not genesis.
 8. **FORWARD (E7)** → `huntington-clash-of-civilizations`: Toynbee's list was built
    to explain growth and breakdown. Take his five living civilizations plus the
    fossils and write down what else one would need to know before using the list to

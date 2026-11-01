@@ -425,26 +425,39 @@ liberal opposition; Cortina their leader).
     a French priest objected in the early 1850s that Donoso had made human nature more depraved than the
     Church's dogma allows (Trent teaches a wounded nature, not a worthless one) — so his
     anthropology is a political choice, not theology. (e) The forecast: Spain and Europe in the
-    1850s did not fall to a "colossal" tyrant; the twentieth century is another matter, and the
-    course does not settle it here. **Reply, from the text:** Donoso never claims dictatorship is
+    1850s did not fall to a "colossal" tyrant; the twentieth century is another matter. This
+    lesson does not judge the forecast; the dilemma is tested on the record of 1793–1804 in the
+    next lesson (`<Ref>` assignats: it fits 1799 and breaks at the next step) and fully on an
+    emergency article in `article-48-weimar`. **Reply, from the text:** Donoso never claims dictatorship is
     good in itself; his argument is a dilemma, and to refuse both dictatorships is, on his premises,
     to choose the dagger by default — the Progressives' "legality" did not prevent the risings of
     1848, the government did; and his dictatorship is the existing, legal government's, "from
     above", not an adventurer's. **Where the lesson concedes:** the argument stands or falls on
     the premise that liberty is no longer available — an empirical claim about 1849 that Donoso
     states and does not prove — and on the question who judges the emergency, which he answers by
-    pointing at whoever holds force. The later use (one paragraph, forward): a German jurist will
+    pointing at whoever holds force. **Say, objection by objection, whether Donoso answered it**
+    (a fact about the argument, not a verdict on the dilemma): (a) the thermometer objection — not
+    answered; his reply that the dictatorship is the legal government's says who holds the
+    instruments, not why they stop being the disease; (b) who judges the emergency — not answered
+    except by pointing at whoever holds force, which is the objection restated; (c) the term — not
+    answered: nothing in the speech limits the dictatorship in time or in what it may change, as
+    the Roman office was limited; (d) the theological objection — not answered in the speech or
+    the Essay, which assert the anthropology rather than defend it against Trent; (e) the forecast
+    — open in 1851, tested later (above). What he does answer is the charge that he loves
+    dictatorship: the argument is a dilemma, and on its premises refusing both horns chooses the
+    dagger. The later use (one paragraph, forward): a German jurist will
     read the speech as the moment counter-revolutionary thought passed "from legitimacy to
     dictatorship" and will call the liberal answer to "Christ or Barabbas?" a motion to adjourn
     or to appoint a commission of investigation (`<Ref>` schmitt-political-theology); the
     Weimar Republic's emergency article is the case that tests the argument (`<Ref>`
-    article-48-weimar). The course states these as forward questions, not verdicts.
+    article-48-weimar). The course states these as forward questions here; they are decided in
+    those lessons.
 11. **Close.** The reader can now reconstruct the speech's three proofs (rational, historical,
     divine), the thermometer law and the final dilemma, and the Essay's two arguments (politics is
     theology; discussion cannot find truth), and say on which premises each rests. Open problem
     for the next lesson: three forecasts made against the Revolution — Burke's general, Maistre's
-    Providence, Donoso's two dictatorships — can be checked against the record of 1790–1804
-    (`<Ref>` assignats).
+    Providence, Donoso's two dictatorships — are checked against the record of 1790–1804 and
+    judged there (`<Ref>` assignats).
 
 Headings as claims (suggested): "Every legal order hides a dictatorship"; "Concentrated attack,
 concentrated defence"; "Revolutions are diseases of rich and free peoples"; "Two thermometers";
@@ -480,9 +493,7 @@ theological"; "The class that distinguishes"; "The cure and the disease".
 
 ## Pitfalls / subtleties to flag
 
-- **Register rule.** The course passes no verdict of its own on any author or idea: no
-  condemning or approving labels in its own voice. Judgement comes only through argument and
-  evidence; a label may appear only inside a quotation, with who applied it and when.
+- **Register rule.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Terms to anchor (L11), at most three per section:** 1848 (see opening); *Cortes*, *Congress of
   Deputies*; *Moderados* (Moderates) and *Progresistas* (Progressives) — Spain's two liberal
   parties of the 1840s, the first in power under General Narváez; *Narváez* (one clause);

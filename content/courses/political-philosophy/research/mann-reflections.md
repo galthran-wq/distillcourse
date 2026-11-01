@@ -46,13 +46,17 @@ goal: Analyze Mann's wartime case that German Kultur and Western Zivilisation ar
   published the same year, takes the same two words and does exactly that —
   Civilization as the late stage of every Culture — and so turns an ethical
   antithesis into a forecast. Further on: Mann's typology is of intellectuals
-  (the Literat, the Bürger, the Philister) and leaves open what has happened to
+  (the Literat, the Bürger, the Philister) and does not treat
   the CROWD that democracy has brought on stage; `ortega-revolt-of-the-masses`
   takes that up, a liberal diagnosing the mass-man as a type of person, not a
   class. Mann's "democracy = politicisation" is also the first of three
   definitions of the political in this module; Schmitt's
   (`schmitt-concept-of-the-political`) will say the political is not a tone of
-  voice but a grouping into friend and enemy.
+  voice but a grouping into friend and enemy. The lesson carries no verdict
+  (REGISTER.md: reconstruction; the author's own reversal is reported). The
+  one empirical use of Mann's unpolitical Bürger — as an explanation of the
+  voters who chose the presidential regime — is tested only as a claim in
+  `article-48-weimar`, where the module question is decided.
 - **Spine step:** "Liberal Europe breaks: elite theorists show that a minority
   always rules, Mann sets Kultur against Zivilisation, Spengler foretells the
   West's winter, Ortega diagnoses the mass-man, Schmitt names the political as
@@ -360,7 +364,10 @@ author's objection".
    "in the name of the Pope", Alsace "of the Reformation", Strasbourg "of
    absolute monarchy", the Rhineland "of freedom" — Mann's evidence that
    "principles" are the cover of a power politics; quote the four pairs and
-   let the reader judge whether this answers Rolland or dodges him.
+   say what they do to Rolland's charge: they show that France's principles
+   covered conquests, which is a reply in kind (the other side does it too),
+   and they leave his charge — that a writer above the fray while his own
+   state wages aggressive war is complicit — unanswered on its own terms.
 8. **The birth-rate argument** (Ironie 606–608): German births per thousand
    fell from about 41 in 1876 to about 27 by 1913, and Mann reads
    Buddenbrooks' decline as the same curve. A keeper number only if the
@@ -392,10 +399,7 @@ author's objection".
   novelist, author of Der Untertan); Schopenhauer, Wagner (link 6, one clause
   each); Hallström (link 2, Swedish critic). Keep to three new terms per
   section (L11c); link 4 carries three and must be split into sub-headings.
-- **Register (exact rule).** The course passes no verdict of its own on any
-  author or idea: no condemning or approving labels in its own voice.
-  Judgement comes only through argument and evidence; a label may appear only
-  inside a quotation, with who applied it and when.
+- **Register (exact rule).** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Do not translate the book into a nationalist tract or into an apology.**
   Mann's "Ja-und-doch-Nein" is displayed, not solved (Politik 246–259); the
   lesson shows it, in the dry register, and does not moralise in either

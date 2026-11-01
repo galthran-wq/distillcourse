@@ -32,9 +32,12 @@ goal: Analyze Hume's argument that no actual government rests on consent, that a
   and time and custom turn what began in force into what men take as right. The lesson's centre
   is the replacement of a historical-juridical question (who agreed?) by an
   explanatory-utilitarian one (why do the many obey the few, and why should they?).
-- **Hands off:** Three things. (1) The normative gap Hume leaves open — he explains why men obey
-  and appeals to "general opinion" as the standard in morals, but gives no test for when opinion
-  is wrong — is the problem Rousseau answers the opposite way in the next lesson
+- **Hands off:** The lesson decides that consent is not the ground of any actual government
+  (strong: the record, the ship, the promise regress). Three things pass on. (1) What survives of
+  consent is a hypothetical test, a standard to measure a government against; that use is
+  carried to `rawls-theory-of-justice`. The normative gap Hume does leave — he explains why men
+  obey and appeals to "general opinion" as the standard in morals, but gives no test for when
+  opinion is wrong — is the problem Rousseau answers the opposite way in the next lesson
   (`rousseau-inequality-and-general-will`): keep consent and make it real, by assembly. (2) The
   conservative inheritance: "time mellows into legality governments violent in their
   commencement" is Burke's sentence (`burke-reflections`), and the dread of a "total dissolution
@@ -46,6 +49,35 @@ goal: Analyze Hume's argument that no actual government rests on consent, that a
   general will; when France tries to frame a government from principles, Burke, Maistre and
   Donoso Cortés answer that no generation knows enough, Herder and Fichte put the people before
   the state, and Hegel absorbs both sides into the rational state"
+
+## VERDICT
+
+- **Claim judged:** legitimate government rests on the consent of the governed, given at the
+  origin (the original contract) or tacitly, by residence.
+- **Verdict:** the claim fails as an account of any actual government. Grade: **strong**.
+- **What decides it:** (1) As history the original contract fails: the governments Hume surveys
+  began in conquest and usurpation (OC 15–19: Athens, the Achaeans, the two Henrys, "conquest
+  or usurpation, that is, in plain terms, force"; and 1688 itself, where "the majority of seven
+  hundred" determined the change "for near ten millions").
+  (2) Tacit consent by residence fails: the poor peasant who knows no foreign language and lives
+  from day to day is as free to leave as the passenger carried aboard asleep is free to leave the
+  ship (OC 24). (3) Hume's further point holds: allegiance and promise-keeping rest on the same
+  ground, the general interest of society, so deriving the duty to obey from a promise "gains
+  nothing" (OC 36–37). What survives is consent as a hypothetical test, a standard a government
+  could be measured against, not a fact about how any government began. That use is carried to
+  `rawls-theory-of-justice`.
+- **Strongest objection:** Hume answers a question Locke did not ask. Locke asked when obedience
+  is owed, not how governments began; consent is a standard of legitimacy, and Hume himself calls
+  it "the best and most sacred" foundation, so he shows only that most governments fall short of
+  it. **Why it does not overturn the verdict:** the verdict judges consent as the ground of
+  existing governments, and on that the objection concedes Hume's case. A standard that nearly
+  every actual government fails cannot be what makes any of them legitimate; and the ground
+  Locke needs to make consent bind (the general interest) grounds obedience without it. The
+  objection is right that Hume leaves the normative question (when is opinion wrong?) without a
+  test; the lesson says so.
+- **What would overturn it:** a body of states founded and kept by consent that individuals
+  actually gave. Ratification of the American constitution in 1787–88 is the nearest case, and it
+  bound non-voters and later generations who gave none.
 
 ## Sources to consult
 
@@ -337,7 +369,10 @@ Define Whig, Tory and Jacobite here, once; `burke-reflections` recalls them with
    wishes them to fail — but obedience "ought chiefly to be inculcated", and a preacher who
    studies the exceptions is "preposterous". This is where Hume and Locke converge on the
    practical question (both permit resistance in extremity) and diverge on what to teach.
-9. **What does this leave of Locke's case?** Hume's own closing tests (OC 46–48): in morals
+9. **THE WEIGHING. Heading as the verdict: "No actual government rests on consent" (or "Consent
+   founded none of the governments Hume surveys").** This step sets the claim against its
+   strongest objection and the evidence and reaches the verdict of the `## VERDICT` section above
+   (strong). Hume's own closing tests (OC 46–48): in morals
    "there is really no other standard" than general opinion, so a theory that issues in
    "paradoxes, repugnant to the common sentiments of mankind" is refuted — and Locke's two
    paradoxes are named (absolute monarchy no civil government at all, Sect. 90; no tax without
@@ -363,21 +398,30 @@ Define Whig, Tory and Jacobite here, once; `burke-reflections` recalls them with
    reform by degrees) are close to Locke's own (Sects 223–230: people are slow to stir), so the
    quarrel is over what the doctrine teaches, not over what men may do. The reading that Hume
    attacks Locke from inside Locke's own aim — an order that works with men's ordinary passions —
-   is stated as the course's own (Strauss–Cropsey in References).
+   is stated as the course's own (Strauss–Cropsey in References). **The verdict, stated in the
+   course's voice:** as history the original contract fails, and tacit consent by residence
+   fails; Hume's point that allegiance needs no promise to rest on holds; what survives is
+   consent as a hypothetical test. Strong. Name the test that would overturn it: a body of states
+   founded and kept by consent individuals actually gave — and say why the nearest case,
+   ratification in 1787–88, is not one (it bound non-voters and later generations).
 10. **Where the argument goes.** One paragraph, three hand-offs: the next lesson takes the
     opposite way out — keep consent and make it actual, by an assembled people
     (`<Ref>` rousseau-inequality-and-general-will); Burke will say that "prescription … mellows
     into legality governments that were violent in their commencement" and forecast the general
     Hume's "wise man" wished for (`<Ref>` burke-reflections); Madison will write that "all
     governments rest on opinion" (`<Ref>` federalist-one-people-and-the-extended-republic). In
-    the `<Conclusion>`: the reader can now state the opinion theory, rebuild the four arguments
-    against the original contract (record, tacit consent, generations, the promise regress), and
-    say what Hume concedes to consent.
+    the `<Conclusion>`: first the verdict in plain words with its grade — no actual government
+    rests on consent, as origin or by residence, and this is strong; consent survives only as a
+    test a government could be measured against, which is what Rawls will make of it (`<Ref>`
+    rawls-theory-of-justice). Then the reader can state the opinion theory, rebuild the four
+    arguments against the original contract (record, tacit consent, generations, the promise
+    regress), and say what Hume concedes to consent. Then the hand-off to Rousseau.
 
 Headings as claims (suggested): "Force is always on the side of the governed"; "Interest, right
 to power, right to property"; "Both parties are right, not in the sense they intend"; "The
 record shows conquest, not compact"; "A man carried aboard asleep"; "Why keep promises? The same
-reason we obey"; "Time turns force into title"; "What Hume leaves standing".
+reason we obey"; "Time turns force into title"; "No actual government rests on consent" (the
+weighing, step 9).
 
 ## Set pieces and worked examples to recreate
 
@@ -409,9 +453,7 @@ reason we obey"; "Time turns force into title"; "What Hume leaves standing".
 
 ## Pitfalls / subtleties to flag
 
-- **Register rule.** The course passes no verdict of its own on any author or idea: no
-  condemning or approving labels in its own voice. Judgement comes only through argument and
-  evidence; a label may appear only inside a quotation, with who applied it and when.
+- **Register rule.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Terms to anchor (L11), at most three per section:** Whig, Tory, Jacobite (once, at the
   opening anchor — `burke-reflections` will `<Ref>` back); *soldan*, *mamelukes*,
   *praetorians* (FP 1); *Harrington* (James Harrington, whose Oceana, 1656, made the balance of
@@ -552,6 +594,16 @@ reason we obey"; "Time turns force into title"; "What Hume leaves standing".
    Hume's argument says will follow, and in what order. The solution says in one sentence that
    a Whig member of Parliament makes exactly this forecast about France in 1790 — first
    disorder, then a general — with the `<Ref>`.
+9. **Attack the verdict.** The lesson judged that no actual government rests on consent
+   (strong). State the strongest objection in its best form — consent is a standard of
+   legitimacy, not a history, and Hume concedes it is "the best and most sacred" foundation —
+   and then say exactly what evidence would overturn the verdict. The model answer: the
+   objection changes the question rather than answering it; to overturn the verdict one would
+   need states founded and kept by consent individuals actually gave, including those born
+   later; the reader tests the American ratification of 1787–88 against that requirement and
+   says why it falls short (non-voters, later generations), and what a case that met it would
+   have to look like (e.g. a polity in which each adult affirms membership, with a real option to
+   refuse at no ruinous cost).
 
 ## Nietzsche cross-course links
 

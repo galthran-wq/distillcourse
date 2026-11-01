@@ -36,7 +36,11 @@ goal: Apply the module's theories of the crowd, race and the nation to the Dreyf
   organized mass politics of the French right; the question who really decides — the
   organized minority — is `mosca-ruling-class`'s. (iii) Maurras's road from the Henry
   forgery to Vichy and his 1945 conviction is `the-right-after-1945`'s. (iv) Ortega's mass
-  man (`ortega-revolt-of-the-masses`) re-reads the crowd forty years on.
+  man (`ortega-revolt-of-the-masses`) re-reads the crowd forty years on. This lesson
+  decides the module's question (see `## VERDICT`): the crowd, the race and the nation as
+  inheritance explain the passions of mass politics but not its outcome (strong). What it
+  leaves open, with what would settle it, is the nationalists' question of the price — the
+  army after the *fiches* — which belongs to the record of 1914, outside this module.
 - **Spine step:** "The late nineteenth century looks beneath institutions for what moves
   peoples: the crowd (Taine, Le Bon), the race (Gobineau, Chamberlain, Grant), the nation as
   will or as inheritance (Renan, Barrès, Maurras) — and the Dreyfus Affair puts them to the
@@ -70,6 +74,48 @@ goal: Apply the module's theories of the crowd, race and the nation to the Dreyf
     rhetoric of the Affair better than they predict its course; (e) the racial inference
     ("capable of treason by his race") was tested by the case and failed as an inference:
     the author of the bordereau was another officer, not a Jew.
+
+## VERDICT
+
+Module verdict for `crowd-race-nation`, recorded in `research/verdicts/REGISTER.md`, module 6.
+
+- **Claim judged (the module question):** does the crowd, the race or the will of its
+  members explain what a nation is and how mass politics works — tested on the Affair:
+  which theory predicts who decided the case, by what means, on what grounds.
+- **Verdict:** the module's theories **explain the passions of mass politics but not its
+  outcome.** Grade: **strong**.
+
+**What decides it**, theory by theory:
+- *Race* fails outright. Barrès's inference, "That Dreyfus is capable of treason, I conclude
+  from his race" (§22b l.3236), pointed to Dreyfus; the bordereau was Esterhazy's, a French
+  officer of Christian family.
+- *Crowd* explains the noise — the one-word cry "Trahison!", the prestige of the uniform,
+  Barrès's own deference to "the men whom society has designated as competent" — but not
+  the decision. The anti-Dreyfusard mass was larger and louder for years, and it lost.
+  Documents decided the case, with officers inside the closed institutions (Picquart in
+  1896, Cuignet in August 1898), the Cour de cassation and a parliamentary republic. Le
+  Bon's own better line is borne out: the caste — the General Staff — held its verdict for
+  twelve years and yielded only to courts ("crowds are open to conviction; castes never
+  are").
+- *Integral nationalism* is refuted by its own criterion: judged by consequences for the
+  nation, Henry's forgery, once found, did the army more harm than any revision.
+- *Renan:* the outcome fits his civic nation. The Dreyfus family had opted for France, and
+  France restored him by court (12 July 1906) and statute. No plebiscite was held, so the
+  case supports his principle only, not his procedure.
+
+**Strongest objection to the verdict.** The nationalists' reply about the price: the
+*affaire des fiches* (1904) sorted the officer corps by religion and opinion, so justice for
+one man cost the army. It does not overturn the verdict, which is about what decided the
+case, not about whether the decision was costly. **The price question is open.** What would
+settle it: the French command's performance in August–September 1914, traced to officers
+promoted or blocked under the *fiches*.
+
+**What would overturn the verdict.** Evidence that the street or the leagues, not the
+documents and the courts, moved the decisive steps — e.g. that the annulment of 1899 or the
+judgment of 1906 followed a shift in crowd opinion and would not have come without it.
+Sources: Barrès, *Scènes et doctrines* (dossier); the Rennes verdict (§24); the 1906 judgment;
+a standard history for the family's option for France, the elections of 1902 and 1906 and
+the *affaire des fiches* [UNVERIFIED — bind before use].
 
 ## Sources to consult
 
@@ -188,6 +234,13 @@ goal: Apply the module's theories of the crowd, race and the nation to the Dreyf
   - The bordereau: original in the Archives nationales (Paris); facsimiles reproduced in
     the press from 1896 and on Wikimedia Commons (public domain). Facsimile for a figure, not
     for transcription.
+  - **Added for the module verdict (REGISTER.md module 6):** a standard history of the
+    Affair (e.g. J.-D. Bredin, *L'Affaire*, 1983; V. Duclert) for three facts the verdict
+    uses: the Dreyfus family's option for French nationality after 1871, the legislative
+    elections of 1902 and 1906, and the *affaire des fiches* (1904) [UNVERIFIED — none
+    staged; bind each fact to a page before it is written]. For the open price question,
+    a history of the French command in August–September 1914 that traces generals'
+    careers (not staged; named only as what would settle it).
   - Cour de cassation, chambres réunies, judgment of 12 July 1906 annulling the Rennes
     verdict without retrial — text in the Journal officiel and in collected editions (French
     Wikisource; Gallica). Quote only its dispositive sentence, verified.
@@ -308,8 +361,10 @@ of the option against a standard history before stating it; it is load-bearing f
    and 1906 returned majorities that backed the revision and its sequel — VERIFY the
    characterisation of those elections before using it; if used, say "the nation's vote",
    not "the nation chose", and note that a general election is not a referendum on one
-   question. Neither theory is simply borne out: Renan's plebiscite never voted on
-   Dreyfus; Barrès's determinism lost in court and at the polls.
+   question. The finding (REGISTER.md): the outcome fits Renan's civic nation — a family
+   that opted for France was restored by France's court and statute — but supports his
+   principle only, not his procedure, since no plebiscite voted on Dreyfus; Barrès's
+   determinism lost in court and at the polls.
 7. **Politics first, tested.** `politique-d-abord` and `integral-nationalism` (Ref): if
    every question is decided by the nation's interest, a forged document that protects the
    army serves the nation. That is what Maurras argued of Henry's forgery in September 1898
@@ -320,7 +375,8 @@ of the option against a standard history before stating it; it is load-bearing f
    against the act it was used to defend. Then the fact without adjectives: the
    Action française was founded in these months (its declaration, 15 November 1899, in
    Barrès §19b), and Maurras's later career (Ref forward `the-right-after-1945`).
-8. **Where the record departs from every theory (the L16 section).** The five departures
+8. **Where the record departs from every theory — the weighing (the L16 section).**
+   Heading as the verdict: "The theories explain the passions, not the outcome". The five departures
    of the APPLICATION spec, each with its fact: (a) the truth came from inside the closed
    institutions — Picquart in 1896, and in August 1898 the officer (Captain Cuignet) who,
    checking the file for the anti-revision minister Cavaignac, found Henry's forgery; (b)
@@ -339,14 +395,27 @@ of the option against a standard history before stating it; it is load-bearing f
    religion and politics, reported to the war ministry by Freemasons) — "shocked even
    Dreyfusards" (survey, References), and France entered 1914 with an army whose officer
    corps had been sorted by opinion; the nationalists said the Republic had chosen justice
-   to one man at the price of the army. State it; date it; say what evidence would decide
-   whether the price was paid in 1914 (the record of 1914 is outside this module); do not
-   settle it.
+   to one man at the price of the army. State it; date it; then weigh it against the
+   verdict: it does not touch what decided the case, only what the decision cost, so the
+   verdict stands (**strong**). The price question itself is **open** — a finding, stated
+   with what would settle it: the French command's performance in August–September 1914,
+   traced to officers promoted or blocked under the *fiches* (outside this module).
+
+**Conclusion.** State the module verdict in plain words with its grade: tested on the
+Affair, the module's theories explain the passions of mass politics but not its outcome
+(**strong**). The racial inference named the wrong man; the crowd was loud and did not
+decide; integral nationalism's own criterion condemns the forgery it defended; Renan's
+civic nation fits the outcome in principle, though no plebiscite was held. Documents,
+officers inside the closed institutions, courts and a parliamentary republic decided. Then
+the one thing left open and what would settle it (the *fiches* and the command of 1914).
+Hand-off: the opposition the Affair made — the intellectual against the nation — crosses
+the Rhine in 1914 (`mann-reflections`).
 
 Headings as claims (suggested): "Twelve years, four verdicts"; "The nation is innocent: the
 case for the verdict"; "A secret document and a public letter"; "The crowd was loud and did
 not decide"; "Jacobins on both sides; a race that named the wrong man"; "An Alsatian who
-chose France"; "A forgery for the nation"; "What decided the Affair".
+chose France"; "A forgery for the nation"; "The theories explain the passions, not the
+outcome".
 
 ## Set pieces and worked examples to recreate
 
@@ -412,15 +481,13 @@ chose France"; "A forgery for the nation"; "What decided the Affair".
   affaire des fiches (link 8). Drumont and La Libre Parole (link 5, one clause).
 - **The antisemitism is the record, not decoration:** Barrès's racial sentences, the
   degradation crowd, Maurras's "four states" are quoted as evidence, dated, sourced, at the
-  length the argument needs and no longer. The course passes no verdict of its own on any
-  author or idea: no condemning or approving labels in its own voice. Judgement comes only
-  through argument and evidence; a label may appear only inside a quotation, with who
-  applied it and when. The test of the racial inference (link 5) is an evidential test,
+  length the argument needs and no longer. The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. The test of the racial inference (link 5) is an evidential test,
   stated as such; the lesson does not add a moral verdict to it.
 - **Balance:** the nationalist case in link 2 is stated at full strength (institutional
   authority; a verdict binds; an army cannot be retried in the press) before it is tested;
-  the Dreyfusard side's own excesses (the fiches affair) are stated in link 8. Neither camp
-  is the course's.
+  the Dreyfusard side's own excesses (the fiches affair) are stated in link 8. The course
+  takes no camp's side as a camp and labels no one; it judges the theories against the
+  record and states the module verdict (strong), with the price question open.
 - **Real misreading (L13), one slot:** "Dreyfus was cleared at Rennes" or "the Affair ended
   with the pardon" — Rennes convicted him a second time; the pardon left the conviction
   standing (Dreyfus accepted it to survive and kept seeking rehabilitation); only the 1906
@@ -515,7 +582,15 @@ chose France"; "A forgery for the nation"; "What decided the Affair".
    Affair bears out Le Bon best." Argue for or against in one paragraph, citing at least
    two facts from the record and one passage from Barrès, and naming the departure (from
    the APPLICATION spec) that your argument must answer.
-7. **FORWARD (E7) → `mann-reflections`:** the Affair set "the intellectuals" — writers who
+7. **Attack the verdict:** the lesson concludes that the module's theories explain the
+   Affair's passions but not its outcome (strong). State the strongest objection in its
+   best form — the nationalists' price argument, that the revision bought justice for one
+   man with an army sorted by opinion (the *fiches*, 1904) — and say first why it does not
+   touch the verdict as stated, then what evidence would be needed to overturn the verdict
+   itself (that crowd opinion, not documents and courts, moved the annulment of 1899 or the
+   judgment of 1906) and what evidence would settle the open price question (the command
+   of 1914, traced to *fiches* promotions).
+8. **FORWARD (E7) → `mann-reflections`:** the Affair set "the intellectuals" — writers who
    judged the state by universal principles — against "the nation". Predict how a German
    conservative writer in 1915, whose brother had praised Zola, would place Germany's war in
    this opposition, and which side he would take. The solution states in one sentence, with

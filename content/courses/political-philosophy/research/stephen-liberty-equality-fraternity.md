@@ -50,6 +50,44 @@ goal: Analyze Stephen's argument that coercion, legal and moral, is the normal c
 - **Spine step:** "Democracy arrives as a fact and is judged: Tocqueville foresees soft despotism,
   Carlyle demands heroes, Mill defends liberty and Stephen answers him, Marx predicts class war,
   Maine and Lecky call popular government fragile — and the British franchise tests who was right"
+- **Decides (for itself and for `mill-liberty-and-its-limits`):** the question the Mill lesson
+  hands on. Mill's line cannot apply itself (**on balance**); Stephen does not refute Mill's case
+  for free discussion (**strong**). What passes on: whether popular government can last
+  (`maine-and-lecky-on-popular-government`, decided for Britain in `british-franchise`).
+
+## VERDICT (lesson verdict, from research/verdicts/REGISTER.md; also settles what `mill-liberty-and-its-limits` leaves open)
+
+**Claims judged.** (a) Mill's harm principle as "one very simple principle" that applies itself —
+Stephen says it cannot. (b) Stephen's attack on Mill's case for free discussion.
+
+**Verdict (a): Stephen shows the principle cannot apply itself.** Grade: **on balance**. Mill does
+state a criterion: penalties for self-regarding faults are legitimate only "in so far as they are
+the natural, and, as it were, the spontaneous consequences of the faults themselves, not because
+they are purposely inflicted on him for the sake of punishment" (*On Liberty* ch. IV, staged
+`research/texts/mill/on-liberty-body.txt` ll. 2822–2826). But that line runs through the motive of
+the person who avoids or warns, which no one can observe; so the principle needs a judgment it
+cannot itself supply. There is no contradiction between *On Liberty* and *Utilitarianism* ch. V,
+as Stephen claims: Mill classes self-regarding faults as "not properly immoralities" (ll.
+2857–2859), so the definition of "wrong" as what opinion may punish does not reach them.
+
+**Verdict (b): Stephen does not refute Mill's case for free discussion.** Grade: **strong**. His
+method's first question (is the object good?) needs someone entitled to decide which objects are
+good for others, and his answer, "the wise minority", is the premise in dispute. His libel case
+concerns a particular fact decided under rules both parties accept, not the truth of a creed. His
+own limits on the criminal law (the "roughest engine"; the four limits on moral legislation)
+concede most of Mill's practice, as Stephen himself says.
+
+**Strongest objection.** To (a): a boundary can be vague and still be followed — Morley's heat and
+motion — and courts apply motive tests every day (malice, intent). This does not overturn the
+verdict, because a court's motive test is applied by a court, after the fact, under rules of
+evidence; Mill's line must be applied by every neighbour who avoids or warns, with no judge, which
+is Stephen's point. It is why the grade is on balance and not strong. To (b): Stephen's claim that
+men hold opinions by temperament, not argument, is true of most men; but Mill's case rests on the
+entitlement to silence, not on how many men reason, and Stephen supplies no non-question-begging
+holder of that entitlement.
+
+**What would overturn it.** For (a), a way of applying Mill's line that does not depend on
+unobservable motive. For (b), a non-question-begging account of who the "wise minority" are.
 
 ## Sources to consult
 
@@ -198,7 +236,11 @@ goal: Analyze Stephen's argument that coercion, legal and moral, is the normal c
   sense… man as a progressive being"); ch. II ll.556–714 (infallibility; "a standing invitation to
   the whole world to prove them unfounded"); ch. IV ll.2791–2901 (natural penalties vs punishment:
   "we have a right… to act upon our unfavourable opinion of any one, not to the oppression of his
-  individuality, but in the exercise of ours"), ll.2979–2993 ("definite damage, or a definite risk
+  individuality, but in the exercise of ours"); ll.2822–2826 (the criterion: penalties legitimate
+  only as "the natural, and, as it were, the spontaneous consequences of the faults themselves,
+  not because they are purposely inflicted on him for the sake of punishment") and ll.2857–2859
+  (self-regarding faults "are not properly immoralities" — the reply to Stephen's Utilitarianism
+  ch. V point); both load-bearing for the verdict; ll.2979–2993 ("definite damage, or a definite risk
   of damage"), ll.3061–3065 (the thief and owner asymmetry). Utilitarianism and The Subjection of
   Women are NOT in the dossier; Stephen quotes both (Utilitarianism ch. V at LEF l.5318; Mill's
   four propositions on women at LEF ch. V p. 208) — quote Mill through those quotations and say so
@@ -371,24 +413,41 @@ utility "in the largest sense").
    defines "wrong" as what a person "ought to be punished in some way or other for… if not by law,
    by the opinion of his fellow-creatures" — so Mill's ethics licenses the coercion by opinion his
    Liberty forbids.
-   **Where the lesson stands (judgment, not score):** Stephen holds where he shows that opinion
-   coerces, that Mill gives no criterion for when natural penalties become tyranny, and that
-   Mill's two texts pull against each other. Mill holds where Stephen's method needs an authority
-   to decide which objects are good, because the answer Stephen gives — the wise minority — is the
-   premise in dispute, and Stephen's own limits on the criminal law concede much of Mill's practice
-   (Stephen says he opposes Mill's theory more than his practice). Leave the reader with the
-   question each side must answer: who decides what is good for whom, and by what right.
-10. **Close (Conclusion).** The reader can now reconstruct the case that coercion by opinion is how
-    societies form and change, apply Stephen's three questions to a case, and state where Mill's
-    reply holds. Open: Stephen's "Nothing" — he accepts that power is passing to universal
-    suffrage and refuses to call it progress; whether popular government can last is the next
-    critics' question (Ref `maine-and-lecky-on-popular-government`), and the Reform Acts the test
-    (`british-franchise`).
+10. **The weighing — Mill's line cannot apply itself, but Stephen does not refute free
+    discussion.** Set the two claims against the strongest objection to each and reach the
+    verdict. (a) Mill does state a criterion, and the lesson quotes it (ch. IV, staged
+    ll. 2822–2826): natural penalties are legitimate only as "the natural, and, as it were, the
+    spontaneous consequences of the faults themselves, not because they are purposely inflicted on
+    him for the sake of punishment". The line runs through the motive of the one who avoids or
+    warns — which no one can observe; so Stephen is right that the principle cannot apply itself.
+    Objection at full strength (Morley: a vague line can still be followed; courts try motive
+    every day); answer: a court applies a motive test after the fact under rules of evidence,
+    while Mill's line must be applied by every neighbour with no judge. Verdict: **on balance**.
+    Stephen's "best internal point" fails: Mill classes self-regarding faults as "not properly
+    immoralities" (ll. 2857–2859), so *Utilitarianism* ch. V's definition of "wrong" does not reach
+    them, and the two texts do not contradict each other. (b) Stephen's method needs someone
+    entitled to decide which objects are good; his answer — the wise minority — is the premise in
+    dispute; the libel case concerns a fact decided under agreed rules, not the truth of a creed;
+    his own limits on the criminal law concede most of Mill's practice (he says he opposes Mill's
+    theory more than his practice). Verdict: Stephen does not refute Mill's case for free
+    discussion, **strong**. State what would overturn each: a way of applying Mill's line that
+    does not depend on unobservable motive; a non-question-begging account of who the wise
+    minority are.
+11. **Close (Conclusion).** States the verdict in plain words with its grades: Stephen shows that
+    Mill's harm principle cannot apply itself, because its line runs through a motive no one can
+    observe (**on balance**); he does not refute Mill's case for free discussion, because his own
+    method needs the wise minority his argument assumes (**strong**). The reader can now
+    reconstruct the case that coercion by opinion is how societies form and change, apply
+    Stephen's three questions to a case, and say which of Mill's claims survive it. Hand-off:
+    Stephen's "Nothing" — he accepts that power is passing to universal suffrage and refuses to
+    call it progress; whether popular government can last is the next critics' question (Ref
+    `maine-and-lecky-on-popular-government`), and the Reform Acts the test (`british-franchise`).
 
 Headings as claims (suggested): "The principle governs opinion, not only law"; "Coercion is how
 societies change"; "Discussion cannot do coercion's work"; "Suppression need not claim
 infallibility"; "Object, means, price"; "Power precedes liberty"; "Equality is a big name for a
-small thing"; "Love of humanity cannot be a creed"; "Mill's reply and Stephen's answer".
+small thing"; "Love of humanity cannot be a creed"; "Mill's reply and Stephen's answer"; "Mill's line cannot
+apply itself, but Stephen does not refute free discussion".
 
 ## Set pieces and worked examples to recreate
 
@@ -415,9 +474,7 @@ small thing"; "Love of humanity cannot be a creed"; "Mill's reply and Stephen's 
 
 ## Pitfalls / subtleties to flag
 
-- **Register rule.** The course passes no verdict of its own on any author or idea: no condemning
-  or approving labels in its own voice. Judgement comes only through argument and evidence; a label
-  may appear only inside a quotation, with who applied it and when.
+- **Register rule.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **The opening's description of Stephen.** "An Indian civil servant and English judge" compresses
   a career: in 1873 he was a barrister and journalist recently returned from three years as legal
   member of the Viceroy's council (not a member of the Indian Civil Service); he became a judge in
@@ -440,8 +497,10 @@ small thing"; "Love of humanity cannot be a creed"; "Mill's reply and Stephen's 
 - **Women (ch. V pp. 203–219).** The argument is in the book and in the key_ideas; teach it as an
   argument with its date (1873), its premises (real inequalities of age and sex; a family needs one
   head, as a ship), and Mill's counter-position in one sentence (Subjection of Women: legal
-  subordination is a survival of the law of force, unproven by any experiment of equality). No
-  verdict in the course's voice; no omission either.
+  subordination is a survival of the law of force, unproven by any experiment of equality). The
+  register grades nothing here; the lesson states, as a fact about the argument, that the ship
+  analogy shows a family may need one head but not that the head must be the husband, which is the
+  point Mill disputes, and that Stephen does not answer Mill's "no experiment" claim. No omission.
 - **India.** Name it as Stephen's experience and as the religious-neutrality instance (link 5).
   The justification of the Raj, Mill's tutelage, and the gunpowder passage are
   `locke-and-mill-on-empire`'s; one sentence pointing there at most. Stephen's racial remarks
@@ -537,7 +596,10 @@ small thing"; "Love of humanity cannot be a creed"; "Mill's reply and Stephen's 
    some way… if not by law, by the opinion of his fellow-creatures"), derive Stephen's conclusion
    that the definition licenses coercion by opinion of self-regarding wrongs; then construct the
    reply Mill could make from On Liberty ch. IV (self-regarding faults are not "wrongs" in this
-   sense; natural penalties are not punishment) and say whether it holds.
+   sense; natural penalties are not punishment) and say whether it holds. The solution: it holds —
+   Mill calls self-regarding faults "not properly immoralities" (ch. IV, ll. 2857–2859), so there
+   is no contradiction; Stephen's stronger point is that the line between natural penalty and
+   punishment turns on unobservable motive.
 6. **Corroboration (E3, earlier lessons):** set three definitions of liberty side by side —
    Hobbes's "silence of the law" (Ref `hobbes-sovereign-and-liberty`), Mill's sovereignty of the
    individual over himself (Ref `mill-liberty-and-its-limits`), Stephen's "Who is left at liberty to
@@ -549,7 +611,16 @@ small thing"; "Love of humanity cannot be a creed"; "Mill's reply and Stephen's 
    minority are the rightful masters of the foolish majority. Write a claim–evidence–reasoning
    paragraph deciding which premise each argument needs that the other denies, using the libel case
    and the marsh.
-8. **FORWARD (E7) → `british-franchise`:** Stephen (1873) says universal suffrage only subdivides
+8. **Attack the verdict (E6b):** the lesson concludes that Mill's line cannot apply itself (**on
+   balance**) and that Stephen does not refute free discussion (**strong**). Take the first and
+   state the strongest objection in its best form — the law applies motive tests every day
+   (murder and manslaughter, malice in libel), so a line drawn through motive is no worse than
+   much of the criminal law Stephen himself codified — and say what evidence or argument would be
+   needed to overturn the verdict: a way of applying Mill's line, by the neighbours who must apply
+   it, that does not depend on knowing why they avoid or warn. The solution says why the
+   objection lowers the grade to on balance and does not overturn it (a court applies the test,
+   after the fact, under rules of evidence; Mill's line has no court).
+9. **FORWARD (E7) → `british-franchise`:** Stephen (1873) says universal suffrage only subdivides
    power, that leaders gather the fragments, and that nothing can stop it ("haycocks in a flood").
    Turn these into two forecasts that the British record from 1867 to 1928 could confirm or refute,
    and say what observation would refute each. The solution states the forecasts (franchise

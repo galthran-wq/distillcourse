@@ -42,7 +42,10 @@ goal: Analyze Filmer's argument that political power is fatherly power inherited
   exact premises an opponent has to break: that Adam's dominion was political, that it was
   heritable, that its heir can be identified, and that "every authority, however acquired, is
   a father's" does not collapse right into possession.
-- **Hands off:** (i) The test, next lesson (`english-revolution-as-test`): in June 1642 the
+- **Hands off:** The lesson decides Filmer's case (see VERDICT): it fails, established, at the
+  step it needs most — no living king can be shown to be Adam's heir, and the fallback ("however
+  acquired") collapses right into possession; his strongest point, that no one consents to being
+  born into a polity, stands and is carried on. What passes on: (i) The test, next lesson (`english-revolution-as-test`): in June 1642 the
   king's own advisers defended England as a mixture of three estates — the doctrine Patriarcha
   II.16 calls "a mere impossibility or contradiction"; the war will show which royalism the
   king's party actually fought for. (ii) The reply, next module (`locke-property-and-consent`):
@@ -59,6 +62,33 @@ goal: Analyze Filmer's argument that political power is fatherly power inherited
 - **Spine step:** "Christendom builds a law above kings; Machiavelli breaks it; the wars of
   religion force one sovereign power above every faction — Bodin's definition, Hobbes's
   derivation from fear, Filmer's from fatherhood — and the English Revolution tests them"
+
+## VERDICT
+
+- **Claim judged:** political power is fatherly power inherited from Adam, so the king rules as
+  Adam's heir and no people ever had the right to choose or remove a ruler.
+- **Verdict — grade: established** (for the inheritance step). The argument fails at the step
+  it needs most: no living king can be shown to be Adam's heir — Filmer himself grants that "the
+  knowledge who should be that one man be quite lost" (I.9) — and the fallback, that every
+  authority "whether he come to the crown by usurpation, or by election … or by any other way
+  whatsoever" is "the only right and natural authority of a supreme father" (I.10), collapses
+  right into possession: it can no longer tell the rightful king from whoever holds the crown,
+  the distinction the royalist needed against rebels. Filmer's strongest point stands and is
+  carried on: no one consents to being born into a polity, and no people has been shown
+  choosing its first ruler.
+- **What decides it:** Filmer's own text — I.9 and I.10 read together (the failure is internal
+  and textual, which is why the grade is established, not merely strong). Corroborating
+  readers, forward only: Locke, Second Treatise §1 (the four points; "make Sir Robert
+  intelligible … where he treats of usurpation"); Hume on God as author of "a Borgia or an
+  Angria".
+- **Strongest objection:** Filmer never needed the heir to be known: I.9 says power then goes to
+  the heads of families, who confer it, and the man so set up "is substituted properly by God";
+  any settled succession is "reputed" the heir's. It does not overturn the verdict, because this
+  fallback is I.10's "however acquired" in other words — a title that any successful holder
+  acquires — so the theory survives only by ceasing to distinguish right from possession, which
+  is the thing it was written to do.
+- **What would overturn it:** no conceivable evidence, since the heir cannot be identified. (A
+  genealogy tracing a reigning king's line to Adam would be needed, and none can exist.)
 
 ## Sources to consult
 
@@ -470,7 +500,9 @@ What if the premise is false?
    the reader's Hobbes (Ref): the sovereign "is not Subject to the Civill Lawes" (XXVI) and
    cannot be punished (XVIII) — the same rights; Hobbes derives them from authorisation, Filmer
    from paternity.
-8. **Where the argument is strongest and where it is weakest — the OBJECTION at full strength.**
+8. **THE WEIGHING — "The heir cannot be found, and 'however acquired' is possession"** (verdict
+   **established** — see VERDICT). Where the argument is strongest and where it is weakest — the
+   OBJECTION at full strength.
    STRONGEST, stated as the course's own and conceded: no one consents to being born into a
    family or a polity; the subjection of children is natural and the first obedience anyone
    learns; and the demand for an instance of a people choosing its first ruler has never been
@@ -488,17 +520,28 @@ What if the premise is false?
    or by any other way whatsoever", his authority is "the only right and natural authority of a
    supreme father". If the usurper's power is a father's, the theory can no longer tell the
    rightful king from whoever holds the crown — the very distinction the royalist needed against
-   rebels. Name the two replies the course will take up later: the next module's first author
+   rebels. State the verdict as the course's own: the inheritance step fails, established, by
+   Filmer's own I.9 and I.10 — the strongest defence (the heads of families confer, God
+   substitutes) is "however acquired" restated; nothing could overturn it, because the heir
+   cannot be identified. The strongest point (birth, not consent) stands. Name the two replies
+   the course will take up later: the next module's first author
    makes exactly these four points (Second Treatise §1) and dares his reader to "make Sir Robert
    intelligible … where he treats of usurpation"; a Scottish sceptic will say God authorises "a
    Borgia or an Angria" as much as a Trajan (`hume-against-the-original-contract`). The lesson
    ends by marking, on a map of the argument (Figure 7), which premise each later reply breaks.
 
+`<Conclusion>`: states the verdict in plain words with its grade — Filmer's case fails,
+established, at the heir: no living king can be shown to be Adam's heir, and "however acquired"
+makes any possessor a father; what stands is his demand that a consent theory show when anyone
+consented to the polity he was born into. Then the hand-off: in June 1642 the king's own
+advisers defended the very mixture Filmer called a contradiction, and the next lesson reads the
+war against all three theories of sovereignty (`english-revolution-as-test`).
+
 Headings as claims: "Attack the premise, not the conclusion"; "Creation made the first man a
 king: Bellarmine's own concession"; "From Adam to Babel to the next heir"; "A kingdom is a
 family, larger"; "Where did a people ever meet to choose a king?"; "No mixture, no deposition:
 the tyranny of a multitude"; "The king above the laws, and the law of a father above the king";
-"Strongest at birth, weakest at the heir".
+"Strongest at birth, fatal at the heir: 'however acquired' is possession".
 
 ## Set pieces and worked examples to recreate
 
@@ -590,9 +633,7 @@ the tyranny of a multitude"; "The king above the laws, and the law of a father a
   Observations, 1652) absent — so the infants-and-generations argument (course.yaml key idea 3)
   is grounded here only as a derivation from II.6's principle, which the brief marks as the
   course's own step. The biography rests on the title page and the text's internal dates.
-- **Register:** The course passes no verdict of its own on any author or idea: no condemning or
-  approving labels in its own voice. Judgement comes only through argument and evidence; a label
-  may appear only inside a quotation, with who applied it and when. (Locke's "glib nonsense" may
+- **Register:** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. (Locke's "glib nonsense" may
   appear only as Locke's words, attributed, in a forward clause — never as the course's
   summary of Filmer.)
 
@@ -720,7 +761,16 @@ the tyranny of a multitude"; "The king above the laws, and the law of a father a
    Creation"; his only ancient support is Aristotle's "the eldest in every house is king" and
    Plato's large family — and state what would have to be true for the claim to survive (that
    rule by birth order and rule by superior nature are one principle).
-8. **FORWARD (E7) → `locke-property-and-consent`:** take I.9 ("an heir there always is … although
+8. **Attack the verdict.** The lesson concludes, established, that Filmer's case fails because
+   the heir cannot be identified and "however acquired" collapses into possession. State the
+   strongest objection in its best form — a royalist could drop Adam's genealogy and keep the
+   structure: any settled succession is "reputed" the heir's by God's providence, so the theory
+   needs only a known line, not a known Adam — and say what evidence or argument would be
+   needed to overturn the verdict (a criterion, stated in advance, that tells a "reputed" heir
+   from a successful usurper without appeal to consent or possession). The solution shows that
+   every candidate criterion is either consent (Bellarmine's premise) or prescription
+   (possession lasting long enough), so the verdict stands.
+9. **FORWARD (E7) → `locke-property-and-consent`:** take I.9 ("an heir there always is … although
    the knowledge who should be that one man be quite lost") and I.10 (every authority, "whether
    he come to the crown by usurpation, or by election … or by any other way whatsoever", is "the
    only right and natural authority of a supreme father"). Show that, once the heir is unknown,

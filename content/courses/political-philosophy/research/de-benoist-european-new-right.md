@@ -47,13 +47,53 @@ goal: Analyze the European New Right's programme — metapolitics, ethnopluralis
 - **Hands off:** The manifesto rejects the "Europe of Nations" and the Jacobin nation-state; the
   module's application (`hungarys-fundamental-law`) reads a constitution that does the opposite — a
   national state that defines its people by a thousand-year history, a Christian heritage and a
-  nation extending beyond its borders, inside a union it contests. The reader will judge which of
-  the four post-liberal theories (Deneen, Hazony, Vermeule, de Benoist) the text actually embodies.
-  The synthesis (`the-argument-assembled`) places the right to difference as the last answer to
-  "what holds a people together" and the question whether it is still a right-wing answer.
+  nation extending beyond its borders, inside a union it contests; that lesson finds the text
+  closest to Hazony and furthest from the manifesto. This lesson decides its own question (see
+  VERDICT): on balance, ethnopluralism does not hold together, because it gives the right to
+  difference to peoples and leaves the person who marries out, assimilates or leaves with no
+  standing; the generality clause is consistent and does separate it from a ranking of races. The
+  synthesis (`the-argument-assembled`) places the right to difference as the last answer to "what
+  holds a people together", with that finding.
 - **Spine step:** "After liberalism: Deneen says it failed by succeeding, Hazony defends the order
   of national states, Vermeule the common good, de Benoist the right to difference — Hungary's
   constitution as the case — and the whole argument is assembled"
+
+## VERDICT
+
+Register, module 16, lesson verdict.
+
+- **Claim judged:** the right to difference ("ethnopluralism" in the movement's wider vocabulary;
+  "right to difference" and "differentialist anti-racism" in the manifesto) holds together as a
+  principle — a universal right of every people to remain different, which "has significance only
+  in terms of its generality" (III.1, l.900–904).
+- **Verdict: on balance, it does not hold together. Grade: on balance.**
+- **What decides it:** the right is assigned to PEOPLES, not persons. The manifesto's own
+  anthropology says "Man is an heir, but he can dispose of his heritage" (II.2), yet the right it
+  builds protects the heritage, not the heir: the individual who marries out, assimilates or leaves
+  his people has no standing in the doctrine, and a member of people A whom people B will not admit
+  has no claim either (link 8(a); exercise 4). A principle that grants each person a disposable
+  heritage and then gives the right only to the collectivity that holds it is at odds with itself.
+- **What the verdict grants:** the requirement of generality ("I may claim my difference only if I
+  defend yours") is consistent, and it separates the doctrine from a ranking of races: the
+  manifesto rejects all three postulates of racism ("All three are false", III.2, l.919). The
+  objection that the right is secretly a hierarchy is not upheld on the text.
+- **What it does NOT rest on:** genetics. The draft verdict's appeal to ancient DNA (that every
+  European people is a recent mixture) is deleted. De Benoist's peoples are "ethnocultural"
+  (III.3: "ethnocultural identity" recognised in the public sphere; II.2: "a particular cultural
+  belonging"), he disavows biological prejudice (Fawcett's report; III.2's three postulates), and Bronze-Age admixture says nothing about whether
+  cultural peoples have lasted over the last thousand years. Do not use it in the lesson.
+- **Strongest objection, and why it does not overturn the verdict:** the communitarian model
+  (III.3) and the defence of "total freedom of expression" show the manifesto respects
+  individuals: settled immigrants are not to be expelled, and a person may "dispose of his
+  heritage". Answer: those are policies and an anthropology, not standing within the right; the
+  doctrine says nothing about what a people may do to a member who leaves or to an outsider who
+  wants in, and that silence falls exactly where a right of persons would speak. Why only on
+  balance: the dossier holds one text (1999); the movement's later writings may supply the missing
+  account, and the manifesto's wording ("All men have in common their human nature", II.2)
+  leaves room for a universal personal norm it does not state.
+- **What would overturn it:** an account of the people as a cultural unit, specifiable without
+  ancestry, that gives its members standing to leave (and says what claim an outsider has to
+  join).
 
 ## Sources to consult
 
@@ -367,11 +407,13 @@ it cannot use act at all?
      disavowal is borrowed from the liberalism they reject. The manifesto's replies from its text:
      the generality clause ("cannot be used to exclude others"); the three postulates rejected;
      support for regional languages and "peoples struggling against Western imperialism"; the
-     communitarian model is offered for immigrants already present, not as expulsion. Where the
-     lesson leaves it: the manifesto never says what a people may do to a member of another people
-     who wants to join it — the generality clause protects groups, not the individual who wants to
-     leave his group (contrast Deneen's Amish anecdote, `<Ref deneen-post-liberalism>`, one
-     clause).
+     communitarian model is offered for immigrants already present, not as expulsion. What the
+     lesson finds: the replies answer the charge of hierarchy (the generality clause and the three
+     postulates hold on the text), but not the charge of separation as it bears on persons — the
+     manifesto never says what a people may do to a member of another people who wants to join it;
+     the generality clause protects groups, not the individual who wants to leave his group
+     (contrast Deneen's Amish anecdote, `<Ref deneen-post-liberalism>`, one clause). This half of
+     the objection is weighed in link 9.
    - **(b) The nationalist objection: a federal Europe is an empire.** At strength, from Hazony
      (`<Ref hazony-virtue-of-nationalism>`): "who decides?" — in any federation the centre decides
      what the lower levels "cannot" do, so bottom-up subsidiarity becomes top-down in the first
@@ -380,8 +422,13 @@ it cannot use act at all?
      for. From the integral nationalists (`<Ref barres-and-maurras-integral-nationalism>`): France
      first; the nation is the inheritance one accepts, not a level in a federation. The
      manifesto's replies: the summit's powers are listed and limited (l.1128–1133); "a 'Europe of
-     Nations'" cannot prevent future wars; national egos are what produced 1914–45 (III.6). Leave
-     the dispute open: it is the dispute the module's case (Hungary inside the EU) puts to a test.
+     Nations'" cannot prevent future wars; national egos are what produced 1914–45 (III.6). What
+     the lesson states: the manifesto lists the summit's powers but names no one who decides, in a
+     dispute, what the lower level "cannot" do — so Hazony's "who decides?" is not answered by
+     III.6. The general charge that a federation is an empire was decided in `<Ref
+     hazony-virtue-of-nationalism>` on Hazony's own criterion (compulsory jurisdiction: on balance;
+     the name "empire" left to definition); the manifesto's federal Europe would face the same
+     finding, and the module's case (Hungary inside the EU) shows the dispute in practice.
    - **(c) The objection from its lineage.** At strength: the movement's sources are the
      Conservative Revolution and Evola — Moeller's anti-liberalism and "every people has its own
      socialism", Evola's anti-Christian Tradition, the tripartite ranking of wisdom over force over
@@ -396,7 +443,11 @@ it cannot use act at all?
      defends "total freedom of expression". The inference (a lineage proves the doctrine) is the
      critic's; the manifesto's reply is the "excluded middle" (Introduction): it takes "what seems
      valuable in all currents of thought", Gramsci included. Draw the comparison as a table
-     (figure 5) and let the reader judge.
+     (figure 5), then state what it shows: the engagement and the echoes are fact; the inference
+     that the lineage settles what the doctrine is does not follow — a doctrine is judged by its
+     content, and on democracy and on racism the manifesto reverses its sources. The objection
+     from lineage is therefore not upheld as a refutation; it is a reason to read the text against
+     its sources, which the figure does.
    - **(d) Does it hold together? The strongest internal objection.** A manifesto that calls every
      "absolute, universal, and eternal law" the basis of totalitarianism rests its whole programme
      on one universal right — the right to difference, which "has significance only in terms of
@@ -411,11 +462,36 @@ it cannot use act at all?
      an alternative" is placed here as the liberal verdict, and the manifesto's III.5–III.7 (local
      decision, referendum, participatory democracy) as its answer.
 
+9. **The weighing: "A right of peoples gives no standing to the person who leaves."** (The last body
+   section before the Conclusion; L10e.) The claim: the right to difference holds together. First
+   what holds: the generality clause is consistent, and with the three postulates rejected it
+   separates the doctrine from a ranking of races (8(a), 8(d)) — say so plainly. Then the case
+   that decides it: run the generality clause on persons, not peoples — the woman who marries out,
+   the son who assimilates, the migrant whom people B will not admit. The manifesto's anthropology
+   gives each a heritage he "can dispose of"; its right gives standing only to the people. The
+   doctrine has no answer to what a people may do to the member who leaves, which is where a
+   right of persons would speak. Then the strongest objection at full strength (the communitarian
+   model; "total freedom of expression"; "All men have in common their human nature") and why it
+   does not overturn the verdict: policies and an anthropology are not standing within the right.
+   Then the limit that keeps it at on balance: one text in the dossier, and a universal personal
+   norm the manifesto's wording leaves room for but does not state. Close with what would
+   overturn it: an account of the people as a cultural unit, specifiable without ancestry, that
+   gives its members standing to leave. Do not appeal to genetics or ancient DNA (see Pitfalls).
+
+**Conclusion** (L10): in plain words — the manifesto's right to difference is not a ranking of
+races in disguise: its rule that I may claim my difference only if I defend yours is consistent.
+But on balance it does not hold together, because it gives the right to peoples and none to the
+person who wants to leave one or join another. Hand-off: the module's case
+(`<Ref hungarys-fundamental-law>`) is a constitution that writes a people's identity into law —
+closest to Hazony, furthest from this manifesto — and asks what such a text does to the persons
+under it.
+
 Headings as claims (suggested): "Culture before power"; "Christianity, the religion of the way out of
 religion"; "Liberalism, not communism, is the main enemy"; "Man as such does not exist"; "Two
 anti-racisms"; "Against the nation-state, for a federal Europe"; "Equality of members, not of men";
-"Separation by another name?"; "Empire under another name?"; "A universal right against
-universalism".
+"Difference without rank, but not without separation"; "Who decides what the lower level cannot
+do?"; "A lineage is not a refutation"; "A universal right against universalism"; "A right of
+peoples gives no standing to the person who leaves".
 
 ## Set pieces and worked examples to recreate
 
@@ -486,14 +562,19 @@ universalism".
   readers; otherwise no slot.
 - **Later influence** (identitarian movements, Faye, Dugin, the populist right) is contested and
   outside the dossier; at most one sentence, attributed and in References, no list of admirers.
-- **Register.** The course passes no verdict of its own on any author or idea: no condemning or
-  approving labels in its own voice. Judgement comes only through argument and evidence; a label
-  may appear only inside a quotation, with who applied it and when. This governs "fascist",
+- **Register.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. This governs "fascist",
   "racist", "far right", "neo-pagan" (all critics' or journalists' words — attribute or omit) and
   equally the manifesto's own labels for its opponents ("thought police", "New Class", Tartuffe),
   which stay inside quotation marks. The reader summary's characterisation of the text as defining
   opponents "by caricature" is a reader's judgement — the lesson shows the claim about liberalism
-  (I.3) and the liberal reply, and lets the reader judge.
+  (I.3) and the liberal reply, and says where the manifesto's account of liberalism matches the
+  liberal texts the course has read (Rawls's priority of the right) and where it does not; the
+  word "caricature" stays the reader summary's and is not used in the lesson's voice.
+- **No ancient DNA, no genetics.** The verdict rests on the standing of persons alone. The draft
+  register's appeal to ancient DNA (every European people a recent mixture) is deleted: it answers
+  a claim de Benoist does not make — his peoples are ethnocultural, he disavows biological
+  prejudice — and Bronze-Age admixture says nothing about whether cultural peoples have lasted.
+  Do not Ref `reich-ancient-dna-and-the-indo-europeans` in the weighing.
 - **Translation:** the Telos translation is the authorised English; where a key French term matters
   give it once: droit à la différence (right to difference); métapolitique; Nouvelle Droite. The
   French original (Éléments 94) is not in the dossier.
@@ -587,7 +668,18 @@ universalism".
    (stance on regional languages; on settled immigrants' citizenship; on intermarriage; on asylum)
    and the sources you would need (GRECE's later publications; Éléments; the movement's
    collaborators) — and say which of those the course's dossier holds (only the 1999 text).
-8. **FORWARD (E7) → `hungarys-fundamental-law`:** The manifesto rejects the nation-state and the
+8. **Attack the verdict (E6b):** The lesson holds, on balance, that the right to difference does
+   not hold together because it gives persons no standing to leave. State the strongest objection
+   in its best form — e.g. that every collective right (a nation's self-determination, a minority's
+   language rights in Hazony's or Miller's sense) is held by a group and leaves exit to ordinary
+   liberty, so the verdict demands of de Benoist what it demands of no one; or that "Man is an
+   heir, but he can dispose of his heritage" (II.2) already is the exit right. Then (a) say whether
+   the objection shows standing WITHIN the right or a liberty outside it; (b) say what text or
+   evidence would overturn the verdict — an account, in the manifesto or the movement's later
+   writings, of the people as a cultural unit specifiable without ancestry, with members' standing
+   to leave and outsiders' claims to join; (c) say why an appeal to ancient DNA could neither
+   support nor overturn the verdict.
+9. **FORWARD (E7) → `hungarys-fundamental-law`:** The manifesto rejects the nation-state and the
    "Europe of Nations", and wants citizenship decoupled from nationality. Suppose a member state
    of the EU writes a constitution that opens with "the members of the [national] nation", makes
    the state responsible "for the fate of [nationals] living beyond its borders", and contests the

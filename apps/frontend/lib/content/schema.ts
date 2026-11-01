@@ -137,7 +137,7 @@ export const LessonSchema = z.object({
     introduces: z.array(slug).default([]),
     reinforces: z.array(slug).default([]),
   }),
-  key_ideas: z.array(z.string().min(1)).min(1).max(5),
+  key_ideas: z.array(z.string().min(1)).min(1).max(6),
   demo: DemoSpecSchema.nullable().default(null),
   /** Required on a lab lesson, forbidden on every other type. */
   lab: LabSpecSchema.optional(),

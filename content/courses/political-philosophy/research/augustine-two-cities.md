@@ -40,11 +40,52 @@ goal: Analyze Augustine's account of the two cities and his verdict that no eart
   answered in `machiavelli-effectual-truth` / `machiavelli-discourses-republic`.
   (3) Aquinas will put justice back into the earthly city by way of natural
   law (`aquinas-law-and-kingship`). Plant XIX.17, XIX.24 and XIX.25 as the
-  three sentences later lessons quote.
+  three sentences later lessons quote. What this lesson decides and does not
+  pass on: the pagan charge of 410 fails, and Augustine's proof that Rome
+  was never a republic fails as a refutation on Scipio's terms (both
+  **strong**). The better, political form of the charge — that a religion of
+  two citizenships weakened the West's defence — is named and not decided;
+  `machiavelli-discourses-republic` carries Machiavelli's version of it.
 - **Spine step:** "A Jewish movement becomes Europe's religion by being remade
   in Greek concepts and Roman forms; Constantine's empire and the Church fight
   over who represents the truth; Augustine denies that any earthly city can be
   just"
+
+## VERDICT
+
+Two claims are judged (research/verdicts/REGISTER.md, module 2, lesson
+verdicts).
+
+- **(a) The pagan charge of 410: Rome fell because it abandoned its gods —
+  fails. Grade: strong.** Decided by two records. Rome was sacked under its
+  old gods: the Gauls took the city c. 390 BC, Augustine's own example
+  (City of God II–III, the catalogue of Rome's disasters before Christ). And
+  the Christian East, under the same religion and the same emperors' faith,
+  lasted until 1453. A cause present in the East and absent in the
+  pre-Christian sack cannot be the cause of the sack of 410.
+- **(b) Augustine's proof (XIX.21) that, by Scipio's definition, Rome was
+  never a republic — fails as a refutation on Scipio's terms. Grade:
+  strong.** Decided by the definition itself: Scipio's *ius* is the agreed
+  right of the Romans (*iuris consensu*); Augustine turns it into justice
+  that gives God his due, which requires worship of the true God. That is a
+  new premise, not Scipio's, and by it every pagan city fails in advance.
+  Augustine's own XIX.24, which drops *ius* to make Rome a people again,
+  concedes that the first definition was not doing the work he made it do.
+- **Strongest objection:** Augustine does not import his premise; he reads
+  Cicero's own Laelius ("God is the author of this law") together with
+  Scipio, so the requirement of justice towards God is in Cicero's dialogue.
+  It does not overturn (b): Laelius's God is the author of a law of right
+  reason open to every people, not the object of a cult Rome failed to
+  offer, and nothing in Cicero makes Rome's worship of its gods a breach of
+  that law. Augustine's step "God is owed worship, and Rome gave it to
+  demons" is his, not Laelius's. For (a), the strongest objection is the
+  political form of the charge (two citizenships weaken civic devotion);
+  it is a different and better argument than the one made in 410, and the
+  East's survival already tells against its strong form.
+- **What would overturn it:** for (a), evidence that Christianization of the
+  West, unlike the East, removed something its defence depended on; for
+  (b), a reading of Scipio's *ius* in Cicero's text as justice towards the
+  gods rather than right agreed among citizens.
 
 ## Sources to consult
 
@@ -228,6 +269,16 @@ goal: Analyze Augustine's account of the two cities and his verdict that no eart
   book". The writer may cite I.1 and II.21 from New Advent (PD) for one line
   each; V.24–26 (the happy emperor) likewise. Say in the brief's References
   that these books were consulted only at those points.
+- **City of God II–III on Rome's disasters under the old gods (register
+  source, for the weighing in link 10):** Augustine's catalogue of the
+  calamities Rome suffered while it worshipped its gods, above all the Gallic
+  sack of c. 390 BC (Book III, where he sets the Gauls' sack beside the
+  Goths'; verify the chapter at New Advent, https://www.newadvent.org/fathers/1201.htm,
+  before citing — not staged in `research/texts/`). One or two lines quoted.
+- **The eastern empire's survival to 1453 (register source):** the fall of
+  Constantinople to the Ottomans, 29 May 1453, from any standard account
+  (e.g. Judith Herrin, *Byzantium: The Surprising Life of a Medieval Empire*,
+  2007). One clause, as a date.
 
 ## EXPLANATION PLAN (L0)
 
@@ -327,8 +378,9 @@ republic and shows that by its own terms Rome never was one.
    ascribe to him, since his soul cannot exercise a just control over the
    body?" The ladder needs God at the top to hold at any rung; Rome removed
    God, so every rung is injustice. The lesson must show the reader that
-   Augustine is not importing a Christian premise but using Laelius's
-   ("God is the author of this law") against Scipio.
+   Augustine claims not to import a Christian premise but to use Laelius's
+   ("God is the author of this law") against Scipio — give that claim its
+   full force here; link 10 judges whether it holds.
 7. **OBJECTIONS at full strength — two from outside, one from inside.**
    (a) *The Roman's* (as the course's own, from Voegelin III.4 and Cicero):
    Augustine could not understand Varro because Varro's gods were never meant
@@ -350,9 +402,13 @@ republic and shows that by its own terms Rome never was one.
    judge takes the bench though he may torture the innocent (XIX.6); the
    just war is fought, and lamented (XIX.7); the earthly city's goods are
    real and the pilgrim obeys its laws (XIX.17) — nothing in the two cities
-   forbids the active life; it forbids calling it justice. Whether that
-   suffices is left to the reader; Machiavelli's own qualification (the
-   fault is of the *interpreters*) is quoted too. (c) *The internal one*
+   forbids the active life; it forbids calling it justice. Say what the
+   reply does: it answers the charge as a reading of Augustine's doctrine
+   (nothing in it forbids defence); it does not answer the empirical form,
+   whether believers in fact defended the city less, and the lesson does
+   not decide that form (link 10 says what tells against it).
+   Machiavelli's own qualification (the fault is of the *interpreters*) is
+   quoted too. (c) *The internal one*
    (course.yaml note): see link 8.
 8. **The second definition: what Rome was, if not a republic.** XIX.24: "if
    we discard this definition… a people is an assemblage of reasonable
@@ -392,9 +448,35 @@ republic and shows that by its own terms Rome never was one.
    the bishop, the judge on the bench, the emperor admonished) shows the
    opposite — the heavenly city in politics up to its elbows, denying only
    that politics saves.
-10. **Close:** the reader can now run the two definitions, name the engine
+10. **THE WEIGHING — "The gods did not keep Rome, and Scipio's Rome was a
+    republic by Scipio's terms."** Set the two claims the lesson has staged
+    against their strongest objections and the record. (a) The charge of
+    410: Rome was sacked under its old gods (the Gauls, c. 390 BC —
+    Augustine's own example from Books II–III, one line quoted), and the
+    Christian East, with the same faith, lasted to 1453; so the charge fails
+    (**strong**). Then the better argument the charge contains, the
+    political form from link 7(b): it is different, it is not the one made
+    in 410, and the East's survival tells against its strong form; say what
+    would establish it (evidence that Christianization of the West, unlike
+    the East, removed something its defence depended on) and leave it as
+    that — no verdict on it in this lesson. (b) XIX.21: put Augustine's
+    strongest defence (he only reads Laelius's God with Scipio's
+    definition) against the text: Laelius's God authors a law of reason open
+    to all peoples; "God is owed worship, and Rome gave it to demons" is
+    Augustine's own premise; Scipio's *ius* was right agreed among Romans.
+    So the proof fails as a refutation on Scipio's terms (**strong**), and
+    XIX.24, which drops *ius* to make Rome a people again, is Augustine's own
+    concession that the first definition could not carry his conclusion.
+    Keep what survives: the proof is a valid argument from Augustine's
+    definition of justice, and the second definition is his real teaching.
+11. **Close:** the reader can now run the two definitions, name the engine
     and the measure (libido dominandi, ordo amoris), state why slavery is
-    penal, and say what Augustine leaves to rulers. Open problem: a bishop
+    penal, and say what Augustine leaves to rulers. Then the verdict in
+    plain words, with its grades: Rome did not fall because it left its
+    gods — it was sacked under them, and the Christian East stood for a
+    thousand years more (strong); and Augustine's proof that Rome was never
+    a republic works only because he changed what Scipio meant by right
+    (strong). Hand-off: a bishop
     who has just read XIX.17 is handed a petition to restore a pagan altar
     "whereby earthly peace is secured" — does he preserve the diversity or
     call it a hindrance to worship? That is 384, next lesson, and it
@@ -405,7 +487,9 @@ loves, two cities"; "The earthly city begins with a murder: the lust of
 ruling"; "Virtue is the order of love"; "Slavery is the wage of sin, not of
 nature"; "By Scipio's definition, Rome never was a republic"; "The Roman's
 objection and the worldly one"; "A people is what it loves: the second
-definition"; "The peace of Babylon: what is left to rulers"; conclusion.
+definition"; "The peace of Babylon: what is left to rulers"; "The gods did
+not keep Rome, and Scipio's Rome was a republic by Scipio's terms";
+conclusion.
 
 ## Set pieces and worked examples to recreate
 
@@ -464,7 +548,7 @@ definition"; "The peace of Babylon: what is left to rulers"; conclusion.
   pagan gods: real spirits, wicked; the reader must know he means it
   literally); Eusebius (`<Ref>` previous lesson); Orosius (Augustine's pupil,
   History Against the Pagans, 417 — only if the Lilla irony is used).
-- **Register.** The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+- **Register.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Do not re-teach** Polybius's forecast and religion-as-device, Scipio's
   definition, Laelius's natural law, Aristotle's
   natural slavery, Eusebius or Varro: each is a `<Ref>` plus one clause. The
@@ -480,8 +564,10 @@ definition"; "The peace of Babylon: what is left to rulers"; conclusion.
   "obnoxious" in XIX.17 means "exposed to", not "offensive" — gloss it or
   avoid it.
 - **Books I–XIII and XX–XXII were not read by the swarm**: the 410 opening,
-  II.21's promise and V.24–26 (the happy emperor) are cited from New Advent
-  only at those points; say nothing else about them.
+  II.21's promise, V.24–26 (the happy emperor) and the Books II–III
+  catalogue of Rome's disasters under its gods (the Gallic sack, for the
+  weighing) are cited from New Advent only at those points; say nothing else
+  about them.
 - **Where the summary and text differ:** summary 17's "line" pointers are
   chapter-lines of the New Advent flattenings; XIV.15 (lust of ruling) is at
   book14 line 132, XIV.28 at 190; XV.1 is at book15 line 12, XV.5 at 28,
@@ -493,8 +579,9 @@ definition"; "The peace of Babylon: what is left to rulers"; conclusion.
   a bond of peace" at the price of wars) is two-sided; present both halves
   and do not make him either an imperialist or an anti-imperialist.
 - **Do not moralise** the pagan virtue question in either direction: the
-  verdict is Augustine's; Machiavelli's reversal is coming; the reader
-  weighs.
+  verdict "splendid vices" is Augustine's measure of virtue, not a claim the
+  record can test, so the course passes none of its own on it (it does pass
+  the two verdicts in link 10); Machiavelli's reversal is coming.
 - **Numbers:** keepers — 410 (the sack), 413–426 (composition), the six
   steps of XIX.21. Everything else to the decade.
 - **Names only in References:** Dods (translator), Voegelin (except as the
@@ -576,9 +663,20 @@ definition"; "The peace of Babylon: what is left to rulers"; conclusion.
    for (the judge on the bench, XIX.6; the earthly city's goods as "gifts of
    God", XV.4) and state what would have to be true for the claim to survive
    (that calling political goods "not justice" in fact weakens the will to
-   defend them — an empirical claim about believers, which the course will
-   test in the Machiavelli lessons).
-7. **FORWARD (E7)** → `altar-of-victory`. XIX.17 says the heavenly city
+   defend them — an empirical claim about believers; the solution notes that
+   the Christian East, defended until 1453, tells against its strong form).
+7. *Attack the verdict.* The lesson judges that Augustine's XIX.21 proof
+   fails as a refutation on Scipio's terms. State the strongest objection in
+   its best form — that Cicero's own Laelius makes God the author of true
+   law, so justice towards God is already inside Cicero's definition and
+   Augustine is only reading the dialogue whole — and say what evidence would
+   be needed to overturn the verdict: a passage of the Republic or the Laws
+   in which *ius* or the agreement of a people requires worship of a true
+   god rather than right agreed among citizens. Then do the same, in two
+   sentences, for the verdict on the charge of 410: what would show that
+   Christianization weakened the West's defence in a way it did not weaken
+   the East's?
+8. **FORWARD (E7)** → `altar-of-victory`. XIX.17 says the heavenly city
    preserves the nations' diverse laws and institutions "so long only as no
    hindrance to the worship of the one supreme and true God is thus
    introduced". A pagan senator petitions a Christian emperor to restore a
@@ -588,7 +686,7 @@ definition"; "The peace of Babylon: what is left to rulers"; conclusion.
    "hindrance to worship") and name the single question of fact that decides
    between them. The solution says: in 384 a bishop of Milan derived one of
    them, in two letters the next lesson reads.
-8. *Document reasoning — change and continuity (E3 reach-back).* Aristotle's
+9. *Document reasoning — change and continuity (E3 reach-back).* Aristotle's
    natural slave (`<Ref>`), Cicero's "unjust slavery when men are slaves who
    could govern themselves" (`<Ref>`), Augustine's "a name introduced by sin
    and not by nature": for each, what changed in the *ground* of slavery, and

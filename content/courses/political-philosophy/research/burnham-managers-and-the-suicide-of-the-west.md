@@ -3,7 +3,7 @@
 status: planned
 module: postwar-conservatism
 type: core
-goal: Analyze Burnham's thesis that a managerial class was replacing capitalists as the ruling class, and his later argument that liberalism is the ideology of Western contraction, and evaluate both
+goal: Analyze Burnham's thesis that a managerial class was replacing capitalists as the ruling class, and his later argument that liberalism is the ideology of Western contraction, and judge both against the record and Burnham's own test
 
 ## ARC (L10)
 
@@ -32,7 +32,9 @@ goal: Analyze Burnham's thesis that a managerial class was replacing capitalists
   book states and the second applies: ideologies express the interests and condition of a class, and
   are not refuted by facts. The lesson reconstructs both theses, tests the 1941 forecasts against
   1945, and turns Burnham's own test of an ideology — "what evidence might conceivably prove you
-  wrong?" — on his 1964 thesis.
+  wrong?" — on his 1964 thesis, and judges both (see `## VERDICT`): 1941's war forecasts failed and
+  its description of the managed corporation and the administrative state held, established; the
+  1964 thesis is not settled by 1989–91, open, with the evidence that would settle it named.
 - **Hands off:** (i) `udhr-read-against-the-right` (next): Burnham's 39-sentence test of liberalism
   ends with eight sentences taken from the 1948 Declaration — the module's application reads that
   document article by article. (ii) `lasch-revolt-of-the-elites`: thirty years later, a critic from
@@ -46,7 +48,61 @@ goal: Analyze Burnham's thesis that a managerial class was replacing capitalists
   of Gnosticism, Kirk's and Nisbet's American conservatism, Burnham's managers — tested on the
   Declaration of 1948"
 
+## VERDICT
+
+(From `research/verdicts/REGISTER.md`, Module 9, lesson verdict. Binding: carry each part and its
+grade exactly.)
+
+- **(1941) Claim: the managers will replace owners as the ruling class, and the managerial powers will
+  win the war. → The war forecasts failed; the description of the managed corporation and the
+  administrative state held. Grade: established.** Germany was defeated, Russia did not split, and
+  capitalism was restored in western Europe (the edition's own DMR glosses: "This was Burnham's big
+  mistake"); the state grew, administrative agencies took over rule-making, and salaried managers
+  gained control of the large firm.
+- **(1964) Claim: liberalism is the ideology of Western suicide. → Not settled by 1989–91. Open.**
+  Burnham's own test reads: "if the contraction of the past fifty years should cease and be reversed,
+  then the ideology of liberalism, deprived of its primary function, will fade away"
+  (`C/research/texts/burnham/suicide-of-the-west.txt` l.2573). His "liberalism" is a specific
+  ideology — his nineteen propositions, guilt, accommodation in place of rollback — not liberal
+  democracy. The reversal of 1989–91 came under governments that had rejected détente in his sense.
+  So "liberal states won the Cold War" scores the test in the wrong sense of the word, and the growth
+  of the former imperial states after 1950 is beside a thesis he defined by territory ruled. Neither
+  reading of 1989–91 decides it.
+- **What would settle it:** a series on elite opinion on Burnham's propositions — rollback against
+  containment, decolonisation and guilt — from 1964 to 2000, to test whether those positions weakened
+  before the reversal (which would fit Burnham: the ideology faded and the contraction stopped) or
+  only after it (which would fit his test's prediction of fading once the function was gone, but
+  leave the causal claim unshown), or did not weaken at all (against him). The series is not in the
+  course; the lesson says so.
+- **Strongest objection to the verdict:** the critics' reading — the West reversed the contraction
+  while remaining liberal, so the thesis is refuted, not open. It does not overturn the verdict,
+  because it scores the test with "liberal" meaning liberal democracy, which Burnham's thesis is not
+  about; on his definition the governments that won the last decade of the Cold War had rejected the
+  liberal positions he named. From the other side, the heirs' reading — the reversal came despite
+  liberalism and so confirms him — needs the same missing series to show the positions had weakened
+  first.
+- **What would overturn it (move it off open):** the elite-opinion series above.
+
+**(Round 2) Forecast check hosted here: planned economies against market economies.** Chosen host: this lesson, not `marx-manifesto` or `the-cognitive-elite`, because Burnham made the dated forecast the record can test. In 1941 he wrote that "there is good reason to believe that under managerial economy there will be a greater total output of material goods in relation to the total population than under capitalism" (`C/research/texts/burnham/the-managerial-revolution.txt` l.3685–3692), managerial economy being the centralised, state-directed economy of Russia and Germany, able "to plan for and with the economy as a whole" (l.3647–3659). (The Marx lesson's brief forbids using the regimes that invoked Marx as a refutation of the Manifesto; the cognitive-elite lesson's question is distribution inside one market economy.)
+
+- **Claim judged:** the planned economy will produce more per head than the market economy (Burnham 1941); in general form, which of the two delivers higher output per head.
+- **Verdict: market economies outperform planned ones. Grade: established.** Burnham's forecast failed.
+- **What decides it — matched pairs, where history held people, language and starting point nearly fixed and changed the economic order** (Maddison Project Database 2023, `gdppc`, 2011 int'l $, `C/research/texts/round2-a/growth/maddison2023-gdppc.csv`; WDI, `wdi-gdppc-ppp-2021intl.csv`):
+  - *The Koreas.* South Korea: $998 per head in 1950, $13,874 in 1990, $41,321 in 2022. North Korea: $2,456 in 1990, $1,569 in 2022 — about 4% of the South. No measured North Korean series exists before 1990 (the old Maddison figures for 1950–89 are conjecture and are not to be quoted: `maddison2010-korea-1990gk.csv`, README). The Bank of Korea's 2025 estimate puts the North's GNI per head at 3.6% of the South's (1.87 against 52.57 million won) [secondary: Yonhap report; order of magnitude only] (`bok-north-korea-gni-2025.csv`).
+  - *The Germanies.* East German GDP per head was about 56% of West German in 1950 and "remained at about 56 per cent" through 1989, on the main reconstruction (Sleifer 2003/2006); the same author puts East German per-capita national income at 103% of the West's in 1936 (`east-west-germany.csv`). So the East began level before the war, fell behind by 1950 (war damage, dismantling and reparations to the USSR are part of that), and in forty years of planning never closed the gap while the West grew. Other estimates differ in level (Maddison 2006: 65% in 1950, 27% in 1990 [UNVERIFIED: transcribed from a secondary table]); every GDR estimate rebuilds output from prices a plan set, and the lesson says so.
+  - *China after 1978.* $1,744 per head in 1978 → $15,977 in 2018, about 5.7% a year on Maddison's revised (Wu) series; 8.4% a year on the official series (`growth-china-india.csv` — state which series is quoted). Before reform, 1950–78, about 2.8% a year ($799 → $1,744).
+  - *India after 1991.* $2,062 in 1991 → $7,294 in 2019, about 4.6% a year; 1950–80, about 1.4% a year ($987 → $1,495).
+  - The pairs agree in direction and the gaps are large. Each has a confounder named in the lesson: the North's war losses and the South's American aid; the East's reparations; China's and India's catch-up from a low base and their large remaining state sectors. No confounder reverses a pair, and the within-country turns (China, India) remove the fixed differences of people and place.
+- **What Burnham got right, stated:** the managerial economies of the 1930s did end mass unemployment (l.3593–3605), and he himself said "there is no necessary social virtue in 'planning'" and warned that planning's known aims were war and the new class's privilege (l.3712–3725). The forecast that fails is the one about output per head.
+- **Strongest objection:** the pairs compare dictatorships with (eventually) democracies and small with large aid, so they test regimes, not the economic order. **Why it does not overturn the verdict:** South Korea and Taiwan grew fastest while still dictatorships, and China's acceleration came with no change of political regime; the variable that changed in every pair is the order of property and prices. **What would overturn it:** a planned economy that held output per head at parity with a matched market economy over decades.
+
+**Objection (author's review): every country that adopts capitalism becomes uniformly richer.** Required: the lesson states it at full strength before answering it; it does not alter the verdict above.
+- *At full strength:* the pairs above, read as a law — the Koreas, the Germanies, China after 1978, India after 1991, and Chile, which fell from 38.6% of US output per head in 1950 to 30.5% in 1980 and was back to 38.9% by 2022 after its market reforms (`maddison2023-gdppc.csv`); every country that has moved from plan to market has grown faster than before; so markets are not merely better than plans but sufficient for prosperity.
+- *Answered — necessary, not sufficient:* Argentina, a market economy of European settlers, stood at 57% of US output per head in 1900 and 60% in 1913 — level with Canada (58%, 70%) and not far from Australia (80%, 81%) — and fell to 52% (1950), 44% (1980) and 31% (2022), while Canada and Australia held or rose (78%, 89% in 2022). Latin America as a whole did not converge: Brazil 15% of US output per head in 1950, 25% in 2022; Mexico 23% and 28%. Acemoglu and Robinson's account: what decides is not "a market" but inclusive institutions — "secure private property, an unbiased system of law, and a provision of public services that provides a level playing field", with open entry (`C/research/texts/acemoglu-robinson/why-nations-fail.txt` l.789); Argentina "grew rapidly for five decades up until 1920 … but then started a long slide" (l.625). So the market is necessary for sustained growth on this record (no planned economy matched its pair) and not sufficient (market economies without secure property and rule of law stagnated). Venezuela (55.5% of US output in 1950, 9.0% in 2022) is a market economy turned state-directed after 1999 and supports the main verdict, not the objection.
+
 ## Sources to consult
+
+- **(Round 2) For the planned-vs-market forecast check** (all under `C/research/texts/round2-a/growth/`, see `README.txt` for units and caveats): Maddison Project Database 2023 (Bolt & van Zanden 2024), `maddison2023-gdppc.csv` — the Koreas, China, India, Argentina, Australia, Canada, Brazil, Mexico, Chile, Venezuela, USA; Sleifer, *Planning Ahead and Falling Behind: The East German Economy in Comparison with West Germany 1936–2002* (2006; thesis 2003), via `east-west-germany.csv` (rounded statements, not a yearly table); Maddison 2006 East/West figures [UNVERIFIED]; World Bank WDI `NY.GDP.PCAP.PP.KD`, `wdi-gdppc-ppp-2021intl.csv`; Bank of Korea 2025 North Korea estimate [secondary], `bok-north-korea-gni-2025.csv`; growth rates and the Wu-vs-official China series, `growth-china-india.csv`. Acemoglu & Robinson, *Why Nations Fail* (2012), `C/research/texts/acemoglu-robinson/why-nations-fail.txt` l.789 (inclusive institutions), l.625 (Argentina's slide), l.709 (the Koreas). Burnham's forecast: `the-managerial-revolution.txt` l.3593–3605, l.3647–3659, l.3685–3692, l.3712–3725.
 
 - **J. Burnham, The Managerial Revolution: What Is Happening in the World (1941)** — summary index 73
   (read in full). Full text: `C/research/texts/burnham/the-managerial-revolution.txt` (7,979 lines;
@@ -320,22 +376,46 @@ ideology to the creed of the class he now opposed. One plain sentence makes the 
       fade away". Between 1989 and 1991 the Soviet bloc collapsed and much of eastern Europe joined
       Western institutions; liberalism did not fade. Readings: for Burnham's heirs, the reversal came
       despite liberalism, through the rearmament and resolve he called for; for his critics, liberal
-      states won the Cold War and the test refutes the thesis. The lesson sets out both and leaves the
-      weighing to the reader.
+      states won the Cold War and the test refutes the thesis. Both are set out here at full strength;
+      link 11 weighs them.
     - *The managerial thesis as description without a test:* the ruling-class definition is testable
       (incomes, control of access), but Burnham's own figures (Soviet income shares, the German state
       share of national income, "half or more" of Americans dependent on government) are asserted
       without sources — the reader should know which numbers are his.
-    Where the lesson concedes and holds: 1941's description of the large organization and the
-    administrative state lasted and its forecast of the war's winner did not; 1964's premise
-    (contraction by acreage) is true on its own measure, while its explanation (a failure of will
-    expressed by liberalism) is an argument whose test is stated and whose evidence is disputed.
+10b. **(Round 2) Forecast check: did the planned economy out-produce the market?** (300–500 words, inside the scorecard of link 6 or as its own short section after link 6 if link 10 runs long; set-piece line: "Two Koreas, one language, one peninsula: by 2022 the South produced about twenty-six times as much per head as the North.") Burnham's dated sentence (l.3685–3692) → the matched pairs (Koreas, Germanies with the 1936 baseline, China after 1978, India after 1991, Maddison 2023) → verdict, **established**, with the confounders named and the strongest objection (regimes, not orders) answered. Then the author's-review objection at full strength — markets make every adopter uniformly richer — and the answer: necessary, not sufficient (Argentina from 57–60% of US output per head in 1900–13 to 31% in 2022; Brazil and Mexico not converging; Acemoglu and Robinson's inclusive institutions, secure property and an unbiased law). Credit what Burnham got right (unemployment in the 1930s; "no necessary social virtue in 'planning'").
+11. **The weighing: the managers came, the managerial powers lost, and the suicide thesis is open.**
+    Set both theses against their strongest objections and the record and reach the verdict of
+    `## VERDICT`, claim → evidence → bearing (L10e). (i) 1941: the scorecard of link 6 and the forecast check of link 10b decide it — the planned economy did not out-produce the market (**established**); and —
+    the war forecasts failed and the description of the managed corporation and the administrative
+    state held — **established**. (ii) 1964: the premise (contraction by acreage) is true on its own
+    measure; the thesis that liberalism is the ideology of the contraction is scored by Burnham's own
+    test (l.2573). Read the test with his definition of liberalism (the nineteen propositions, guilt,
+    accommodation in place of rollback), not with liberal democracy: the reversal of 1989–91 came
+    under governments that had rejected détente in his sense, so "liberal states won" scores it in
+    the wrong sense of the word, and the postwar growth of the former imperial states is beside a
+    thesis defined by territory ruled. The heirs' reading needs evidence that the positions weakened
+    before the reversal; the critics' needs the word to mean what Burnham did not mean. **Open** — and
+    say what would settle it: a series on elite opinion on rollback against containment and on
+    decolonisation and guilt, 1964–2000, showing whether those positions weakened before or after the
+    reversal. The course does not have the series and says so.
+
+**Conclusion** (one or two short paragraphs, before Exercises): the verdict in plain words with its
+grades — established: Burnham's 1941 description of who runs the large organization and the
+administrative state held, and his forecasts of who would win the war failed; established too: his
+forecast that the planned economy would out-produce the market failed — the matched pairs (the Koreas,
+the Germanies, China after 1978, India after 1991) all run the other way — though markets are necessary
+for growth, not sufficient (Argentina); open: whether
+liberalism, in his sense, is the ideology of the West's contraction — 1989–91 does not settle it, and a
+series on elite opinion from 1964 to 2000 would. Then the hand-off: the last eight of his thirty-nine
+sentences are articles of the 1948 Declaration, which the next lesson reads against the module's
+critics (`udhr-read-against-the-right`).
 
 Headings as claims (suggested): "Three theories, one survivor"; "A ruling class is defined by control";
 "Abolishing property did not abolish class"; "Only the managers are technically necessary"; "Three
 roads to one society"; "The forecasts against the record"; "The West contracts with its power intact";
 "Nineteen propositions"; "Guilt, the enemy on the right, and the foxes"; "The test Burnham set
-himself".
+himself"; "The managers came, the managerial powers lost, and the suicide thesis is open". Eleven
+sections is too many for 45 minutes: merge links 2–3 and links 4–5 if the draft runs long.
 
 ## Set pieces and worked examples to recreate
 
@@ -364,9 +444,7 @@ himself".
 
 ## Pitfalls / subtleties to flag
 
-- **Register rule:** The course passes no verdict of its own on any author or idea: no condemning or
-  approving labels in its own voice. Judgement comes only through argument and evidence; a label may
-  appear only inside a quotation, with who applied it and when.
+- **Register rule:** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **The opening's "square miles":** Burnham gives no square-mile or percentage counts; his measure is
   the colours of an atlas and the phrase "cut to less than half of what it was in 1914". The opening
   is fixed; the first Suicide section states the measure exactly as Burnham does and says it is his
@@ -410,7 +488,7 @@ himself".
   mind"). One sentence; do not make the biography the argument.
 - **Balance:** the 1941 thesis and the 1964 thesis each at full strength first (the automobile company
   and the atlas are persuasive and should feel so), then the objections from the democratic record,
-  from the decolonized side, and from Burnham's own falsification test. The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+  from the decolonized side, and from Burnham's own falsification test. The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 
 ## FIGURE PLAN
 
@@ -480,7 +558,23 @@ himself".
    measure for "contraction" and for "liberalism" between 1964 and 2000, what result would confirm and
    what would refute it, and why the events of 1989–91 do not settle it without a further premise
    (whose doing the reversal was).
-8. **FORWARD (E7) → `udhr-read-against-the-right`:** the last eight of Burnham's 39 sentences are
+8. **Attack the verdict.** The lesson graded Burnham's 1964 thesis open. State the strongest objection
+   in its best form — that the West reversed its contraction in 1989–91 while remaining liberal, so the
+   thesis is refuted — and then the strongest objection from the other side — that the reversal came
+   from leaders who had rejected détente, so the thesis is confirmed. For each, name the premise it
+   needs that the course's evidence does not supply, and describe the series (whose opinion, on which
+   of Burnham's propositions, which years) that would move the verdict off open in its direction.
+8b. **(Round 2) Attack the forecast-check verdict.** The lesson graded "market economies outperform
+   planned ones" established. State the strongest objection in its best form (the pairs compare
+   regimes and aid, not economic orders; East Germany paid reparations; the North fought a war), and
+   say what evidence would overturn the verdict: a planned economy at parity with a matched market
+   economy over decades. Then state at full strength the opposite overreach — that every country that
+   adopts markets grows uniformly richer — and test it on Argentina 1913–2022 and Brazil and Mexico
+   1950–2022 (Maddison 2023, shares of US output per head). Solution: the pairs survive their
+   confounders because the within-country turns of China (1978) and India (1991) hold people and place
+   fixed; the overreach fails because market economies without secure property and an unbiased law did
+   not converge — necessary, not sufficient.
+9. **FORWARD (E7) → `udhr-read-against-the-right`:** the last eight of Burnham's 39 sentences are
    articles of the 1948 Declaration (e.g. "The will of the people shall be the basis of the authority
    of government"; "Everyone, as a member of society, has the right to social security"). For three
    of them, name the L-proposition each one expresses and say what Burnham's use of them assumes about

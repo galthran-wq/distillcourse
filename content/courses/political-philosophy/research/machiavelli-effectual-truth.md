@@ -22,10 +22,13 @@ goal: Analyze Machiavelli's argument that a prince must learn how not to be good
   the lion — backed by cases from the Italian wars he watched. The lesson reconstructs the rules
   WITH their examples and puts to them the strongest objection the reader already owns:
   Aquinas's "tyranny does not pay" and Augustine's "splendid vices" read backward.
-- **Hands off:** Open problem: if the prince must rest on the people (IX) and the people's end
-  is "more decent" (they want only not to be oppressed), what regime does Machiavelli's own
-  analysis favour — and was Machiavelli a Machiavellian? `machiavelli-discourses-republic` takes
-  it. The standard itself (effectual truth) is reused there and attacked in `bodin-sovereignty`
+- **Hands off:** The dispute with Aquinas is settled inside this lesson as a fact about the
+  argument: it largely dissolves into Machiavelli's own rule (never be hated), which concedes
+  Aquinas's mechanism and disputes only whether fear can be had without hatred. What passes on:
+  if the prince must rest on the people (IX) and the people's end is "more decent" (they want
+  only not to be oppressed), what regime does Machiavelli's own analysis favour — and was
+  Machiavelli a Machiavellian? `machiavelli-discourses-republic` takes it and answers it (one
+  standard, two books), and judges his republican thesis on conflict and liberty. The standard itself (effectual truth) is reused there and attacked in `bodin-sovereignty`
   (treaties, fear vs affection) — forward hooks, one clause each.
 - **Spine step:** "Christendom builds a law above kings; Machiavelli breaks it; the wars of
   religion force one sovereign power above every faction — Bodin's definition, Hobbes's
@@ -179,8 +182,13 @@ ruined (XV). Either the advice was wrong or the standard was.
    break "at every opportunity" (XVII), and the remedy for hatred is not virtue but keeping off
    property and women and resting on the people (XIX–XX: "the best possible fortress is not to
    be hated"). So the disagreement narrows to an empirical claim: whether fear without hatred is
-   a stable state. The lesson concedes what Machiavelli concedes: Agathocles got empire "but not
-   glory" (VIII) — the ledger has a column he does not fill.
+   a stable state — and on the mechanism it largely dissolves: Machiavelli's own rule ("not to
+   be hated") grants Aquinas that a hated ruler falls, and the two differ only on whether fear
+   can be kept apart from hatred. The lesson says so in the course's voice: Machiavelli answers
+   Aquinas's prudential objection with his own rule, in Aquinas's terms; he does not answer
+   Augustine's — he accepts the description (virtue serving glory) and changes the standard by
+   which it would count as a charge. And he concedes what Augustine would press: Agathocles got
+   empire "but not glory" (VIII) — the ledger has a column he does not fill.
 6. **People or nobles?** IX: every city has two humours — the people desire not to be commanded
    or oppressed, the great desire to command and oppress; a prince raised by the nobles has
    equals who cannot be satisfied, one raised by the people has subjects who ask only not to be
@@ -188,8 +196,9 @@ ruined (XV). Either the advice was wrong or the standard was.
    only for a private citizen who expects the people to rescue him (l.1638–1649). XIX's Roman
    emperors (Marcus to Maximinus) as the natural experiment: those who satisfied soldiers
    against the people fell with the soldiers. This is where "was Machiavelli a Machiavellian?"
-   is asked as the course's own question and left open — the people's end is "more decent"; the
-   prince needs them; so what regime does the analysis favour? Hand off to the Discourses.
+   is asked as the course's own question — the people's end is "more decent"; the prince needs
+   them; so what regime does the analysis favour? The next lesson answers it from the
+   Discourses (one standard applied to two questions); hand off to it.
 7. **What of fortune?** XXV: fortune arbiter of half our actions; a river in flood that men can
    dyke in quiet times; success is the FIT between a man's method and the times (Julius II's
    impetuosity suited his times; a cautious man would have failed), and since men cannot change
@@ -267,9 +276,7 @@ the people, not the great"; "Fortune is a river: dykes, timing and the fit to th
   the Frederick the Great "King Chance" footnote, the arrest-and-torture footnote beyond one
   clause, the Third Man film clip from the lectures. Keep the Italian-wars chronology to the
   decade and to the four or five names above.
-- **Register:** The course passes no verdict of its own on any author or idea: no condemning or
-  approving labels in its own voice. Judgement comes only through argument and evidence; a label
-  may appear only inside a quotation, with who applied it and when. The body states the
+- **Register:** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. The body states the
   arguments; the charge that the book teaches evil openly appears only as a charge, attributed
   (Strauss, 1958, References), never as the course's verdict.
 - **Fortune as a woman (XXV):** report the sentence and its argumentative work (impetuosity
