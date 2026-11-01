@@ -16,24 +16,24 @@ goal: Construct the position the verdicts support as a derivation — graded pos
 
 ## VERDICT
 
-This lesson carries no new verdict. Its grades are the register's, composed by one rule: **a postulate is graded by the register's grade for the verdicts that ground it (the weaker, where it has two halves); a thesis is no firmer than its weakest premise.** The two value premises (P16, P17's second half) are graded `argued`.
+Its postulate and thesis grades are the register's, composed by one rule: **a postulate is graded by the register's grade for the verdicts that ground it (the weaker, where it has two halves); a thesis is no firmer than its weakest premise.** The value premises (P16, P17's second half, and the common-ground premise "peace over war") are graded `argued`; "offices to the capable" is common ground with no grade. A postulate no thesis uses (P13) is a background premise. The lesson's own Verdicts (two hard cases and six critics; hard case 2 is prose, no Verdict) are entered in `verdicts/REGISTER.md` under "the-doctrine".
 
 Composite grades this lesson states (derived here, each from register grades; the writer must not round any upward):
 
 | Item | Grade | Weakest load-bearing ground |
 |---|---|---|
 | T1 mixed, limited regime | **on balance** (its "settled last word under law" part **strong**) | P6 as a tendency (on balance); capacity kept only with competition and removability (`michels-and-pareto-oligarchy-and-elites` second verdict, on balance) |
-| T2 liberal freedom does not found itself | **on balance** | P8 (Böckenförde premise, on balance) |
-| T3 control of membership | **on balance** | Miller over Carens (on balance) |
+| T2 liberal freedom does not found itself | **on balance** | P4 and P8 (both on balance); P6 for the step from markets to freedom |
+| T3 control of membership | **on balance** | P8 and Miller over Carens (both on balance) |
 | T4 membership cultural, not racial | **strong** | P9 (strong); P1's equal-standing half (strong) |
 | T5 market with guaranteed minimum | **on balance** | the floor as common ground (`the-cognitive-elite`, on balance) |
 | T6 public precedence for the historic culture | **on balance** | P8 (on balance) |
 | T7 no inherited guilt | **strong** | `inherited-guilt-and-reparations` (a)–(d), each strong |
-| T8 power between peoples, cooperation among free states | **on balance** | P15(a), the Melos description (`thucydides-power-and-justice`, on balance) |
-| T9 radical alternatives excluded | **on balance** overall; each part at its own grade | the decider (on balance) |
+| T8 power between peoples, cooperation among free states | **on balance** | P15(a), the Melos description (`thucydides-power-and-justice`, on balance); its "should" from peace over war (argued) |
+| T9 radical alternatives excluded | **on balance** overall; each part at its own grade (racial nation established, from its failing its own tests; conservative revolution on balance, strong for Moeller; conquest strong; ownership strong, established against Aristotle's version) | the decider (on balance) |
 | Hard case 1, screening by declared hostility to the constitutional order | **on balance** | T1, T3 |
 | Hard case 1, screening by religion as such | **open** | no data separating religion from origin, sex, education and ideology |
-| Hard case 2, how many is too many | **open** (the criterion is derived; the number is not) | integration by cohort not bound |
+| Hard case 2, how many is too many | prose, no Verdict: the criterion is derived, the number is not | integration by cohort not bound |
 | Hard case 3, nation-building over generations | **open** | Third Republic [secondary]; Hungary's cohesion unmeasured |
 
 ## Register against plan (where the register governs)
@@ -202,11 +202,11 @@ Bearing: of the six, the critics that remain open hit P8 (MacIntyre, the post-li
 
 ### V. What stays open (heading: "Five questions stay open, and each would move a named postulate or thesis") — ~200 words
 
-A table (figure 3) and one short paragraph. Rows: the genetic share of group gaps (moves nothing in T1–T9 — shown at T4; settled by sibling-difference admixture designs and within-family genomic studies in African-ancestry samples); the cause of the West's rise (moves P17's cause, not its worth; if the cause were the institutions T1 and T2 name, it would strengthen T2; settled by within-Europe timing designs); whether a free state can build a nation over generations (hard case 3; moves T2's "on demand" and T3's scope); the number at which immigration is too many (hard case 2; moves the application of T3); the line between screening by ideology and by religion (hard case 1; moves T3's practice and T6's limit). The paragraph states the sensitivity result the map shows: P8 is the postulate most theses rest on (T2, T3, T6) and the weakest of them; a bound diversity-and-trust series is the single piece of evidence that would move the most.
+A table (figure 3) and one short paragraph. Rows: the genetic share of group gaps (moves nothing in T1–T9 — shown at T4; settled by sibling-difference admixture designs and within-family genomic studies in African-ancestry samples); the cause of the West's rise (moves P17's cause, not its worth; if the cause were the institutions T1 and T2 name, it would strengthen T2; settled by within-Europe timing designs); whether a free state can build a nation over generations (hard case 3; moves T2's "on demand" and T3's scope); the number at which immigration is too many (hard case 2; moves the application of T3); the line between screening by ideology and by religion (hard case 1; moves T3's practice and T6's limit). The paragraph states the sensitivity result the map shows: seven theses rest on at least one on-balance premise (P8 under T2, T3, T6; P4/P6 under T1, T2, T5, T9; Miller under T3; P15 under T8; the floor under T5). P6 sits under the most theses; P8's distinction is that its deciding evidence, a bound diversity-and-trust series, is named and not yet gathered, and three critics (Rawls, MacIntyre, Habermas) land on it.
 
 ### Conclusion (`<Conclusion>`, ~150 words)
 
-In plain words: the doctrine is seventeen premises, two of them value premises argued, the rest graded on the record; nine theses each derived from named premises; the position they compose — a free state, limited, ruled by a removable few under law, living on a nation and an inherited culture it cannot produce on demand, controlling its membership within duties of rescue, open to anyone who takes on its culture and closed to status by descent, with a market and a floor, and no inherited guilt. Its grade is on balance, because P8 is. What the reader can now do: take any proposal, find the thesis it falls under, trace it to its postulates, and say what would overturn it. The optional continuation: the Nietzsche course (`nietzsche/nietzsche-and-politics`). Nothing in this course comes next.
+In plain words: the doctrine is seventeen premises, two of them value premises argued, the rest graded on the record; nine theses each derived from named premises; the position they compose — a free state, limited, ruled by a removable few under law, living on a nation and an inherited culture it cannot produce on demand, controlling its membership within duties of rescue, open to anyone who takes on its culture and closed to status by descent, with a market and a floor, and no inherited guilt. Two theses are strong and seven on balance, each of the seven resting on at least one on-balance premise; P8 is the one whose deciding evidence is named and not yet gathered. What the reader can now do: take any proposal, find the thesis it falls under, trace it to its postulates, and say what would overturn it. The optional continuation: the Nietzsche course (`nietzsche/nietzsche-and-politics`). Nothing in this course comes next.
 
 ## Set pieces and worked examples to recreate
 
@@ -262,20 +262,20 @@ In plain words: the doctrine is seventeen premises, two of them value premises a
      | P10 | Rome's worship (m2, strong); secularization forecast failed (m15, strong) |
      | P11 | Burke general (m4, on balance); Maistre fails (m4, strong) |
      | P12 | laws of decline fail (m1, m2, m7, m11, strong; m6 established); Polybius forecast (m2, strong); Spengler parliaments failed (m7, strong); recovery after Rome (m12, on balance) |
-     | P13 | Condorcet's material forecasts (m9, strong); Fukuyama spread failed (m11, strong) |
+     | P13 | Condorcet's material forecasts (m9, strong); Fukuyama spread failed (m11, strong) — background premise, feeds no thesis |
      | P14 | markets outperform planned (m9, established); institutions alone produce gaps (m13, established) |
      | P15 | Melos description (m1, on balance); right of the stronger fails as right (m14, strong); republican peace (m11, strong) |
      | P16 | argued; rule by knowledge untested (m1); Carlyle (m5, strong); Stephen–Mill (m5, strong); decider (m7); Vermeule (m16); franchise (m5, strong); civil core (m9, strong); 2026 vote (m16, strong) |
      | P17 | argued; science after 1400 (m12, strong); wealth from 1300 (m12, on balance); no continuous lead (m12, strong); cause (m12, open) |
-     | T1 | P1, P4, P5, P6, P16 |
-     | T2 | P4, P7, P8, P9, P14, P16 |
-     | T3 | P7, P8, P9, P16; Miller over Carens (m15); 2015 (m15); Carens's movers (m15); fiscal checks (m15) |
-     | T4 | P1, P9; racial account fails; Barrès (b) (m6, strong) |
-     | T5 | P1, P3 (idle), P6, P14; floor (m10, on balance); merit case (m10) |
-     | T6 | P8, P9, P10, P16; no neutral state (m16, strong); civil core (m9, strong) |
+     | T1 | P1, P2, P4, P5, P6, P16; common ground: offices to the capable; 1642 and 1689 (m3); capacity with removability (m1, m7); Weimar (m7); Fourth Amendment (m16) |
+     | T2 | P4, P6, P7, P8, P9, P14, P16; liberal principles alone do not suffice (m16) |
+     | T3 | P7, P8, P9, P16; Miller over Carens (m15); integration by itself failed (m15); fiscal checks (m15) |
+     | T4 | P1, P9, P16; racial account fails (m6, m13, established); Barrès (b) (m6, strong); regimes not by genes (m13, strong); within-group heritability cannot apportion a between-group gap (m13, established); facts about heredity settle no policy (m13, strong) |
+     | T5 | P1, P3 (idle), P6, P14, P16; floor (m10, on balance); merit case (m10); heavy redistribution makes a nation poor fails (m10, on balance) |
+     | T6 | P8, P9, P10, P16, P17; no neutral state (m16, strong); civil core (m9, strong); Rome's worship (m2, strong) |
      | T7 | P7; inherited guilt (a)–(d) (m14, strong) |
-     | T8 | P5, P15; EU charge (m16) |
-     | T9 | P1, P4, P6, P11, P15; decider (m7, m8); racial nation; Moeller (m8); unjust titles (m14); ownership (m1, m14) |
+     | T8 | P5, P15; common ground: peace over war (argued); Melos (m1); republican peace (m11); right of the stronger (m14); EU charge (m16) |
+     | T9 | P1, P4, P6, P9, P11, P12, P15; decider (m7, m8); racial nation; Moeller (m8); unjust titles (m14); ownership (m1, m14) |
 
 2. `draw:` single `<Figure>` — **Allows and forbids** (III): a two-column table, each row: the item, its thesis (T-number), its grade; the two *added* items marked as following from a thesis's limits. Wide-table container.
 3. `draw:` single `<Figure>` — **The doctrine's critics and its open questions** (IV–V): table A — critic, objection in one line, target postulate/thesis, answer, grade; table B — open question, what would settle it, which postulate or thesis it moves. Wide-table container.
@@ -290,7 +290,7 @@ No sourced images: the lesson is a derivation from the course's own verdicts.
 4. *Apply — an ideological ban*: An association preaches that the constitution is void and law must be replaced by religious law; another is a congregation of the same faith that preaches no such thing. Which may be banned, under which thesis? Solution: the first falls under T1 and T3 (hostility to the constitutional order; on balance), with the 1932 criterion that a constitution may deny the equal chance to those who would use legality to abolish it (`<Ref the-right-in-1933>`) as the precedent the doctrine shares; the second may not (T6, religious liberty; hard case 1 open on religion as such). State the grade and what would move it.
 5. *Apply — a reparations claim*: (a) Descendants of people enslaved before 1865 claim reparation from the state; (b) people now living who were refused mortgage insurance in the 1960s because of their neighbourhood claim against the same state. Solution: (a) as a claim of guilt, T7 refuses it — guilt does not pass (strong); as a claim of liability against a state that has persisted since 1865, T7 does not exclude it in principle (liability passes through persisting institutions, strong), but a remedy measured by what the claimants' position would have been without the wrong cannot be computed (indeterminacy, non-identity, choice of baseline: strong), and supersession is possible, not automatic — so the claim fails in its counterfactual form and the doctrine says what form could succeed (a wrong whose effects run, through a persisting institution, to people now alive); (b) owed repair (strong) — T7's third clause; the doctrine forbids refusing it.
 6. *Spaced retrieval across the course (E3)*: For P5, P7 and P12, name the event or text that grounds each (1642/1689; Barrès and Hume; Spengler's parliaments and Polybius's forecast), the lesson that judged it, and its grade — one clause and a Ref each.
-7. *Attack the doctrine at its weakest postulate (claim–evidence–reasoning; last; E7)*: Identify the postulate on which the most theses rest and whose grade is lowest; attack it at full strength from whichever side you think strongest, say which theses fall if the attack succeeds, and name the evidence that would overturn it. Solution (labelled "possible answers"): P8 (on balance; under T2, T3, T6). Liberal attack: Habermas plus the EU-second-generation result plus the Third Republic — a free state can produce its solidarity over generations; succeeds if a bound diversity-and-trust series shows no fall and a bound Third Republic account shows a nation built under free institutions; then T2's "on demand" stands but T3's case for selection weakens and T6 loses its ground. Post-liberal attack: MacIntyre plus Deneen — the loyalty cannot outlast the lost account of the good, so P8 understates the problem; succeeds if a cohesion series shows liberal institutions eroding the supplement faster than any free state restores it; then P16 is under pressure and T2's "keep" with it. Each answered at the register's grade; neither preferred over the evidence. The solution ends with the forward clause: the reader has reached `nietzsche/nietzsche-and-politics`, where the most radical answer to the question beneath P16 is read (optional continuation).
+7. *Attack the doctrine at P8 (claim–evidence–reasoning; last; E7)*: P8 is named in the task as the on-balance postulate whose deciding evidence is named and not yet gathered (as written, the lesson's attack from the other side is MacIntyre's alone, since the post-liberals target P16 and T1); attack it at full strength from whichever side you think strongest, say which theses fall if the attack succeeds, and name the evidence that would overturn it. Solution (labelled "possible answers"): P8 (on balance; under T2, T3, T6). Liberal attack: Habermas plus the EU-second-generation result plus the Third Republic — a free state can produce its solidarity over generations; succeeds if a bound diversity-and-trust series shows no fall and a bound Third Republic account shows a nation built under free institutions; then T2's "on demand" stands but T3's case for selection weakens and T6 loses its ground. Post-liberal attack: MacIntyre plus Deneen — the loyalty cannot outlast the lost account of the good, so P8 understates the problem; succeeds if a cohesion series shows liberal institutions eroding the supplement faster than any free state restores it; then P16 is under pressure and T2's "keep" with it. Each answered at the register's grade; neither preferred over the evidence. The solution ends with the forward clause: the reader has reached `nietzsche/nietzsche-and-politics`, where the most radical answer to the question beneath P16 is read (optional continuation).
 
 ## Nietzsche cross-course links
 

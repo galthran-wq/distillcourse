@@ -678,6 +678,25 @@ Adopted in `intro` (2026-11-01), with one clause added by the author after round
 
 ---
 
+## The doctrine (`the-doctrine`)
+
+The lesson composes the verdicts above into 17 postulates and 9 theses (grades composed, no new evidence). Its own Verdicts weigh hard cases and critics against those grades; none adds a new finding, and none is counted in the Balance table below.
+
+### Hard cases
+- Hard case 1 — May a free state screen applicants by religion as such, rather than by declared hostility to its constitutional order? → **Open.** For: second-generation Muslims keep their parents' religiosity, and integration by itself failed for the non-EU second generation (both **strong**, module 15). Neither finding separates religion from origin, education, sex and declared ideology. Screening by declared hostility follows from T1 and T3, **on balance**. Decided by: no series separating religion from those four in predicting integration. Would be overturned by: integration outcomes by cohort, employment by sex, second-generation attachment and age-and-sex-adjusted suspect rates with religion separated from them.
+- Hard case 2 — How many is too many? → No Verdict (prose). The criterion follows from T3 and P8 (a cohort stops converging on the population in employment by sex, second-generation outcomes and trust); the number cannot be derived until a series relating cohort size and composition to integration is gathered.
+- Hard case 3 — Can a free state produce over generations the solidarity it cannot produce on demand? → **Open.** Decided by: the cases for and against are partial; the strongest case for (the Third Republic) rests on a summary of one book [secondary], and Hungary's cohesion is unmeasured. Would be overturned by: a checked account of a nation built under free institutions within a generation or two, or a cohesion series moving with a deliberate schooling programme and not with the economic cycle.
+
+### Critics
+- Rawls (hits P8, T2) → his objection does not overturn P8; his stability route is untested. Grade: **on balance** (the stability route **open**). Decided by: his theory presupposes a bounded people (§58); integration did not by itself produce allegiance. Would be overturned by: support for just institutions forming at equal rates in groups with and without a prior shared identity.
+- Carens (hits T3) → does not overturn T3; the duty to those above the floor of rescue stays **open**. Grade: **on balance**. Decided by: a right to some adequate place, not this one; the movers' inference failed (**strong**). Would be overturned by: an argument that equal worth grounds a right to enter this state, or evidence that under free access realised migration runs far below stated desire.
+- MacIntyre (hits P9, T6, and through them P8) → whether a burden-bearing loyalty can outlast the lost tradition is **open**. Decided by: no evidence measures it. Would be overturned by: a cohesion series in societies that lost a shared religion, tracked against willingness to bear burdens for strangers.
+- Habermas (hits P8) → leaves P8 standing; bears on hard case 3. Grade: **on balance**. Decided by: P8 claims only the motivational dependence, which he grants. Would be overturned by: the trust-and-transfers series P8 names, showing no fall where shared identity weakens.
+- The post-liberals (hit P16 and T1) → the remedy fails, **on balance**: it offers no check that could replace the removable rulers of T1. Decided by: Vermeule's safeguard lies in officials' good faith (**on balance**); the majority that wrote its presuppositions into Hungary's constitution overrode its court (Fourth Amendment, **strong**). Cohesion under that constitution is unmeasured (**open**) and is not used as evidence; the causal claim (liberalism, not wealth or technology, dissolved the bonds) is **open**. Would be overturned by: a mechanism in the theory, not in officials' character, that can block a governing majority's determination.
+- The racial right (hits T4, P9) → the racial nation fails as a ground of membership; T4 does not rest on the genetic share being zero. Grade: **established**. Decided by: the racial accounts fail on their own tests (modules 6, 13); within-group heritability cannot apportion a between-group gap. Would be overturned by: an independent measure of ancestry that predicts the rise and fall of civilizations better than institutional or ecological causes.
+
+---
+
 ## Balance
 
 **Counting rule.** Every graded item in this register is counted once, by the claim it judges: whose claim it is (right-leaning, or left/liberal) and whether it was upheld or failed. A sub-verdict counts separately. Items on no left–right axis are left out: Polybius, Augustine, the Altar, Thucydides, Machiavelli, Jay, Toynbee (a), Weber, the Koreas and Diamond, Burke's defence against Hastings, Sorel (claimed by both extremes), and "facts settle policy" (fails for both). Open, pending and untestable items are left out too. A verdict against a claim is not counted again as a verdict for its rival. Where a lesson splits, each half is counted.
