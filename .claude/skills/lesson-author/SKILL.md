@@ -78,7 +78,11 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
    apparatus: which statements become `<Definition>`/`<Theorem>`/`<Lemma>`/
    `<Proposition>`/`<Corollary>`/`<Proof>`
    (only where genuinely mathematical — L5; for non-mathematical material
-   use `<Remark>` and prose), where the worked `<Example>`s and their
+   use `<Remark>` and prose), whether the lesson ends a dispute it staged
+   with a `<Verdict>` (L17 — only in subjects settled by evidence and
+   argument, never in a math or ML lesson; where the course keeps
+   `research/verdicts/REGISTER.md`, exactly when it assigns this lesson a
+   verdict, with its claim and grade), where the worked `<Example>`s and their
    paired in-body exercises go (math overlay), where the `<Demo>` embed
    goes (if specced), whether the material meets a GENUINE documented
    misconception (L13 — if yes, plan the refutation; if no, no slot),
@@ -176,6 +180,19 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
      make it add the condition, the counterexample, or the consequence the
      course reaches later. Same test for `<Remark>`/`<Aside>`: delete it; if
      nothing is lost, it was never worth boxing.
+   - A verdict (L17) is one `<Verdict grade="…" decidedBy="…"
+     overturnedBy="…">` closing the section that weighs the two sides —
+     after both have been put at full strength, never before. The claim is
+     one or two declarative sentences that say which side wins and why;
+     the `<Conclusion>` restates it in plain words. Neither, nor the prose
+     around them, says it more firmly than the grade: "on balance" is not
+     "shows", "open" is not a lean. No verdict in a math or ML lesson, and
+     none invented for a lesson whose dispute it cannot settle.
+   - A doctrine reconstructed as a derivation (L17) states its premises as
+     `<Postulate grade="…" grounds="…">` (`argued` for a value premise) and
+     its conclusions as `<Thesis from="P1, P3; Verdict 2.1">`, each thesis
+     no firmer than its weakest premise. Same scope as `<Verdict>`: never
+     in a math or ML lesson.
    - Sources are never named in the body (L8a) — not in prose, callouts,
      environment titles, captions, exercises or solutions. The brief and
      the cached texts are where YOU learn the material; the reader gets the

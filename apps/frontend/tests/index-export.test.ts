@@ -9,7 +9,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
 import rehypePrettyCode from "rehype-pretty-code";
-import { Conclusion } from "@/components/mdx/Blocks";
+import { Conclusion, Verdict } from "@/components/mdx/Blocks";
 import { courseDocuments, type IndexDocument } from "@/lib/content/index-export";
 import type { LoadedCourse, LoadedLesson } from "@/lib/content/load";
 
@@ -48,6 +48,8 @@ const LESSON_MDX = [
   '<Demo name="Thing" />',
   "",
   '<Ref lesson="other" />' + " opened the question.",
+  "",
+  '<Verdict grade="on balance" decidedBy="the record.">The settlement lasted.</Verdict>',
   "",
   "<Exercise>",
   "  <Task>Do it.</Task>",
@@ -159,6 +161,7 @@ async function renderedIds(mdx: string): Promise<string[]> {
         Figure: () => null,
         Demo: () => null,
         Conclusion,
+        Verdict,
       },
     }),
   );
@@ -215,6 +218,8 @@ describe("courseDocuments", () => {
     expect(chunk.text).not.toContain("log2(x)"); // …to its opening line
     expect(chunk.text).toContain("The other lesson opened the question."); // <Ref>
     expect(chunk.text).toContain("Answer one."); // solutions are indexed
+    // a verdict keeps its grade, and its tests, which are props
+    expect(chunk.text).toContain("Verdict (on balance). The settlement lasted.\nDecided by: the record.");
     expect(lessonChunks(exportDocuments(), "main")[1].text).toContain("\\alpha");
   });
 

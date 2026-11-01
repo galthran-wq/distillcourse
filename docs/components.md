@@ -30,6 +30,46 @@ theorems (history, philosophy, speech, music) use `<Remark>` and plain prose
 - `<Example title?="…">…</Example>` — worked example, every step shown (L7).
 - `<Remark title?="…">…</Remark>` — numbered note; the generic
   in-text environment for any subject.
+- `<Verdict grade="strong" decidedBy?="…" overturnedBy?="…">…</Verdict>` —
+  the graded answer to a dispute the lesson staged and weighed (pedagogy
+  L17), set like a result with its own counter, the claim upright:
+  "Verdict 4.2 *(strong).*" `grade` is required and one of `established`,
+  `strong`, `on balance`, `open` (anything else is a validation error).
+  `decidedBy` (the evidence or argument that settles it) and `overturnedBy`
+  (what finding would reverse it) are plain-text props, written as they
+  should read after their labels, full stop included; they share one line
+  under the claim. Only for subjects whose disputes are settled by evidence
+  and argument — history, philosophy, political theory, social science,
+  contested empirical claims. Never in a math or ML lesson: there a result
+  is proved (`<Theorem>`, `<Proposition>`) or measured.
+
+  ```mdx
+  <Verdict
+    grade="strong"
+    decidedBy="the post-1689 record."
+    overturnedBy="showing that the 1689 limits did not bind."
+  >
+  Hobbes's claim that a mixed or limited monarchy cannot stand fails: the
+  settlements of 1660 and 1689 divided power and lasted.
+  </Verdict>
+  ```
+- `<Postulate grade="argued" grounds?="…" overturnedBy?="…">…</Postulate>` —
+  a premise of a doctrine set out as a derivation (pedagogy L17), set like a
+  Verdict and numbered through the lesson, not per section: "Postulate 3
+  *(strong).*", cited in prose and in a thesis's `from` as P3. `grade` is
+  required: one of the four verdict grades, or `argued` for a value premise
+  that is argued for rather than measured. `grounds` (what supports it) and
+  `overturnedBy` share one line under the statement.
+- `<Thesis from="P3, P4; Verdicts 15.2, 15.4" grade?="…">…</Thesis>` — what
+  the doctrine derives, numbered through the lesson (T1, T2…): "Thesis 3
+  *(on balance; from P3, P4; Verdicts 15.2, 15.4).*" `from` is required and
+  names the postulates and verdicts the thesis follows from; `grade`
+  (postulate scale) is optional.
+
+The three graded environments share a scope: subjects settled by evidence
+and argument, never math or ML. A one-line `<Verdict …>claim</Verdict>`
+parses as inline MDX; write the opening and closing tags on their own lines,
+as in the example. The props are plain text — no math, links or `<Ref>`.
 
 ## Callouts
 

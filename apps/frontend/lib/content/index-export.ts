@@ -13,6 +13,7 @@ import { rawUrlBase } from "../labs/mirror";
 import type { LoadedCourse, LoadedLesson } from "./load";
 import { CONCLUSION_ANCHOR, lessonKey, type Corpus } from "./locator";
 import { isMdxJsxNode, stringAttr, type MdxJsxNode } from "./mdx-jsx";
+import { gradedAttrs, gradedNote, gradedTests, isGraded } from "./graded";
 import { isReadable } from "./visibility";
 
 /**
@@ -182,7 +183,16 @@ function extractJsx(node: JsxNode, out: Segment[]): void {
   }
   const inline = node.type === "mdxJsxTextElement";
   if (!inline) out.push({ text: "\n\n", code: false });
+  // The grade travels with the claim, so it is never quoted firmer than it
+  // was graded; the tests are props, which nothing else here reads.
+  const graded = isGraded(name) ? gradedAttrs(node) : undefined;
+  if (graded !== undefined) out.push({ text: `${name} (${gradedNote(graded)}). `, code: false });
   extract(node.children ?? [], out);
+  if (isGraded(name)) {
+    for (const [label, value] of gradedTests(name, graded ?? {})) {
+      out.push({ text: `\n${label} ${value}`, code: false });
+    }
+  }
   if (!inline) out.push({ text: "\n\n", code: false });
 }
 

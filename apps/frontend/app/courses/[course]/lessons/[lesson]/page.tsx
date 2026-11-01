@@ -31,6 +31,7 @@ import {
   KeyFact,
   Lemma,
   Original,
+  Postulate,
   Quote,
   Proof,
   Proposition,
@@ -39,6 +40,8 @@ import {
   Solution,
   Task,
   Theorem,
+  Thesis,
+  Verdict,
 } from "@/components/mdx/Blocks";
 import { lessonKey, lessonPage } from "@/lib/content/locator";
 import { compileLesson } from "@/lib/content/render";
@@ -131,6 +134,9 @@ export default async function LessonPage({
     Proof,
     Example,
     Remark,
+    Verdict,
+    Postulate,
+    Thesis,
     KeyFact,
     Task,
     Conclusion,

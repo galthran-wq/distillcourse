@@ -93,6 +93,32 @@ describe("lintCourse", () => {
     expect(errors(lintDir(dir)).map((d) => d.rule)).toContain("component-unknown");
   });
 
+  it.each([
+    ["a verdict off the scale", '<Verdict grade="likely">A.</Verdict>'],
+    ["a verdict without a grade", "<Verdict>A.</Verdict>"],
+    ["a verdict graded as a value premise", '<Verdict grade="argued">A.</Verdict>'],
+    ["a postulate without a grade", "<Postulate>A.</Postulate>"],
+    ["a thesis off the scale", '<Thesis from="P1" grade="likely">A.</Thesis>'],
+    ["a thesis that follows from nothing", '<Thesis grade="strong">A.</Thesis>'],
+  ])("flags %s (env-grade)", (_, block) => {
+    const dir = brokenCopy((d) =>
+      rewrite(join(d, "lessons/intro-surprise/lesson.mdx"), "<Example>", `${block}\n\n<Example>`),
+    );
+    expect(errors(lintDir(dir)).map((d) => d.rule)).toContain("env-grade");
+  });
+
+  it("passes graded environments on their scales (env-grade)", () => {
+    const blocks = [
+      '<Verdict grade="on balance" decidedBy="the record.">A.</Verdict>',
+      '<Postulate grade="argued" grounds="an argument.">B.</Postulate>',
+      '<Thesis from="P1">C.</Thesis>',
+    ].join("\n\n");
+    const dir = brokenCopy((d) =>
+      rewrite(join(d, "lessons/intro-surprise/lesson.mdx"), "<Example>", `${blocks}\n\n<Example>`),
+    );
+    expect(errors(lintDir(dir))).toEqual([]);
+  });
+
   it("flags unparseable MDX (mdx-compile)", () => {
     const dir = brokenCopy((d) =>
       rewrite(join(d, "lessons/intro-surprise/lesson.mdx"), "<Example>", "<Example"),
