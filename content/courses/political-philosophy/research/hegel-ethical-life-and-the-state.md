@@ -9,20 +9,31 @@ goal: Analyze Hegel's argument that freedom is realised only in family, civil so
 
 - **Inherits:** The whole module. From `locke-property-and-consent`: property by
   labour and consent as the ground of government; from
-  `rousseau-inequality-and-general-will`: the general will, total alienation,
-  "forced to be free", and the open difficulty (a universal assembled from
-  individual wills); from `burke-reflections`: the entailed inheritance, the
-  partnership of generations, prejudice as reason men inherit, and the forward
-  question whether a standard "in the process" can judge the process; from
-  `maistre-and-bonald`: no constitution is made by deliberation, Providence uses
-  men, and the last exercise's thought that an order might be rational without
-  being designed. From `kallipolis-and-the-philosopher-king`: Plato's abolition
-  of property and family for the guardians (Hegel's foil at §46 and §185); from
-  `aristotle-political-animal-and-natural-slavery`: the city prior to the
-  individual (Hegel's ancestor at §258) and natural slavery (§57); from
+  `hume-against-the-original-contract`: government founded on opinion, the
+  denial that any actual state began in a contract, time turning force into
+  title — Hegel will agree that the state's origin settles nothing and deny that
+  opinion and utility are its ground; from `rousseau-inequality-and-general-will`:
+  the general will, total alienation, "forced to be free", and the open difficulty
+  (a universal assembled from individual wills); from `burke-reflections`: the
+  entailed inheritance, the partnership of generations, prejudice as reason men
+  inherit, and the forward question whether a standard "in the process" can judge
+  the process; from `maistre-and-bonald`: no constitution is made by deliberation,
+  Providence uses men, "there is no such thing as man", and the open problem that
+  lesson closed on — is there an account on which the state is rational AND not
+  designed? From `herder-and-fichte-volk-and-nation` (the prerequisite): the
+  `volk` as a community of language, custom and memory prior to any state, the
+  `plurality-of-cultures`, Fichte's `language-as-nation` and his national
+  education, with the state as the instrument of the nation's eternity — Hegel's
+  answer is that "a nation does not begin by being a state" (§349) and becomes
+  actual and sovereign only as one; Hegel names Fichte three times (Preface,
+  §258 Remark, §273 Remark). From `kallipolis-and-the-philosopher-king`: Plato's
+  abolition of property and family for the guardians (Hegel's foil at §46 and
+  §185); from `aristotle-political-animal-and-natural-slavery`: the city prior to
+  the individual (Hegel's ancestor at §258) and natural slavery (§57); from
   `hobbes-sovereign-and-liberty`: indivisible sovereignty (§278–279 inherits and
-  corrects it); from `aquinas-law-and-kingship` and `cicero-natural-law`:
-  `natural-law`, which Hegel absorbs into the rational actuality of right.
+  corrects it); from `aquinas-law-and-kingship` and
+  `cicero-res-publica-and-natural-law`: `natural-law`, which Hegel absorbs into
+  the rational actuality of right.
 - **Contributes:** One move: freedom is not the absence of restraint (the
   Revolution's) and not obedience to what is given (the reaction's) but a
   structure a person grows into and knows as his own — family, civil society,
@@ -33,22 +44,28 @@ goal: Analyze Hegel's argument that freedom is realised only in family, civil so
   derivation of the three spheres from the failures of the two abstractions
   that precede them (abstract right, morality) and the §258 critique of the
   contract.
-- **Hands off:** Two objections stated, one argued later. (a) Marx's inversion
-  — civil society, not the state, is the real ground, and the state is its
-  committee (`marx-manifesto`, next module; one paragraph here, and the rabble
-  of §§241–245 as the seam). (b) The historicism charge, stated as the course's
-  own with Strauss in References: if world history is the court of judgment,
-  right has no standard outside what wins — argued in
-  `strauss-natural-right-and-history`. The module's application `assignats`
+- **Hands off:** Two objections stated, one argued later, and one refusal. (a)
+  Marx's inversion — civil society, not the state, is the real ground, and the
+  state is its committee (`marx-manifesto`, next module; one paragraph here, and
+  the rabble of §§241–245 as the seam). (b) The historicism charge, stated as the
+  course's own with Strauss in References: if world history is the court of
+  judgment, right has no standard outside what wins — argued in
+  `strauss-natural-right-and-history`. (c) The refusal comes next: a Spanish
+  deputy who visited Berlin in 1849 and was horrified by the Hegelians will deny
+  that the age's oppositions can be reconciled at all — Catholicism or
+  socialism, the dagger or the sabre — and will ask, of a constitution under
+  attack, who decides when its rules run out (`donoso-cortes-on-dictatorship`,
+  the next lesson; the FORWARD exercise). The module's application `assignats`
   reinforces `rational-state` by asking whether the Revolution's lasting
   institutions are Hegel's "rational actual" or Maistre's "paper".
-  `tocqueville-equality-and-the-township` opens the next module from Hegel's
-  civil society and the fear of a formless mass. Popper's reading goes in
-  References only.
-- **Spine step:** "Government by consent (Locke) and the general will (Rousseau)
-  make a revolution thinkable; Burke, Maistre and Bonald answer that no
-  generation knows enough to design a society, and Hegel absorbs both sides into
-  the rational state"
+  `tocqueville-equality-and-the-township` opens the next module from Hegel's civil
+  society and the fear of a formless mass. Popper's reading goes in References
+  only.
+- **Spine step:** "Government by consent (Locke) is doubted by Hume and
+  radicalised by Rousseau's general will; when France tries to frame a government
+  from principles, Burke, Maistre and Donoso Cortés answer that no generation
+  knows enough, Herder and Fichte put the people before the state, and Hegel
+  absorbs both sides into the rational state"
 
 ## Sources to consult
 
@@ -132,9 +149,23 @@ goal: Analyze Hegel's argument that freedom is realised only in family, civil so
     suffrage; §§316–318 public opinion deserving both respect and contempt.
   - §§321–340 external sovereignty and international law (l.8732–9050): war as
     the ethical moment (§324), no Praetor between states (§333), world history
-    as "the world's court of judgment" (§340, l.9037–9048). The extra lesson
-    `war-is-divine` reads §§321–340 as a comparison; here they are the bridge to
-    the end.
+    as "the world's court of judgment" (§340, l.9037–9048). The starred section
+    of `maistre-and-bonald` named §324 and §333 as a forward comparison with
+    Maistre's war; here they are the bridge to the end.
+  - THE NATION AND THE STATE, against Herder and Fichte: §274 (l.7519) "the state,
+    as the mind of a nation, is both the law permeating all relationships within
+    the state and also at the same time the manners and consciousness of its
+    citizens" — so a constitution depends on a nation's self-consciousness; §349
+    (l.9129) "A nation does not begin by being a state. The transition from a
+    family, a horde, a clan, a multitude, &c., to political conditions is the
+    realisation of the Idea in the form of that nation"; without a state a nation
+    "lacks the objectivity" of law and "its autonomy is formal only and is not
+    sovereignty"; §211 Remark (l.5576 ff.) codification against the claim that a
+    people may not codify its law (one clause). Fichte by name: Preface (l.324,
+    the passport with the suspect's portrait — philosophy should not legislate
+    details); §258 Remark (l.6497, Rousseau's error "as Fichte did later");
+    §273 Remark (l.7449, Fichte's "ephorate" as a superficial conception of the
+    state).
   - World History §§341–360 (l.9051–9250): nations as tools of the world mind;
     §347 "it is only once that a nation can make its hour strike"; §§350–351 the
     right of heroes to found states and the "barbarians" passage (flag); §§352–360
@@ -172,10 +203,13 @@ goal: Analyze Hegel's argument that freedom is realised only in family, civil so
   modern state is but a committee for managing the common affairs of the whole
   bourgeoisie"; Marx's note that Hegel described civil society correctly and
   put the state on top of it. Argued in `marx-manifesto`.
-- **Strauss & Cropsey (eds.), History of Political Philosophy, 3rd ed., ch. on
-  Hegel (Pierre Hassner)** — text landing at
-  `research/texts/strauss-cropsey/history-of-political-philosophy.txt`; consult
-  as the standard close reading. DOSSIER GAP: file empty at writing time.
+- **Strauss & Cropsey (eds.), History of Political Philosophy, 3rd ed.,
+  "Georg W. F. Hegel" by Pierre Hassner (tr. Allan Bloom), pp. 732–760** — text
+  `research/texts/strauss-cropsey/history-of-political-philosophy.txt`
+  l.35558–37006 (OCR; page headers inline). Copyrighted: paraphrase; Hassner in
+  References only. Consult as the standard close reading (the Philosophy of
+  Right's order; war and the state as an individual; the end of history) and grep
+  it for any claim about the structure the lesson makes.
 - **Smith, Open Yale PLSC 114** — no Hegel lecture in the course; do not cite.
 
 ## EXPLANATION PLAN (L0)
@@ -323,7 +357,21 @@ rebuilds the structure in his order and asks what it concedes to each side.
    Maistre: the constitution "cannot be given a priori" (§274, Napoleon's
    constitution for Spain), and "who is to frame the constitution?" is a
    meaningless question (§273) — but he refuses their ground: not inheritance,
-   not Providence, but the concept.
+   not Providence, but the concept. Note that the Remark adds "as Fichte did
+   later": the same error, Hegel says, runs through the philosopher of the
+   German nation (`<Ref>` herder-and-fichte-volk-and-nation) — one clause. And
+   the origin questions Hegel dismisses include Hume's (`<Ref>`
+   hume-against-the-original-contract): Hegel agrees with Hume that origin
+   settles nothing and disagrees that opinion and interest are the ground.
+   Then the step the previous lesson requires (one paragraph, §274 and §349):
+   Herder's and Fichte's people come before any state; Hegel grants that "a
+   nation does not begin by being a state" and that a constitution must match
+   the nation's self-consciousness (§274), and denies that a nation without a
+   state is free — its independence is "formal only and is not sovereignty"
+   (§349). The Volk is the material; the rational state is its actuality. Mark
+   the seam (L10b): from a philosopher of the nation-as-mind one expects the
+   nation to be the end; Hegel makes the state the end and the nation its
+   bearer.
 8. **What does the rational state look like, and what guarantees it?** Briefly
    (§§272–320), as the structure that makes the §258 claim concrete:
    constitutional monarchy as the differentiation of the concept — legislature
@@ -343,7 +391,8 @@ rebuilds the structure in his order and asks what it concedes to each side.
 9. **Where does the state end — and who judges between states?** §§321–340:
    the state is an individual among states; the citizen's duty to sacrifice life
    for it; war is "the ethical moment", not an absolute evil (§324 — one
-   paragraph; `<Ref>` war-is-divine for the comparison); states are in a state
+   paragraph; `<Ref>` maistre-and-bonald, whose starred section set Maistre's
+   divine war beside it); states are in a state
    of nature to each other, "there is no Praetor to judge between states"
    (§333), so disputes are settled by war; and the only judge is world history —
    "the world's court of judgment" (§340, Schiller's Weltgeschichte ist das
@@ -378,10 +427,13 @@ rebuilds the structure in his order and asks what it concedes to each side.
     nature; the monarch is hereditary; the Estates are corporate — and the
     refusal of its ground (Providence, prejudice) as unknowing. What the reader
     can now do: rebuild the three spheres from the failures that force each, and
-    state §258 as the answer to Rousseau. What stays open: whether a state
-    judged only by history has any standard at all (the postwar module), and
-    whether the Revolution's own institutions — the next lesson's departments
-    and code — are "rational actual" or "paper" (`<Ref>` assignats).
+    state §258 as the answer to Rousseau, and §349 as the answer to Herder and
+    Fichte. What stays open: what happens when the rational constitution's
+    normal case breaks down and someone must decide outside its rules (`<Ref>`
+    donoso-cortes-on-dictatorship, next); whether a state judged only by history
+    has any standard at all (the postwar module); and whether the Revolution's
+    own institutions — the departments and the Code — are "rational actual" or
+    "paper" (`<Ref>` assignats, the module's application).
 
 ## Set pieces and worked examples to recreate
 
@@ -431,6 +483,14 @@ rebuilds the structure in his order and asks what it concedes to each side.
 
 ## Pitfalls / subtleties to flag
 
+- **Register rule.** The course passes no verdict of its own on any author or
+  idea: no condemning or approving labels in its own voice. Judgement comes only
+  through argument and evidence; a label may appear only inside a quotation, with
+  who applied it and when.
+- **Do not re-teach Herder or Fichte.** The Volk, the plurality of cultures, the
+  Urvolk and national education are recalled with a `<Ref>` and a clause each;
+  the lesson's new matter is §274 and §349 — the nation as the state's material,
+  not its end.
 - **Terms to anchor (L11):** *Sittlichkeit / ethical life* (define at §142 — not
   "morality"; the German Sitte = custom, mores) against *Moralität / morality*
   (the inward standpoint of conscience, Kant's); *abstract right*; *the person*
@@ -500,9 +560,9 @@ rebuilds the structure in his order and asks what it concedes to each side.
   "Strauss argues".
 - **Dossier gaps:** the summary notes shard 6/7 was supplied under another
   label (§§257–297 are present in the full file — verified: §258 at l.6460,
-  §273 at l.7416, §279 at l.7634); the Strauss–Cropsey Hegel chapter is
-  unavailable (empty file); the Phenomenology "cabbage" line is only in Fawcett
-  — verify or omit.
+  §273 at l.7416, §279 at l.7634, §274 at l.7519, §349 at l.9129); the
+  Strauss–Cropsey Hegel chapter has landed (OCR, l.35558–37006); the
+  Phenomenology "cabbage" line is only in Fawcett — verify or omit.
 
 ## FIGURE PLAN
 
@@ -599,21 +659,23 @@ rebuilds the structure in his order and asks what it concedes to each side.
    Rousseau's Legislator and civil religion — `<Ref>` — already supply the
    prior institutions, which is the Idealist reading the Rousseau lesson marked
    as a gloss).
-7. **FORWARD (E7) → `assignats`.** Hegel says a constitution "cannot be given a
-   priori" (§274), that "who is to frame the constitution?" is a meaningless
-   question (§273), and yet that the modern state's codified, public law is an
-   achievement (§§211–216). Take the three revolutionary constitutions of
-   1791, 1793 and 1795 and the departments of 1790: by Hegel's own criteria,
-   which of these is "paper" (Maistre, `<Ref>`) and which could be "rational
-   actual"? The reader should reach the thought that the test is not who made
-   it but whether it was found to articulate a people's life — and that this is
-   a test the record can be asked. The solution says in one sentence that the
-   next lesson asks it of the assignat, the departments and the Code, with the
-   `<Ref>`.
-8. *Retrieval across the module (E3).* One sentence each: what Locke, Rousseau,
-   Burke, Maistre and Hegel say the state IS (a trust; the sovereign people; a
-   partnership of generations; a providential growth; the actuality of the
-   ethical Idea) and what each says it is NOT.
+7. **FORWARD (E7) → `donoso-cortes-on-dictatorship`.** Hegel's monarch "has
+   only to say yes and dot the i" (§280 Addition): he decides, but inside a
+   constitution whose laws, ministers and Estates have already done the work.
+   Take a case the constitution's laws did not foresee: armed political clubs in
+   the capital, the ministers divided, the Estates unable to meet. Using §§272–273
+   and §§279–280, say what in Hegel's structure decides, and whether the "I will"
+   of the crown can act when the constitution it completes is itself under
+   attack. The reader should reach the thought that a rational constitution
+   presupposes the normal case, and that someone must decide when the normal case
+   has ended. The solution says in one sentence that the next lesson's Spanish
+   deputy, who found the Hegelians of Berlin incomprehensible, answers exactly
+   this — "when legality is not enough, dictatorship" — with the `<Ref>`.
+8. *Retrieval across the module (E3).* One sentence each: what Locke, Hume,
+   Rousseau, Burke, Maistre, Fichte and Hegel say the state IS (a trust; a
+   government held up by opinion; the sovereign people; a partnership of
+   generations; a providential growth; the instrument of a nation's eternity;
+   the actuality of the ethical Idea) and what each says it is NOT.
 
 ## Nietzsche cross-course links (where his ideas enter)
 

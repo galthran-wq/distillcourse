@@ -9,9 +9,13 @@ goal: Analyze Machiavelli's republican teaching — that class conflict produced
 
 - **Inherits:** From `machiavelli-effectual-truth`: the standard (how men actually keep power),
   virtù and fortune, the two humours of Prince IX and the open question "was Machiavelli a
-  Machiavellian?" From `cicero-mixed-constitution` and `decline-of-regimes`: the cycle of
-  regimes (Plato's fathers and sons; Polybius's anacyclosis as Cicero transmits it) and Rome's
-  balance of consuls, senate and tribunes. From `aristotle-faction-and-the-best-life`: stasis as
+  Machiavellian?" From `polybius-anacyclosis-and-rome`: the cycle of regimes (anacyclosis —
+  kingship, tyranny, aristocracy, oligarchy, democracy, mob-rule and back to one man), Lycurgus's
+  Sparta as a mixture designed by reason and Rome's as a mixture reached through trial and
+  disaster (course.yaml's phrase for VI.10), and Rome's balance of consuls, senate and people, each able to block the others.
+  From `decline-of-regimes`: Plato's version of the decline, fathers and sons. From
+  `cicero-res-publica-and-natural-law`: Scipio's verdict that Rome, built by many generations,
+  beats any one founder's design. From `aristotle-faction-and-the-best-life`: stasis as
   the disease of cities, born of rival conceptions of equality. From `augustine-two-cities`: the
   earthly city's peace is a truce of lusts; pagan virtue is splendid vice; the charge (already
   flagged there as the objection to carry) that Christianity made men weak. From
@@ -24,19 +28,22 @@ goal: Analyze Machiavelli's republican teaching — that class conflict produced
   question (how a city stays free, not how a man holds it), so that the two books answer each
   other rather than contradict.
 - **Hands off:** Open problem: Machiavelli's Rome is a mixture (senate, consuls, tribunes) kept
-  free by tension; the next two lessons deny that any such thing exists — Bodin says sovereignty
-  is indivisible and Rome was a popular state governed aristocratically; Hobbes says "mixed
-  government" is three factions. `bodin-sovereignty` takes it. The "founder" theme (I.9, III.1)
+  free by tension; the rest of this module denies that any such thing exists — Bodin says
+  sovereignty is indivisible and Rome was a popular state governed aristocratically; Hobbes says
+  "mixed government" is three factions; Filmer reads the same four centuries of Roman tumult as
+  an "ocean of blood" that ended, as it had to, in a monarchy (Patriarcha II.11–12) — the
+  opposite verdict on the same evidence. `bodin-sovereignty` takes it. The "founder" theme (I.9, III.1)
   is inherited much later by `carlyle-heroes` and `ortega-revolt-of-the-masses` — forward clause
   only.
-- **Spine step:** "Christendom builds a law above kings — and Machiavelli breaks it, measuring
-  princes and republics by what works rather than what ought to be"
+- **Spine step:** "Christendom builds a law above kings; Machiavelli breaks it; the wars of
+  religion force one sovereign power above every faction — Bodin's definition, Hobbes's
+  derivation from fear, Filmer's from fatherhood — and the English Revolution tests them"
 
 ## Sources to consult
 
 - **Machiavelli, Discourses on Livy (Thomson tr., 1883; Gutenberg)** — summaries.json index 19;
   text at
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/machiavelli/discourses.txt`
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/machiavelli/discourses.txt`
   (line numbers are this file's; chapter heads are "CHAPTER N.—_title_"). Read: Book I Preface
   (ancient examples admired, not imitated; "the heavens, the sun, the elements and man"
   unchanged); I.1 l.647ff (founders; fertile site needs hard laws; Rome free from the start);
@@ -73,40 +80,54 @@ goal: Analyze Machiavelli's republican teaching — that class conflict produced
   III.3 l.9585ff ("slay the sons of Brutus"; Soderini); III.9 l.10690ff (fit to the times;
   republic outlasts a prince by diversity of citizens); III.30 (Moses killed the envious).
 - **Machiavelli, The Prince IX, XV, XVIII** — same file set;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/machiavelli/prince.txt`.
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/machiavelli/prince.txt`.
   Only to recall the two humours and the standard (`<Ref>` to the previous lesson); and
   Discourses I.9 to refute the "end justifies the means" slogan if the previous lesson's
   exercise is recalled.
 - **Smith, Open Yale L11** — index 9;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/oyc/lecture-11.txt`
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/oyc/lecture-11.txt`
   l.63–68 (Ch4 "Was Machiavelli a Machiavellian?": humours, people's end more decent, Spinoza's
   reading; Ch1–2 II.2 and Numa; Ch5 the achievement — an armed, expansive, populist republic).
   Scaffold only; Smith's name in References.
 - **Augustine, City of God XIX** — index 17;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/cityofgod-book19.txt`:
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/cityofgod-book19.txt`:
   XIX.12–13 (peace as the end all seek; the earthly peace as truce), XIX.25 (splendid vices).
   For the OBJECTION in link 3 — one or two clauses, Ref'd.
 - **Aristotle, Politics V** — index 16;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/aristotle/`
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/aristotle/`
   (Book V on stasis). Backward Ref only: the diagnosis Machiavelli reverses.
+- **Polybius, Histories VI.3–18 (Shuckburgh tr., public domain)** — index 89;
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/polybius/histories-book6-shuckburgh.txt`
+  (chapter markers `+N+`: VI.4 l.78, VI.5 l.110, VI.9 l.259, VI.10 l.311 Lycurgus, VI.11–18
+  l.356–610 the Roman parts). Backward Ref only (`polybius-anacyclosis-and-rome`): Discourses I.2
+  follows VI.4–10 closely — the six forms, the order of decay, Lycurgus, Rome reaching the
+  mixture by experience rather than design — without naming Polybius. The lesson must not
+  re-teach the cycle; it uses the borrowing for one move: Machiavelli takes Polybius's frame
+  whole and changes one thing, the CAUSE of Rome's mixture (Polybius: "through many struggles
+  and difficulties, and by continually adopting reforms from knowledge gained in disaster",
+  VI.10 l.347–350; Machiavelli: the quarrel of nobles and people, I.2–4). Exercise 3 uses the pair.
 - **Cicero, Republic I–II** — index 39;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/cicero/de-republica-de-legibus-loeb.txt`:
-  the Roman institutions and the cycle (Ref `cicero-mixed-constitution`); Exercise 7
-  corroborates Machiavelli's Rome against Scipio's.
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/cicero/de-republica-de-legibus-loeb.txt`:
+  Scipio's account of Rome's gradual growth (Ref `cicero-res-publica-and-natural-law`) — one
+  clause at link 1; not re-taught.
 - **Bodin, Six Books II.1 (Tooley l.3458–3530)** — index 20;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/bodin/six-books-tooley-1955-full.txt`:
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/bodin/six-books-tooley-1955-full.txt`:
   Machiavelli named among those who hold the mixed-state view ("Contarini, Machiavelli, and many
   others", l.3458). Forward hook only — the objection the next lesson develops.
 - **Strauss & Cropsey (eds.), History of Political Philosophy, 3rd ed., ch. "Niccolò
-  Machiavelli"** — text landing at
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/strauss-cropsey/history-of-political-philosophy.txt`;
-  consult as the standard close reading (especially on the Prince/Discourses relation). FILE
-  EMPTY at brief time — check.
+  Machiavelli" (L. Strauss, pp. 296–317)** — OCR text at
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/strauss-cropsey/history-of-political-philosophy.txt`,
+  lines 14604–15563. For this lesson pp. 303–317 (from ~l.14918: "if one turns from the Prince
+  to the Discourses in order to find the solution to the difficulties not solved in the Prince"
+  — the Prince/Discourses relation for link 6; the use of Livy and the authority of ancient Rome,
+  ~l.15036–15116; Roman religion praised for its political use, ~l.15149). Copyrighted —
+  paraphrase; the thesis that the Discourses restore something old while teaching something new
+  is stated as one reading, Strauss in References.
 
 Names ONLY in References: Strauss, Smith, Pocock (The Machiavellian Moment), Skinner, Mansfield,
 Spinoza and Rousseau as readers (Political Treatise V.7; Social Contract III.6 n.), Thomson
-(translator), Polybius (name him as the source of the cycle in References, as
-`cicero-mixed-constitution` did; in body "the cycle the reader met with Cicero").
+(translator). Polybius is a thinker the course teaches, so the body may name him: "the cycle
+the reader met with Polybius" (Ref `polybius-anacyclosis-and-rome`).
 
 ## EXPLANATION PLAN (L0)
 
@@ -122,10 +143,13 @@ produce a theory of freedom?
 1. **How does a city get a good constitution?** Obvious attempt: a wise founder gives it one
    (Lycurgus for Sparta — the reader has Sparta, Ref `sparta-as-test-case`). Why it fails for
    Rome: Rome had no Lycurgus; its kings were expelled and it had only consuls and a senate —
-   two of the three elements. Answer (I.2): the six forms slide each into its contrary (the
-   cycle the reader met with Plato and Cicero, Ref — one clause), so a wise legislator mixes all
-   three; Rome reached the mixture "by chance", because the quarrels of nobles and people forced
-   the creation of the tribunes (I.3) — a mixture made by conflict, not design. Anchor the Roman
+   two of the three elements. Answer (I.2): the six forms slide each into its contrary — the
+   cycle the reader met with Polybius (Ref `polybius-anacyclosis-and-rome`, one clause; I.2
+   follows Histories VI almost line for line, unnamed) — so a wise legislator mixes all three;
+   Rome reached the mixture "by chance", because the quarrels of nobles and people forced the
+   creation of the tribunes (I.3) — a mixture made by conflict, not design. Say the seam: from
+   Polybius one expects the mixture to be the cure for discord; Machiavelli makes discord the
+   cause of the mixture. Anchor the Roman
    offices at first mention: consuls (two annual chief magistrates), senate (council of former
    magistrates), tribunes of the people (officers created c. 494 BC with power to veto and to
    protect plebeians).
@@ -249,8 +273,9 @@ wiser and more constant than a prince"; "One standard, two books".
   (in Machiavelli's sense only: idle landholders with castles); Francis and Dominic (founders of
   the two great thirteenth-century orders — the reader met a Dominican in Aquinas). Keep to
   three per section.
-- **Do not re-teach** the regime cycle (Ref `decline-of-regimes`, `cicero-mixed-constitution`),
-  Aristotle's stasis, Augustine's two cities, or The Prince's rules — one clause each.
+- **Do not re-teach** the regime cycle or Rome's balance of parts (Ref `decline-of-regimes`,
+  `polybius-anacyclosis-and-rome`), Aristotle's stasis, Augustine's two cities, or The Prince's
+  rules — one clause each.
 - **The real misreading (L13):** "Machiavelli was a democrat / the Discourses are a democratic
   text." Refute from I.55 (a corrupt people needs a prince), III.3 (kill the enemies of the new
   freedom), I.5–6 (the choice is between expansion and quiet, not for or against the people),
@@ -264,9 +289,11 @@ wiser and more constant than a prince"; "One standard, two books".
 - **The II.2 hedge** must be reported fairly: Machiavelli blames the interpretation, praises
   renewal (III.1), and uses religion instrumentally (I.12) — the lesson states this as a tension
   in the text, not as a secret atheism to be unmasked.
-- **No moralising:** neither "Machiavelli the proto-liberal" nor "Machiavelli the pagan".
-- **Dossier thin:** no secondary beyond Smith L11 and Strauss's pages; the Strauss–Cropsey file
-  is empty; the Florentine Histories, where Machiavelli condemns Florence's factions as the bad
+- **Register:** The course passes no verdict of its own on any author or idea: no condemning or
+  approving labels in its own voice. Judgement comes only through argument and evidence; a label
+  may appear only inside a quotation, with who applied it and when.
+- **Dossier thin:** no secondary beyond Smith L11, Strauss's pages and the Strauss–Cropsey
+  chapter (OCR); the Florentine Histories, where Machiavelli condemns Florence's factions as the bad
   kind, are NOT in the dossier — the writer must not cite them, and should say in References
   that the Florence/Rome contrast (I.7–8) is the dossier's only evidence that not all conflict
   is good.
@@ -275,8 +302,10 @@ wiser and more constant than a prince"; "One standard, two books".
 
 1. `draw:` single `<Figure>` — **the cycle and the exit** (I.2): the six forms on a wheel, each
    arrow labelled with the contrary it slides into; a single exit arrow to "the mixture" with
-   two routes — Lycurgus (design) and Rome (chance, through tumult). Ref the Cicero lesson's
-   cycle figure rather than redraw the whole wheel; the new element is the two routes.
+   two routes — Lycurgus (design) and Rome — and Rome's route drawn twice, labelled with
+   Polybius's cause ("knowledge gained in disaster") and Machiavelli's ("the quarrel of nobles and
+   people"). Reuse the Polybius lesson's cycle wheel (`polybius-anacyclosis-and-rome`) rather
+   than redraw a new one; the new element is the relabelled Roman route.
 2. `draw:` `<FigureSequence>` (4 frames) — **the two humours make the tribunes** (I.3–4): frame
    1 nobles and people as two humours (desire to dominate / desire not to be dominated); frame 2
    the people secede to the Sacred Mount; frame 3 the tribunes created as the outlet; frame 4
@@ -323,11 +352,14 @@ wiser and more constant than a prince"; "One standard, two books".
    produced the armies that overran Italy); what it can be USED to establish about
    sixteenth-century views of religion's civic function, and what it cannot (the author's
    private belief).
-3. **Corroboration (E3 from `aristotle-faction-and-the-best-life`):** Aristotle's Politics V on
-   faction and Discourses I.4 describe the same kind of event — the poor against the rich — and
-   reach opposite verdicts. Lay the two passages side by side, state what each takes the event
-   to be evidence of, and name the premise that differs (whether a city's end is quiet or
-   growth).
+3. **Corroboration (E3 from `aristotle-faction-and-the-best-life` and
+   `polybius-anacyclosis-and-rome`):** Aristotle's Politics V on faction and Discourses I.4
+   describe the same kind of event — the poor against the rich — and reach opposite verdicts.
+   Lay the two passages side by side, state what each takes the event to be evidence of, and
+   name the premise that differs (whether a city's end is quiet or growth). Then add Polybius
+   VI.10 (l.344–352: Rome reached its mixture "through many struggles and difficulties, and by
+   continually adopting reforms from knowledge gained in disaster") and say which of the two Machiavelli has rewritten, and in which
+   clause.
 4. **Boundary probe (E6a):** a city with zero conflict — Machiavelli's own Venice or Sparta
    (I.6). State what his theory predicts for it (it cannot expand; it must disarm or exclude its
    people) and what he says happened when it was struck (Venice after Agnadello/Vailà 1509,

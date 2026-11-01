@@ -15,9 +15,24 @@ goal: Test Burke's and Maistre's predictions about the Revolution's paper money 
   itself a constitution; "there is no such thing as man"; written law is "paper";
   the count of laws and "three constitutions in five years" held for here. From
   `hegel-ethical-life-and-the-state`: the rational state as what is understood
-  after the fact, actuality against mere existence, and the last exercise's
-  question — which of the Revolution's products is "paper" and which could be
-  "rational actual". From `locke-property-and-consent`: money as the convention
+  after the fact, actuality against mere existence, a constitution that "cannot
+  be given a priori" (§274), codification as an achievement (§211), and the
+  question that lesson's close left for this one — which of the Revolution's
+  products is "paper" and which could be "rational actual". From
+  `donoso-cortes-on-dictatorship` (the prerequisite): `dictatorship-of-the-sabre`
+  — when legality cannot save society, the only choice is between a
+  dictatorship from below and one from above — and the thermometer's "million
+  eyes and ears" of administrative centralisation; the record of 1793–1804 (the
+  Terror's committees, the Directory's coups against its own legislature, the
+  general of 1799) is the case his dilemma was drawn from. From
+  `hume-against-the-original-contract`: `government-founded-on-opinion` — and
+  credit is opinion: a paper currency is worth what holders believe the issuing
+  government's word is worth; "Antiquity always begets the opinion of right" and
+  time turns a title begun in force into right (the buyers of Church lands). From
+  `herder-and-fichte-volk-and-nation`: the `plurality-of-cultures` — laws made
+  "for all times and peoples" fit no people — set against the metric system
+  decreed "for all peoples, all times" (one clause). From
+  `locke-property-and-consent`: money as the convention
   that lifts the limits on property (Sect. 46–50), and property as what the
   legislative may not take without consent (Sect. 138–140) — the confiscation of
   Church lands is the case. From `rousseau-inequality-and-general-will`: "the
@@ -37,11 +52,14 @@ goal: Test Burke's and Maistre's predictions about the Revolution's paper money 
   — and Tocqueville's answer that the levelling the Revolution accelerated is a
   "providential fact" no one designed (`tocqueville-equality-and-the-township`).
   The epistemic thesis returns in `what-conservatism-is` and
-  `oakeshott-rationalism-in-politics` with this lesson's ledger as its evidence.
-- **Spine step:** "Government by consent (Locke) and the general will (Rousseau)
-  make a revolution thinkable; Burke, Maistre and Bonald answer that no
-  generation knows enough to design a society, and Hegel absorbs both sides into
-  the rational state"
+  `oakeshott-rationalism-in-politics` with this lesson's ledger as its evidence;
+  Donoso's dilemma returns in `schmitt-political-theology` and is tested again on
+  an emergency article in `article-48-weimar`.
+- **Spine step:** "Government by consent (Locke) is doubted by Hume and
+  radicalised by Rousseau's general will; when France tries to frame a government
+  from principles, Burke, Maistre and Donoso Cortés answer that no generation
+  knows enough, Herder and Fichte put the people before the state, and Hegel
+  absorbs both sides into the rational state"
 - **APPLICATION spec (L16):**
   - *Artefact:* (1) the assignat — the note itself (a photograph of a real one),
     what it was (a bond on the confiscated "national property", made legal
@@ -57,8 +75,12 @@ goal: Test Burke's and Maistre's predictions about the Revolution's paper money 
     `no-such-thing-as-man` (Maistre's thesis that legislation for "man" is paper
     and that what endures was not deliberated); `rational-state` (Hegel's
     actuality vs existence as the test for what lasted); `labour-theory-of-property`
-    and Locke's taxation-by-consent (the confiscation as the case); the
-    sourcing drill from `english-revolution-as-test` and `altar-of-victory`.
+    and Locke's taxation-by-consent (the confiscation as the case);
+    `dictatorship-of-the-sabre` (Donoso's dilemma as the lens on 1793–1799: the
+    Terror as the dictatorship that claimed to come from below, Brumaire as the
+    one from above, the Code made under it) and `government-founded-on-opinion`
+    (the assignat's value as opinion of the state's credit); the sourcing drill
+    from `english-revolution-as-test` and `altar-of-victory`.
   - *Departures the lesson must name:* (a) the assignat did collapse, roughly as
     Burke said — but by a route he did not predict (war finance after 1792 and
     the Terror's price controls, not the land-bank's structure alone), and the
@@ -73,7 +95,11 @@ goal: Test Burke's and Maistre's predictions about the Revolution's paper money 
     as his "legislator who says fiat" and Burke as his general become master;
     (e) the count of laws is a measure of output, not of durability: most of the
     15,479 were decrees of administration, and the thesis "nothing designed
-    endures" needs a criterion for what counts as design. State each departure
+    endures" needs a criterion for what counts as design; (f) Donoso's dilemma
+    fits 1799 (a general ended an assembly that could no longer govern) but not
+    its sequel: the dictatorship "from above" kept and codified the Revolution's
+    civil law rather than restoring the old order, so the sabre preserved what
+    Donoso's dagger had won. State each departure
     plainly and let the reader weigh which theory the record favours where.
 
 ## Sources to consult
@@ -209,7 +235,17 @@ goal: Test Burke's and Maistre's predictions about the Revolution's paper money 
   and Compagnie d'Occident, whose shares and notes collapsed in 1720). Any
   standard history; public domain accounts in Thiers and in White.
 - **Smith, Open Yale** and **Strauss–Cropsey** — not applicable to this lesson;
-  do not cite. Strauss–Cropsey file empty at writing time in any case.
+  do not cite (the Strauss–Cropsey OCR has landed; it has no chapter on the
+  assignats, Maistre or Donoso).
+- **Donoso Cortés, Speech on Dictatorship (1849)** — summaries.json index 94;
+  `research/texts/donoso-cortes/speech-dictatorship-1849.txt` l.19 ("the First
+  Republic, which was a gigantic dictatorship without end"), l.80–84 (the
+  dilemma). Backward `<Ref>` only, one paragraph in link 5.
+- **Hume, "Of the First Principles of Government"** — summaries.json index 91;
+  `research/texts/hume/hume-first-principles.txt` FP 2–3 (opinion of interest;
+  "Antiquity always begets the opinion of right"). Backward `<Ref>` only, one
+  sentence in link 2 (credit as opinion) and one in link 5 (the buyers of
+  national property).
 
 ## EXPLANATION PLAN (L0)
 
@@ -262,6 +298,11 @@ them. Both forecasts can be checked. The lesson checks them.
    l.1564–1604). Burke's forecast, stated in one sentence the record can test:
    compulsory paper on confiscated land will depreciate toward nothing, breed
    speculation, set town against country, and leave the state ruling by force.
+   Put the mechanism in the previous lessons' terms in one sentence: a note
+   accepted "of choice" rests on the holder's opinion of the issuer's interest
+   and right (`<Ref>` hume-against-the-original-contract); a note forced at par
+   replaces that opinion with the law's penalty — which is why Burke calls it
+   "the creature not of credit, but of power".
 3. **What does the record show?** The depreciation series as a figure (the
    lesson's primary data chart), with the sourcing drill applied to the source
    first: the official departmental tables of 1797 — who drew them up (the
@@ -308,15 +349,28 @@ them. Both forecasts can be checked. The lesson checks them.
    theodolite" into "square republics" — survived every regime since and are
    the frame of French administration today; the metric system decreed in
    1795 for "all peoples and all times" — legislation for "man" in Maistre's
-   exact sense — is the world's measure; the sale of Church lands was never
-   reversed, and Maistre himself (ch. 10) said it must not be. Then the
+   exact sense, and for no people in particular against Herder's plurality of
+   peoples (`<Ref>` herder-and-fichte-volk-and-nation, one clause) — is the
+   world's measure; the sale of Church lands was never reversed, and Maistre
+   himself (ch. 10) said it must not be — the buyers' title, begun in
+   confiscation, became right by possession and interest, as the module's
+   sceptic said titles do (`<Ref>` hume-against-the-original-contract). Then the
    hardest case, stated for both sides: the Civil Code of 1804, which gave the
    Revolution's civil law (equality before the law, civil marriage, partible
    inheritance, the end of feudal tenures) a form that outlasted every French
    regime — but was made under one ruler by a commission of four, not by an
    assembly; Maistre can claim it as a legislator who "says fiat", Burke as the
    general become master; and yet its content was the Assembly's. The lesson
-   does not resolve this; it names it.
+   does not resolve this; it names it. Then Donoso's lens, one paragraph
+   (`<Ref>` donoso-cortes-on-dictatorship): he called the First Republic "a
+   gigantic dictatorship without end" and framed every crisis as a choice
+   between a dictatorship from below and one from above. The record of
+   1793–1799 fits the frame (the Committee of Public Safety ruling by decree in
+   the name of the people; the Directory purging its own legislature in 1797
+   and 1798; the general of 1799), and breaks it at the next step: the
+   dictatorship "from above" did not restore what the one "from below" had
+   destroyed — it codified the Revolution's civil law and kept the departments,
+   now under prefects, the "million ears" of Donoso's thermometer.
 6. **Where theory and record part.** The ledger (the lesson's synthesis figure):
    forecast / ground / what happened / verdict, for Burke's four and Maistre's
    two. Then the departures, each stated as a departure from a specific
@@ -387,6 +441,16 @@ them. Both forecasts can be checked. The lesson checks them.
 
 ## Pitfalls / subtleties to flag
 
+- **Register rule.** The course passes no verdict of its own on any author or
+  idea: no condemning or approving labels in its own voice. Judgement comes only
+  through argument and evidence; a label may appear only inside a quotation, with
+  who applied it and when.
+- **Do not re-teach Donoso, Hume or Herder.** Each enters as a lens with a `<Ref>`
+  and a clause; the lesson's new matter remains the two artefacts and the
+  forecasts of Burke and Maistre. *Fructidor* (September 1797, the Directory's
+  purge of the royalist majority in its own councils) and *Brumaire* (November
+  1799, Bonaparte's coup) are anchored in one clause each if Donoso's paragraph
+  uses them.
 - **Terms to anchor (L11):** *assignat* (define as above at first use);
   *biens nationaux / national property* (the confiscated lands of the Church,
   from November 1789, later the émigrés' and the crown's); *legal tender*
@@ -427,7 +491,7 @@ them. Both forecasts can be checked. The lesson checks them.
   case if the writer can anchor it in one sentence).
 - **Maistre's 15,479 is a count of acts.** Most were administrative decrees;
   the thesis it is made to carry (volume shows the absence of a legislator) is
-  Maistre's inference, not a fact in the table. Say so; do not debunk — the
+  Maistre's inference, not a fact in the table. Say so; do not dismiss it — the
   number is real and the inference is the argument to weigh.
 - **The Code cuts both ways** and the lesson must say so (link 5) rather than
   claim it for one side. Likewise the sale of Church lands: Burke's "Never did a
@@ -522,7 +586,8 @@ them. Both forecasts can be checked. The lesson checks them.
    sentence with its mechanism (S4 l.1258–1284, 1366–1398) and Maistre's about
    the laws with its inference (ch. 7), then name which concept from
    `burke-reflections` and which from `maistre-and-bonald` each forecast is a
-   test of.
+   test of, and which of Donoso's two dictatorships (`<Ref>`
+   donoso-cortes-on-dictatorship) the general of 1799 would count as.
 2. *Research-shaped task (the one computation).* Using the depreciation table
    in the lesson's figure, take a debt of 1,000 livres contracted in coin in
    1790 and repaid in assignats at face value in January 1793, January 1795 and

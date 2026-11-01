@@ -7,10 +7,14 @@ goal: Apply the module's accounts of representation, natural law and the two cit
 
 ## ARC (L10)
 
-- **Inherits:** The whole module, by concept id: `res-publica` and `populus`
-  (`cicero-mixed-constitution`); `natural-law` and Cicero's civil religion —
-  "no new gods or alien gods unless recognized by the State", the gods as
-  witnesses of oaths, virtues deified (`cicero-natural-law`, Laws II);
+- **Inherits:** The whole module, by concept id: `anacyclosis` and
+  `checks-and-balances`, with Polybius's reading of Roman religion as the
+  thing "which keeps the Roman commonwealth together" and the oath that keeps
+  Roman officials honest (`polybius-anacyclosis-and-rome`, VI.56);
+  `res-publica`, `populus`, `natural-law` and Cicero's civil religion — "no
+  new gods or alien gods unless recognized by the State", the gods as
+  witnesses of oaths, virtues deified (all `cicero-res-publica-and-natural-law`,
+  whose Laws II hand-off paragraph this lesson cashes);
   `hellenization` and the Church as "the Roman Empire consecrated by the
   Gospel" (`hellenization-of-christianity`); `representation-existential`,
   `civil-theology`, `political-theology`, Celsus's warning and Eusebius's
@@ -48,8 +52,9 @@ goal: Apply the module's accounts of representation, natural law and the two cit
     of Milan, Epistles 17 (to Valentinian, before the consistory heard the
     petition) and 18 (the point-by-point reply once Ambrose had obtained the
     text). NOT in the dossier; pointers and licence below.
-  - *Module results used:* `civil-theology` (Varro/Cicero: the city's gods as
-    the condition of its existence — Symmachus's whole case);
+  - *Module results used:* `civil-theology` (Polybius/Varro/Cicero: the
+    city's gods as the condition of its existence, religion as what holds
+    the commonwealth and keeps oaths — Symmachus's whole case);
     `representation-existential` (Ambrose Ep. 17: all men serve the emperor,
     the emperor serves God — temporal power de-divinized); `political-theology`
     (what Ambrose does NOT argue: no "one God, one emperor"; and what he
@@ -185,16 +190,31 @@ goal: Apply the module's accounts of representation, natural law and the two cit
   They shall preserve the rites of their families and their ancestors"),
   15052–15062 (virtues deified, not vices; the altar to Fever), 15691 (Delphi:
   keep the ancestral rites, "the best"). Keyes PD in the US only — short
-  quotes. `<Ref>` `cicero-natural-law`. Symmachus's Relatio reads like a
-  gloss on these clauses; the lesson should show that.
+  quotes. `<Ref>` `cicero-res-publica-and-natural-law`. Symmachus's Relatio reads like
+  a gloss on these clauses; the lesson should show that.
 - **Voegelin III.4–III.7** (3600–4092) for Varro's painter and Celsus's "who
   wishes to destroy the national cult wants to destroy the national
   cultures" — `<Ref>` `constantine-and-representation`; one clause each.
 - **Lilla** (index 10, lines 2380–2446) — the Eusebian temptation; one
   forward note at most; References.
-- **Strauss & Cropsey, ch. "St. Augustine" (Fortin)** — text landing at
-  `research/texts/strauss-cropsey/history-of-political-philosophy.txt` (EMPTY
-  at brief time). References.
+- **Polybius VI.56** — `research/texts/polybius/histories-book6-
+  shuckburgh.txt` lines 1770–1790: "a scrupulous fear of the gods, is the
+  very thing which keeps the Roman commonwealth together"; Roman officials
+  keep faith "from pure respect to their oath". Public domain. `<Ref>`
+  `polybius-anacyclosis-and-rome`. The Greek outsider's functional account,
+  two centuries before Symmachus, of exactly what the Relatio defends —
+  quote one clause beside Symmachus's oath argument.
+- **Strauss & Cropsey, ch. "St. Augustine" (Fortin), pp. 176–205** — now
+  landed (OCR, not summarised): `research/texts/strauss-cropsey/history-of-
+  political-philosophy.txt` lines 8743–10254. Lines 9770–9815 (p. 199):
+  Gratian's removal of the altar in 382 "over the opposition of the pagan
+  faction, led by Symmachus, who contended that any substantial deviation
+  from the traditional cult … would sooner or later prove detrimental to the
+  empire"; 410 as the climax; the deeper charge that Christianity's "dual
+  citizenship" weakened civic devotion. Lines 9935–9960 (p. 202): Ambrose
+  among the writers who expected a Christian empire to bring earthly peace
+  and prosperity — the expectation Augustine refused. Copyrighted;
+  paraphrase; References.
 - Not in the dossier, for the writer's own orientation (References only,
   never body): Alan Cameron, *The Last Pagans of Rome* (2011) — the standard
   revision (disputes Gratian's pontifex refusal; argues the "pagan
@@ -222,7 +242,7 @@ argued.
    Vestals and priests and the temple lands, and (it is reported) the
    emperor's own refusal of the title pontifex maximus. Then the module's
    first tool: this is Cicero's civil theology in its most literal form
-   (`<Ref>` `cicero-natural-law`: the gods made "members" of the citizens'
+   (`<Ref>` `cicero-res-publica-and-natural-law`: the gods made "members" of the citizens'
    association "as judges or witnesses" of oaths; the state alone recognizes
    gods). Taking the altar away did not forbid anyone's worship; it removed
    the god from the place where the city's representatives swore. In the
@@ -257,8 +277,8 @@ argued.
    customs". **Civil theology predicts the document.** Note too what it does
    not say: nothing about the truth of the gods, everything about Rome's
    existence and the sanctity of property.
-3. **Why does the "one road" argument not win?** The obvious reading today:
-   Symmachus is the tolerant party and Ambrose the fanatic. Put the "one
+3. **Why does the "one road" argument not win?** The obvious reading today casts Symmachus as pleading for tolerance and
+   Ambrose as refusing it. Put the "one
    road" sentence at full strength — it is the most quoted line of the whole
    affair — and then let Ambrose answer it on two levels. Factually (Ep. 17,
    18): restoring the altar means every senator present at the oath,
@@ -273,8 +293,8 @@ argued.
    Ambrose's appeal to a truth above Rome's customs is also an appeal above
    statute. **Natural law is claimed by both** (`natural-law` reinforced), in
    Symmachus's form as the ancestral and customary, in Ambrose's as the
-   revealed and universal — the Laelius/Philus axis (`<Ref>`
-   `cicero-natural-law`: custom varies, true law is one) turned so that the
+   revealed and universal — the Laelius/Philus axis (`<Ref>` `cicero-res-publica-and-natural-law`: custom varies, true law is
+   one) turned so that the
    pagan holds the custom end and the Christian the one-law end. Cicero's own
    clause, "no new gods unless recognized by the State", now cuts against
    the old gods, because the state has changed its recognition.
@@ -457,8 +477,9 @@ the documents bear out".
   Symmachus as its advocate, as Ambrose himself says (Ep. 17: the Christian
   senators are the majority) — which is the primary evidence — and leave the
   historiography to References.
-- **Do not moralise in either direction:** Symmachus is not the liberal
-  hero nor Ambrose the fanatic; the lesson's job is to say what each asked,
+- **Register.** The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+- **Do not moralise in either direction:** the lesson casts neither man as
+  hero or villain; the lesson's job is to say what each asked,
   on what grounds, and which theory predicts it. "No some-believe strawmen":
   the "one road" argument is given at full strength and answered on its own
   terms.
@@ -513,8 +534,8 @@ the documents bear out".
 7. `source: no pool candidate — hunt:` **the Curia Julia, interior or
    exterior** (Wikimedia Commons, CC-BY-SA). The reader must see the hall
    where the altar stood and the senators swore — Diocletian's rebuilding,
-   say so. If `cicero-mixed-constitution` already placed this image, reuse the
-   same file. Placement: at link 1.
+   say so. If an earlier lesson of this module already placed a Curia Julia
+   photograph, reuse the same file. Placement: at link 1.
 8. `source: no pool candidate — hunt:` **the Winged Victory of Brescia**
    (first-century bronze Victoria, Museo di Santa Giulia, Brescia; Wikimedia
    Commons, CC-BY-SA photographs). The reader must see what a Victoria looked
@@ -539,8 +560,9 @@ the documents bear out".
 ## EXERCISE PLAN (E6/E7 + playbook-history mix)
 
 1. *Retrieval (warm-up, the only one).* List Symmachus's five grounds and,
-   beside each, the clause of Cicero's Laws II it realizes and the module
-   concept it instantiates (E3 reach-back to `cicero-natural-law`).
+   beside each, the clause of Cicero's Laws II it realizes and the module concept it
+   instantiates (E3 reach-back to `cicero-res-publica-and-natural-law` and,
+   for the oath, Polybius VI.56 in `polybius-anacyclosis-and-rome`).
 2. *Document reasoning — the sourcing drill on the Relatio.* Metadata: a
    pagan senator, prefect of the city, writing in 384 to three emperors (one
    a boy at an Arian court) for a senatorial minority, after a famine and a
@@ -585,7 +607,7 @@ the documents bear out".
    in one sentence the principle both presuppose — that a ruler is bound by a
    law he did not make and cannot repeal — and then ask what that law *is*
    for a Christian ruler: Cicero's right reason in nature (`<Ref>`
-   `cicero-natural-law`), God's revealed command, or both in some order. The
+   `cicero-res-publica-and-natural-law`), God's revealed command, or both in some order. The
    solution says: the next module opens with a theologian who answers a king
    by ranking exactly these — eternal, natural, divine and human law — and
    that "an unjust law is no law" (which the reader has from Laws II.5) is
@@ -594,5 +616,5 @@ the documents bear out".
 ## Nietzsche cross-course links (where his ideas enter)
 
 none — the "Rome against Judea" reading of this century belongs to
-`hellenization-of-christianity`'s Refs and is not repeated; `nietzsche-on-the-
-right` later carries the reception line.
+`hellenization-of-christianity`'s Refs and is not repeated; the reception of
+Nietzsche on the right is taught in `the-right-after-1945`.

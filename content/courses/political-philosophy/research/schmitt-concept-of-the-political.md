@@ -12,14 +12,22 @@ goal: Analyze Schmitt's criterion of the political as the friend–enemy distinc
   (`bodin-sovereignty`); Hobbes's state of nature as a disposition to war and
   his protection–obedience principle (`hobbes-state-of-nature-and-covenant`,
   `hobbes-sovereign-and-liberty`); Cicero's and Aquinas's just war
-  (`cicero-natural-law`, `aquinas-law-and-kingship`); Mill's harm principle as
+  (`cicero-res-publica-and-natural-law`, concept `just-war`; `aquinas-law-and-kingship`); Mill's harm principle as
   the liberal rule for coercion (`mill-liberty-and-its-limits`); Ortega's
   mass-man and his two liberal premises — rule rests on opinion, liberalism is
   sharing existence with the enemy (`ortega-revolt-of-the-masses`); Mann's
-  "democracy = politicisation" (`mann-reflections`). From `thrasymachus-and-
-  the-ring` the reader has the realist challenge the tradition keeps answering;
-  Schmitt is its twentieth-century form and the lesson should say so in one
-  clause.
+  "democracy = politicisation" (`mann-reflections`). From the module's first
+  lessons: Mosca's political formula and Pareto's derivations
+  (`mosca-ruling-class`, `michels-and-pareto-oligarchy-and-elites`) — the
+  thesis that the principles by which power justifies itself are not its
+  substance, which Schmitt's liberal lexicon (link 8) applies to liberalism
+  itself; one clause, Ref. From the counter-revolution module: Maistre's
+  executioner and war as divine law (`maistre-and-bonald`), and Donoso Cortés's
+  choice between the dictatorship of the dagger and of the sabre
+  (`donoso-cortes-on-dictatorship`) — both on Schmitt's list of thinkers who
+  presuppose a dangerous man (link 7). From `thrasymachus-and-the-ring` the
+  reader has the realist challenge the tradition keeps answering; Schmitt is
+  its twentieth-century form and the lesson should say so in one clause.
 - **Contributes:** One move: a CRITERION for the political — not a subject
   matter (the state) and not a tone of life (Mann) but the grouping of men into
   friends and enemies with the real possibility of killing — and the
@@ -31,12 +39,17 @@ goal: Analyze Schmitt's criterion of the political as the friend–enemy distinc
 - **Hands off:** If the political is the decision on the enemy, who decides,
   and what is law when the decision is taken? That is sovereignty, and
   `schmitt-political-theology` answers: sovereign is he who decides on the
-  exception. The 1933 question — what the author of this criterion did when
-  the enemy was named by a party — is carried to `article-48-weimar`.
-- **Spine step:** "Liberal Europe breaks: Mann sets Kultur against Zivilisation,
-  Ortega diagnoses the mass-man, Schmitt names the political as friend and
-  enemy and the sovereign as he who decides the exception — and Weimar is the
-  case"
+  exception. The constitutional case — a constitution's emergency clause in
+  use, 1930–33 — is `article-48-weimar`, the module's application. The 1933
+  question — what the author of this criterion did when the enemy was named by
+  a party, and what in the criterion made that easy — is `the-right-in-1933`
+  (next module's application); this lesson reports the bare dated facts once
+  (link 8d) and Refs forward.
+- **Spine step:** "Liberal Europe breaks: elite theorists show that a minority
+  always rules, Mann sets Kultur against Zivilisation, Spengler foretells the
+  West's winter, Ortega diagnoses the mass-man, Schmitt names the political as
+  friend and enemy and the sovereign as he who decides the exception — and
+  Weimar is the case"
 
 ## Sources to consult
 
@@ -135,10 +148,12 @@ goal: Analyze Schmitt's criterion of the political as the friend–enemy distinc
   1932 as "the case for banning the Nazis and Communists"; joined encouraged
   by Heidegger; patron Schleicher murdered 1934; "too scholarly and not
   crude enough to become the Nazis' 'crown jurist'"; the 1936 lecture), and
-  the liberal verdict that the epigram "contained enough truth to distract
-  from its overall falsity". REFERENCES ONLY; state the verdict as the liberal
-  objection, in the course's voice. Fawcett is a self-declared left-liberal;
-  one reading.
+  a liberal historian's verdict that the epigram "contained enough truth to
+  distract from its overall falsity". REFERENCES ONLY. The verdict itself is
+  NOT stated in the course's voice (register rule); the lesson states the
+  ARGUMENT behind it — the criterion describes war, not politics — as the
+  liberal objection, at full strength, and leaves the verdict to the reader.
+  Fawcett is a self-declared left-liberal; one reading.
 - **Muller anthology ch. 7, introduction to Schmitt** — summary index 48;
   cached `research/texts/muller/conservatism-anthology.txt` lines ~3665–3700:
   the parties as subcultures with their own newspapers and clubs; the 1923
@@ -247,7 +262,7 @@ and trade, has never had a politics of its own.
    men killing each other; only the existential defence of one's own form of
    life. Hence the internal enemy: every state declares one in extremity (the
    Athenian decree of Demophantos, 410 BC; the Jacobins; the heretic). Hence
-   the attack on JUST WAR (Ref `cicero-natural-law`, `aquinas-law-and-
+   the attack on JUST WAR (Ref `cicero-res-publica-and-natural-law`, `aquinas-law-and-
    kingship`): justice does not belong to the concept of war; a war justified
    by a norm is a war against a criminal, and the Kellogg Pact (1928) outlaws
    not war but particular enemies — the one who "disturbs the peace". And
@@ -269,7 +284,7 @@ and trade, has never had a politics of its own.
    war can be driven to the utmost inhumanity"; Proudhon's saying, "Whoever
    invokes 'humanity' wishes to cheat" (l.1455). The League of Nations is
    intergovernmental, neither international nor universal; it does not
-   abolish war, it legitimises certain wars. Ref `cicero-natural-law` (the
+   abolish war, it legitimises certain wars. Ref `cicero-res-publica-and-natural-law` (the
    kinship of all men, one commonwealth) as the tradition this denies.
    Heading: "Whoever invokes humanity wants to cheat".
 
@@ -291,7 +306,9 @@ and trade, has never had a politics of its own.
    "providential enemy" (1656; ~1880–1903). Tocqueville's "spectacle
    ridicule et terrible" — aristocrats praising the people's goodness with
    1793 at the door (~1908–1922): inability to tell friend from enemy is the
-   symptom of a class's political end. Ref `maistre-and-bonald`,
+   symptom of a class's political end. Ref `maistre-and-bonald` and
+   `donoso-cortes-on-dictatorship` (Donoso's radical original sin; one clause —
+   his own lesson taught it),
    `hobbes-state-of-nature-and-covenant`, `rousseau-inequality-and-general-will`
    (Rousseau's good natural man as the optimist pole). Heading: "Every political
    theory assumes a dangerous man".
@@ -325,8 +342,8 @@ and trade, has never had a politics of its own.
    thing (the Brunner objection of 1939 — "the enemy, not the friend, is the
    positive feature" — is the scholarly form; Schmitt's 1963 reply, l.280–288,
    is that a trial begins with a wrong and criminal law with a misdeed, which
-   is not a "primacy of crime"). Add the epigram verdict (course's voice):
-   "enough truth to distract from its overall falsity".
+   is not a "primacy of crime"). The objection is argued, not summed up in a
+   verdict: the course does not pronounce the criterion true or false.
    (c) **Schmitt's own admission** (1963 Foreword, l.336–352): that a
    "cautious, initial delimitation of a conceptual field has been turned into
    a primitive slogan, a so-called friend-enemy theory, known only by hearsay"
@@ -335,12 +352,12 @@ and trade, has never had a politics of its own.
    conventional, real and absolute enemy, which the 1932 text had not drawn.
    The lesson weighs this: a concession about reception, or a retreat from the
    1932 claim that the political is the real possibility of killing?
-   (d) **1933**, reported as fact bearing on reception: Schmitt joined the
-   NSDAP in May 1933; in August 1934 defended the murder of the SA leadership
-   and of his own patron Schleicher in "Der Führer schützt das Recht"; lectured
-   in 1936 on German law "in the fight against the Jewish intellect"; was
-   sidelined that year; was detained by the Americans after 1945 and never
-   taught again. The lesson's question, not its verdict: does a theory that
+   (d) **1933**, reported as fact bearing on reception, in two sentences and
+   no more (the full reading is `the-right-in-1933`, forward `<Ref>`): Schmitt
+   joined the NSDAP in May 1933; in August 1934 he defended the killings of
+   30 June–2 July, his own patron Schleicher among the dead, in "Der Führer
+   schützt das Recht"; he was sidelined in 1936 and, after 1945, detained and
+   never taught again. The lesson's question, not its verdict: does a theory that
    says only participants can name the enemy have any way of saying that a
    participant named the wrong one? The strongest reading against Schmitt is
    stated in the course's own voice (it is Strong's): the theory lets the
@@ -435,11 +452,15 @@ politics — and the replies".
   the slogan is not defending the theory; the lesson does the first and
   leaves the second to the reader.
 - **Do not let the 1933 facts do the arguing, in either direction.** Report
-  them dated and once (link 8d), say they bear on reception, and keep the
-  objections to the theory separate from the biography. Never "a Nazi
-  jurist" as an epithet in body prose; never an apology either. Strong's
-  interpretation (Hitler as "miracle", l.698–765) is a reading — References,
-  or one clause as "one reading".
+  them dated and once (link 8d), say they bear on reception, keep the
+  objections to the theory separate from the biography, and leave the
+  connection between them to `the-right-in-1933`. Strong's interpretation
+  (Hitler as "miracle", l.698–765) is a reading — References, or one clause as
+  "one reading".
+- **Register (exact rule).** The course passes no verdict of its own on any
+  author or idea: no condemning or approving labels in its own voice.
+  Judgement comes only through argument and evidence; a label may appear only
+  inside a quotation, with who applied it and when.
 - **Scholars live in References only:** Strong, Schwab, Miller (translators
   and editors), Fawcett, Muller, Strauss (1932 Notes), Meier, Bendersky,
   Kennedy, Brunner (though Schmitt names Brunner, so the 1963 Foreword's
@@ -551,8 +572,9 @@ politics — and the replies".
    about a court that rules on whether a party is an enemy of the
    constitution (a court is a third party, so either it is itself the
    political entity deciding, or its ruling is not the political decision).
-   The solution says this is exactly the question the Weimar Staatsgerichtshof
-   faced in October 1932 and Refs `article-48-weimar`.
+   The solution ends on the derivation itself; it does not anticipate the
+   Weimar court case (that is the module's application, and the one FORWARD
+   exercise of this set is no. 8).
 6. **Counter-argument stem (synthesis):** Someone claims: "The friend–enemy
    criterion is simply Thrasymachus — justice is what the stronger decides."
    Name two facts the claim fails to account for (Schmitt denies that the
@@ -592,4 +614,5 @@ politics — and the replies".
   thinker in this course's neighbourhood, and that the two cases differ
   (Nietzsche was dead; Schmitt joined).
 - Otherwise none. Schmitt's lineage is Hobbes, Bodin, Maistre, Donoso and
-  Hegel, all of which this course teaches itself.
+  Hegel — and Donoso Cortés, who now has his own lesson — all of which this
+  course teaches itself.

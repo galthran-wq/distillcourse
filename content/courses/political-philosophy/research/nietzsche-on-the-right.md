@@ -1,3 +1,5 @@
+> **SUPERSEDED (2026-10-31 structure revision).** This lesson was dropped from course.yaml; its material is merged into the-right-after-1945 (and the Nietzsche Ref in ressentiment-and-envy). Kept only as a fuller record that the successor brief may point to — never brief a lesson from this file.
+
 # Research brief: nietzsche-on-the-right (Nietzsche's inheritance on the right)
 
 status: planned

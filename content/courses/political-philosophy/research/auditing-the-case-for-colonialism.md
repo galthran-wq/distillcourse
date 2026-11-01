@@ -16,8 +16,16 @@ goal: Apply the sourcing drill to three empirical claims in the Case for Colonia
   both of which rest on empirical premises about what the wrong did and what
   it does now. From the whole course: the sourcing drill (metadata → prediction
   → records/argues/omits → use, not bias → corroboration), used on texts since
-  module 1 and on a trial in `burke-against-hastings`; here on peer-reviewed
-  studies.
+  module 1 and on a trial in `burke-against-hastings`; and — the closest
+  model — on two datasets in `national-data-audited`, the application that
+  closed the heredity module just before this one: entry by entry, then the
+  statistical step, with the same standard for both sides. That lesson set up
+  the two statistical tools this one needs: what a correlation and its square
+  (the share of variance a variable accounts for) measure, and what an
+  instrument is (a fact that moves the cause and reaches the outcome by no other
+  road — there, settler mortality for institutions). Recall both by `<Ref>`
+  national-data-audited with a clause; do not re-teach. Here the drill turns on
+  peer-reviewed studies as cited by two sides of a public dispute.
 - **Contributes:** The module's method applied to its own material: three
   claims, three cited studies, read for what they measured, on what data,
   against what comparison, and whether the claim as made survives. The result is
@@ -27,8 +35,10 @@ goal: Apply the sourcing drill to three empirical claims in the Case for Colonia
   (`the-nation-and-its-defenders`: who "we" are), and the closing synthesis
   (`the-argument-assembled`) returns to "the West's judgment of its conquests"
   as one of three thematic halts. The one forward exercise reaches
-  `murray-strange-death-of-europe`, where demographic projections are read with
-  their assumptions by the same drill.
+  `powell-raspail-and-camus`, where three prophecies of displacement are
+  checked against the demographic record and "what a demographic projection can
+  and cannot say" is taught by the same drill (`murray-strange-death-of-europe`
+  returns to the ONS, Pew and Kaufmann projections after it).
 - **Spine step:** "The West judges its own conquests: Vitoria's titles, Locke's waste land, Burke's impeachment of Hastings, Mill's tutelage, the colonial balance sheet, and whether guilt is inherited"
 - **APPLICATION spec (L16):** The artefact is three peer-reviewed studies as
   cited on two sides of a public dispute — by Gilley's 2022 Response ("Lazy
@@ -106,8 +116,13 @@ goal: Apply the sourcing drill to three empirical claims in the Case for Colonia
 - **Gilley, "The Case for Colonialism" (2017/2018)** — index **7**; text
   `research/texts/gilley/case-for-colonialism-original-AQ2018.txt`. Note 4:
   Acemoglu, Johnson & Robinson cited as "American Economic Review 95, no. 5
-  (2000): 1369–401" — the paper is AER 91:5 (December 2001), 1369–1401. A
-  fourth drill if the writer wants one.
+  (2000): 1369–401" — the paper is AER 91:5 (December 2001), 1369–1401. The
+  reader has already audited this paper's dataset (`<Ref>`
+  national-data-audited), so this is a retrieval drill, not a new one: the
+  citation slip plus the article's own sentence that such studies "do not
+  control for the presence or absence of colonialism" (`<Ref>`
+  colonial-balance-sheet) — one paragraph at most, or a second half to
+  Exercise 1.
 - **The three studies — NOT in the dossier; obtain (open versions exist), read
   the abstract, the data section, the main table and the magnitude
   discussion:**
@@ -123,9 +138,11 @@ goal: Apply the sourcing drill to three empirical claims in the Case for Colonia
      effects; the magnitude paragraph (how large a one-standard-deviation
      increase in exports is in trust units, and how it compares with other
      determinants); the instrumental-variable section (historical distance of
-     the ethnic group's territory from the coast as the instrument — one
-     sentence for the newcomer: a variable that moves the cause but reaches
-     the outcome only through it); the channels section (internal norms vs
+     the ethnic group's territory from the coast as the instrument — recalled
+     by `<Ref>` national-data-audited, where the instrument and its "no other
+     road" assumption were set up on settler mortality; one clause here, plus
+     the question the reader can now ask unaided: by what other road could
+     distance from the coast reach trust?); the channels section (internal norms vs
      external institutions). What to settle: whether "one to two per cent of
      explained variation" appears in the paper and in what sense (incremental
      R² of the slave-export variable), and what the standardised coefficient
@@ -227,10 +244,14 @@ lesson opens three.
    survey answers about trust from the Afrobarometer round of 2005, matched to
    the respondent's ethnic group's recorded slave exports between 1400 and
    1900; a negative relation that survives controls and an instrument
-   (distance from the coast). The explanation the lesson owes the newcomer —
-   figure 2: "variance explained" is the share of the spread in trust answers
-   across respondents that the regression attributes to a variable; a variable
-   can shift the average answer by a tenth of a standard deviation (the
+   (distance from the coast; `<Ref>` national-data-audited for what an
+   instrument is). What the lesson adds to what the reader holds — figure 2:
+   "variance explained" (recalled from `<Ref>` national-data-audited, where the
+   square of a correlation was read as the share of spread a line accounts for)
+   is here the share of the spread in trust answers across individual
+   respondents, not across country means; the new step is the standardised
+   coefficient beside it — a variable can shift the average answer by a tenth
+   of a standard deviation (the
    standardised coefficient the paper reports, to be verified) and still
    account for only one or two per cent of the spread, because most of the
    spread is between individuals for other reasons; small share and real
@@ -355,8 +376,9 @@ entries are made of".
 - **Terms to anchor (L11):** Afrobarometer (a survey of public attitudes
   across African countries, begun 1999); standardised coefficient (the effect
   of a one-standard-deviation change in the cause, in standard deviations of
-  the outcome); R² / variance explained; instrumental variable (one sentence,
-  no more); King's African Rifles (the British colonial regiment in East
+  the outcome); R² / variance explained and instrumental variable — both
+  recalled by `<Ref>` national-data-audited, never re-defined at length; King's
+  African Rifles (the British colonial regiment in East
   Africa); Demographic and Health Surveys; birth cohort; welfare ratio and
   bare-bones basket; Blue Books (colonial governments' annual statistical
   returns); Gold Coast (Ghana), Nyasaland (Malawi); peer review; AER and JEH
@@ -390,7 +412,8 @@ entries are made of".
 - **No verdict on colonialism.** The lesson's finding is about compressions
   and their direction. "Gilley was right" or "the critics were right" is the
   conclusion the drill forbids; "the op-ed moved the period; the Response
-  moved the magnitude" is the kind of sentence it allows, once verified.
+  moved the magnitude" is the kind of sentence it allows, once verified. The
+  register rule: The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
 - **Dates:** to the decade except 2005 (the survey round), 1880–1965 and
   1400–1900 (the studies' own periods), 2009/2011/2012 (publication), 2017 and
   2022 (the dispute).
@@ -473,14 +496,16 @@ Balance: all draw; 5–6 visuals.
    post-1963 civilian series; a never-colonised comparator's heights, with the
    comparator problem from the previous lesson named), and what result would
    decide between them.
-7. **FORWARD (E7) → `murray-strange-death-of-europe`.** A demographic projection
-   (a statistics office's or a research centre's) says what share of a
-   population a group will be in 2050. Before reading its number, run the
-   metadata step of the drill: list the assumptions such a projection must make
-   (fertility by group over decades; migration flows; who counts as a member of
-   the group across generations; mixed descent). The solution says the lesson
-   on the restrictionist case reads the ONS, Pew and Kaufmann projections with
-   exactly these assumptions stated, `<Ref>`.
+7. **FORWARD (E7) → `powell-raspail-and-camus`.** A speech or a projection says
+   what share of a population a group will be in fifteen or twenty years, or in
+   2050. Before reading its number, run the metadata step of the drill: list the
+   assumptions such a forecast must make (fertility by group over decades;
+   migration flows; who counts as a member of the group across generations;
+   mixed descent) and what later record would test it. The solution says the
+   next module's lesson on the prophecies of displacement checks three such
+   forecasts against the censuses and states what a demographic projection can
+   and cannot say, with a `<Ref>` (and that `murray-strange-death-of-europe`
+   reads the ONS, Pew and Kaufmann projections the same way).
 8. **Synthesis — the audited entry.** Write the balance-sheet entry for one of
    the three claims as the drill leaves it: the claim as made, the evidence as
    the paper gives it, the reasoning that connects or fails to connect them,

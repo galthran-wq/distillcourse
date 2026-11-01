@@ -21,7 +21,22 @@ goal: Analyze Waldron's argument that historic injustices can be superseded by c
   cost–benefit of empire — whatever the ledger says, who is owed and who owes.
   From Locke ch. XVI (met in `locke-and-mill-on-empire`): the unjust
   conqueror gets no title and conquered descendants "may always shake off" the
-  yoke — a Lockean seed of the reparations case.
+  yoke — a Lockean seed of the reparations case. From
+  `ressentiment-and-envy` (equality-after-Rawls module): the form of argument
+  that explains a moral demand by the satisfaction it gives the one who makes
+  it, and that lesson's objection to it — a motive charge can be turned against
+  any claim and does not show the claim false; the "moral intoxicant" step of
+  the tyranny-of-guilt case (link 6) has exactly this form, and the same
+  objection applies (one clause, `<Ref>`). From `the-right-after-1945`: the
+  postwar settlement and denazification — the course has already met a nation
+  reckoning with a crime of the generation before; the opening's "the
+  Holocaust" is recalled from there in a clause, never re-told. And from
+  `geography-or-institutions` / `national-data-audited` (the heredity module,
+  just before this one): the institutional claim that colonial institutions
+  shaped today's gap between nations — the strongest available version of the
+  "present effect" a reparations case needs; recall in one clause where link 5
+  needs it, with the audit's caution that the causal estimate rests on
+  contested data.
 - **Contributes:** Three answers to one question — what does justice now
   require of a wrong done then — reconstructed at full strength: counterfactual
   rectification and why it cannot be carried out; continuing injustice and the
@@ -84,24 +99,23 @@ goal: Analyze Waldron's argument that historic injustices can be superseded by c
   their punishment — the summary's gloss: "collective inherited guilt
   rejected"; verify the passage and quote it short). Public domain.
 - **Murray, The Strange Death of Europe ch. 10 "The tyranny of guilt"** — index
-  **50**; text `research/texts/murray/strange-death-of-europe.archive-djvu.txt`
-  l.4470–4606 (the section "Double standards and the triumph of the
-  masochists"; exact text spot-checked). WARNING: `research/texts/murray/
-  strange-death-of-europe.txt` is a mis-staged file (George H. Smith, The Case
-  Against God); use the djvu file or the `thestrange-s3-.txt` shard
-  (l.1280–1400). Read: Turkey never made to feel guilt (l.4470–4480); "if
-  historical wrongs must lead to atonement in the present day, then what is the
-  statute of limitations and to whom else may it apply?" (l.4482); "if the
-  concept of historical guilt means anything, it means that a hereditary stain
-  of complicity can be said to pass down from one generation to another" and
-  the one precedent — the Christian doctrine of Jewish guilt, lifted by a pope
-  only in 1965, which "the modern age views… as morally repugnant" (l.4496–4506);
-  Bruckner's "moral intoxicant… From being a nobody one becomes a somebody"
-  (l.4508–4514); Andrew Hawkins's 2006 "So Sorry" march in Banjul in chains
-  (l.4515–4525); "Perhaps the guilt industry is a mono-generational phenomenon"
-  (l.4600–4602). Also the earlier section "The stain of Europe" (Australia's
-  Sorry Day and the 2008 apology; Columbus 1992; reparations) for the examples'
-  anchors. Copyrighted: one or two short quotations, paraphrase.
+  **75** (the clean full text; sources.yaml prefers it to the earlier read, index
+  50). Text `research/texts/murray/strange-death-of-europe.txt` — NOW the real
+  Murray (the earlier warning that this file was mis-staged and the pointers to
+  an `archive-djvu` file no longer apply; line numbers below are this file's and
+  were re-checked). Ch. 10 begins l.4633; "The stain of Europe" l.4809 (Sorry Day
+  in Australia l.~4861; the 2008 apology; Columbus 1992; reparations); "Double
+  standards and the triumph of the masochists" l.5080. Read: Turkey never made to
+  feel guilt (l.5092–5112); "if historical wrongs must lead to atonement in the
+  present day, then what is the statute of limitations and to whom else may it
+  apply?" (l.~5126–5128); "a hereditary stain of complicity can be said to pass
+  down from one generation to another" and the one precedent — the Christian
+  attribution of guilt to the Jews, lifted by a pope only in 1965, which "the
+  modern age views … as morally repugnant" (l.5146–5151); Bruckner's diagnosis
+  that guilt "has become a moral intoxicant in Western Europe" (l.5158–5162);
+  the 2006 "So Sorry" march in Banjul in chains (l.~5173); "Perhaps the guilt
+  industry is a mono-generational phenomenon" (l.5269). Copyrighted: one or two
+  short quotations, paraphrase.
 - **Bruckner, La Tyrannie de la pénitence (2006; Eng. The Tyranny of Guilt: An
   Essay on Western Masochism, 2010)** — NOT in the dossier; known through
   Murray. References; the "moral intoxicant" phrase via Murray.
@@ -148,9 +162,12 @@ goal: Analyze Waldron's argument that historic injustices can be superseded by c
   despotic power only over combatants; children keep their inheritance; "the
   conquered… may always shake off" an imposed government (Sect. 192). Recall by
   Ref from the Locke/Mill lesson.
-- No Strauss–Cropsey chapter applies (Nozick and Waldron postdate the
-  volume's range; the Burke chapter for the partnership — file empty at brief
-  time).
+- Strauss–Cropsey: no chapter on the question (Nozick and Waldron postdate the
+  volume's range). The Burke chapter (Mansfield) has landed —
+  `research/texts/strauss-cropsey/history-of-political-philosophy.txt`
+  l.33273–34313 (OCR) — optional check on the partnership of generations and
+  prescription (grep "prescription", "partnership"); Mansfield in References
+  only.
 
 ## EXPLANATION PLAN (L0)
 
@@ -276,7 +293,10 @@ return what was stolen. The lesson's first set piece tests it.
    and the one historical precedent — the Christian attribution of guilt to
    Jews, formally lifted only in 1965 — is one "the modern age views as morally
    repugnant"; and guilt is enjoyed — "a moral intoxicant… From being a nobody
-   one becomes a somebody" — the theatre director who marched in Banjul in
+   one becomes a somebody" (with the reply the reader already holds from
+   `<Ref>` ressentiment-and-envy: that a demand gratifies its maker does not
+   show it unjust — the envy charge's own weakness, applied here to the other
+   side) — the theatre director who marched in Banjul in
    chains and a "So Sorry" T-shirt in 2006 for a sixteenth-century ancestor;
    perhaps "a mono-generational phenomenon". Add Scruton's condition as a
    step: forgiveness requires the wrongdoer's acknowledgment, penitence and
@@ -332,8 +352,8 @@ we inherit the debt?"
    caption of a fifth frame if used.
 6. **The internment payments** ($20,000, 1988; Waldron I pp. 6–7) as the
    worked case of symbolic reparation — the apology that costs something.
-7. **Murray's statute-of-limitations paragraph** (djvu l.4482–4495) and the
-   Banjul march (l.4515–4525), paraphrased with one short quotation each; set
+7. **Murray's statute-of-limitations paragraph** (l.~5120–5135 of the clean
+   text) and the Banjul march (l.~5170–5180), paraphrased with one short quotation each; set
    beside Scruton's conditions of forgiveness (l.668–678) and Burke's
    "immortal for the good of the members, not for their punishment" (S3
    l.268–278).
@@ -376,17 +396,16 @@ we inherit the debt?"
   provocative rhetorical moves" — do not use it. Equally, the reparations case
   is not presented as "guilt" by the course: its own authors frame it as debt
   and acknowledgment.
-- **No moralising, no verdict.** The tone rule's "no moralizing in either
-  direction" applies with full force; the lesson ends with three positions and
-  their concessions.
+- **No moralising, no verdict.** The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when. The lesson ends with three positions
+  and their concessions.
 - **Numbers:** $20,000 (1988) bound; dates 1865, 1942–45, 1965, 1988, 1992,
   2006, 2014. No wealth-gap figures unless the writer has the source and binds
   it (Coates gives several; one at most, with its base).
 - **Do not re-teach** Locke's labour theory or proviso, Vitoria's dominium,
   Burke's partnership — one `<Ref>` clause each. Do not teach Miller ch. 7 —
   the forward exercise only.
-- **Mis-staged file:** `research/texts/murray/strange-death-of-europe.txt` is
-  not Murray. Use the djvu file; line pointers above are to it.
+- **Murray's text:** `research/texts/murray/strange-death-of-europe.txt` is now
+  the clean full text (index 75); line pointers above are to it.
 - **Nozick, Parfit, Bruckner, Murray, Scruton, Miller, Kukathas, Sher,
   Thompson: References only.** Waldron is the material and may be named as the
   author of the argument under reconstruction ("Waldron argues") — course.yaml

@@ -13,7 +13,7 @@ goal: Derive Hobbes's argument from natural equality through the war of all agai
   began in force, so why would equals ever submit, and what turns force into obligation? From
   `thrasymachus-and-the-ring`: justice as the interest of the stronger; Glaucon's story that
   justice arose by a compact among the weak and is kept only from fear. From
-  `cicero-natural-law`: Carneades's case that justice is convention and the wise man who does
+  `cicero-res-publica-and-natural-law`: Carneades's case that justice is convention and the wise man who does
   not seize his advantage is a fool. From `aristotle-political-animal-and-natural-slavery`: man
   as political animal, the natural master and slave — the two theses Hobbes denies by name. From
   `machiavelli-effectual-truth`: men as they are; fear more reliable than love. From
@@ -35,14 +35,17 @@ goal: Derive Hobbes's argument from natural equality through the war of all agai
   (`locke-property-and-consent`), Rousseau's "he read society into nature"
   (`rousseau-inequality-and-general-will`), and the thesis that with Hobbes fear of violent
   death takes the place of the natural end — the frame of `strauss-natural-right-and-history`.
-- **Spine step:** "Wars of religion force a new answer: one sovereign power above every faction,
-  bound by no law of its own making — Bodin's definition, Hobbes's derivation from fear, and the
-  English Revolution as the test"
+  The nearest forward objection comes from the royalist side, two lessons on
+  (`filmer-patriarcha`): grant every right the covenant gives the sovereign, deny that men were
+  ever born equal and unbound — every man is born a son, under command. One clause.
+- **Spine step:** "Christendom builds a law above kings; Machiavelli breaks it; the wars of
+  religion force one sovereign power above every faction — Bodin's definition, Hobbes's
+  derivation from fear, Filmer's from fatherhood — and the English Revolution tests them"
 
 ## Sources to consult
 
 - **Hobbes, Leviathan (1651), Parts I–II (Gutenberg #3207)** — summaries.json index 21; text at
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/hobbes-leviathan/pg3207-full.txt`
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/hobbes-leviathan/pg3207-full.txt`
   (line numbers are this file's; 1651 spelling — quote as printed, gloss once; marginal heads
   appear as title-case lines and are ideal excerpt boundaries). Chapters begin: XIII l.3920, XIV
   l.4121, XV l.4648, XVI l.5258, XVII l.5503, XVIII l.5720. Read in full XIII–XVII; read for one
@@ -85,7 +88,7 @@ goal: Derive Hobbes's argument from natural equality through the war of all agai
   place"; "naturall timorousnesse") for the objection in link 6 — one quotation, the chapter
   itself is the next lesson's.
 - **Smith, Open Yale L12–L13** — index 9;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/oyc/lecture-12.txt`
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/oyc/lecture-12.txt`
   (Ch1 the paradox of absolutism and consent, Westphalia 1648, the frontispiece — l.15, 54–56;
   Ch2 Aubrey's Hobbes; Ch4 civil science as art; Ch5–6 the state of nature as a thought
   experiment, "a known disposition to fight", conflict primary and peace an artefact),
@@ -96,7 +99,7 @@ goal: Derive Hobbes's argument from natural equality through the war of all agai
   References; the paradox and the Esposito question become the course's own in plain words (no
   firemen anecdote — invented-persona-adjacent; state the problem abstractly).
 - **Strauss, Natural Right and History ch. V.A pp. 165–202** — index 35;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/strauss/nrh-s5-ch5a-hobbes.txt`:
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/strauss/nrh-s5-ch5a-hobbes.txt`:
   "fear of violent death takes the place of telos" (pp. 177–181); the fundamental fact is a
   right, not a duty (pp. 181–184); the extreme-case foundation fails because fear of violent
   death is only "commonly" strongest — capital punishment, war (pp. 196–200); "that imprudent,
@@ -105,7 +108,7 @@ goal: Derive Hobbes's argument from natural equality through the war of all agai
   name in References.
 - **Oakeshott, "The Moral Life in the Writings of Thomas Hobbes" (Rationalism in Politics, pp.
   248–294)** — index 43;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/oakeshott/rationalismi-s6-hobbes.txt`:
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/rationalismi-s6-hobbes.txt`:
   s.2 pp. 250–260 (pride and fear; "the fear that counts is of shameful death at the hands of
   another man"; reason generated by fear; "they who travel carry their swords with them"; the
   "tame man" and reason's "low-grade (if gilt-edged) security"); footnote p. 255 (the war of all
@@ -114,22 +117,29 @@ goal: Derive Hobbes's argument from natural equality through the war of all agai
   `augustine-two-cities`) and the pride/fear pairing; the moralist-of-individuality reading is
   the NEXT lesson's objection.
 - **Voegelin, New Science of Politics VI.4** — index 36;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/voegelin/new-science-of-politics-full.txt`
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/voegelin/new-science-of-politics-full.txt`
   (~l.6777–6974): no summum bonum, fear of death as summum malum; the race metaphor ("to forsake
   the course is to die"); covenant as "psychic fusion"; "a person is the same that an actor is".
   OPTIONAL frame for links 1 and 5; copyrighted — paraphrase; name in References.
 - **Plato, Republic II (Glaucon's compact)** — index 14;
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/plato/`;
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/plato/`;
   backward Ref only (`thrasymachus-and-the-ring`): the same origin story, the opposite verdict —
   Exercise 6.
 - **Cicero, Rep. III (Carneades)** — index 39; backward Ref only.
-- **Strauss & Cropsey (eds.), History of Political Philosophy, 3rd ed., ch. "Thomas Hobbes"** —
-  text landing at
-  `/home/processing/distillcourse/content/courses/political-philosophy/research/texts/strauss-cropsey/history-of-political-philosophy.txt`;
-  consult as the standard close reading of XIII–XVII. FILE EMPTY at brief time — check for
-  arrival.
+- **Strauss & Cropsey (eds.), History of Political Philosophy, 3rd ed., ch. "Thomas Hobbes"
+  (L. Berns, pp. 396–420)** — OCR text at
+  `/home/processing/distillcourse/.claude/worktrees/course+political-philosophy/content/courses/political-philosophy/research/texts/strauss-cropsey/history-of-political-philosophy.txt`,
+  lines 19286–20513. For this lesson pp. 399–406 (ll. ~19407–19740): the state of nature as
+  deduced from the passions, its historical existence "not very important" (l.19414–19426 —
+  supports the Remark in Pitfalls); the right of nature as "the blameless liberty" (l.19552);
+  laying down the right to resist (l.19585–19591); no valid covenant where there is reasonable
+  fear of non-performance, hence a coercive power (l.19610–19617 — check link 4); the two-part
+  social contract and the sovereign as a person whose legislation is the subjects'
+  "self-legislation" (l.19688–19714 — check link 6); paternal and despotic government arising by
+  acquisition (l.19720). The standard close reading against which to check the derivation;
+  copyrighted — paraphrase; Berns in References.
 
-Names ONLY in References: Strauss, Smith, Oakeshott, Voegelin, Skinner, Tuck, Warrender,
+Names ONLY in References: Strauss, Smith, Oakeshott, Voegelin, Berns, Skinner, Tuck, Warrender,
 Gauthier (the prisoner's-dilemma reading — the body may DRAW the 2×2 as the course's own device
 without naming game theory's authors), Aubrey (his Brief Life supplies the biography — "fear and
 I were born twins" may be quoted as Hobbes's own words, with Aubrey in References), Macpherson.
@@ -315,7 +325,7 @@ about fear".
 - **The real misreading (L13):** "Hobbes says men are naturally wicked / selfish." Refute from
   XIII ("the desires … are in themselves no sin"), from the situational structure of the
   argument (the modest man must anticipate too), and from the Foole's answer (breaking covenant
-  is against reason, not merely against morals). One slot; no second strawman. A second real
+  is against reason, not only against morals). One slot; no second strawman. A second real
   one, handled in a Remark not a slot: "the state of nature is Hobbes's account of prehistory" —
   he says it was "never generally so" and gives America and inter-state relations as the cases
   where it obtains.
@@ -328,11 +338,14 @@ about fear".
   is stated from Hobbes's own text (XIV void covenant; XXI substitution).
 - **Numbers (L12):** none needed beyond 1588, 1640, 1649, 1651 and the "nineteen" laws; do not
   inventory laws 4–19 in body prose — a folded table.
-- **No moralising:** neither "the father of liberalism" nor "the apologist of absolutism" — the
-  paradox is stated as the question the next lesson answers.
+- **Register:** The course passes no verdict of its own on any author or idea: no condemning or
+  approving labels in its own voice. Judgement comes only through argument and evidence; a label
+  may appear only inside a quotation, with who applied it and when. The paradox (absolute power
+  from equality and consent) is stated as the question the next lesson answers.
 - **Dossier thin:** De Cive and the Elements of Law are not in the dossier; Aubrey's Brief Lives
   is not in the dossier (the "twins" line is in Hobbes's own Latin verse autobiography — cite as
-  such in References); the Strauss–Cropsey chapter file is empty.
+  such in References); the Strauss–Cropsey Hobbes chapter is OCR (verify any sentence before
+  relying on it).
 
 ## FIGURE PLAN
 

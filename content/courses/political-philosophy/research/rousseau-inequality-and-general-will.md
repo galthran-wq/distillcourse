@@ -10,8 +10,16 @@ goal: Analyze Rousseau's account of how society made men unequal and his solutio
 - **Inherits:** From `locke-property-and-consent`: a state of nature already
   under law, property by labour with limits that money dissolves ("in the
   beginning all the world was America"), consent (express and tacit) as the only
-  ground of government, and the open problem the last exercise set — that the
-  first "this is mine" needs others to believe it. From Hobbes
+  ground of government, and the trust and right of resistance. From
+  `hume-against-the-original-contract` (the previous lesson): the record shows
+  conquest and usurpation, not compact; tacit consent by residence is a fiction
+  (the sleeping passenger); generations are "in perpetual flux", so each cannot
+  consent; allegiance rests on opinion, interest and time — and the gap Hume
+  left: he explains why men obey and gives no test for when they should not.
+  Rousseau takes the opposite way out of Hume's problem: not to drop consent but
+  to make it actual (the assembled people, the periodic assemblies of SC III.18).
+  From `filmer-patriarcha`: paternal authority as the model of political power,
+  which SC I.2 dismisses in a paragraph. From Hobbes
   (`hobbes-state-of-nature-and-covenant`): natural men as fearful, competitive,
   proud; sovereignty as absolute and indivisible; the covenant of each with
   each. From `machiavelli-discourses-republic`: `civil-religion` (Numa's
@@ -31,7 +39,8 @@ goal: Analyze Rousseau's account of how society made men unequal and his solutio
   of what people want.
 - **Hands off:** Three objections are put in this lesson and one is left to the
   next: (a) Maistre's Hottentot — society is as old as man, the state of nature
-  is a fiction (held for `maistre-and-bonald` and `war-is-divine`, stated here
+  is a fiction (held for `maistre-and-bonald`, whose starred section on the
+  Seventh Dialogue reads it, stated here
   in one paragraph); (b) Constant's ancient against modern liberty — a sovereign
   people is as dangerous as any tyrant, and moderns want security, not
   participation (put at full strength here); (c) Hegel's §258 — the general will
@@ -40,10 +49,11 @@ goal: Analyze Rousseau's account of how society made men unequal and his solutio
   the one Burke takes up: if a people may frame a government for itself from
   principles, what happens when it tries — `burke-reflections` opens with Price
   claiming exactly that right in 1789.
-- **Spine step:** "Government by consent (Locke) and the general will (Rousseau)
-  make a revolution thinkable; Burke, Maistre and Bonald answer that no
-  generation knows enough to design a society, and Hegel absorbs both sides into
-  the rational state"
+- **Spine step:** "Government by consent (Locke) is doubted by Hume and
+  radicalised by Rousseau's general will; when France tries to frame a government
+  from principles, Burke, Maistre and Donoso Cortés answer that no generation
+  knows enough, Herder and Fichte put the people before the state, and Hegel
+  absorbs both sides into the rational state"
 
 ## Sources to consult
 
@@ -135,10 +145,20 @@ goal: Analyze Rousseau's account of how society made men unequal and his solutio
   "fermentation" passage and amour-propre (L19), republican vs liberal freedom
   and the paradox of I.6 (L20); Smith's "most modern men mistake a town for a
   city, and a bourgeois for a citizen". References only.
-- **Strauss & Cropsey (eds.), History of Political Philosophy, 3rd ed., ch. on
-  Rousseau (Allan Bloom)** — text landing at
-  `research/texts/strauss-cropsey/history-of-political-philosophy.txt`; consult
-  as the standard close reading. DOSSIER GAP: file empty at writing time.
+- **Strauss & Cropsey (eds.), History of Political Philosophy, 3rd ed.,
+  "Jean-Jacques Rousseau" by Allan Bloom, pp. 559–580** — text
+  `research/texts/strauss-cropsey/history-of-political-philosophy.txt`
+  l.27125–28146 (OCR; page headers inline). Copyrighted: paraphrase; Bloom in
+  References only. Consult as the standard close reading (the Second Discourse's
+  natural man; the general will as the substitute for natural law; the
+  Legislator) and grep it for any claim about the order of the argument.
+- **Rousseau, SC III.18 and IV.2 on renewing and presuming consent** — full text
+  l.5092–5160 (III.18: "The periodical assemblies … are designed" to put two
+  questions, the first "Does it please the Sovereign to preserve the present
+  form of government?", l.5139–5151) and l.5300–5306 (IV.2: "When the State is
+  instituted, residence constitutes consent; to dwell within its territory is to
+  submit to the Sovereign"). Use both in link 6 as Rousseau's answer to the
+  previous lesson's generations objection, and in exercise 5.
 - **Burke, Reflections S3 l.1309–1324** (summaries.json index 24): Hume's
   report of Rousseau's "secret of composition" — the marvellous. One sentence,
   as the forward hook to `burke-reflections`.
@@ -242,7 +262,11 @@ society corrupted men come to design a society in which each obeys only himself?
    general will, which II.3 says it may not when factions exist — so the
    doctrine's safety depends on conditions (small state, equality, no parties,
    no representation, III.15: "the moment a people allows itself to be
-   represented, it is no longer free") that no modern state meets; (ii) the
+   represented, it is no longer free") that no modern state meets — and note
+   here, in one sentence with a `<Ref>` to hume-against-the-original-contract,
+   that Rousseau meets Hume's generations problem head-on: the people must
+   assemble periodically and vote on whether to keep the form of government
+   and its magistrates (III.18), so consent is renewed rather than presumed; (ii) the
    Idealist gloss (the "real will" forced against the "actual will") is a
    reading, not the text, and the course names it as such with Cole in
    References; (iii) the step from "I am a member of the sovereign" to "the
@@ -281,7 +305,7 @@ society corrupted men come to design a society in which each obeys only himself?
    handoffs: (a) Maistre's reply that there never was a natural man — the
    frontispiece of Rousseau's own Discourse shows a Hottentot returning to his
    fellows, "society is as old as man" (one paragraph, `<Ref>`
-   maistre-and-bonald and war-is-divine); (c) Hegel's §258 in one sentence
+   maistre-and-bonald, its starred Seventh Dialogue section); (c) Hegel's §258 in one sentence
    (`<Ref>` hegel-ethical-life-and-the-state); and the problem the next lesson
    opens — a people in 1789 claiming the right to frame a government for
    itself (`<Ref>` burke-reflections).
@@ -339,6 +363,10 @@ society corrupted men come to design a society in which each obeys only himself?
 
 ## Pitfalls / subtleties to flag
 
+- **Register rule.** The course passes no verdict of its own on any author or
+  idea: no condemning or approving labels in its own voice. Judgement comes only
+  through argument and evidence; a label may appear only inside a quotation, with
+  who applied it and when.
 - **Terms to anchor (L11):** *amour de soi* vs *amour-propre* (define both at
   first use, in the fermentation scene, not before); *perfectibility*; *the
   general will* (never "the majority's will" — define at II.3, not at I.6 where
@@ -370,7 +398,7 @@ society corrupted men come to design a society in which each obeys only himself?
   then accuses it.
 - **Hegel §258 is stated, not argued, here.** One paragraph, with the forward
   `<Ref>`; the Hegel lesson does the work.
-- **Maistre's Hottentot is held for `maistre-and-bonald`/`war-is-divine`**: one
+- **Maistre's Hottentot is held for `maistre-and-bonald`** (its starred section): one
   paragraph here, no more; do not teach Providence or the executioner.
 - **The Second Discourse is not a call to return to the forest** — Rousseau says
   so (Note 9 / Appendix, "What, then, is to be done?"); refute this real and
@@ -383,12 +411,12 @@ society corrupted men come to design a society in which each obeys only himself?
   "savages" are stated where they bear on the argument and nowhere else.
 - **Names ONLY in References:** Cole, Strauss, Bloom (Strauss–Cropsey), Smith,
   Gossman, Talmon, Berlin (for "two concepts"), Holmes, Kelly. Constant,
-  Hobbes, Locke, Hegel, Maistre, Mandeville, Grotius, Pufendorf, Montesquieu,
+  Hobbes, Locke, Hume (`<Ref>`), Hegel, Maistre, Mandeville, Grotius, Pufendorf, Montesquieu,
   Voltaire may be named as thinkers/interlocutors. State scholars' theses as
   the course's own ("the reading that Rousseau's general will replaces natural
   law as the test of right").
 - **Dossier gaps:** Constant's lecture is present only through Gossman; the
-  Strauss–Cropsey chapter is unavailable (empty file); Rousseau's note on the
+  Strauss–Cropsey Bloom chapter has landed (OCR, l.27125–28146); Rousseau's note on the
   Hottentot may be truncated in the Gutenberg Cole text — check, and if absent
   rely on Maistre's description (spd.txt l.12938 ff.) and say the frontispiece
   is Rousseau's.
@@ -433,7 +461,9 @@ society corrupted men come to design a society in which each obeys only himself?
    must see the engraving Maistre read against the book — a man in European
    dress handing back his clothes and walking toward his people. It passes the
    visible-not-legible test (the scene, not the caption, is the content).
-   Placement: the closing section where Maistre's objection is stated.
+   Placement: the closing section where Maistre's objection is stated. The starred
+   Seventh Dialogue section of `maistre-and-bonald` uses the same engraving: one
+   capture, credited in each lesson's credits.yaml.
 9. `source: no pool candidate — hunt:` a portrait of Rousseau — Maurice Quentin
    de La Tour's 1753 pastel (Musée Antoine-Lécuyer, Saint-Quentin) via Wikimedia
    Commons (PD-Art). Optional float at the opening. The lesson stays draw-heavy
@@ -468,7 +498,9 @@ society corrupted men come to design a society in which each obeys only himself?
    unanimity and all else may go by majority (IV.2), and that residence implies
    consent. Derive from I.6–I.7 why unanimity is needed once and only once, and
    then test whether "residence implies consent" is any stronger than Locke's
-   highway (`<Ref>` Sect. 119) that the previous lesson's Hume objection broke.
+   highway (`<Ref>` locke-property-and-consent, Sect. 119) that the previous
+   lesson's sleeping passenger broke (`<Ref>` hume-against-the-original-contract,
+   OC 24) — and say whether the periodic assemblies of III.18 repair it.
 6. *Synthesis / counter-argument (Constant).* Someone claims that Rousseau's
    conditions (small state, no representation, no factions, civil religion)
    show he described a city of the ancient type and so his theory has nothing
