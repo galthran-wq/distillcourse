@@ -108,7 +108,7 @@ how easily they would master what it presents.
   computes the object a later lesson names, or hits the wall its mechanism
   removes — and the solution says so with a `<Ref>`.
 
-## Callouts & citations (L15, L8a a/b, L9a)
+## Callouts, citations & verdicts (L15, L8a a/b, L9a, L17)
 
 - **K1 (required)**: apply the deletion test to every `<KeyFact>`,
   `<Remark>`, `<Aside>`: does it carry a synthesis, a boundary, or a
@@ -119,6 +119,23 @@ how easily they would master what it presents.
 - **K3 (required)**: no narration of the obvious ("in expectation
   notation…", "recreated below", "does the work") and no idiom-for-flavour.
   Quote every instance.
+
+- **K4 (required)**: verdicts (L17). Every `<Verdict>` closes the section
+  that weighs a dispute the lesson staged, after both sides were put at
+  full strength; the `<Conclusion>` restates it in plain words; nothing in
+  the Verdict, the Conclusion or the prose around them states the claim
+  more firmly than its grade (quote any sentence that does). A `<Verdict>`
+  in a math or ML lesson is a defect — a result there is proved or
+  measured. A lesson that stages and settles a dispute with no Verdict, or
+  one with a Verdict but no dispute it settled, fails. Where the course has
+  `research/verdicts/REGISTER.md`, each Verdict's claim and grade match the
+  register's entry for this lesson, and a lesson the register lists under
+  "No verdict" has none. Where the lesson sets out a derivation, each
+  `<Thesis>` follows from what its `from` names and is graded no firmer
+  than its weakest premise; a value premise is graded `argued`, not
+  `established`. A `<Postulate>` or `<Thesis>` in a math or ML lesson is a
+  defect too. N-A when the lesson stages no dispute and sets out no
+  derivation.
 
 ## Visuals & demos
 9. Each visual carries an idea; captions state facts or tasks, not

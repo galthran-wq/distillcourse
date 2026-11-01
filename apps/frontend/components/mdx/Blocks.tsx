@@ -6,13 +6,20 @@ import {
 } from "react";
 import { LABEL_CLASS } from "@/components/ui/styles";
 import { CONCLUSION_ANCHOR } from "@/lib/content/locator";
+import {
+  gradedNote,
+  gradedTests,
+  type Grade,
+  type GradedName,
+  type GradedProps,
+} from "@/lib/content/graded";
 import { AnchorMark } from "./Heading";
 
 /**
  * Textbook environments. Numbering is done with CSS counters (see
  * globals.css): each environment class increments its own counter — except
  * Lemma, Proposition and Corollary, which share Theorem's — and the label
- * ("Definition 1.1", "Exercise 1", …) is injected via ::before on
+ * ("Definition 1.1", "Verdict 4.2", …) is injected via ::before on
  * .env-head. Optional `title` renders in parentheses after the label.
  *
  * `data-toggle` on the collapsible ones is telemetry's hook
@@ -24,15 +31,19 @@ function Env({
   kind,
   title,
   children,
+  after,
 }: {
   kind: string;
   title?: string;
   children: ReactNode;
+  /** Set under the body, inside the closing rule. */
+  after?: ReactNode;
 }) {
   return (
     <section className={`env env-${kind}`}>
       <p className="env-head">{title !== undefined && <> ({title})</>}</p>
       <div className="env-body">{children}</div>
+      {after}
     </section>
   );
 }
@@ -82,6 +93,57 @@ export function Proposition(props: { title?: string; children: ReactNode }) {
 
 export function Corollary(props: { title?: string; children: ReactNode }) {
   return <Result kind="corollary" {...props} />;
+}
+
+/**
+ * A graded statement (lib/content/graded.ts): its grade, and for a thesis
+ * what it follows from, in the head's parentheses; its tests on one line
+ * under the statement, inside the closing rule.
+ */
+function Graded({
+  name,
+  children,
+  ...props
+}: GradedProps & { name: GradedName; children: ReactNode }) {
+  const tests = gradedTests(name, props);
+  return (
+    <Env
+      kind={name.toLowerCase()}
+      title={gradedNote(props)}
+      after={
+        tests.length > 0 && (
+          <p className="env-tests">
+            {tests.map(([label, value]) => (
+              <span key={label} className="env-test">
+                <i>{label}</i> {value}
+              </span>
+            ))}
+          </p>
+        )
+      }
+    >
+      {children}
+    </Env>
+  );
+}
+
+/** The graded answer to a dispute the lesson staged and weighed. */
+export function Verdict(
+  props: { grade: Grade; decidedBy?: string; overturnedBy?: string; children: ReactNode },
+) {
+  return <Graded name="Verdict" {...props} />;
+}
+
+/** A premise of a doctrine set out as a derivation; numbered through the lesson. */
+export function Postulate(
+  props: { grade: Grade; grounds?: string; overturnedBy?: string; children: ReactNode },
+) {
+  return <Graded name="Postulate" {...props} />;
+}
+
+/** What a doctrine derives from its postulates and verdicts; numbered through the lesson. */
+export function Thesis(props: { from: string; grade?: Grade; children: ReactNode }) {
+  return <Graded name="Thesis" {...props} />;
 }
 
 export function Example(props: { title?: string; children: ReactNode }) {
