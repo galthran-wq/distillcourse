@@ -5,15 +5,30 @@ module: heredity-and-civilization
 type: core
 goal: Analyze Diamond's geographical explanation and Acemoglu and Robinson's institutional explanation of the inequality between nations, and evaluate each against the other and against the hereditarian and cultural accounts
 
+Register rule (binding on the lesson): The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+
+Revised 2026-11-01 for the restructured module: this lesson is now ninth, after the four premises of the
+hereditarian argument have been tested on the US data (lessons 1–6), after the political lesson
+(`gould-and-harden-on-heredity`) and after ancient DNA (`reich-ancient-dna-and-the-indo-europeans`). Its own
+content is unchanged; its inheritance and its statement of the hereditarian position at the scale of nations
+follow `research/heredity-evidence-review.md` §7 (status: the association between national averages of
+measured skills and income is strong; the lowest entries are unreliable; causation runs both ways; no design
+has isolated a genetic component of national differences).
+
 ## ARC (L10)
 
 - **Inherits:** From the module so far: the hereditarian account of the gap between nations
   (`hereditarian-case-iq-and-nations`: national IQ correlated with GDP, IQ → wealth and wealth → IQ,
   and Lynn and Vanhanen's own concession that markets and democracy are a "necessary second factor");
-  ancient DNA's record of mixture and migration (`reich-ancient-dna-and-the-indo-europeans`); and the
-  objections, ending on the open problem that within-population genetics does not, on present
-  evidence, settle gaps between populations (`gould-and-harden-on-heredity`, whose forward exercise
-  already met Nogales). From `why-the-west`: culture as cause — Weber's Protestant ethic
+  the premise-by-premise test of the hereditarian argument on the US data, ending on an open genetic
+  share that no current design can measure (`heritability-within-and-between-groups` for the
+  within/between point; `us-gap-size-trend-and-environment`, `adoption-studies-across-groups`,
+  `admixture-and-polygenic-scores` for the evidence and what would settle it); the political lesson's
+  point that the factual question does not by itself settle what follows (`gould-and-harden-on-heredity`);
+  and ancient DNA's record of mixture and migration, ending on the steppe herders' expansion and the
+  question whether proximate means or deeper conditions explain one people's spread over another
+  (`reich-ancient-dna-and-the-indo-europeans`, whose forward exercise lands on this lesson's
+  proximate/ultimate distinction). From `why-the-west`: culture as cause — Weber's Protestant ethic
   (`weber-only-in-the-west`), Landes's fragmentation and "culture makes all the difference", including
   Zheng He's fleets (`landes-european-exceptionalism`), Henrich's Church and kinship
   (`henrich-church-and-kinship`), Pomeranz's coal and colonies (`pomeranz-and-goody-the-rival-thesis`).
@@ -38,7 +53,7 @@ goal: Analyze Diamond's geographical explanation and Acemoglu and Robinson's ins
   tables can carry the weight is the module's application, `national-data-audited`. The colonial
   origins of extractive institutions return in the empire module (`colonial-balance-sheet`,
   `auditing-the-case-for-colonialism`).
-- **Spine step:** "Heredity as an explanation of the gaps between peoples, at full strength (The Bell Curve, national IQ, ancient DNA), met by its objections (Gould, Harden) and by the rival explanations from geography and institutions — and the key datasets audited"
+- **Spine step:** "Heredity as an explanation of the gaps between peoples, tested premise by premise — what the tests measure, what heritability can and cannot imply, the hereditarian case at full strength, then the US gap, adoption, admixture and polygenic scores on the step from a real gap to a genetic one — then what follows politically whatever the answer, what ancient DNA shows, the rival explanations from geography and institutions, and the key datasets audited"
 
 ## Sources to consult
 
@@ -270,7 +285,12 @@ Arizona–Sonora border, split when the United States bought the strip in 1853 (
      territory, the reversal mostly disappears; 2010 paper, References) — which leaves open whether what
      the settlers carried was culture, skills, institutions or genes. A hereditarian synthesis also
      makes geography and genes complements: farming, which geography placed, changed what was selected
-     for (named in References; no adjudication).
+     for (named in References; no adjudication). Dossier constraint (§7 and "Claims the lessons must
+     NOT make"): at the national scale the lesson states the hereditarian account's claim as its
+     authors' and adds the module's finding in one sentence with a `<Ref>` to
+     `admixture-and-polygenic-scores` — no design has isolated a genetic component of national
+     differences, and none has excluded one; the 2021 upper bound taught there rests on assumptions it
+     states.
    - **Hereditarian concessions, on the same cases:** Lynn and Vanhanen treat the two Koreas as an
      institutional natural experiment and call high national IQ "necessary, but not sufficient"; their
      own data put China and Japan far below the IQ prediction in 1820 and 1900, which they attribute to

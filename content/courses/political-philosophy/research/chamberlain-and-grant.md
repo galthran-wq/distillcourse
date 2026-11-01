@@ -38,7 +38,9 @@ goal: Analyze Chamberlain's racial reading of European history and Grant's Nordi
   the migrations Grant described (the Nordic/Aryan claims are the backward Ref there). (iii)
   `gould-and-harden-on-heredity` — the army tests, Brigham's use of Grant's scheme and his
   1930 recantation. (iv) `hereditarian-case-iq-and-nations` — the twentieth-century form
-  of the hereditarian argument, which shares this lesson's question but not its evidence.
+  of the hereditarian argument, which shares this lesson's question but not its evidence; the
+  heredity module tests it premise by premise (from `what-intelligence-tests-measure` to
+  `admixture-and-polygenic-scores`).
   (v) `powell-raspail-and-camus` — "replacement" as an argument about immigration
   (`replacement-as-argument`), where `nordicism` returns. (vi) `the-right-in-1933` and
   `the-right-after-1945` — what the right did with these ideas in power and after.

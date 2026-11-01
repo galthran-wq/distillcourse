@@ -36,8 +36,9 @@ Every borrowing is stated with its own grade of confidence, never as one flat li
   then the rival thesis's answer.
 - **Hands off:** The module closes; the question it leaves is whether the differences between
   peoples that the ledger records are themselves to be explained by something deeper —
-  heredity (`hereditarian-case-iq-and-nations`, next module's first lesson), geography or
-  institutions (`geography-or-institutions`). One sentence in the `<Conclusion>` says the next
+  heredity (the next module, which opens by asking what an intelligence test measures,
+  `what-intelligence-tests-measure`, and states the hereditarian case in
+  `hereditarian-case-iq-and-nations`), geography or institutions (`geography-or-institutions`). One sentence in the `<Conclusion>` says the next
   module takes the gap between nations, not between techniques, as its problem.
 - **Spine step:** "Why the West? Weber, Landes, Murray and Henrich argue for Western exceptionalism from religion, fragmentation, accomplishment and kinship; Pomeranz and Goody answer that the West was one link in a long chain of exchange; the borrowing ledger tests both"
 - **APPLICATION spec (L16):** The artefact read is the documentary record of four transfers,
@@ -530,14 +531,17 @@ and cannot show".
 7. **Synthesis / argument:** in a claim–evidence–reasoning paragraph, decide whether the ledger
    supports the exceptionalist reply, the rival thesis, or neither, item by item; the model
    solution shows that the answer differs by item and by date.
-8. **FORWARD (E7) → `hereditarian-case-iq-and-nations`:** both theses in this module explain the
+8. **FORWARD (E7) → `what-intelligence-tests-measure`:** both theses in this module explain the
    West's distinction by culture, institutions or circumstance and leave the people's own
    capacities equal. State what kind of evidence an explanation by inherited differences would
    have to bring that the ledger cannot supply (a measure of the populations, not of their
-   techniques), and say why China's early lead in three of the four techniques is a problem any
+   techniques), what that measure would itself have to be shown to do before it could carry the
+   argument (measure one ability, predict outcomes, mean the same thing in every population
+   measured), and say why China's early lead in three of the four techniques is a problem any
    such explanation must address. The solution says in one sentence that the next module opens
-   with exactly that argument — and that its authors answer the China case with markets and
-   institutions — with a `<Ref>`.
+   by putting exactly those questions to intelligence tests (`<Ref>` what-intelligence-tests-measure),
+   and that the hereditarian authors answer the China case with markets and institutions
+   (`<Ref>` hereditarian-case-iq-and-nations).
 
 ## Nietzsche cross-course links
 

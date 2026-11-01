@@ -38,8 +38,11 @@ goal: Analyze Gobineau's argument that civilizations rise through a creative rac
   migrate", the measurers' classifications worthless) and Toynbee's
   (`toynbee-challenge-and-response`: race "refuted", half the civilizations built by more
   than one race). (iii) The modern form of the hereditarian answer and its critics —
-  `hereditarian-case-iq-and-nations`, `reich-ancient-dna-and-the-indo-europeans`,
-  `gould-and-harden-on-heredity`. (iv) `renan-what-is-a-nation` answers that a nation is
+  the heredity module, which tests the argument premise by premise
+  (`what-intelligence-tests-measure` → `admixture-and-polygenic-scores`), states the case at
+  full strength (`hereditarian-case-iq-and-nations`), asks what follows politically
+  (`gould-and-harden-on-heredity`) and reads ancient DNA
+  (`reich-ancient-dna-and-the-indo-europeans`). (iv) `renan-what-is-a-nation` answers that a nation is
   not a race.
 - **Spine step:** "The late nineteenth century looks beneath institutions for what moves
   peoples: the crowd (Taine, Le Bon), the race (Gobineau, Chamberlain, Grant), the nation as
