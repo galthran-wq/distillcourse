@@ -665,7 +665,9 @@ The answer: a people may control its membership, within duties of rescue, fair t
 
 Not intact. Clauses 1, 2 and 4 survive, with clause 1 at on balance. Two phrases go beyond the module verdicts: "cannot replace" in clause 3, and "the constitution written by one majority … failed by [its] own tests" in clause 4. Proposed wording, for the human to decide (course.yaml is not edited here):
 
-> Its answer, on balance, is that it cannot. Liberal freedom is real and worth keeping, but it does not found itself: it lives on a nation, an elite held under law and an inherited culture that it did not create and cannot produce on demand. The radical right's alternatives (the decider, the racial nation, the conservative revolution) failed by their own tests; the constitution written by one majority has shown what its critics feared about the courts, and has not shown the cohesion it was written to secure.
+> Its answer, on balance, is that it cannot. Liberal freedom is real and worth keeping, but it does not found itself: it lives on a nation, an elite held under law, an inherited culture that it did not create and cannot produce on demand, and an economy of property and markets that every planned alternative failed to match. The radical right's alternatives (the decider, the racial nation, the conservative revolution) failed by their own tests; the constitution written by one majority has not shown the cohesion it was written to secure.
+
+Adopted in `intro` (2026-11-01), with one clause added by the author after round 1: **"an economy of property and markets that every planned alternative failed to match"** — grounded in `burnham-managers-and-the-suicide-of-the-west` (market economies outperform planned ones: **established**, necessary not sufficient) and `marx-manifesto` (Marx's distinctive forecasts failed: **strong**). The course's position is set out as a derivation in `the-doctrine` (plan: `DOCTRINE-PLAN.md`).
 
 ### The strongest objections to the thesis, and the answers
 
