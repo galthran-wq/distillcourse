@@ -35,11 +35,18 @@ goal: Analyze Henrich's argument that the medieval Church's marriage and family 
   (charter towns, guilds, universities, monastic orders) and later representative government,
   impersonal law and science. The lesson starts from the 2010 finding that Western subjects are
   psychological outliers, follows Henrich's chain link by link, and tests each link against his
-  evidence and the strongest objections.
-- **Hands off:** (i) If a distinctive European psychology and its institutions were in place by
-  1500, Europe's material lead should be visible long before 1800; the claim that it was not — that
-  the most advanced regions of China and England were close around 1750 and that the gap opened
-  with coal and New World land — is `pomeranz-and-goody-the-rival-thesis` (FORWARD exercise);
+  evidence and the strongest objections, saying for each whether Henrich answers it. The lesson
+  grades its own evidence (strongest for present-day kinship ↔ psychology correlations, weaker
+  for dosage → kinship in the Middle Ages, weakest for the links to science and industry); it does
+  not pass a module verdict.
+- **Hands off:** Whether kinship — or fragmentation, a religious ethic, or high-medieval
+  institutions — caused the West's lead is judged in `the-borrowing-ledger`: each is partly
+  supported, none decisive, the cause **open**, with what would settle it (within-Europe designs
+  separating the timing of kin-dissolution, state competition and literacy). (i) If a
+  distinctive European psychology and its institutions were in place by 1500, Europe's material
+  lead should be visible long before 1800; the claim that it was not — that the most advanced
+  regions of China and England were close around 1750 and that the gap opened with coal and New
+  World land — is `pomeranz-and-goody-the-rival-thesis` (FORWARD exercise);
   there too the author who first linked the Church's marriage rules to the dissolution of the
   European family is read for his larger thesis. (ii) Henrich explicitly rejects a genetic
   account of the psychological differences (ch. 14); the hereditarian argument at full strength,
@@ -331,16 +338,28 @@ and author of *The WEIRDest People in the World* (2020).
      kirk-and-nisbet-american-conservatism>`), and what a defender of the clan, the lineage and
      the inherited obligation would count as a loss. Henrich's book records costs too (ch. 14:
      impersonal institutions transplanted into kin-based societies misfire; a WEIRD sense of self
-     can lack meaning). The lesson states both readings and decides neither.
+     can lack meaning), so he does not dispute the description; he answers the objection only by
+     declining to rank. The lesson says so: the two readings agree on the facts, and whether the
+     change was a loss or a gain is a question of value that the evidence in this lesson does not
+     settle.
    - *Exceptionalism without superiority (from both sides).* Henrich's West is exceptional but not
      "better": its psychology is a historical accident of one Church's marriage policy, nothing in
      it is fixed or innate (ch. 14 on genes), and the same programme run by a modern state (the
      PRC's Marriage Law of 1950, Meiji and South Korean civil codes) produced similar shifts in
      decades. The exceptionalist can claim the institutions; the rival thesis can claim the
      contingency. State this as the hinge to the next lesson, without reproach either way.
-   Where the lesson stands: Henrich supplies the mechanism Landes's "culture" and Murray's
+   Where the lesson stands, objection by objection — whether Henrich answered it is a fact about
+   the argument, and the lesson states it: *reverse causation* is answered in part (controls,
+   within-country comparisons, the Orthodox contrast, immigrants' children) but not closed, by his
+   own concession that cross-country correlation is a weak guide to cause; *timing* is not
+   answered — his own endnote and Augustine leave open that low cousin marriage predates the
+   bans, and there is no direct medieval count; *scope and measures* he partly concedes, which is
+   why the evidence is graded. Henrich supplies the mechanism Landes's "culture" and Murray's
    "autonomy" lacked, with more evidence than either; his strongest links are the present-day
-   correlations and the regional comparisons, his weakest the medieval timing.
+   correlations and the regional comparisons, his weakest the medieval timing. Whether kinship
+   was *the* cause of the West's lead is not decided here: the module's closing lesson weighs it
+   with fragmentation, Weber's ethic and high-medieval institutions and finds each partly
+   supported and the cause **open** (`<Ref the-borrowing-ledger>`, one clause).
 
 Headings as claims (suggested): "Western subjects are outliers — the 2010 finding"; "A world built
 on clans needs a different mind"; "The Church changed the family before cities changed the
@@ -382,9 +401,7 @@ economy"; "Years under a Western bishop predict weaker kinship"; "The south of I
 
 ## Pitfalls / subtleties to flag
 
-- **The label rule.** The course passes no verdict of its own on any author or idea: no condemning
-  or approving labels in its own voice. Judgement comes only through argument and evidence; a
-  label may appear only inside a quotation, with who applied it and when.
+- **The label rule.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **"WEIRD" is an acronym, not a judgment.** The authors say so (endnote 1). The lesson uses it as
   a technical term, defines it once, and never plays on the word.
 - **The 2010 paper vs the 2020 book.** The paper documents the outlier status and *refuses* to say
@@ -412,7 +429,8 @@ economy"; "Years under a Western bishop predict weaker kinship"; "The south of I
 - **Genes:** Henrich's position (ch. 14) is that cultural evolution, not genetic selection,
   explains the differences, and that any genetic push may run the other way. Report it as his
   position; the hereditarian argument and its critics have their own lessons (`<Ref
-  hereditarian-case-iq-and-nations>`, forward). Neither endorse nor dismiss.
+  hereditarian-case-iq-and-nations>`, forward), where the question is weighed with its evidence;
+  this lesson reports Henrich's position and passes no judgment on it.
 - **Borrowings (if the collective-brain material enters):** keep the graded statements — paper
   via the Arab world (secure); gunpowder most likely via Mongol-era contact, no document of the
   transfer, Europeans plausibly unaware of its origin; Gutenberg most probably an independent
@@ -539,9 +557,10 @@ economy"; "Years under a Western bishop predict weaker kinship"; "The south of I
    by about 1500, what should a comparison of wages, life expectancy and market development in
    England and the most advanced region of China (the lower Yangzi) show around 1750? State the
    prediction and what result would embarrass it. The solution says in one sentence that the next
-   lesson's rival thesis finds the two regions close in 1750 and the gap opening after 1800, with
-   coal and New World land, and that this is the test the exceptionalist accounts of this module
-   must meet — `<Ref pomeranz-and-goody-the-rival-thesis>`; and that the same lesson reads the
+   lesson's rival thesis claims the two regions were close in 1750 and the gap opened after 1800,
+   with coal and New World land, that the course finds that regional claim open while
+   north-western Europe already led China as a whole before 1800, and that this is the test the
+   exceptionalist accounts of this module must meet — `<Ref pomeranz-and-goody-the-rival-thesis>`; and that the same lesson reads the
    anthropologist who first tied the Church's marriage rules to the European family for a thesis of
    his own.
 

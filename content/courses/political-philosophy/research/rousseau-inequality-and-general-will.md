@@ -37,23 +37,74 @@ goal: Analyze Rousseau's account of how society made men unequal and his solutio
   "forced to be free". The lesson's centre is the hardest step: how total
   alienation can be freedom, and what the general will is if it is not the sum
   of what people want.
-- **Hands off:** Three objections are put in this lesson and one is left to the
-  next: (a) Maistre's Hottentot — society is as old as man, the state of nature
-  is a fiction (held for `maistre-and-bonald`, whose starred section on the
-  Seventh Dialogue reads it, stated here
-  in one paragraph); (b) Constant's ancient against modern liberty — a sovereign
+- **Hands off:** The lesson decides Rousseau's empirical claim about natural man
+  against Hobbes (see `## VERDICT`): the solitary natural man fails
+  (established), the state lowers lethal violence, so Hobbes's point holds
+  (strong), and inequality rises with property, storage and settlement, so
+  Rousseau's sequence holds (strong; on balance for organised violence). The
+  general will is not judged here. Three objections are put in this lesson and
+  one is left to the next: (a) Maistre's Hottentot — society is as old as man,
+  the state of nature is a fiction (decided here as a fact about early humans;
+  Maistre's use of it is read in `maistre-and-bonald`'s starred section on the
+  Seventh Dialogue, stated here in one paragraph); (b) Constant's ancient against modern liberty — a sovereign
   people is as dangerous as any tyrant, and moderns want security, not
   participation (put at full strength here); (c) Hegel's §258 — the general will
   built from individual wills is "caprice" and ended in the Terror (stated here,
   argued in `hegel-ethical-life-and-the-state`). The problem that stays open is
   the one Burke takes up: if a people may frame a government for itself from
   principles, what happens when it tries — `burke-reflections` opens with Price
-  claiming exactly that right in 1789.
+  claiming exactly that right in 1789; the module answers it in `assignats`.
 - **Spine step:** "Government by consent (Locke) is doubted by Hume and
   radicalised by Rousseau's general will; when France tries to frame a government
   from principles, Burke, Maistre and Donoso Cortés answer that no generation
   knows enough, Herder and Fichte put the people before the state, and Hegel
   absorbs both sides into the rational state"
+
+## VERDICT
+
+- **Claim judged:** natural man is solitary and peaceable, and violence and
+  domination are made by society (Second Discourse, against Hobbes, who "read
+  society into nature").
+- **Verdict:** each author is right about a different stage.
+  - (a) The solitary, pre-social natural man fails: humans have always lived in
+    groups. Grade: **established**. Rousseau half-concedes the method's limit
+    himself: the state of nature "no longer exists, perhaps never did exist, and
+    probably never will exist" (Second Discourse, Preface; `pg46333-full.txt`
+    l.8018).
+  - (b) The state lowers lethal violence, so Hobbes's point holds. Prehistoric
+    bands and tribes sit near the phylogenetic baseline of about 2% of deaths
+    from violence within the species; chiefdoms are higher; states are lower
+    (Gómez et al. 2016). The same paper reports high lethal violence in
+    present-day bands and tribes; and among mobile foragers most killing is
+    personal (homicide, feud, execution) rather than war (Fry & Söderberg 2013).
+    Grade: **strong**.
+  - (c) Inequality rises with property, storage and settlement, so Rousseau's
+    sequence holds. Wealth transmission and inequality are "substantial among
+    pastoral and small-scale agricultural societies" but "limited among
+    horticultural and foraging peoples" (Borgerhoff Mulder et al. 2009). And
+    Rousseau himself puts the "horrible state of war" in nascent society, after
+    property, not in the forest (Second Discourse, Part II;
+    `rousseau/d2-inequality-part2-appendix.txt` l.468). Grade: **strong** for
+    inequality; **on balance** for organised violence (war) arriving with
+    property and settlement.
+- **What decides it:** the three studies above, read against the Second
+  Discourse's own sequence. The lesson can state it as a ledger: Rousseau wins
+  the history of inequality, Hobbes wins the comparison between life with and
+  without a state, and neither wins on a solitary man, who never existed.
+- **Strongest objection:** Rousseau's natural man is a thought experiment, not a
+  claim about prehistory ("let us begin by laying facts aside"), so no
+  archaeology can touch it. **Why it does not overturn the verdict:** the
+  Discourse uses the hypothesis to explain where inequality and violence come
+  from, and an explanation of origins answers to the record; the parts of it
+  that make empirical claims (the stages, the war after property) are exactly
+  the parts the evidence tests, and one of them it upholds. A second objection,
+  from the other side: rates of violence among present-day bands may reflect
+  contact with states and colonial societies (Gómez et al. raise it). This
+  lowers the firmness on (b) for the earliest periods, which is why (b) is
+  strong and not established; the prehistoric figures do not depend on contact.
+- **What would overturn it:** for (b), a consistent finding that states have
+  higher rates of violent death than non-state societies; for (c), foraging
+  societies with heritable wealth inequality on the pastoral scale.
 
 ## Sources to consult
 
@@ -159,6 +210,29 @@ goal: Analyze Rousseau's account of how society made men unequal and his solutio
   instituted, residence constitutes consent; to dwell within its territory is to
   submit to the Sovereign"). Use both in link 6 as Rousseau's answer to the
   previous lesson's generations objection, and in exercise 5.
+- **The evidence for the weighing (step 8; see `## VERDICT`).** All three staged
+  in `research/texts/audit-right-shading/`; DOIs confirmed via Crossref.
+  - Gómez, Verdú, González-Megías & Méndez, "The phylogenetic roots of human
+    lethal violence", *Nature* 538 (2016) 233–237, doi:10.1038/nature19758 —
+    `gomez-2016-phylogenetic-roots-lethal-violence.txt` (the 2% baseline,
+    l.20 and l.3118–3123; bands, tribes, chiefdoms and states compared,
+    l.3166–3186, ending "the level of lethal violence in state societies was
+    lower than the phylogenetic inferences"; the contact caveat beside it).
+  - Fry & Söderberg, "Lethal Aggression in Mobile Forager Bands and Implications
+    for the Origins of War", *Science* 341 (2013) 270–273,
+    doi:10.1126/science.1235675 — `fry-soderberg-2013-abstract.txt` (abstract
+    only: 21 mobile forager societies; most lethal events homicides, a few
+    feuds, a minority war).
+  - Borgerhoff Mulder et al., "Intergenerational Wealth Transmission and the
+    Dynamics of Inequality in Small-Scale Societies", *Science* 326 (2009) 682,
+    doi:10.1126/science.1178336 — `borgerhoff-mulder-2009-wealth-transmission.txt`
+    (abstract l.72–76).
+  - Keeley, *War Before Civilization* (1996): References only.
+  - Rousseau's own concession: Second Discourse, Preface, the state "which no
+    longer exists, perhaps never did exist, and probably never will exist"
+    (`rousseau/pg46333-full.txt` l.8018); and the "horrible state of war" placed
+    after property (`rousseau/d2-inequality-part2-appendix.txt` l.468, full file
+    l.9854).
 - **Burke, Reflections S3 l.1309–1324** (summaries.json index 24): Hume's
   report of Rousseau's "secret of composition" — the marvellous. One sentence,
   as the forward hook to `burke-reflections`.
@@ -298,14 +372,38 @@ society corrupted men come to design a society in which each obeys only himself?
    religion are what make a people able to will the laws it needs — the
    solution works only if the question that produced it is not asked again
    (the course's own statement of the Strauss point).
-8. **Closing: the two Rousseaus and the two objections held over.** State
-   plainly what the reader can now do: trace the thread from amour de soi to
+8. **THE WEIGHING. Heading as the verdict: "Rousseau wins the history of
+   inequality; Hobbes wins the comparison with the state".** Return to the
+   Second Discourse's empirical claims (steps 1–3) now that the reader has seen
+   what Rousseau built on them. Set out the claim, then the strongest objection
+   (it is a hypothesis "laying facts aside", so evidence cannot touch it) and
+   why it fails (an account of origins answers to the record; Rousseau himself
+   puts the war after property, l.468, which is a claim about sequence). Then the
+   evidence, one paragraph each: (a) no solitary stage — humans have always
+   lived in groups, and Rousseau conceded the state "perhaps never did exist"
+   (established); (b) lethal violence near 2% in prehistoric bands and tribes,
+   higher in chiefdoms, lower in states (Gómez et al. 2016), with most forager
+   killing personal rather than war (Fry & Söderberg 2013) — Hobbes's point that
+   the state lowers violence holds (strong); (c) inherited wealth and inequality
+   substantial among herders and farmers, limited among foragers (Borgerhoff
+   Mulder et al. 2009) — Rousseau's sequence holds (strong), and so, on balance,
+   does his placing of organised war after property. Say what would overturn
+   each (states with higher violent-death rates than non-state societies;
+   foragers with pastoral-scale inherited inequality). Maistre's Hottentot
+   ("society is as old as man") enters here as the objection that was right on
+   (a), one paragraph, `<Ref>` maistre-and-bonald (its starred Seventh Dialogue
+   section). A `<KeyFact>` may carry the three-line ledger. Note that the
+   verdict does not touch the general will (steps 4–7): a standard of
+   legitimacy is not refuted by prehistory.
+9. **Closing: the two Rousseaus and the objections held over.** The
+   `<Conclusion>` states the verdict first, in plain words with its grades:
+   there never was a solitary natural man (established); the state lowers
+   lethal violence, as Hobbes said (strong); inequality rose with property and
+   settlement, as Rousseau said (strong), and organised war probably with it (on
+   balance). Then state plainly what the reader can now do: trace the thread from amour de soi to
    amour-propre to the rich man's contract to total alienation to the general
    will, and name the step where the argument bears most weight. Then the
-   handoffs: (a) Maistre's reply that there never was a natural man — the
-   frontispiece of Rousseau's own Discourse shows a Hottentot returning to his
-   fellows, "society is as old as man" (one paragraph, `<Ref>`
-   maistre-and-bonald, its starred Seventh Dialogue section); (c) Hegel's §258 in one sentence
+   handoffs: (c) Hegel's §258 in one sentence
    (`<Ref>` hegel-ethical-life-and-the-state); and the problem the next lesson
    opens — a people in 1789 claiming the right to frame a government for
    itself (`<Ref>` burke-reflections).
@@ -363,10 +461,7 @@ society corrupted men come to design a society in which each obeys only himself?
 
 ## Pitfalls / subtleties to flag
 
-- **Register rule.** The course passes no verdict of its own on any author or
-  idea: no condemning or approving labels in its own voice. Judgement comes only
-  through argument and evidence; a label may appear only inside a quotation, with
-  who applied it and when.
+- **Register rule.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Terms to anchor (L11):** *amour de soi* vs *amour-propre* (define both at
   first use, in the fermentation scene, not before); *perfectibility*; *the
   general will* (never "the majority's will" — define at II.3, not at I.6 where
@@ -399,7 +494,8 @@ society corrupted men come to design a society in which each obeys only himself?
 - **Hegel §258 is stated, not argued, here.** One paragraph, with the forward
   `<Ref>`; the Hegel lesson does the work.
 - **Maistre's Hottentot is held for `maistre-and-bonald`** (its starred section): one
-  paragraph here, no more; do not teach Providence or the executioner.
+  paragraph here, inside the weighing (step 8), as the objection that was right about
+  the solitary stage, no more; do not teach Providence or the executioner.
 - **The Second Discourse is not a call to return to the forest** — Rousseau says
   so (Note 9 / Appendix, "What, then, is to be done?"); refute this real and
   prevalent misreading in one sentence where the Second Part ends (a genuine
@@ -519,6 +615,19 @@ society corrupted men come to design a society in which each obeys only himself?
    and notice that he never says a people can deliberate one into existence.
    The solution says in one sentence that the next lesson opens with a Whig who
    denies the preacher's right on different grounds, with the `<Ref>`.
+8. **Attack the verdict.** The lesson judged that the state lowers lethal
+   violence (strong), against Rousseau's peaceable natural man. State the
+   strongest objection in its best form — present-day bands and tribes may be
+   violent because they have met states and colonial societies, so they show
+   nothing about life before the state; and forager killing is mostly personal,
+   not war (Fry & Söderberg) — and say what evidence would be needed to
+   overturn the verdict. The model answer separates what the objection hits (the
+   ethnographic figures) from what it does not (the prehistoric estimates in
+   Gómez et al., which are near the 2% baseline and above the state rate), notes
+   that Fry & Söderberg count deaths by motive, not rates, so they do not say
+   foragers die by violence less often than subjects of states, and states the
+   overturning finding: a consistent body of data in which states show higher
+   rates of violent death than non-state societies of the same kind.
 
 ## Nietzsche cross-course links (where his ideas enter)
 

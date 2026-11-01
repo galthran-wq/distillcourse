@@ -32,7 +32,8 @@ goal: Analyze Powell's 1968 speech, Raspail's Camp of the Saints and Renaud Camu
   the normative (whether the change is a loss, and to whom), and the rhetorical — and teaches
   the reader what a demographic projection can and cannot establish. `replacement-as-argument`
   is introduced here: the claim taught as an argument with its history, its evidence and the
-  evidence against it, never asserted and never dismissed.
+  evidence against it, and then judged claim by claim — the descriptive claim and the
+  intentional claim each get their own verdict (## VERDICT).
 - **Hands off:** (i) `carens-open-borders` (next): the opposite starting point — the
   individual's freedom to move, from which a people's wish to remain itself gives no right to
   exclude. Raspail's own dilemma (refusing is racism, accepting is the end of identity) is the
@@ -42,8 +43,64 @@ goal: Analyze Powell's 1968 speech, Raspail's Camp of the Saints and Renaud Camu
   fear") and adds his own premise, the "tiredness" of the receiving civilization; his lesson
   reads the projections again for what they do and do not show. (iv)
   `the-2015-crisis-read-three-ways`: the year Raspail's million arrived, by another route and
-  with another outcome. (v) `de-benoist-european-new-right`: the "right to difference" as a
-  different answer to the same fear.
+  with another outcome; it now carries the module's four-part verdict (procedure, security,
+  principle, integration). (v) `de-benoist-european-new-right`: the "right to difference" as a
+  different answer to the same fear. What this lesson decides and what passes on: every
+  checkable forecast of the three texts is judged here (## VERDICT); Powell's consent claim —
+  that the people were "never consulted" — is open here and is decided in
+  `murray-strange-death-of-europe` ("never chosen": not intended or forecast in scale, strong;
+  but chosen in its instruments, strong).
+
+## VERDICT
+
+The lesson judges each prophecy claim by claim, in its own voice, with these grades.
+
+**Powell (1968).**
+- *His numbers:* **right in direction and roughly in size, later than forecast. Strong.** About
+  4.6 million non-White in the UK in 2001, against his 5–7 million for 2000; England and Wales
+  18.3 percent not White in 2021. The category mismatch (his "Commonwealth immigrants and their
+  descendants" against the census's self-assigned ethnic group) is stated beside the figures.
+- *His bloodshed and domination ("the whip hand", the Tiber):* **not borne out in the form he
+  gave them. Strong.** The record of ethnic disorder (1981, 1985, 2001) is stated beside this
+  verdict, not left out of it.
+- *His consent claim* ("a decision by default, on which they were never consulted"): **open
+  here**, carried to the Murray lesson, where "never chosen" is decided.
+
+**Raspail (1973).**
+- The scale arrived in 2015 by another route (about a million crossings in a year, in small
+  boats, mostly to Greece), and for months the core states did not refuse — the nearest the
+  record came to his scenario.
+- *The strong form* ("the West will not refuse"): **failed. Strong.** Australia's turn-backs
+  from 2013, the Hungarian fence in September 2015, the EU–Turkey statement of March 2016.
+- *The 2045–50 claim* (half of under-55s in the urban zones of extra-European origin):
+  **pending** — not yet checkable; the trajectory is stated from TeO2.
+- *The 1985 Figaro projection* understated migration and still got the religious outcome wrong
+  (no Muslim majority among the 2016 lycée sample).
+
+**Camus (2011–2018).**
+- *Descriptive claim* (the composition of the population is changing): **on balance.** True on
+  any definition, by an amount that depends on how mixed descent is counted.
+- *Intentional claim, as a plot:* **unsupported. Strong.** His own text rejects a plot
+  ("I have never imagined that a group of people with evil intentions congregated one day"),
+  and the UN's 2000 report is a projection exercise, not a plan.
+- *Intentional claim, as "wanted by part of the governing class":* **unsupported. On balance.**
+  One contested insider account (Neather, *Evening Standard*, October 2009, later disowned by
+  its author) [secondary] sits against the documented forecasting errors — the 2004 forecast of
+  5,000–13,000 a year, the missed "tens of thousands" target (judged in the Murray lesson) —
+  which point to drift, not design.
+
+**Strongest objection to the verdicts:** from one side, that "right in direction" lets Powell
+off — his speech was a forecast of conflict and domination, and that forecast failed; from the
+other, that "unsupported" lets the governing class off — Neather's account is an insider's, and
+"drift" is what a policy no one would defend in public looks like from outside. Neither
+overturns the verdicts. The first is already the second Powell item: the number forecast and
+the consequence forecast are graded separately, and the consequence forecast fails (strong).
+The second needs evidence of intent; one account later disowned does not outweigh the record
+of governments surprised by their own numbers, which is why the grade is on balance and not
+strong. **Would be overturned by:** for Powell's consequences, sustained communal violence on
+the scale he invoked; for the intentional claim, documents of policy showing that the scale of
+immigration was intended and concealed; for Raspail's strong form, a case in which states with
+the means to refuse a mass arrival declined to do so for years rather than months.
 - **Spine step:** "The live question: what a nation is and who may join it — Scruton and
   Miller on the pre-political loyalty, America as England's heir from the Federalist to Who
   Are We?, the prophecies of displacement from Powell to Camus, Carens and Miller on borders,
@@ -217,6 +274,11 @@ All text paths are relative to
     must be checked in the press and reported only as they are found; nothing is to be
     attributed to him by inference. Opinion polls on belief in "replacement" (France, 2021;
     United States, 2022) only with publisher, date and question wording.
+- **Andrew Neather, article in the *Evening Standard*, October 2009** (title and day to be
+  bound), and his later disavowal [secondary: known from press reports;
+  not staged — obtain the article and the disavowal before quoting]. The one insider account
+  cited for the intentional claim's weaker form; set against the forecasting errors documented
+  in the Murray lesson (Dustmann et al. 2003, `texts/audit-right-shading/dustmann-et-al-2003-home-office-25-03.txt`).
 - **Names ONLY in References (L8a):** the demographers and statisticians (Dumont, Coleman,
   Kaufmann, Tribalat, Le Bras, and the authors of the Pew, UN, INSEE and TeO2 reports — in the
   body: "a 2017 projection", "the 2019–20 French survey of origins"); the commentators in the
@@ -293,7 +355,8 @@ a demographic projection can say.
    in London; his critics, that the forecast of bloodshed and domination failed. Answer: the
    number forecast was right in direction and roughly in size, with a lag; the consequence
    forecasts (domination, bloodshed) were not borne out in the form he gave them; the consent
-   claim (P5) is a claim about the political process and is examined in the Murray lesson.
+   claim (P5) is a claim about the political process, open here and decided in the Murray
+   lesson.
 4. **Raspail: a novel as an argument.** Anchor: Jean Raspail (1925–2020), travel writer and
    novelist; the book written in 1971–72, published January 1973; the title from Revelation 20
    (the nations "compass the camp of the saints"). The plot in five sentences (set piece 4):
@@ -324,7 +387,8 @@ a demographic projection can say.
    Hungarian fence (September 2015), the EU–Turkey statement (March 2016) that cut the Aegean
    route (`<Ref>` the-2015-crisis-read-three-ways, forward, one clause). The novel's strongest
    premise, P2, failed in its strong form; whether it holds in a weaker form is the Murray
-   lesson's question. (c) *The 2045–50 forecast* (preface l.217): half of under-55s in the urban
+   lesson's question (and the 2015 lesson's, which judges what the months of non-refusal
+   showed). (c) *The 2045–50 forecast* (preface l.217): half of under-55s in the urban
    zones of "extra-European origin" — not yet checkable; the trajectory is, from the 2019–20
    French survey of origins (TeO2): the writer states what share of the young adult
    population has an immigrant parent or grandparent of non-European origin, and how many of
@@ -368,9 +432,13 @@ a demographic projection can say.
    complex processes", l.4415–4430) yet assigns agency to "replacists" who "want" the change.
    The commonly offered documentary proof, the UN's 2000 report on "replacement migration", is
    a projection exercise that computes the flows needed to offset ageing and states its own
-   purpose (the writer quotes its stated purpose and conclusion). Answer: (i) is a demographic
-   claim to be checked number by number; (ii) needs evidence of intent, which the texts do not
-   supply and the author declines to seek.
+   purpose (the writer quotes its stated purpose and conclusion). The weaker form of (ii) —
+   that part of the governing class wanted the change — rests on one insider account (a former
+   speechwriter's *Evening Standard* article of October 2009, later disowned; [secondary]),
+   which the lesson sets against the documented forecasting errors (the Murray lesson's 2004
+   forecast and the missed net-migration target). Answer: (i) is a demographic claim to be
+   checked number by number; (ii) needs evidence of intent, which the texts do not supply and
+   the author declines to seek; link 10 gives the verdict on each.
 8. **The argument's history and its uses.** The form — differential fertility plus immigration
    equals the replacement of a native people — is older than the term: Grant in 1916 called
    the change in American stock "a replacement pure and simple" (`<Ref>`
@@ -410,19 +478,30 @@ a demographic projection can say.
    whether "a people" is defined by descent (Barrès, Raspail's *souche*), by culture
    (Huntington) or by will (Renan) (`<Ref>` renan-what-is-a-nation,
    barres-and-maurras-integral-nationalism).
-10. **Close.** For each prophecy, what the record shows: Powell — the numbers broadly as
-    forecast, later than forecast; the domination and bloodshed not; the consent claim open.
-    Raspail — the scale arrived in 2015 by another route; the West's paralysis did not, in the
-    strong form; the 2045 claim pending. Camus — the descriptive core partly measurable and
-    definition-dependent; the intentional claim unestablished. The question every one of them
-    raises and none answers by itself: may a people decide who joins it, and on what ground? —
-    the next lesson's starting point, from the opposite side.
+10. **The weighing: the numbers came, the bloodshed and the paralysis did not, and the plot
+    is unsupported.** Set each prophecy's claims against the record and against the strongest
+    objection, as in ## VERDICT, and give each grade in the course's voice. Powell — numbers
+    right in direction and roughly in size, later than forecast (**strong**); bloodshed and
+    domination not borne out in the form he gave them (**strong**), with the disorders of 1981,
+    1985 and 2001 stated beside the verdict; consent **open**, to the Murray lesson. Raspail —
+    the scale arrived in 2015 by another route, and for months the core states did not refuse;
+    the strong form failed (**strong**); the 2045 claim **pending**; the 1985 projection's input
+    too low and its output still wrong. Camus — the descriptive claim **on balance**
+    (definition-dependent); the plot **unsupported, strong**; "wanted by part of the governing
+    class" **unsupported, on balance** (Neather against drift). The objections from both sides
+    (that "right in direction" flatters Powell; that "unsupported" flatters the governing
+    class) each get two sentences and the reason they do not overturn the grades.
+
+    **Conclusion.** The verdicts in plain words with their grades (as above), then the hand-off:
+    the question every one of the three raises and none answers by itself — may a people decide
+    who joins it, and on what ground? — is the next lesson's starting point, from the opposite
+    side; it is decided two lessons on, in `miller-strangers-in-our-midst`.
 
 Headings as claims (suggested): "Powell's speech as an argument"; "What the reception shows,
 and what it does not"; "Powell's numbers against the census"; "Raspail: the obstacle is pity";
 "A million came, and the West refused"; "1985: the input was too low and the output still
 wrong"; "Camus: a fact, a theory, or a charge?"; "An old argument with a record"; "What a
-projection can say".
+projection can say"; "The numbers came; the bloodshed, the paralysis and the plot did not".
 
 ## Set pieces and worked examples to recreate
 
@@ -455,16 +534,16 @@ projection can say".
 
 ## Pitfalls / subtleties to flag
 
-- **No label in the course's voice (course.yaml notes; co-contested).** The course passes no
-  verdict of its own on any author or idea: no condemning or approving labels in its own
-  voice. Judgement comes only through argument and evidence; a label may appear only inside a
-  quotation, with who applied it and when. Concretely: The Times's "evil speech" (1968), Benn's
+- **No label in the course's voice (course.yaml notes; co-contested).** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. Concretely: The Times's "evil speech" (1968), Benn's
   comparison, the ministers' 1985 words, the summary's own characterisations of the novel and
   the polemic — all are quoted with author and date or omitted; none becomes the course's
   description. The rule applies in both directions.
-- **Replacement is taught as an argument, never asserted, never dismissed.** No sentence of
-  the lesson states that replacement is occurring or that it is a fiction; sentences state
-  what was claimed, by whom, with what numbers, and what the numbers did. Every projection is
+- **Replacement is taught as an argument, then judged claim by claim.** The lesson does not
+  use "replacement" in its own voice as a description; it states what was claimed, by whom,
+  with what numbers, and what the numbers did, and then gives the register's verdicts: the
+  composition is changing by a definition-dependent amount (on balance); the plot is
+  unsupported (strong); the "wanted by part of the governing class" form is unsupported (on
+  balance). Every projection is
   given with publisher, year, variant/assumption and horizon.
 - **Category traps (the commonest real error, L13):** (a) Powell's "Commonwealth immigrants
   and their descendants" ≠ census ethnic group ≠ foreign-born; (b) net migration ≠ gross
@@ -588,7 +667,17 @@ projection can say".
    Huntington lists as having made earlier assimilation possible — dispersion, the 1924–65
    pause, war service — and that Raspail's 2045 forecast has not yet come due), and state what
    would have to be true for the claim to survive.
-8. **FORWARD (E7) → `carens-open-borders`:** Raspail states a dilemma: no one wishes to
+8. **Attack the verdict:** Take the verdict that the intentional claim, in its weaker form
+   ("wanted by part of the governing class"), is unsupported (on balance). State the strongest
+   case against it: the insider account of 2009, the decision not to use the transitional
+   restrictions of 2004, the decades of public opposition in polls, and the argument that
+   "drift" sustained for fifty years is indistinguishable from intent. Then say what evidence
+   would be needed to overturn the verdict — what kind of document, from whom, showing what —
+   and why the forecasting errors count against intent. The solution distinguishes choosing an
+   instrument (which the Murray lesson finds was done) from intending its scale (which the
+   record does not show), and names the evidence that would close the gap: internal policy
+   papers projecting and accepting the realised scale before the decision.
+9. **FORWARD (E7) → `carens-open-borders`:** Raspail states a dilemma: no one wishes to
    renounce his dignity by acquiescing in racism, yet every people has "the sacred right to
    preserve its differences and identities". Find the premise in the second half that a liberal
    who starts from the moral equality of individuals would deny, and say what follows for a

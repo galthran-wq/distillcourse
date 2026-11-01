@@ -45,14 +45,55 @@ goal: Analyze Vitoria's examination of every title by which Spain might hold the
   then see what that remainder licensed when refused. The lesson's result is
   Vitoria's own uncomfortable sequence: persuasion → defence → redress → full
   war, and the eighth title he leaves open "for the sake of argument".
-- **Hands off:** The open problem is whether a universalist doctrine (natural
-  law here; consent and progress next) can justify rule over a people that has
-  not consented, and whether the justification's conditions ("for their
-  benefit, not Spanish profit") are restraints or a licence.
-  `locke-and-mill-on-empire` takes it: Locke's "waste" land re-opens the
+- **Hands off:** The lesson decides two things: every unjust title fails on
+  Vitoria's own premises (strong), and the just titles, enforceable by war, were
+  a licence rather than a restraint, because the party that judged a refusal
+  was the party that went to war over it (on balance). What passes on is the
+  question whether a universalist doctrine (natural law here; consent and
+  progress next) carries its exclusion as a lapse or as a consequence of its own
+  conditions. `locke-and-mill-on-empire` takes it: Locke's "waste" land re-opens the
   discovery title Vitoria closed, and Mill's tutelage is the eighth title in
   nineteenth-century dress.
 - **Spine step:** "The West judges its own conquests: Vitoria's titles, Locke's waste land, Burke's impeachment of Hastings, Mill's tutelage, the colonial balance sheet, and whether guilt is inherited"
+
+## VERDICT
+
+Binding: research/verdicts/REGISTER.md, module 14, `vitoria-right-to-the-americas`.
+
+- **Claim judged.** Spain's titles to the Americas, in two parts: (a) the
+  unjust titles (emperor, pope, discovery, refusal of the faith, sins against
+  nature, voluntary acceptance, divine gift) and the natural-slavery title;
+  (b) the just titles Vitoria leaves standing (travel, trade, preaching,
+  defence of the innocent), enforceable by war when refused — restraint or
+  licence?
+- **Verdict.** (a) Every unjust title fails on Vitoria's own premises. Grade:
+  **strong**. (b) The just titles, enforceable by war, are **a licence rather
+  than a restraint**. Grade: **on balance**.
+- **What decides it.** (a) Q1's result: the Indians had cities, laws,
+  marriages, magistrates and commerce, so they held true dominium, "as much as
+  any Christians"; once they own, discovery gives nothing ("any more than it
+  would if they had discovered us"), and neither emperor nor pope has
+  jurisdiction over non-subjects (De Indis Q1–Q2, pp. 239–277, text
+  `research/texts/vitoria/political-writings.txt`). (b) The ladder of Q3 Art.1
+  ss6–8: a refusal of travel, trade or preaching is an injury, injury is a
+  just cause, and the judge of whether a refusal occurred and whether
+  persuasion was exhausted is the Spanish prince — the party that goes to
+  war. Nothing in the scheme lets a neutral party judge the refusal. Vitoria's
+  own Letter to Arcos (1534) shows the conditions were not met in Peru, and his
+  Conclusion keeps trade and the fifth-part tax even if every title fails.
+- **Strongest objection.** The conditions are real restraints: injury is the
+  sole cause; persuasion and defence come first; the prince must take counsel
+  and hear the other side; in doubt the possessor keeps possession; in victory
+  he is a judge, not a prosecutor; and Vitoria says in his own voice that the
+  Spaniards exceeded the bounds. A doctrine's content is not its abuse.
+- **Why it does not overturn the verdict.** Every one of those restraints is
+  applied by the party that profits from finding them satisfied. A restraint
+  whose application rests with the restrained is a counsel of conscience, not
+  a check; the Arcos letter is evidence that its author saw it fail, not that
+  it worked. That the restraints are sincere is granted; this is why the grade
+  is on balance rather than strong.
+- **What would overturn it.** A mechanism in Vitoria's scheme letting a
+  neutral party judge whether a refusal had occurred and whether war was due.
 
 ## Sources to consult
 
@@ -325,23 +366,53 @@ lesson's chain is his own quaestio.
    the conditions are real restraints (proportion, the prince as judge, war for
    peoples not princes, the possessor's right in doubt, "no further than on
    Christians"), and he says in his own voice that the Spaniards exceeded them;
-   a doctrine's content and its use are two things. Leave the reader weighing
-   which the "for the sake of argument" title was.
+   a doctrine's content and its use are two things. The weighing is the next
+   section.
 
 9. **Valladolid, one paragraph.** Anchor: 1550–51, a junta at Valladolid
    convened by Charles V hears Las Casas, a Dominican who had been a colonist
    and became bishop of Chiapas, against Sepúlveda, a humanist and royal
    chronicler who argued from Aristotle's natural slavery that war on the
-   Indians was just; no verdict was pronounced; the New Laws of 1542 had
+   Indians was just; the junta pronounced no decision; the New Laws of 1542 had
    already restricted the encomienda. The point for the chain: the title
-   Vitoria left open was taken up on both sides within a decade. Nothing more
-   — the dossier has only the pointer.
+   Vitoria left undecided was taken up on both sides within a decade. Nothing
+   more — the dossier has only the pointer.
+
+10. **The weighing — the unjust titles fail; the just titles were a licence.**
+   This is the lesson's last body section and it reaches the verdict (see
+   VERDICT). First, (a): restate in three sentences why every unjust title
+   fails on Vitoria's premises — dominium follows reason, not grace; discovery
+   needs res nullius; no jurisdiction over non-subjects — and say plainly that
+   this part is **strong**: the failure is Vitoria's own argument, and no later
+   reader has repaired a title he struck. Then (b): set the objection's best
+   form (step 8's reply: the restraints are real and sincere, and their author
+   condemned their breach) against the ladder's structure. Ask the one
+   question that decides it: who judges whether a refusal occurred, whether
+   persuasion was exhausted, whether the war is proportionate? In Vitoria's
+   scheme, the Spanish prince and his counsellors — the party that goes to war.
+   A restraint applied by the restrained is a counsel of conscience, not a
+   check; the Arcos letter shows its author saw it fail in Peru, and the
+   Conclusion keeps trade and the fifth even if every title fails. Verdict:
+   on balance, a licence rather than a restraint. Why not strong: the
+   restraints were stated, sincere and, in the Law of War, more exact than any
+   before them. What would overturn it: a mechanism in the scheme letting a
+   neutral party judge the refusal.
 
 Headings fall out as: "A verdict of conscience, not a fact of possession";
 "Did the Indians own anything? Four denials"; "Seven titles, and the law each
 fails"; "What is left: the right to travel, trade and preach"; "What a refused
 right licenses"; "The law of war that measures the war"; "The eighth title and
-the exchequer"; "Did the just titles license the conquest?"
+the exchequer"; "Did the just titles license the conquest?"; "At Valladolid the undecided title was argued both ways";
+"The just titles were a licence, because the party that judged the refusal made
+the war".
+
+**Conclusion.** States the verdict in plain words with its grades: every title
+Spain claimed by discovery, papal grant, empire, unbelief or nature fails on
+Vitoria's own premises (strong); the right of travel, trade and preaching he
+left standing, enforceable by war and judged by the party that would wage it,
+worked as a licence rather than a restraint (on balance). Then the hand-off:
+the eighth title, rule "for their benefit", returns in liberal dress — Locke's
+waste land and Mill's tutelage, `locke-and-mill-on-empire`.
 
 ## Set pieces and worked examples to recreate
 
@@ -427,7 +498,7 @@ the exchequer"; "Did the just titles license the conquest?"
   enslavement of the innocent in a permanent war against pagans (Law of War
   §42), wholesale punishment after victory against infidels (§§45–48), the
   natural-slavery title left open. State them as what the text says; the
-  register rule applies: The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+  register rule applies: The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **No demographic numbers.** The dossier has none for the conquest's death
   toll and the "Black Legend" debate is not in it; the lesson needs no number
   except, if any, the one Vitoria gives (the fifth-part tax). Dates: 1493,
@@ -548,6 +619,17 @@ Balance: 6 draw / 2 source — a close reading of an argument stays draw-heavy.
    document record about Spanish practice, what does it argue, what does it
    omit (any means for the hearers to understand it), and which of Vitoria's
    seven refutations it falls under (the sixth — and the fourth).
+9. **Attack the verdict.** The lesson concludes, on balance, that the just
+   titles were a licence rather than a restraint. State the strongest
+   objection in its best form (the Law of War's tests — sole cause of injury,
+   counsel, hearing the other side, the possessor's right in doubt, the victor
+   as judge — are real limits, and their author condemned their breach in
+   Peru). Then say what evidence would be needed to overturn the verdict: a
+   provision in De Indis or On the Law of War that places the judgment of a
+   refusal in a neutral party's hands, or a documented case in which the
+   conditions stopped a Spanish war before it began. The solution checks the
+   texts and finds neither, and says why that keeps the grade at on balance
+   rather than raising it.
 
 ## Nietzsche cross-course links (where his ideas enter)
 

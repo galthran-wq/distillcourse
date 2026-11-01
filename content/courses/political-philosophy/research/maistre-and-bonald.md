@@ -40,7 +40,8 @@ goal: Analyze the counter-revolutionary case that no constitution can be made by
   individual, the family is its model, and marriage — like sovereignty — is a
   bond the parties cannot dissolve because a third party (the child; God) is
   always present. Then the charge: that this is the first draft of fascism — put
-  at full strength and answered. A starred section (it absorbs what had been planned as
+  at full strength, weighed, and judged (see `## VERDICT`): the source version
+  fails, two narrower affinities stand. A starred section (it absorbs what had been planned as
   a separate extra lesson on war) extends the executioner's argument to war — the Seventh
   Dialogue's soldier and executioner, the earth as an altar, war as a divine law
   of expiation (`war-as-expiation`) — with Hegel's and Schmitt's accounts named
@@ -58,8 +59,14 @@ goal: Analyze the counter-revolutionary case that no constitution can be made by
   (3) The problem that stays open for `hegel-ethical-life-and-the-state`: if
   Burke grounds order in inherited reason and Maistre in a Providence reason
   cannot reach, is there an account on which the state is rational AND not
-  designed? (4) Maistre's count of laws and his "three constitutions in five
-  years" are tested in `assignats`. (5) The starred section's comparisons point
+  designed? (4) Maistre's count of laws, his "three constitutions in five
+  years" and his general thesis that nothing durable is made by deliberation are
+  decided in `assignats`, the module's closing lesson: his forecast for
+  revolutionary France's constitutions is borne out, the general thesis fails
+  (strong) on the American constitution of 1787, which falsifies his Washington
+  prophecy (Considerations ch. 7, pp. 107–109, read in this lesson), and on the
+  French institutions that outlasted every regime. This lesson states the thesis
+  and the prophecy; it does not grade them. (5) The starred section's comparisons point
   forward to Hegel's §§321–340 (`hegel-ethical-life-and-the-state`) and to the
   "real possibility of killing" (`schmitt-concept-of-the-political`). The
   conservative/reactionary distinction (Lilla) is seeded here and taught in
@@ -69,6 +76,38 @@ goal: Analyze the counter-revolutionary case that no constitution can be made by
   from principles, Burke, Maistre and Donoso Cortés answer that no generation
   knows enough, Herder and Fichte put the people before the state, and Hegel
   absorbs both sides into the rational state"
+
+## VERDICT
+
+- **Claim judged:** Maistre's doctrine is a first draft of fascism (the charge
+  made most forcefully in the mid-twentieth century; Berlin in References).
+- **Verdict:** the strong version, Maistre as a *source* of fascism, fails.
+  Grade: **strong**. Two narrower affinities stand: the glorification of war as
+  "mysterious and divine", and the decisionism that passes through Donoso Cortés
+  to Schmitt. Grade: **on balance**. And his argument against the contract — a
+  promise presupposes a society in which promises bind, so society is not made by
+  a promise — is correct, and the charge's own author concedes it.
+- **What decides it:** (1) The line of influence: Maistre's peak influence ran to
+  nineteenth-century ultramontane Catholics through *Du Pape* and to Maurras's
+  Action française, not to the founders of Italian Fascism or National Socialism
+  (Garrard, pp. 117–131). (2) The doctrine: his system is centred on God and
+  anti-nationalist in its ultramontanism; fascism as the worship of will and
+  nation is centred on man (Garrard's "theologically unmusical"). (3) The charge
+  leaves "fascism" undefined, so its strong form cannot be tested as stated.
+  (4) What stands: Garrard concedes that Maistre "glorifies war, declares it
+  mysterious and divine" (pp. 120–122; the Seventh Dialogue); and the doctrine of
+  sovereignty "perfectly synonymous" with infallibility, deciding "without delay
+  and without appeal", is the line Donoso and Schmitt take up.
+- **Strongest objection:** influence need not be documented reading; the charge
+  is about structure — a doctrine that grounds order in terror and in the
+  annihilation of individual reason supplies the shape of a totalitarian creed
+  whoever read it. **Why it does not overturn the verdict:** the structural
+  version is the narrower affinity, and it is already granted on balance; it
+  cannot carry the source claim, because the parts that carry the structure
+  (Providence, the Church above the nation, the refusal of a violent
+  counter-revolution and of vengeance) are the parts fascism did not take.
+- **What would overturn it:** documented reading of Maistre among the founders of
+  Italian Fascism or National Socialism.
 
 ## Sources to consult
 
@@ -507,7 +546,11 @@ most famous charge against it.
    violence, self-immolation, the national soul and hatred of critical
    intellectuals is "the heart of all totalitarian doctrines"; Maistre is "a
    remarkable, and terrifying, prophet of our day".
-8. **The replies, and where the lesson concedes.** (i) On the logic: the
+8. **THE WEIGHING. Heading as the verdict: "Not a source of fascism; a
+   theologian of war and of the decision".** This is the last core body
+   section; it sets the charge against its replies and the evidence and reaches
+   the verdict of `## VERDICT`. The replies, and where the lesson concedes.
+   (i) On the logic: the
    anti-contract argument is correct — a promise presupposes a society in which
    promises bind, so society is not made by a promise (the charge's own author
    concedes this); and the psychological realism (men desire to submit and to
@@ -525,14 +568,27 @@ most famous charge against it.
    "glorifies war, declares it mysterious and divine" is substantially right
    (one sentence here; the starred section below reads the text for readers who
    want it); and that his method is a lawyer's
-   brief — the circle of link 3 — is right. The course's own position: the
-   charge is best read as a warning about where the executioner's argument goes
-   when its theology is removed and its sociology kept; the reader is left to
-   weigh. Seed the distinction `what-conservatism-is` will teach: the reactionary
+   brief — the circle of link 3 — is right. **The verdict, in the course's
+   voice:** as a claim that Maistre is a source of fascism the charge fails
+   (strong): the influence ran to the ultramontanes and the Action française, not
+   to Rome or Berlin, and the system is God-centred and anti-nationalist. Two
+   narrower points stand on balance: the glorification of war, and the
+   decisionism that runs through Donoso to Schmitt. His argument against the
+   contract is correct. State the strongest objection (the charge is about
+   structure, not documented reading) and why it lands only on the narrower
+   claim; and say what would overturn the verdict — documented reading of
+   Maistre among the founders of Italian Fascism or National Socialism. The
+   charge's real value is as a warning about where the executioner's argument
+   goes when its theology is removed and its sociology kept; that is a point
+   about the argument, and the lesson says so. Seed the distinction `what-conservatism-is` will teach: the reactionary
    reads history as a rupture, as the revolutionary does; Burke does not (one
    sentence, Lilla in References).
 9. **Where this leads.** One paragraph, in the core path (it must not depend on
-   the starred section). Three hand-offs: (i) "There is no such thing as man" —
+   the starred section). The `<Conclusion>` opens with the verdict in plain
+   words and its grades: Maistre is not a source of fascism (strong); he is a
+   theologian of war and of the sovereign decision, and those two affinities
+   with later doctrines stand (on balance); his argument that no promise can
+   found society is right. Then the hand-offs. Three hand-offs: (i) "There is no such thing as man" —
    only Frenchmen, Italians, Russians — raises the question what makes a people
    one, which a Lutheran pastor had answered with language and custom and a Berlin
    philosopher will turn into a nation's mission (`<Ref>`
@@ -681,10 +737,7 @@ most famous charge against it.
 
 ## Pitfalls / subtleties to flag
 
-- **Register rule.** The course passes no verdict of its own on any author or
-  idea: no condemning or approving labels in its own voice. Judgement comes only
-  through argument and evidence; a label may appear only inside a quotation, with
-  who applied it and when.
+- **Register rule.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Terms to anchor (L11):** *Savoy* (an Alpine duchy ruled by the king of
   Sardinia from Turin, French-speaking, annexed by France in 1792 — Maistre was
   a senator of its high court; anchor at the opening's "Savoyard"); *Lausanne*
@@ -747,9 +800,10 @@ most famous charge against it.
 - **The 15,479 laws and "three constitutions in five years" are the application
   lesson's artefact**; one sentence here, no table.
 - **The stock portrait is a target, not the lesson.** The course does not teach
-  "Pope, King and Hangman"; it teaches the arguments and then the charge. Equally,
-  the course does not adopt the charge: the reader weighs. No moralising either
-  way; Maistre's realism (ch. 2, ch. 10, Berlin IX) is evidence, not
+  "Pope, King and Hangman"; it teaches the arguments and then the charge, and
+  then judges the charge as an argument (`## VERDICT`): the source version fails,
+  the narrower affinities stand on balance. The verdict is on the charge, not a
+  label for Maistre. No moralising either way; Maistre's realism (ch. 2, ch. 10, Berlin IX) is evidence, not
   exculpation.
 - **The executioner is theodicy before it is politics.** Its home is the
   question "why do the wicked prosper?" and the answer that punishment is a
@@ -916,6 +970,19 @@ most famous charge against it.
    grounds and the counterfactual removes only one — and say which of the two a
    later account that calls war "the ethical moment" of the state shares (`<Ref>`
    hegel-ethical-life-and-the-state, forward; the solution names §324).
+9. **Attack the verdict.** The lesson judged that Maistre is not a source of
+   fascism (strong), while granting two narrower affinities (on balance). State
+   the strongest objection in its best form — a doctrine can shape a movement
+   without being read by its founders, through the intermediaries who carried
+   it (Maurras, the Action française, the Catholic right) and through its
+   structure: order grounded in terror, individual reason "annihilated" in the
+   national reason — and say what evidence would be needed to overturn the
+   verdict. The model answer: the intermediaries named lead to the Action
+   française and Vichy, not to Rome or Berlin, so the objection, if it holds,
+   proves a link to a different movement; the structure it cites is the
+   narrower affinity already granted; and the overturning evidence would be
+   documented reading of Maistre, or of a writer drawing explicitly on him,
+   among the founders of Italian Fascism or National Socialism.
 
 ## Nietzsche cross-course links (where his ideas enter)
 

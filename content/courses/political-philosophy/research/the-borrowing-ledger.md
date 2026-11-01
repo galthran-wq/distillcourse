@@ -5,14 +5,17 @@ module: why-the-west
 type: core
 goal: Apply the module's rival theses to the documented record of what the West borrowed — paper, gunpowder, printing, Hindu-Arabic numerals — grading each transfer by the strength of its evidence, and evaluate the reply that the West turned borrowings into self-sustaining systems
 
-Register rule (binding on the lesson): The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+Register rule (binding on the lesson): The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 
 Every borrowing is stated with its own grade of confidence, never as one flat line ("Europe took paper, gunpowder and printing from China" is the sentence the lesson exists to take apart). The rival thesis's answer is stated as an argument about evidence and timing, never as a reproach; the pro-Western reply is stated at full strength.
 
 ## ARC (L10)
 
-- **Inherits:** From `pomeranz-and-goody-the-rival-thesis`: the great divergence dated after
-  1800 and the theft-of-history thesis — a Eurasian chain of exchange, leads that alternate,
+- **Inherits:** From `pomeranz-and-goody-the-rival-thesis`: the great divergence as Pomeranz
+  dated it (after 1800) and that lesson's verdicts on it — regional parity around 1750 fails
+  (on balance); north-western Europe already ahead of China as a whole before 1800 (strong); the coal-and-colonies windfall surviving as an account of why industry came in
+  Britain and so fast (on balance) — and the theft-of-history thesis (Goody's categorical claim
+  open) — a Eurasian chain of exchange, leads that alternate,
   Goody's list of eastern techniques Europe received (paper, compass, gunpowder, printing) and
   the Needham table of transmission lags; the exceptionalist reply that the lead was in knowledge
   before it was in income; and both sides' agreement that Europe borrowed before 1500 ("Europe
@@ -33,8 +36,18 @@ Every borrowing is stated with its own grade of confidence, never as one flat li
   unaware where it came from), Gutenberg's press (most probably an independent invention; at
   most stimulus) — and then test the module's two theses on the ledger: the pro-Western reply
   (everyone borrowed; the West turned borrowings into self-sustaining systems) at full strength,
-  then the rival thesis's answer.
-- **Hands off:** The module closes; the question it leaves is whether the differences between
+  then the rival thesis's answer — and, as the module's closing lesson, the module verdict on
+  its question (why the West pulled ahead: an old, unique inheritance, or late luck inside a
+  shared Eurasian exchange): neither pure answer survives. The broad late-luck view fails on
+  timing (**strong**); the lead opened in the late Middle Ages, in Italy first, decisive in
+  north-western Europe in the early modern period (**on balance**); an ancient lead in wealth or
+  technique fails (**strong**) — Song China was ahead and Europe borrowed heavily — and the
+  difference lies in what Europe did with its borrowings; the cause (fragmentation, kinship, a
+  religious ethic, high-medieval institutions) is **open**.
+- **Hands off:** The module closes having decided its timing question and left its causal one
+  open, with what would settle it (within-Europe designs that separate the timing of
+  kin-dissolution, state competition and literacy, and show which predicts where innovation was
+  kept); the question it leaves is whether the differences between
   peoples that the ledger records are themselves to be explained by something deeper —
   heredity (the next module, which opens by asking what an intelligence test measures,
   `what-intelligence-tests-measure`, and states the hereditarian case in
@@ -60,6 +73,53 @@ Every borrowing is stated with its own grade of confidence, never as one flat li
   the one that favours it; (4) the "system" reply is judged with hindsight from the nineteenth
   century — the reader must ask when each system became self-sustaining and whether others had
   comparable ones at that date.
+
+## VERDICT (module verdict)
+
+- **Claim judged (the module question).** Why did the West pull ahead: an old, unique
+  inheritance, or late luck inside a shared Eurasian exchange?
+- **Verdict.** Neither pure answer survives. Grades are split and must be carried exactly:
+  **strong** that the broad late-luck view fails on timing; **on balance** on when the lead
+  opened; **open** on cause.
+  - *Late luck.* The broad late-luck view — that the gap opened after 1800 — fails for China as
+    a whole. China "led the world in living standards during the Northern Song dynasty, but had
+    fallen behind Italy by 1300"; its output per head fell through the Qing, and "by 1750 the gap
+    was too large to be bridged by regional variation within China" (Broadberry, Guan & Li).
+    **Strong.** Pomeranz's own claim, regional parity between the Yangzi delta and England or
+    Holland around 1750, **fails, on balance** (`pomeranz-and-goody-the-rival-thesis`).
+  - *When.* The lead in output per head opened in the late Middle Ages, in Italy first, and
+    became decisive in north-western Europe in the early modern period. **On balance.** The lead
+    in recorded science opens from about 1400 on Murray's count (`murray-human-accomplishment`),
+    with the caveat that pre-1400 Islamic and Chinese work is where source bias would bite.
+  - *Ancient inheritance.* An ancient lead in wealth or technique fails: Song China was ahead,
+    and Europe borrowed heavily — paper and numerals secure transfers, gunpowder probable (this
+    lesson's ledger). **Strong.** What Europe did with its borrowings — the mechanised paper
+    mill, corned powder, print that no one could suppress — is where the difference lies.
+  - *Cause.* Fragmentation (Landes), kinship (Henrich), a religious ethic (Weber) and an
+    inheritance of institutions from the high Middle Ages (the Church's kinship rules,
+    corporations, universities, chartered towns) are each partly supported, and none is
+    decisive. **Open.** What would settle it: within-Europe designs that separate the timing of
+    kin-dissolution, state competition and literacy, and show which predicts where innovation
+    was kept.
+- **What decides it.** The national accounts (Broadberry, Guan & Li, *JEH* 78, 2018; abstract
+  `texts/verdict-audit/broadberry-guan-li-2017-abstract.txt`) for the timing; Li & van Zanden
+  (*JEH* 72, 2012) for the delta–Netherlands gap in the 1820s; this lesson's ledger for the
+  borrowings; the module's earlier lessons for the causes, each of which found partial support
+  and no decisive test (`weber-only-in-the-west`: the ethic not the main channel, on balance;
+  `landes-european-exceptionalism`: fragmentation necessary-not-sufficient;
+  `henrich-church-and-kinship`: strongest on present-day correlations, weakest on medieval
+  timing).
+- **Strongest objection to the verdict.** Pomeranz's reply that wage series compare unlike
+  workers and miss women's textile earnings — so the early gap is an artefact of what was
+  measured. It narrows the gap but does not overturn the timing finding, because the
+  national-accounts estimates do not rest on wage series. From the other side: that the systems
+  Europe built from its borrowings are themselves the old, unique inheritance. That claims a
+  cause, which is the open part of the verdict; the ledger shows only that the difference lay
+  in what was done with borrowed techniques, not why.
+- **What would overturn it.** On timing: independent national accounts putting China as a
+  whole at north-western Europe's output per head in 1750. On the ancient inheritance: evidence
+  of a European lead in wealth or technique before 1000. On cause: the within-Europe design
+  above, which would turn "open" into a finding.
 
 ## Sources to consult
 
@@ -230,7 +290,16 @@ Every borrowing is stated with its own grade of confidence, never as one flat li
     Crest of the Peacock* (3rd ed. Princeton 2011) — Madhava's infinite series (14th c.) and the
     proposed Jesuit route to Europe; Plofker (above) for the sceptical reading — use it as the
     rival thesis's own claim graded by the same rule.
-- **Names only in References:** every scholar above (Bloom, Tsien, Needham, Hunter,
+- **For the module verdict (timing):** S. Broadberry, H. Guan & D. D. Li, "China, Europe, and
+  the Great Divergence: A Study in Historical National Accounting, 980–1850", *Journal of
+  Economic History* 78:4 (2018), and the authors' 2021 restatement — abstract of the 2017 CAGE
+  working paper staged at `C/research/texts/verdict-audit/broadberry-guan-li-2017-abstract.txt`
+  (quote the abstract's sentences; the paper is not staged); Y. Li & J. L. van Zanden, "Before
+  the Great Divergence? Comparing the Yangzi Delta and the Netherlands at the Beginning of the
+  Nineteenth Century", *Journal of Economic History* 72 (2012) (not staged; state date and
+  direction only). Per-head dollar figures [UNVERIFIED]: do not state them. Names in
+  References only.
+- **Names only in References:** every scholar above (Broadberry, Guan, Li, van Zanden, Bloom, Tsien, Needham, Hunter,
   Partington, Chase, Andrade, Carter, Hobson, Eisenstein, Pettegree, Edwards, Plofker, Ifrah,
   Sigler, Roberts, Parker, Hoffman, Mokyr, Joseph, Gimpel, White, Pacey, Sivin). May be named in
   the body as objects of study: Gutenberg, Bi Sheng, Fibonacci (Leonardo of Pisa), al-Khwarizmi,
@@ -372,21 +441,53 @@ know what exactly was borrowed — and how one knows.
    Where each side concedes: the reply concedes that Europe originated none of the four techniques
    on this ledger except (probably) the press; the rival thesis concedes that Europe mechanised
    paper first and that print and powder were taken furthest, fastest, in Europe (Goody's own
-   paper-export sentence). The lesson does not decide whether "systems" are the West's
-   distinction; it states what would decide it — a comparison of when each society's version of
-   a system became self-reinforcing, judged by the same measure.
+   paper-export sentence). Whether Europe's systems were the old, unique inheritance the reply
+   claims is a question about cause, and the weighing (section 9) finds it open; what the ledger
+   itself settles is narrower and is stated there — the difference lay in what Europe did with
+   its borrowings, not in an ancient lead in technique. The comparison that would decide the
+   systems question: when each society's version of a system became self-reinforcing, judged by
+   the same measure.
 8. **Application check (L16, the departures).** One short section reading the ledger against the
    module's idealised theses: priority is not transfer; absence of a document is not proof of
    independence; surviving records favour literate stations; "who invented" and "who made it
    matter" are two ledgers. Close by naming which module result each item tests (paper:
    invention of invention; numerals: Murray's meta-inventions and Weber's book-keeping; powder:
    fragmentation; print: fragmentation and the "Press" of Weber's list).
+9. **The weighing (module verdict): no ancient lead, an early-modern one, and a cause still
+   open.** The module's question set against its two pure answers and the evidence (VERDICT
+   section), in three steps, each with its grade stated in the body. (i) *Timing.* The broad
+   late-luck view meets the national accounts — China ahead under the Northern Song, behind Italy
+   by 1300, falling through the Qing — and fails: **strong**. Its strongest defence,
+   Pomeranz's reply that wage series miss women's earnings, does not reach estimates that do not
+   rest on wages; recall in one clause that his regional claim stays open
+   (`<Ref pomeranz-and-goody-the-rival-thesis>`). The lead opened in the late Middle Ages, Italy
+   first, decisive in the north-west in the early modern period — **on balance**, with Murray's
+   count placing the scientific lead from about 1400 and the caveat on pre-1400 sources
+   (`<Ref murray-human-accomplishment>`). (ii) *Inheritance.* The ledger the reader has just
+   built refutes an ancient lead in wealth or technique: Song China was ahead and Europe
+   borrowed paper and numerals for certain, gunpowder probably — **strong**. The difference lies
+   in what Europe did with the borrowings (the mechanised mill, corned powder, print no one
+   could suppress). (iii) *Cause.* Fragmentation, kinship, Weber's ethic and the high-medieval
+   institutions (the Church's kinship rules, corporations, universities, chartered towns) are
+   each partly supported and none decisive — **open**; state what would settle it
+   (within-Europe designs separating the timing of kin-dissolution, state competition and
+   literacy, and showing which predicts where innovation was kept). Close the section with the
+   verdict as one sentence: neither pure answer survives.
+
+**Conclusion** (the `<Conclusion>` block): states the module verdict in plain words with its
+split grades — the West did not pull ahead late and by luck alone: China as a whole had fallen
+behind Italy by 1300 (strong); nor did it inherit an ancient lead, since it borrowed from a
+China that was ahead (strong); the lead opened in the late Middle Ages and became decisive in
+the early modern north-west (on balance), and lay in what Europe did with what it borrowed; why
+Europe did that is open, with the design that would settle it. Then the hand-off: the next
+module takes the gap between nations, not between techniques, as its problem.
 
 Headings as claims: "What would prove a borrowing"; "Paper: a chain of mills from Samarkand to
 Fabriano"; "Numerals: secure, and two centuries in the waiting room"; "Gunpowder: a recipe
 without a route"; "Printing: most probably invented twice"; "Borrowing into system: the
 pro-Western reply"; "Others built systems too: the rival thesis's answer"; "What the ledger can
-and cannot show".
+and cannot show"; "Neither late luck nor an ancient lead: the West pulled ahead in the late
+Middle Ages, for reasons still open".
 
 ## Set pieces and worked examples to recreate
 
@@ -504,33 +605,42 @@ and cannot show".
 
 ## EXERCISE PLAN (E6/E7 + playbook-history mix)
 
-1. **Retrieval (the one warm-up):** from memory, give each of the four items its grade and the
-   single strongest piece of evidence for that grade.
-2. **Document reasoning (sourcing drill):** Francis Bacon, *Novum Organum* I.129 (1620).
+1. **Document reasoning (sourcing drill):** Francis Bacon, *Novum Organum* I.129 (1620).
    Metadata (an English Lord Chancellor and natural philosopher, writing to launch a method of
    discovery); predict before reading what he will say about the inventions' origins; then: what
    the passage records (that educated Europeans of 1620 credited these inventions to no one), what
    it argues (that mechanical discoveries changed the world more than empires or sects), what it
    omits (where they came from); what it can be used to establish for the gunpowder grade and what
    it cannot.
-3. **Claim to refute (E6b):** "Gutenberg copied Korean metal type." Name the step that fails (no
+2. **Claim to refute (E6b):** "Gutenberg copied Korean metal type." Name the step that fails (no
    documented contact or carrier; a different process at each of the six components) and state
    what single document would change the grade.
-4. **Boundary probe (E6a):** take the grading rule to its edge — a technique with certain priority
+3. **Boundary probe (E6a):** take the grading rule to its edge — a technique with certain priority
    and a perfect timing match, but no document and no borrowed word (gunpowder). What grade does the
    rule give, why is that grade lower than paper's, and what would happen to the grade if a
    Latin text were found calling saltpetre "Chinese snow"?
-5. **Derivation the lesson skipped (E6c):** apply the same rule to a claim in the rival thesis's
+4. **Derivation the lesson skipped (E6c):** apply the same rule to a claim in the rival thesis's
    favour — the Kerala infinite series and the calculus — and to one in the reply's favour —
    "the scientific journal had no precedent anywhere". Grade both, and state which earlier
    lesson's concept each grade bears on (`theft-of-history`; `accomplishment-inventory`).
-6. **Corroboration (paired sources):** Landes ("the use (but not the making)" of cannon, l.1322)
+5. **Corroboration (paired sources):** Landes ("the use (but not the making)" of cannon, l.1322)
    and Goody on the Ottoman Imperial Foundry and Janissaries (ch. 4 pp. 104–105). State the
    agreement, the disagreement, and which of the two counts as "borrowing into system" on the
    lesson's definition.
-7. **Synthesis / argument:** in a claim–evidence–reasoning paragraph, decide whether the ledger
+6. **Synthesis / argument:** in a claim–evidence–reasoning paragraph, decide whether the ledger
    supports the exceptionalist reply, the rival thesis, or neither, item by item; the model
    solution shows that the answer differs by item and by date.
+7. **Attack the verdict (aimed at the course):** The module concludes that the broad late-luck
+   view fails on timing (strong), that the lead opened in the late Middle Ages (on balance), and
+   that the cause is open. State the strongest objection to the timing verdict in its best form
+   (pre-statistical national accounts rest on assumed output per worker; wage series miss
+   women's textile earnings; Italy is not "the West" that industrialised), then say what evidence
+   would be needed to overturn each graded part. Solution: timing — independent national
+   accounts putting China as a whole level with north-western Europe in 1750; "late Middle Ages"
+   — evidence that the Italian lead of 1300 was transient and north-western Europe's lead opened
+   only after 1700; the open cause — the within-Europe design that separates kin-dissolution,
+   state competition and literacy. The solution also says why the women's-earnings reply bears
+   on the regional comparison and not on China as a whole.
 8. **FORWARD (E7) → `what-intelligence-tests-measure`:** both theses in this module explain the
    West's distinction by culture, institutions or circumstance and leave the people's own
    capacities equal. State what kind of evidence an explanation by inherited differences would

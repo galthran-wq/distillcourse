@@ -5,7 +5,7 @@ module: heredity-and-civilization
 type: core
 goal: Analyze what twin and DNA-based heritability estimates measure, and reconstruct the inference from heritability within groups to a genetic difference between them, naming its hidden premise and which premise each standard objection attacks
 
-Register rule (binding on the lesson): The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+Register rule (binding on the lesson): The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 
 The lesson must forbid two sentences with equal force: "high (or equal) heritability within groups
 makes a genetic gap probable" and "heritability is irrelevant to group differences". The first is
@@ -55,8 +55,40 @@ size and trend are `us-gap-size-trend-and-environment`'s, and no design has esti
   then sends premise 3's size and trend and the first evidence on H to
   `us-gap-size-trend-and-environment`, the direct tests to `adoption-studies-across-groups` and
   `admixture-and-polygenic-scores`, the political question to `gould-and-harden-on-heredity`. One
-  sentence in the `<Conclusion>` names the next lesson's task.
+  sentence in the `<Conclusion>` names the next lesson's task. What this lesson decides: the inference
+  "highly (or equally) heritable within groups, so the gap is probably genetic" is invalid
+  (**established**); the default hypothesis passes on as a hypothesis to be tested, not a default.
+  Whether it is true is decided, as far as the evidence goes, in `national-data-audited` (the module
+  verdict: **open** on the genetic share).
 - **Spine step:** "Heredity as an explanation of the gaps between peoples, tested premise by premise — what the tests measure, what heritability can and cannot imply, the hereditarian case at full strength, then the US gap, adoption, admixture and polygenic scores on the step from a real gap to a genetic one — then what follows politically whatever the answer, what ancient DNA shows, the rival explanations from geography and institutions, and the key datasets audited"
+
+## VERDICT
+
+- **Claim judged:** "intelligence is highly heritable within groups, so the gap between them is
+  probably genetic", including its variant "equal heritabilities in both groups show it".
+- **Verdict:** the inference is **invalid**. Grade: **established**. Jensen's default hypothesis
+  survives as a hypothesis, not as a default: it carries its own burden of proof like its rival.
+- **What decides it:** within-group data cannot partition a between-group difference. Between-group
+  heritability h²B = δG²/(δG + δE)² is defined without reference to within-group heritability, places
+  no constraint from it, can exceed 1, and fits a genetic difference in either direction (Schraiber &
+  Edge 2024, l.120–148, l.402–405). In simulations, lowering every member of one group by a constant
+  leaves its heritability unchanged, because a constant changes no correlation (Sorjonen & Melin
+  l.14–33, l.81–97). Lewontin's seed-corn case is granted by both sides (Bell Curve ch. 13; Warne
+  2021; Rushton & Jensen disown the confusion). Dossier §1 and §8, "Claims the lessons must NOT make".
+- **Strongest objection:** human groups are not random handfuls of the same seed; they have different
+  recent ancestries, so some genetic difference is to be expected and between-group heritability is
+  "likely" above zero (Warne l.~355–375); and the uniform environment the simulations assume is just
+  the "Factor X" no one has found (R&J p. 250). It does not overturn the verdict. Expecting *some*
+  genetic difference says nothing about its direction or size for this trait, and that is what the
+  inference claimed to deliver; and the Factor-X reply bears on whether H is plausible, not on whether
+  heritability is evidence for it, since equal heritability is what a uniform cause would leave
+  behind too. The objection moves the dispute to the genomic and environmental designs of the
+  following lessons, which is the verdict's own conclusion.
+- **What would overturn it:** an error in the derivation of h²B, or a method that uses within-group
+  data alone and constrains the size and sign of δG without measuring environments. Neither exists.
+- **What the verdict does not reach:** whether the gap is partly genetic. That is **open** (module
+  verdict, `national-data-audited`); the lesson forbids "heritability is irrelevant" with the same
+  force, since heritability is premise 2.
 
 ## Sources to consult
 
@@ -469,7 +501,14 @@ modern dispute.
    share has not been estimated by any design (dossier "Overall answer" 3; "must NOT make", both
    lists). Gould's "not tied by rising degrees of probability" is right about heritability alone;
    whether H is true is the question the module's remaining evidence lessons take up.
-8. **A map of the objections, which orders what follows.** Problem: with the premises numbered, every
+8. **The weighing: heritability within groups cannot show that the gap is genetic.** (Heading as a
+   claim; it can carry the map as its second half.) Set the inference at full strength (Jensen's
+   default hypothesis, the 2020 meta-analysts' equal-heritability test) against the proof and the
+   simulations, and against the strongest objection (VERDICT: different ancestries make some genetic
+   difference likely; the uniform environment is an unfound Factor X). Reach the verdict in the
+   course's voice: the inference is invalid, **established**; the default hypothesis stands as a
+   hypothesis, not a default, and the evidence that could decide it is genomic and environmental,
+   not heritability. Then the map. Problem: with the premises numbered, every
    objection in the dispute can be placed on the premise it attacks — and the reader can see which
    are settled, which open. The table (figure 4, built row by row here, KEEPER):
    | Premise | Objection | Status (dossier) | Where tested |
@@ -484,9 +523,13 @@ modern dispute.
 Headings as claims (suggested): "How twins separate genes from homes"; "A share that depends on the
 population"; "What the DNA shows, and how much less it finds"; "The argument written out — and the
 premise it hides"; "The default hypothesis"; "Why heritability within groups cannot settle the
-difference between them"; "What the argument can still claim"; "Where each objection strikes".
+difference between them"; "What the argument can still claim"; "Heritability within groups cannot
+show the gap is genetic".
 
-`<Conclusion>`: the reader can now read a heritability (and its scope), tell a twin from a DNA
+`<Conclusion>`: the verdict in plain words: the step from "heritable within groups" to "probably
+genetic between them" is invalid, and the course holds this as **established**; the default hypothesis
+remains a hypothesis that must be tested by other evidence, not a default. Then: the reader can now
+read a heritability (and its scope), tell a twin from a DNA
 estimate, write the hereditarian argument as premises, find its hidden premise, and say why
 within-group heritability is evidence for premise 2 and none for the premise that decides the dispute.
 Next: the case its proponents make for that premise, at full strength.
@@ -704,6 +747,16 @@ Next: the case its proponents make for that premise, at full strength.
    is real, names the check as invariance across cohorts (`<Ref>` back to
    `what-intelligence-tests-measure`), and says in one sentence that the next-but-one lesson measures
    exactly this rise and what each side makes of it (`<Ref>` to `us-gap-size-trend-and-environment`).
+
+9. **Attack the verdict:** The lesson holds as **established** that within-group heritability cannot
+   show a between-group difference to be genetic. State the strongest reply in its best form: groups
+   of different recent ancestry should differ genetically in many traits, so with within-group
+   heritability high, a genetic share above zero is the reasonable prior, and the burden lies on
+   whoever names the Factor X. Then say what evidence would be needed to overturn the verdict itself
+   (not merely to make H more plausible): a method using within-group data alone that fixes the sign
+   and size of δG. The solution shows that the reply argues for a prior on H, which the verdict
+   leaves untouched, and that only genomic designs with controlled environments (`<Ref>`
+   `admixture-and-polygenic-scores`) could move H.
 
 Floor check: one warm-up (1); claims to refute in both directions (2, 3); derivation (4); boundary
 probe (5); research-shaped design (7); corroboration and CER argument (6); FORWARD (8). Mix:

@@ -42,12 +42,50 @@ goal: Analyze Gobineau's argument that civilizations rise through a creative rac
   (`what-intelligence-tests-measure` → `admixture-and-polygenic-scores`), states the case at
   full strength (`hereditarian-case-iq-and-nations`), asks what follows politically
   (`gould-and-harden-on-heredity`) and reads ancient DNA
-  (`reich-ancient-dna-and-the-indo-europeans`). (iv) `renan-what-is-a-nation` answers that a nation is
-  not a race.
+  (`reich-ancient-dna-and-the-indo-europeans`). This lesson has decided that Gobineau's
+  argument fails; it has not decided the modern question, which has different evidence.
+  (iv) `renan-what-is-a-nation` answers that a nation is not a race.
 - **Spine step:** "The late nineteenth century looks beneath institutions for what moves
   peoples: the crowd (Taine, Le Bon), the race (Gobineau, Chamberlain, Grant), the nation as
   will or as inheritance (Renan, Barrès, Maurras) — and the Dreyfus Affair puts them to the
   test"
+
+## VERDICT
+
+Recorded in `research/verdicts/REGISTER.md`, module 6, `gobineau-inequality-of-races`.
+
+- **Claim judged:** civilizations rise through a creative race and decay through its
+  mixture.
+- **Verdict:** **fails on its own terms and on the evidence.** Grade: **established**.
+
+**What decides it.** Four findings, each internal to the Essay or from its own list, plus one
+from later evidence. (1) The elimination of rival causes was incomplete: showing each
+received cause occurs in thriving states shows none is sufficient, not that none
+contributes, and conquest, trade, epidemic and fiscal collapse were never tested. (2) The
+definition is circular: the decline is the only evidence offered that the blood changed —
+the structure Gobineau mocked in his predecessors. (3) His self-set test — if any element of
+the ten civilizations is not due to the white races "the whole theory … is false" — cannot
+fail as he applies it, because every civilization is assigned a white origin by
+classification (Egypt and China as "Aryan" colonies), with no evidence offered in Book I.
+(4) His own list holds counter-examples: China lasted and absorbed its conquerors; Rome was
+by his own Note "a mixture of Celts, Iberians, Aryans, and Semites"; the three American
+civilizations have no white impulse assigned. His concessions (Morton's tables doubted,
+hybrids fertile, languages borrowed, mixed peoples producing art) remove the hierarchy's
+supports. (5) Ancient DNA shows every present population is a mixture of earlier mixtures
+(forward Ref `reich-ancient-dna-and-the-indo-europeans`), so "pure" founding blood never
+existed to be diluted. Sources: Book I (g.txt), as cited in the plan's step 7.
+
+**Strongest objection to the verdict.** Gobineau's reply to Tocqueville: the consequences of
+a doctrine do not refute it, and the evidence of the 1850s was too thin to refute it either,
+so the theory was unproven rather than false. It does not overturn the verdict. The verdict
+does not rest on consequences, and the failures (1)–(4) are failures of the argument itself,
+visible in the 1850s from Gobineau's own text; (5) then supplies the independent evidence of
+ancestry that he lacked, and it tells against him.
+
+**What would overturn it.** An independent measure of ancestry — fixed without reference to
+the outcome — that predicts the rise and fall of civilizations better than institutional or
+ecological causes. **Scope:** the verdict does not touch the modern hereditarian question
+(module 13), which is a different argument with different evidence.
 
 ## Sources to consult
 
@@ -325,15 +363,31 @@ several (monogenism vs polygenism) was open.
    `reich-ancient-dna-and-the-indo-europeans`). The modern hereditarian case is a different
    argument with different evidence and has its own module (`<Ref>`
    `hereditarian-case-iq-and-nations`) — do not let this lesson pre-judge it.
-   What the reconstruction leaves standing, stated without verdict: the problem (why
-   civilizations fall when the moral explanations have counter-examples) and the
-   observation that institutions do not transplant easily — which later theories explain
-   by culture or institutions rather than blood.
+8. **The weighing — "The theory fails on its own terms and on the evidence".** Set the
+   five tests against the strongest objection (Gobineau's reply to Tocqueville: a truth is
+   not refuted by its consequences, and the 1850s could not refute him either) and reach
+   the verdict (see `## VERDICT`): the argument fails, grade **established**, because its
+   failures are internal and textual — an incomplete elimination, a circular definition, a
+   self-set test that cannot fail, counter-examples on its own list — and the later
+   evidence of ancestry tells against it. State what would overturn it (an independent
+   measure of ancestry that predicts rise and fall better than institutional or ecological
+   causes) and its scope (not the modern hereditarian question). What survives is the
+   problem (why civilizations fall when the moral explanations have counter-examples) and
+   the observation that institutions do not transplant easily — which later theories
+   explain by culture or institutions rather than blood.
+
+**Conclusion.** State the verdict in plain words with its grade: Gobineau's theory that
+civilizations rise through a creative race and fall through its mixture fails, on its own
+terms and on the evidence — **established**. Name the two failures the reader should carry
+(decline is the only evidence of changed blood; the test he set himself cannot fail as he
+applies it) and the scope limit (module 13's question is different). Hand-off: his
+successors kept the hierarchy and dropped the pessimism — the next lesson.
 
 Headings as claims, for example: "Every received cause of decline has a counter-example";
 "Degeneration defined as a change of blood"; "Mixture builds a civilization and ends it";
 "Laws take after the people"; "Ranking groups, conceding individuals"; "Tocqueville: probably
-false, certainly pernicious"; "Five places the argument gives way".
+false, certainly pernicious"; "Five places the argument gives way"; "The theory fails on
+its own terms and on the evidence".
 
 ## Set pieces and worked examples to recreate
 
@@ -376,10 +430,7 @@ false, certainly pernicious"; "Five places the argument gives way".
   Gobineau argues with in ch. VIII — one clause); the Cherokees (a Native American nation in
   the south-eastern United States that adopted a written constitution and plantation
   agriculture before its removal in 1838); the King of Hanover (dedicatee).
-- **The label rule binds hard here.** The course passes no verdict of its own on any author
-  or idea: no condemning or approving labels in its own voice. Judgement comes only through
-  argument and evidence; a label may appear only inside a quotation, with who applied it
-  and when. The summary in the dossier uses label words for the book; the lesson does not.
+- **The label rule binds hard here.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. The summary in the dossier uses label words for the book; the lesson does not.
   Its judgement is the test section.
 - **Quote the argument, not the epithets.** The racial rankings must be stated so the reader
   knows exactly what is claimed (three primary races, an order among them, the ten
@@ -403,9 +454,9 @@ false, certainly pernicious"; "Five places the argument gives way".
 - **Real misreading (L13):** "Gobineau argued that the white race should rule and could
   save civilization by staying pure." He held that no people stays pure, that civilization
   requires mixture, and that the end is inevitable. One slot.
-- **Contested, do not settle in this lesson:** whether group differences in measured traits
-  have a genetic part is the heredity module's question; this lesson tests Gobineau's
-  argument and his evidence, which are a different argument.
+- **Scope of the verdict:** the lesson settles Gobineau's argument (fails, established).
+  Whether group differences in measured traits have a genetic part is the heredity
+  module's question, with different evidence; this lesson does not settle it and says so.
 - **Numbers (L12):** keepers — ten civilizations; 1853; Gobineau's "ten millions within …
   twenty-six millions outside" (his estimate, framed as his ranking of his own nation).
   Morton's figures appear only in a figure, with Gobineau's own critique.
@@ -487,7 +538,14 @@ false, certainly pernicious"; "Five places the argument gives way".
    Aristotle's concession that nature "often fails" (`<Ref>`
    `aristotle-political-animal-and-natural-slavery`) and Gobineau's concession about
    individuals: what does each concession do to its theory?
-8. **FORWARD (E7) → `chamberlain-and-grant`:** Gobineau's theory makes decline inevitable.
+8. **Attack the verdict:** the lesson grades the failure of Gobineau's theory
+   "established". State the strongest case against that grade in its best form — that in
+   1853 the evidence could neither confirm nor refute him, so "unproven" is the most a
+   fair judge could say — and then say what evidence would be needed to overturn the
+   verdict itself: what kind of measure of ancestry, fixed how and in advance of what,
+   predicting what better than which rival causes. The solution separates the internal
+   failures (which need no later evidence) from the empirical one.
+9. **FORWARD (E7) → `chamberlain-and-grant`:** Gobineau's theory makes decline inevitable.
    Identify the single premise a follower would have to drop to turn the theory into a
    political programme, and say what would have to replace it. The solution names the
    premise (a noble race is given once and can only be lost) and its replacement (races are

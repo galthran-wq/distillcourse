@@ -29,12 +29,54 @@ goal: Analyze Burke's case against Hastings — that arbitrary power cannot be h
   own principles and maxims, and not upon ours". The lesson shows that the
   Hastings speech and the Reflections are one theory of inherited order,
   turned on the Company instead of the Jacobins.
-- **Hands off:** Burke's speech is itself a ledger — misery to Bengal, corruption
+- **Hands off:** Decided here: Hastings's "geographical morality" fails as a
+  defence, and the impeachment does not contradict the Reflections (strong).
+  What passes on: Burke's speech is itself a ledger — misery to Bengal, corruption
   flowing back to Britain, the "star from the West" that a good empire might
   have been — with no counterfactual and no comparison. `colonial-balance-sheet`
   asks what a cost–benefit accounting of empire would need that an eighteenth-
   century prosecutor's does not, and whether it can be done at all.
 - **Spine step:** "The West judges its own conquests: Vitoria's titles, Locke's waste land, Burke's impeachment of Hastings, Mill's tutelage, the colonial balance sheet, and whether guilt is inherited"
+
+## VERDICT
+
+Binding: research/verdicts/REGISTER.md, module 14, `burke-against-hastings`.
+
+- **Claim judged.** Two claims: (a) Hastings's defence, that "the constitution
+  of Asia is despotism" and a governor there may rule by its practice —
+  Burke's "geographical morality"; (b) the charge that the impeachment
+  contradicts the Reflections (the defender of inherited order prosecuting
+  the man who governed by the order he found).
+- **Verdict.** **The defence fails, and there is no contradiction.** Grade:
+  **strong**.
+- **What decides it.** (a) The defence would license any act by citing the
+  worst local precedent: if the practice of a place fixes the governor's
+  duties, no act anywhere is ruled out so long as someone before him did it.
+  It also needs Asia to be lawless, and Burke shows the defence's own sources
+  had law (the Koran and the fetwah, the Mughal province's partitioned
+  offices, the Shaster). (b) Burke's principle that power over others is a
+  trust under law — arbitrary power "is a thing which neither any man can hold
+  nor any man can give" — is the Reflections' inherited order turned on the
+  Company: the Reflections' partnership of generations rests on "the great
+  primeval contract of eternal society" (`research/texts/burke/reflections-full.txt`
+  l.3271), the same law prior to "all our devices" that the Hastings speech
+  invokes; and in both the enemy is a power that treats a country as material
+  to be redrawn (the Jacobins; "birds of prey and passage").
+- **Strongest objection.** The natural-law passage is the exception in a
+  corpus that argues from prescription and circumstance: by Burke's own
+  method of the Reflections, an established practice of absolute power in
+  Bengal is the prescription a conservative should respect, so the
+  prosecutor of 1788 abandoned the method of 1790.
+- **Why it does not overturn the verdict.** Prescription in the Reflections
+  protects an inherited order of law and property; it never protects a power
+  held without law, and Burke denies that arbitrary power can be held at all,
+  so it cannot be inherited. And the Indian order Burke defends is itself a
+  prescription — "their own principles and maxims" — which the Company, not
+  he, overturned. The objection shows the natural-law passage is rare, not
+  that it contradicts the rest.
+- **What would overturn it.** A passage in the Reflections defending a power
+  held without law because it is inherited, or a defence of local practice
+  that does not license any act its precedent covers.
 
 ## Sources to consult
 
@@ -377,17 +419,46 @@ did in Bengal to Indians — and why did this man think they must?
    "eternal separation" sentence from 1783 — if Britain cannot govern India
    without governing itself ill, "a ground is laid for their eternal
    separation, but none for sacrificing the people of that country to our
-   constitution" — is a conditional case for leaving. Leave the reader with
-   both: the conservative against this empire, and the conservative who could
-   not imagine India governing itself.
+   constitution" — is a conditional case for leaving. The lesson says what this
+   settles as a fact about the argument: the Whig-imperial reading is right that
+   Burke's remedy was better government, not withdrawal, and that he did not
+   contemplate Indian self-government; it is wrong that his objection was only
+   to the Company, because the trust binds any British power there, Parliament
+   included. He was against arbitrary rule over India, not against empire as
+   such.
+
+9. **The weighing — geographical morality fails, and the impeachment is the
+   Reflections turned on the Company.** The lesson's last body section reaches
+   the verdict (see VERDICT). (a) The defence: show in two sentences why a
+   standard drawn from "the practice" of a place licenses any act that has a
+   precedent there, and why the defence also needed Asia to be lawless, which
+   link 4(c) refuted. (b) The contradiction charge at full strength: the
+   Reflections argue from prescription, and an established practice of absolute
+   power is a prescription. The answer: prescription protects an inherited
+   order of law and property, never a power held without law; Burke's
+   "neither any man can hold nor any man can give" means arbitrary power
+   cannot be inherited; and the Reflections' own partnership rests on "the
+   great primeval contract of eternal society" (l.3271), the same prior law.
+   Verdict: the defence fails and there is no contradiction, **strong**. What
+   would overturn it: a passage in the Reflections defending power held
+   without law because inherited.
 
 Headings fall out as: "Why a trading company stands before the Lords"; "A
 commonwealth without a people"; "Governing a people by their own principles";
 "'The constitution of Asia is despotism': the defence"; "Geographical morality
 rejected"; "Arbitrary power can neither be held nor given"; "Asia had law";
 "Corruption and arbitrary power beget each other"; "In the name of human nature
-itself"; "One theory of inherited order, two targets"; "Did he object to empire,
-or to the Company?"
+itself"; "One theory of inherited order, two targets"; "Against arbitrary
+rule, not against empire"; "Geographical morality fails, and the impeachment is
+the Reflections turned on the Company".
+
+**Conclusion.** States the verdict in plain words with its grade: the defence
+that Asia's constitution was despotism fails, because it would license any act
+by the worst local precedent, and Burke's impeachment does not contradict the
+Reflections — it is the same theory of power as a trust under an inherited law,
+turned on the Company (strong). Then the hand-off: Burke's speech is a ledger
+with no counterfactual; `colonial-balance-sheet` asks what an accounting of
+empire would need and whether it can be done.
 
 ## Set pieces and worked examples to recreate
 
@@ -456,7 +527,7 @@ or to the Company?"
   speech as a second set — one sentence from it.
 - **Register:** the speech is forensic oratory; the course is not. Quote the
   invective short, in `<Quote>`, and keep the course's own sentences
-  declarative. The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+  declarative. The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Mehta, Marshall, O'Brien, Bromwich, Macaulay (as historian) only in
   References.** "The Reflections and the Hastings speech as one theory" is
   stated as the course's own.
@@ -561,7 +632,20 @@ argument's structure.
 8. **Synthesis — claim–evidence–reasoning.** "The Hastings speech contradicts
    the Reflections." Argue it both ways in one paragraph each (the natural-law
    passage against prescription; the inherited order against dislocators), then
-   judge, naming which passage decides it for you.
+   judge, naming which passage decides it for you. The solution reaches the
+   lesson's verdict and names the deciding passages.
+9. **Attack the verdict.** The lesson concludes, strongly, that the
+   impeachment does not contradict the Reflections. Build the strongest
+   contrary case: the Reflections tell the reader to respect established
+   practice and distrust abstract rights, and Burke in Westminster Hall appeals
+   to "eternal laws of justice" and "human nature itself" against an
+   established Asian practice — the very appeal he condemns in Paris. Then
+   say what evidence would be needed to overturn the verdict: a passage in
+   the Reflections defending a power held without law because it is
+   inherited, or a passage in the Hastings speeches conceding that the
+   Mughal order was arbitrary and still demanding that it be overturned. The
+   solution names where it searched and why the absence keeps the grade at
+   strong.
 
 ## Nietzsche cross-course links (where his ideas enter)
 

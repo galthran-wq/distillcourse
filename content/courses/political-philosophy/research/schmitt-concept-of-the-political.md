@@ -43,8 +43,12 @@ goal: Analyze Schmitt's criterion of the political as the friend–enemy distinc
   use, 1930–33 — is `article-48-weimar`, the module's application. The 1933
   question — what the author of this criterion did when the enemy was named by
   a party, and what in the criterion made that easy — is `the-right-in-1933`
-  (next module's application); this lesson reports the bare dated facts once
-  (link 8d) and Refs forward.
+  (next module's application), which answers it; this lesson reports the bare
+  dated facts once (link 8d) and Refs forward. The lesson carries no verdict
+  of its own (REGISTER.md) but states two findings, each graded on balance: a
+  criterion that finds politics only at its extreme mistakes the exception for
+  the thing; and Schmitt's point that liberal states fight wars under other
+  names has force.
 - **Spine step:** "Liberal Europe breaks: elite theorists show that a minority
   always rules, Mann sets Kultur against Zivilisation, Spengler foretells the
   West's winter, Ortega diagnoses the mass-man, Schmitt names the political as
@@ -150,9 +154,11 @@ goal: Analyze Schmitt's criterion of the political as the friend–enemy distinc
   crude enough to become the Nazis' 'crown jurist'"; the 1936 lecture), and
   a liberal historian's verdict that the epigram "contained enough truth to
   distract from its overall falsity". REFERENCES ONLY. The verdict itself is
-  NOT stated in the course's voice (register rule); the lesson states the
-  ARGUMENT behind it — the criterion describes war, not politics — as the
-  liberal objection, at full strength, and leaves the verdict to the reader.
+  NOT quoted in the course's voice (register rule: no labels); the lesson
+  states the ARGUMENT behind it — the criterion describes war, not politics —
+  as the liberal objection, at full strength, and states the finding the
+  register grades: the criterion mistakes the exception for the thing (on
+  balance).
   Fawcett is a self-declared left-liberal; one reading.
 - **Muller anthology ch. 7, introduction to Schmitt** — summary index 48;
   cached `research/texts/muller/conservatism-anthology.txt` lines ~3665–3700:
@@ -342,24 +348,37 @@ and trade, has never had a politics of its own.
    thing (the Brunner objection of 1939 — "the enemy, not the friend, is the
    positive feature" — is the scholarly form; Schmitt's 1963 reply, l.280–288,
    is that a trial begins with a wrong and criminal law with a misdeed, which
-   is not a "primacy of crime"). The objection is argued, not summed up in a
-   verdict: the course does not pronounce the criterion true or false.
+   is not a "primacy of crime"). The finding, in the course's voice, graded
+   **on balance**: a criterion that finds politics only at its extreme has
+   mistaken the exception for the thing — Schmitt's 1963 reply shows that a
+   field may begin from its limit case, not that the limit case is the field.
+   And the finding on the other side, also **on balance**: Schmitt's charge
+   that liberal states fight wars under other names ("sanctions",
+   "pacifications", "international police"; the Kellogg Pact; Article 16
+   blockades) has force — the liberal vocabulary did not abolish the enemy, it
+   renamed him. Both stated, neither inflated: the lesson does not pronounce
+   the criterion simply true or false.
    (c) **Schmitt's own admission** (1963 Foreword, l.336–352): that a
    "cautious, initial delimitation of a conceptual field has been turned into
    a primitive slogan, a so-called friend-enemy theory, known only by hearsay"
    — the text was "didactic", a framework for "an immense problem", not a
    doctrine; and the Foreword's own later distinction (l.352–437) between
    conventional, real and absolute enemy, which the 1932 text had not drawn.
-   The lesson weighs this: a concession about reception, or a retreat from the
-   1932 claim that the political is the real possibility of killing?
+   The lesson weighs this and says what the text shows: the Foreword refines
+   the enemy concept and complains of misreading, but withdraws no sentence of
+   the 1932 claim that the political is the real possibility of killing — a
+   concession about reception, not a retreat.
    (d) **1933**, reported as fact bearing on reception, in two sentences and
    no more (the full reading is `the-right-in-1933`, forward `<Ref>`): Schmitt
    joined the NSDAP in May 1933; in August 1934 he defended the killings of
    30 June–2 July, his own patron Schleicher among the dead, in "Der Führer
    schützt das Recht"; he was sidelined in 1936 and, after 1945, detained and
-   never taught again. The lesson's question, not its verdict: does a theory that
-   says only participants can name the enemy have any way of saying that a
-   participant named the wrong one? The strongest reading against Schmitt is
+   never taught again. The question this raises — does a theory that says
+   only participants can name the enemy have any way of saying that a
+   participant named the wrong one? — is answered in `the-right-in-1933`
+   (forward Ref), where Schmitt's own texts are found to contain both a
+   criterion against a legal revolution and the step that accepts whoever has
+   succeeded. The strongest reading against Schmitt is
    stated in the course's own voice (it is Strong's): the theory lets the
    enemy define the friend. Strauss's 1932 objection goes to References with
    its thesis stated once in the body as the course's own: affirming the
@@ -457,10 +476,7 @@ politics — and the replies".
   connection between them to `the-right-in-1933`. Strong's interpretation
   (Hitler as "miracle", l.698–765) is a reading — References, or one clause as
   "one reading".
-- **Register (exact rule).** The course passes no verdict of its own on any
-  author or idea: no condemning or approving labels in its own voice.
-  Judgement comes only through argument and evidence; a label may appear only
-  inside a quotation, with who applied it and when.
+- **Register (exact rule).** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Scholars live in References only:** Strong, Schwab, Miller (translators
   and editors), Fawcett, Muller, Strauss (1932 Notes), Meier, Bendersky,
   Kennedy, Brunner (though Schmitt names Brunner, so the 1963 Foreword's

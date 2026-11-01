@@ -5,7 +5,7 @@ module: heredity-and-civilization
 type: core
 goal: Evaluate the two designs that try to test a genetic contribution to the gap directly — regression on genomic ancestry and comparison of polygenic scores — stating what each has found, what confounds it, and what study would settle the question
 
-Register rule (binding on the lesson): The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+Register rule (binding on the lesson): The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 
 Group labels: the studies use self-identified race/ethnicity ("SIRE": Black or African-American,
 White or European-American, Hispanic, Asian, biracial) and, separately, genomic ancestry estimated
@@ -40,14 +40,41 @@ measured fraction of a person's genome. The lesson's whole argument depends on k
   well-powered sibling-difference admixture design with observed colour and local ancestry, and
   within-family genetic studies of cognition in African-ancestry samples — with the residue no design
   removes.
-- **Hands off:** To `gould-and-harden-on-heredity`: the empirical question is open in both
-  directions, and the course can say what evidence would close it; the next question is what would
+- **Hands off:** To `gould-and-harden-on-heredity`: this lesson decides that neither "genes cause the
+  gap" nor "there is no genetic difference" has been shown by the direct designs (**strong**); the
+  empirical question is therefore **open** in both directions, and the course can say what evidence would
+  close it (the module verdict in `national-data-audited` recalls this lesson's design); the next question is what would
   follow politically if it closed either way. One sentence in the `<Conclusion>`; the FORWARD exercise
   reaches it. (The ancient-DNA selection result is mentioned here only for what it does to one
   assumption of a 2021 bound; `reich-ancient-dna-and-the-indo-europeans` owns ancient DNA.)
 - **Spine step:** "Heredity as an explanation of the gaps between peoples, tested premise by premise — what the tests measure, what heritability can and cannot imply, the hereditarian case at full strength, then the US gap, adoption, admixture and polygenic scores on the step from a real gap to a genetic one — then what follows politically whatever the answer, what ancient DNA shows, the rival explanations from geography and institutions, and the key datasets audited"
 - Not module-final: no APPLICATION spec. `national-data-audited` recalls this lesson's "what would
   settle it" in the module's closing status; the statement is made here once.
+
+## VERDICT
+
+- **Claim judged:** two opposite readings of the direct genetic designs: (i) admixture regressions and
+  polygenic scores show that genes cause part of the gap; (ii) they show there is no genetic difference.
+- **Verdict:** **neither is shown.** Grade: **strong**.
+- **What decides it** (dossier §§4–5, 9): admixture slopes are small and positive (PNC: r = 0.086, under 1%
+  of variance; lasker2019, kirkegaard2019), and the slope sums the genetic and the environmental effects of
+  ancestry, colourism and family circumstances included (Schraiber & Edge preprint l.301–316). The one
+  within-family estimate is positive and not significant (Fuerst et al. 2023, Table 6: 0.62 ± 0.55, interval
+  −0.46 to 1.70). Polygenic scores lose most of their accuracy outside European ancestry, and mean
+  differences between ancestries cannot at present be read as genetic potential. Bird's 2021 bound (at most
+  4.7–8.5 points "in either direction") holds only under neutrality and stated assumptions; it is a bound, not
+  a measured zero.
+- **Strongest objection:** from the hereditarian side, every genomic design that has been run points the
+  same way (positive slopes, a positive sibling estimate, a score gap in the predicted direction), and
+  consistent direction across designs is itself evidence. From the other side, Bird's bound caps any genetic
+  share at a few points, which is close enough to none. Neither overturns the verdict. Direction across
+  designs that share the same confound (ancestry correlates with appearance and family circumstance in all
+  of them) is one result repeated, not several; the sibling estimate's interval includes zero. The bound
+  rests on neutrality, which the 2026 ancient-DNA result shows is a testable premise rather than a given,
+  and on national-IQ inputs the module audits.
+- **What would overturn it:** a well-powered sibling-difference admixture design with observed skin colour
+  and local ancestry, or within-family genome-wide studies of cognition in large African-ancestry samples
+  (section 10). A significant result there, in either direction, would decide what this lesson cannot.
 
 ## Sources to consult
 
@@ -456,7 +483,11 @@ lasker2019 l.155–160).
    continental ancestries cannot at present be read as differences in genetic potential (dossier §5
    status, settled); and the bound is a bound under stated assumptions, not a measured zero (dossier
    "must NOT", environmental side).
-10. **What would settle it.** Problem: if the present designs cannot decide, which could? Build the
+10. **The weighing: the direct designs have shown neither a genetic cause nor its absence — and what
+    would.** (Heading as a claim.) First set each reading at its strongest against the evidence of
+    sections 3–9 and against the strongest objection (VERDICT: consistent direction across designs; the
+    bound as a near-zero), and reach the verdict in the course's voice: neither is shown, **strong**. Then
+    what would settle it. Problem: if the present designs cannot decide, which could? Build the
     answer as the chain of confounds and the design step that removes each (figure 7, the module's
     KEEPER table):
     - family-level confounds (parental SES, wealth, neighbourhood, family-level colourism) → a
@@ -480,11 +511,15 @@ lasker2019 l.155–160).
     can show — state the disagreement, do not resolve it. Close with both Status lines (dossier §4 and
     §5) and the two limits the module has established (`<Ref>` `us-gap-size-trend-and-environment`):
     the gap is not wholly genetic as it stands; no evidence excludes a genetic share.
+    `<Conclusion>`: the verdict in plain words: the direct genetic designs have not shown that genes cause
+    part of the gap, and have not shown that there is no genetic difference; the course holds this as
+    **strong**, and states the design that would decide it. Then the hand-off sentence (ARC).
 
 Headings as claims: "An ancestry share is a measured fraction of a genome"; "Blood groups: a null from
 a blunt instrument"; "A small slope and a large extrapolation"; "The slope as evidence for genes"; "The
 slope sums two effects"; "Siblings remove the family, not the face"; "How a polygenic score is built";
-"Scores travel badly"; "Average scores across ancestries"; "What would settle it".
+"Scores travel badly"; "Average scores across ancestries"; "Neither a genetic cause nor its absence has
+been shown".
 
 ## Set pieces and worked examples to recreate
 
@@ -704,6 +739,13 @@ drawing states more clearly than a scan of a journal table.
    would change it, and why. The solution shows that most of the claims survive either result because
    they rest on a value premise, and says in one sentence that the next lesson sets those premises side
    by side, with a `<Ref>`.
+
+9. **Attack the verdict:** The lesson holds as **strong** that the direct designs show neither a genetic
+   cause of the gap nor its absence. State the best case that they do show a genetic contribution (the
+   direction of every slope, the sibling point estimate, the score gap), then the best case that they show
+   none worth the name (the neutral bound). For each, say what evidence would be needed to overturn the
+   verdict. The solution shows that both cases rest on a premise the designs cannot check (no confounding by
+   appearance and family; neutrality), and names the section-10 design that would remove it.
 
 Mix check: retrieval 1; document reasoning 7; synthesis/argument 5, 6, 8; quantitative reasoning that
 serves an argument 2, 3, 4 (each tied to a claim the lesson's readers will meet in print, per the

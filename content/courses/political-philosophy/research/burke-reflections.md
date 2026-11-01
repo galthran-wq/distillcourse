@@ -47,8 +47,13 @@ goal: Analyze Burke's case against the Revolution as a failure of knowledge befo
   constitution is that it grew, where is the standard by which growth is judged?
   That is the road to Hegel (`hegel-ethical-life-and-the-state`). Burke's
   forecasts (paper money, the departments that will not obey Paris, the general
-  who becomes master) are the predictions the module's application `assignats`
-  tests. Burke's India (the Hastings impeachment, "geographical morality") is
+  who becomes master, and France "expunged out of the system of Europe" for
+  "much time") are decided in the module's closing lesson `assignats`: the
+  paper money and the general are hits (strong), the departments and France's
+  eclipse are misses (strong), and his general argument, that no generation can
+  redesign a whole society at once without a heavy price, is upheld on balance
+  (the war of 1792 and war finance are a rival cause of the worst of the price).
+  This lesson states the forecasts and their grounds and does not grade them. Burke's India (the Hastings impeachment, "geographical morality") is
   HELD for `burke-against-hastings` in the empire module — one sentence here,
   no more.
 - **Spine step:** "Government by consent (Locke) is doubted by Hume and
@@ -193,6 +198,16 @@ goal: Analyze Burke's case against the Revolution as a failure of knowledge befo
   sociability) and the objection that "one group's perilous innovation is
   another's prudent repair"; Hazlitt's "the only specimen of Burke is all that
   he wrote". Fawcett in References only.
+- **Burke, Speech on the Army Estimates, House of Commons, 9 February 1790**
+  (Debrett, 1790; PD) — `research/texts/audit-right-shading/burke-army-estimates-1790.txt`.
+  l.10: France "expunged out of the system of Europe"; "most assuredly it would
+  take up much time to restore her to her former active existence". l.38: the
+  French "the ablest architects of ruin that had hitherto existed in the world",
+  having pulled down "their army; their navy; their commerce". Written nine
+  months before the Reflections. Use as forecast (v) in step 7 and in the
+  ledger (set piece 8): the failed forecast beside the hits, so the ledger shows
+  both columns from Burke's own words. Within four years French armies were
+  beating the coalition; graded in `assignats`.
 - **Maistre, Considerations ch. 6 n.2 (p. 92: Paine's constitution "you can
   put in your pocket") and Berlin VI pp. 128–129 (Maistre vs Burke on the Act
   of Settlement)** — for the one-sentence forward hook to `maistre-and-bonald`.
@@ -346,10 +361,14 @@ then a general.
    Paper money: a currency on confiscated Church land breeds "an oligarchy of
    money-managers" and "a nation of gamesters" (S3 l.1982–2203) — one sentence,
    RESERVED for `assignats`. (iv) The departments will not obey Paris (S1
-   l.1719–1760). Written in 1790, before the Terror (1793), before the execution
-   of the king, before Bonaparte (1799). The lesson states what came true and
-   where (i, ii), and holds iii and iv for the application lesson, which tests
-   them.
+   l.1719–1760). (v) France as a power: in the Commons on 9 February 1790 Burke
+   said France was "expunged out of the system of Europe" and that it "would
+   take up much time to restore her" (Army Estimates speech, l.10). Written in
+   1790, before the Terror (1793), before the execution of the king, before
+   Bonaparte (1799). The lesson states what came true and where (i, ii), states
+   (v) beside them as a forecast the record contradicted within four years (the
+   victories of 1794), so the reader sees both columns, and holds iii and iv for
+   the application lesson, which grades the whole ledger.
 8. **The objections, at full strength.** Three, in this order. (a) **Paine and
    Wollstonecraft (1790–91):** the dead cannot bind the living — "the vanity and
    presumption of governing beyond the grave is the most ridiculous and insolent
@@ -357,14 +376,22 @@ then a general.
    Burke "pities the plumage, but forgets the dying bird"; his reverence for
    rank is sympathy for the queen and none for the poor; and his contempt for
    reason ("a mortal antipathy to reason") leaves no way to tell a good
-   prejudice from a bad one. (b) **The Whig/Tory puzzle:** the same man defended
+   prejudice from a bad one. **Did Burke answer it?** In part. To "the dead
+   cannot bind the living" he has an answer in the text: the partnership makes
+   the living trustees, free to improve, not owners free to dispose (exercise 6
+   works it). To "how do you tell a good prejudice from a bad one?" the
+   Reflections gives no criterion, only a rule about the burden of proof and the
+   rate of change (see (c)); the lesson says so plainly. The plumage charge is
+   about sympathy, not argument, and needs no answer. (b) **The Whig/Tory puzzle:** the same man defended
    the American colonists, prosecuted Hastings for arbitrary power in India
    (one sentence; `<Ref>` burke-against-hastings), and now defends the French
    monarchy — is this consistency ("varying his means to secure the unity of
    his end", S4 l.1801–1818) or apostasy? Give Burke's own answer (the
    Americans claimed the rights of Englishmen, not of men; the Assembly
    destroys what the colonists defended) and the critics' (he defends whatever
-   is established). (c) **The self-application problem:** if no general
+   is established). Say that the question is decided, with the Hastings record
+   in front of the reader, in `burke-against-hastings`; here it is stated, not
+   judged. (c) **The self-application problem:** if no general
    principle can be applied without circumstance, "distrust general principles"
    is itself a general principle; and the probabilistic version — why believe
    that the unforeseen effects of change are more likely bad than good? Burke's
@@ -373,7 +400,11 @@ then a general.
    building"; the argument is about the burden of proof and the rate of change,
    not a ban. The lesson concedes that this leaves the line between repair and
    innovation to judgment, which is where Fawcett's objection (one group's
-   perilous innovation is another's prudent repair) lands.
+   perilous innovation is another's prudent repair) lands. So: Burke answers the
+   self-application charge (his rule is a presumption, not a principle applied
+   without circumstance) and does not answer the probabilistic one in this book;
+   whether the record bears out his presumption for France is what `assignats`
+   decides.
 9. **Where the argument leads next.** State the course's own forward objection
    (Strauss in References): Burke made the good constitution one that *grew*
    rather than one that was *designed* — natural in its manner of production,
@@ -388,7 +419,8 @@ then a general.
    people's language and ways? — which a Lutheran pastor had already answered
    (`<Ref>` herder-and-fichte-volk-and-nation). Close by saying what the reader
    can now do: state Burke's case in its epistemic form and locate where it rests
-   on judgment.
+   on judgment; and that his forecasts, hits and misses, are graded against the
+   record at the end of the module (`<Ref>` assignats).
 
 ## Set pieces and worked examples to recreate
 
@@ -430,19 +462,17 @@ then a general.
    revised — the one-line consequence: "the temporary possessors and
    life-renters" may not "cut off the entail".
 8. **The forecast ledger** (S2 l.383–384; S4 l.829–837; S1 l.1719–1760; S3
-   l.1982–2203): four predictions, each with Burke's stated ground and the
-   year it was written, against what happened (Terror 1793–94; Bonaparte
-   1799) — with iii and iv marked "tested in `assignats`".
+   l.1982–2203; Army Estimates speech l.10): five predictions, each with
+   Burke's stated ground and the year it was written, against what happened
+   (Terror 1793–94; Bonaparte 1799; French victories from 1794) — with iii,
+   iv and v marked "graded in `assignats`".
 9. **Paine's dying bird and Wollstonecraft's antipathy to reason** — two short
    quotations, dated (1790, 1791), with the sourcing drill applied (author,
    audience, what each argues and omits).
 
 ## Pitfalls / subtleties to flag
 
-- **Register rule.** The course passes no verdict of its own on any author or
-  idea: no condemning or approving labels in its own voice. Judgement comes only
-  through argument and evidence; a label may appear only inside a quotation, with
-  who applied it and when.
+- **Register rule.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Terms to anchor (L11):** *Whig* and *Tory* (recall with `<Ref>`
   hume-against-the-original-contract, where they were anchored; one clause: Burke
   a Whig); *prescription* (title by long possession — define at link 2);
@@ -480,15 +510,20 @@ then a general.
   is "virtue and wisdom, actual or presumptive" and property is defended as
   ballast and rampart, not as merit; state both halves. The occupations sneer
   (hairdresser, tallow-chandler, S1 l.1636–1645) is in the text; quote it if
-  used and let the reader weigh it.
+  used and say what it does to the argument: the stated criterion is "virtue and
+  wisdom", and a man's trade is no evidence against either, so the sneer goes
+  beyond what the criterion licenses (exercise 5 asks what further premise it
+  needs).
 - **Period prejudice:** antisemitic phrases (S1 l.1568–1584, 1623; S2
   l.606–632, 1340) are not needed by any argument and should be left out
   (L12a); if the "Jew brokers" sentence is quoted for the sociology, the
   lesson names it as period prejudice in one clause and moves on.
 - **The forecast is partly retrospective glory**: Burke also predicted things
-  that did not happen (the departments would not obey Paris; the Revolution
-  could not pay a biscuit). The ledger shows both columns; the application
-  lesson judges.
+  that did not happen (the departments would not obey Paris; France expunged
+  from Europe's system for "much time", Army Estimates speech 1790; the
+  Revolution could not pay a biscuit). The ledger shows both columns; the
+  application lesson grades them (`assignats`: hits strong, misses strong,
+  general argument on balance).
 - **"Epistemic before moral"** is the course's organising thesis (SEP 1.2,
   Hamilton; Oakeshott and Hayek later). State it as the course's own and ground
   it in S1 l.2045–2064 and S2 l.706–727; do not name Hamilton or Hayek in the

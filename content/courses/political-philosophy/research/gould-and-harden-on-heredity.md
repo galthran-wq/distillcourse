@@ -3,9 +3,9 @@
 status: planned
 module: heredity-and-civilization
 type: core
-goal: Analyze how the same factual premise — that genes cause part of the differences between individuals — supports opposite political conclusions in Harden and Murray, set beside Gould's charge that ranking people by one number is itself the political error, and identify the value premise that decides each conclusion
+goal: Analyze how the same factual premise — that genes cause part of the differences between individuals — supports opposite political conclusions in Harden and Murray, set beside Gould's charge that ranking people by one number is itself the political error, identify the value premise that decides each conclusion, and judge whether the factual answer about group gaps would settle the policy question on either side
 
-Register rule (binding on the lesson): The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+Register rule (binding on the lesson): The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 
 This lesson is the module's one normative lesson. The six lessons before it tested the premises of the hereditarian argument against evidence; this one asks what would follow from any answer they could give. It states no factual conclusion of its own about the cause of any group gap: where a position leans on a fact, the lesson names the fact, gives the dossier's status for it in one clause and Refs the lesson that tested it. The three positions — Gould's, Harden's, Murray's — are each given at full strength, then their strongest objection; none gets the last word by position.
 
@@ -43,9 +43,47 @@ This lesson is the module's one normative lesson. The six lessons before it test
   average differences between populations in many traits. The argument she answers — and the evidence of
   ancient DNA on which it rests — is `reich-ancient-dna-and-the-indo-europeans`: the reader meets her
   answer here, before the argument. The rival explanations of national gaps that never mention genes are
-  `geography-or-institutions`; the module's closing status is `national-data-audited`.
+  `geography-or-institutions`; the module's closing status is `national-data-audited`. What this lesson
+  decides: the factual answer about the gap does not settle the policy question, on either side
+  (**strong**); Gould's charge against Morton's measurements fails (**strong**); the 1920s army-test
+  ranking of European nationalities failed on its author's retraction (**established**). Which value
+  premise is right (what equality is, the unit of justice) is not decided here: it is the question
+  `rawls-theory-of-justice` and `the-cognitive-elite` left **open** (Rawls's reciprocity route untested).
 - **Spine step:** "Heredity as an explanation of the gaps between peoples, tested premise by premise — what the tests measure, what heritability can and cannot imply, the hereditarian case at full strength, then the US gap, adoption, admixture and polygenic scores on the step from a real gap to a genetic one — then what follows politically whatever the answer, what ancient DNA shows, the rival explanations from geography and institutions, and the key datasets audited"
   (this lesson is "what follows politically whatever the answer").
+
+## VERDICT
+
+- **Claims judged:** (a) that the factual answer about group differences settles the policy question, on
+  either side ("if the gap is genetic, preferences are wrong"; "if it is environmental, group remedies are
+  owed"); (b) Gould's charge that Morton's measurements were bent by bias; (c) the 1920s army-test ranking
+  of European nationalities.
+- **Verdicts.** (a) **Fails.** Grade: **strong**. Gould, Harden and Murray accept overlapping facts and
+  reach opposite policies; each built a principle meant to survive either factual answer (Bell Curve
+  l.3233–3247; FR l.492; Harden l.954–960), and the value premises (what equality is, the unit, what the
+  state may do, worth) decide the conclusions. One conclusion does follow on any factual outcome, and the
+  lesson states it with its scope: the tests predict equally for both groups and the groups differ on them
+  (`what-intelligence-tests-measure`; dossier §2), so treating individuals the same at the point of
+  selection will not produce equal group outcomes, and an unequal outcome there is not by itself proof of
+  discrimination. That says nothing about earlier causes of the difference in scores, which this module
+  finds partly environmental (`us-gap-size-trend-and-environment`). (b) **Fails**: the 2011 re-measurement
+  of the surviving skulls found Morton's measurements largely accurate (Lewis et al. 2011); whether his
+  ranking followed from them is a separate question, argued again afterwards (Weisberg 2014). Grade:
+  **strong**. (c) **Failed on its author's retraction**: Brigham withdrew the 1923 ranking in 1930 (Gould
+  l.11459–11460). Grade: **established**.
+- **Strongest objection to (a):** facts do bite: a gap shown to be wholly environmental and movable would
+  weaken Murray's "indefinitely", and a genetic share would remove the claim that group gaps reflect only an
+  unjust history. It does not overturn the verdict: those are the auxiliary premises (permanence, the
+  meaning of an unequal outcome, what interventions can do), and the verdict is about the principles, which
+  each author built to survive either answer. Section 7 states exactly which auxiliary premise moves with
+  which answer. To (b): Lewis et al. may themselves have erred, as the 2014 reply argues; the reply
+  contests the ranking's inference, not the accuracy of the measurements, so (b) stands.
+- **What would overturn it:** for (a), a policy conclusion that one of the three authors draws and that
+  reverses when the genetic share changes while his or her stated value premises stay fixed; for (b), a
+  re-measurement showing Morton's capacities systematically shifted in the direction of his ranking.
+- **Not decided:** which value premise is right. The lesson says so as a finding with its reason: the
+  dispute is about equality and worth, and the course has not tested Rawls's reciprocity route
+  (`the-cognitive-elite`, module verdict: **open**).
 
 ## Sources to consult
 
@@ -310,7 +348,9 @@ as it stands, and no evidence excludes a genetic share (`admixture-and-polygenic
    — a value of 89 he read as 80 (l.4333). State both at full strength (Figure 4) and the narrow
    conclusion each side's best reading supports: Morton's measurements were better than Gould said;
    whether Morton's *ranking* followed from them was argued again afterwards (Weisberg 2014, optional,
-   References). The use for this lesson: Gould's thesis that scientists' commitments shape their results
+   References). The verdict, in the course's voice: Gould's charge that the measurements were bent by
+   bias fails (**strong**); the ranking's inference is a separate question. And on the army tests:
+   the 1923 ranking of European nationalities failed on its author's own retraction (**established**). The use for this lesson: Gould's thesis that scientists' commitments shape their results
    (l.2250–2255) applies to Gould. And Gould states the limit himself: he would respect a hereditarian who
    said his politics fit his data and that he had therefore been "especially vigilant" (l.1615–1621).
    The answer the section reaches: the recurrence thesis and the history are evidence about *motive and
@@ -381,7 +421,9 @@ as it stands, and no evidence excludes a genetic share (`admixture-and-polygenic
    worth (l.2200–2203; l.2182); Murray's texts do too in words (dignity "accessible to all", l.5218; FR's
    "inherent human dignity", l.245), and Harden's charge (l.306) is that the Bell Curve's comfort with
    "some people are superior to other people" (BC l.5066) breaks that separation — state her reading
-   and the text she quotes, and pass no verdict. Gould's column: his value premise (no worth from one
+   and the text she quotes, with the surrounding sentences of BC l.5066; her reading turns on what
+   "superior" means there, and the course gives no grade to it, because the register judges arguments,
+   not the attitude a reader finds in a sentence. Gould's column: his value premise (no worth from one
    number) is close to Harden's (iv); his political conclusion (resist the ranking itself) is stronger
    than hers (keep instrumental ranking). Because: once the value premises are written out, the reader can
    see that the opening's three conclusions follow from three different answers to (i)–(iv), not from three
@@ -422,7 +464,13 @@ as it stands, and no evidence excludes a genetic share (`admixture-and-polygenic
    each author built his or her principle to survive the factual answer, and each still makes empirical
    claims on the way to policy.
 
-8. **Objections, from both sides, at full strength.**
+8. **The weighing: the facts do not decide the policy, on either side.** (Heading as a claim.) Set the
+   claim that the factual answer settles the policy against the objections below, from both sides, and
+   against the strongest objection to the verdict (VERDICT: facts do move the auxiliary premises). Reach
+   the verdict in the course's voice: the claim fails, **strong**; one conclusion follows on any factual
+   outcome (equal treatment at selection will not produce equal group outcomes, and an unequal outcome
+   there is not by itself proof of discrimination), with the scope clause (it says nothing about earlier
+   causes, partly environmental). The objections, at full strength:
    - **From the right, to Harden (and to Rawls through her).** (a) Desert and responsibility: if no one
      deserves his genes, and, by her "free will coefficient" (ch. 10, l.2017–2046), much of the rest is
      luck too, then effort and character lose their claim — and a society that teaches this loses the
@@ -450,9 +498,19 @@ as it stands, and no evidence excludes a genetic share (`admixture-and-polygenic
      a racial theory, not about ranking as such. The psychometric reply belongs to
      `what-intelligence-tests-measure` (Ref). The other side: Gould's charge is aimed at worth, not at
      instrumental selection, and the two are confused in public use — which is his point.
-   - The course passes no verdict.
+   - Which of these objections each author answers: Harden answers (a) and (b) from the right in her
+     text (the pilot; luck and gratitude); the envy charge is answered as `ressentiment-and-envy` answered
+     it (envy cannot defeat a principle); Murray's cause-independence answers the left's (c) only by
+     conceding that his factual chapters do no work for his principle; Gould's charge survives the right's
+     reply only as a charge about worth. Then the verdict as above. Which value premise is right the course
+     does not grade here: it is the question module 10 left **open**, and the lesson says so with that reason.
 
-9. **Close (Conclusion).** What the reader can now do: take any argument from heredity to policy, write its
+9. **Close (Conclusion).** The verdict in plain words first: the answer to whether the gap is genetic would
+   not settle the political question for any of the three, and the course holds this as **strong**; the one
+   conclusion that holds whatever the answer is that equal treatment at selection will not give equal group
+   outcomes, and that an unequal outcome there is not by itself proof of discrimination. Gould's charge
+   against Morton's measurements fails (**strong**); the army-test ranking of the 1920s fell on its author's
+   retraction (**established**). What the reader can now do: take any argument from heredity to policy, write its
    factual and value premises, find which premise a disagreement lives in, and say which conclusions a
    change in the facts would move. Settled for this lesson: the three positions do not differ on the
    genetics of individual differences as much as public debate suggests; they differ on what equality is,
@@ -464,7 +522,7 @@ as it stands, and no evidence excludes a genetic share (`admixture-and-polygenic
 Headings fall out as claims: "A fact and a value make a policy"; "Gould: the error is the ranking";
 "From the army tests to the 1924 quotas"; "Morton's skulls, measured twice"; "Harden: the genetic
 lottery"; "Murray: the individual as the unit"; "Where the two part"; "What a factual answer would
-change"; "Objections from the right and from the left".
+change"; "The facts do not decide the policy, on either side".
 
 ## Set pieces and worked examples to recreate
 
@@ -651,8 +709,19 @@ link 7):
    Argue for (Harden: the within-family evidence makes the lottery literal, and closes the escape that
    talent is earned) and against (the 2022 review's objection: Rawls's natural lottery already covers every
    undeserved talent whatever its cause), then say what the right's desert objection (Ref
-   `rawls-theory-of-justice`, `ressentiment-and-envy`) does to both sides of the dispute. No verdict.
-8. **FORWARD (E7) → `reich-ancient-dna-and-the-indo-europeans`:** Harden quotes a 2018 prediction that
+   `rawls-theory-of-justice`, `ressentiment-and-envy`) does to both sides of the dispute. The solution says
+   what the lesson's verdict implies: the egalitarian principle does not need the genetics (Rawls's natural
+   lottery covers every undeserved talent, whatever its cause), and the within-family evidence bears only on
+   the auxiliary premise that the lottery is literal; whether the principle itself is right is the open
+   question carried from module 10.
+9. **Attack the verdict:** The lesson holds as **strong** that the factual answer would not settle the policy
+   question for any side. State the strongest case against it: name a policy (say, group-targeted
+   remedies in school admissions) whose justification in public argument rests on the gap having an
+   unjust social cause, and argue that a demonstrated genetic share would remove that justification. Then
+   say what evidence would overturn the verdict. The solution shows the case attacks an auxiliary premise,
+   not the principles of Gould, Harden or Murray, and names the register's falsifier: a conclusion one of the
+   three draws that reverses with the genetic share while the stated value premises stay fixed.
+10. **FORWARD (E7) → `reich-ancient-dna-and-the-indo-europeans`:** Harden quotes a 2018 prediction that
    genetic studies will show average differences between human populations in many traits (l.946). Using
    the value table, state what each of the three positions says should follow if that prediction were
    confirmed for some cognitive trait; then say what kind of evidence the prediction rests on, and why

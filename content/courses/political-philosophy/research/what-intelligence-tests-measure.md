@@ -5,7 +5,7 @@ module: heredity-and-civilization
 type: core
 goal: Evaluate the claim that intelligence tests measure one general ability that predicts outcomes outside the test and is measured the same way in different groups, against the evidence from factor structure, predictive validity and measurement invariance
 
-Register rule (binding on the lesson): The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+Register rule (binding on the lesson): The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 
 The lesson tests premise 1 of the module's argument (the tests measure a real general ability that
 matters) and the measurement half of premise 3 (the test measures the same thing in both groups). Each
@@ -49,8 +49,43 @@ in `us-gap-size-trend-and-environment` (forward `<Ref>`), and gives no number fo
   `gould-and-harden-on-heredity`; Spearman's hypothesis (that the gap is largest on the most
   g-loaded tests) is `hereditarian-case-iq-and-nations`'s; cohort non-invariance of the Flynn gains is
   `us-gap-size-trend-and-environment`'s. One sentence in the `<Conclusion>` says the next lesson takes
-  up heritability.
+  up heritability. What this lesson decides: the two charges against the measure (that the tests are
+  biased against the lower-scoring group, and that they measure nothing outside the test room) both
+  fail in the main US data (**strong**); what passes on is the cause of the measured difference, which
+  this lesson does not touch, and whether g is one ability or abilities that reinforce one another,
+  which stays **open**.
 - **Spine step:** "Heredity as an explanation of the gaps between peoples, tested premise by premise — what the tests measure, what heritability can and cannot imply, the hereditarian case at full strength, then the US gap, adoption, admixture and polygenic scores on the step from a real gap to a genetic one — then what follows politically whatever the answer, what ancient DNA shows, the rival explanations from geography and institutions, and the key datasets audited"
+
+## VERDICT
+
+- **Claim judged:** the two charges that would end the dispute before it starts: (i) the tests are
+  biased against Black Americans, so the measured gap is an artefact of the instrument; (ii) the score
+  is a reified number that measures nothing outside the test room.
+- **Verdict:** both charges **fail in the main US data**. Grade: **strong**. A sub-point stays
+  **open**: whether g is one ability or several abilities that reinforce one another (the
+  mutualism reading); what would settle it is a design that separates a common cause from mutual
+  reinforcement during development, which the course does not hold.
+- **What decides it** (dossier §2, research/heredity-evidence-review.md; sources as listed below):
+  predictive validity is about .5 (Neisser et al. 1996), and the regression lines show no
+  under-prediction for the lower-scoring group; if anything the common line over-predicts Black
+  performance (Neisser l.~1018–1035; Bell Curve Appendix 5 and note 11). Measurement invariance is
+  tenable in the main US datasets, strict in the Philadelphia cohort and NLSY97 (Lasker, Hu and the
+  other studies the dossier lists). On reification: oblique rotation removes the first factor only to
+  bring a general factor back one level up, which Gould concedes (Mismeasure, Afterword).
+- **Strongest objection:** invariance has failed where it was tested hard: in a referred
+  special-education sample a threshold was missed (Graves, ΔCFI .011), and Dolan's Dutch and South
+  African analyses failed outright; and a criterion such as supervisors' ratings may carry the same
+  bias as the test, so "no under-prediction" could be bias on both sides. It does not overturn the
+  verdict. The failures come from a referred sample, other countries and second-language testing,
+  not from representative US samples, and the South African case shows what a real failure looks
+  like (broken intercepts), which the US data do not show. Criterion bias of the uniform kind
+  (Einstein's traveller, Bell Curve l.3034–3038) would have to depress every test and every
+  criterion (school, college, training, jobs) by the same amount; and a cause that did that would be
+  a cause acting on the ability, which is the next lessons' question, not a defect of the instrument.
+- **What would overturn it:** a representative US sample in which invariance fails, or in which the
+  tests under-predict the lower-scoring group's outcomes.
+- **What the verdict does not reach:** why the groups differ on the measured ability. Invariance is
+  equally consistent with environmental and genetic causes acting on the ability (step 6).
 
 ## Sources to consult
 
@@ -420,7 +455,12 @@ debate; the APA task force (1995–96, set up after the reception of a 1994 book
    twentieth century fails invariance (`us-gap-size-trend-and-environment`, `<Ref>`; no detail here).
    State the Status verbatim in substance (Pitfalls). Bearing: in the main US data, the measurement
    half of premise 3 holds — the groups differ on the same latent abilities, measured the same way.
-6. **What invariance shows and what it does not.** Problem: if the test measures the same ability in
+6. **The weighing: the tests are not biased against the lower-scoring group, and they do not say
+   why it scores lower.** (Heading as a claim.) Set the two charges, at full strength, against the
+   evidence of steps 3–5 and against the strongest objection (VERDICT): the referred sample, the
+   Dutch and South African failures, criterion bias. Reach the verdict in the course's voice: both
+   charges fail in the main US data, **strong**; g as one ability or a mutualism, **open**. Then the
+   limit of the verdict. Problem: if the test measures the same ability in
    the same way in both groups, has the cause of the difference been narrowed? It has, a little, and
    only in one direction. What invariance rules out: explanations that work through particular
    subtests or items — an unfamiliar language, culturally loaded vocabulary — because those break the
@@ -446,13 +486,16 @@ debate; the APA task force (1995–96, set up after the reception of a 1994 book
 
 Headings as claims (suggested): "The correlations fall into a hierarchy"; "Is g a thing? Rotation and
 its answer"; "What the score predicts, and what it leaves out"; "Bias in the sense that matters to a
-user of the test"; "Same test, same ability? Four rungs of invariance"; "What a test that measures the
-same thing cannot tell you".
+user of the test"; "Same test, same ability? Four rungs of invariance"; "The tests are not biased, and
+they cannot say why the groups differ".
 
-`<Conclusion>`: what the reader can now do (read a validity coefficient, a pair of regression lines,
-and an invariance result, and say what each does and does not show about a group difference); premise
-1 stands in its descriptive form, premise 3's measurement half stands in the main US data; the cause of
-the difference is untouched; the next lesson asks what heritability can say about it.
+`<Conclusion>`: the verdict in plain words: the charge that the tests are biased against Black
+Americans, and the charge that they measure nothing outside the test room, both fail in the main US
+data, and the course holds this as **strong**; whether g is one ability or several that reinforce one
+another is **open**. Then what the reader can now do (read a validity coefficient, a pair of regression
+lines, and an invariance result, and say what each does and does not show about a group difference);
+premise 1 stands in its descriptive form, premise 3's measurement half stands in the main US data; the
+cause of the difference is untouched; the next lesson asks what heritability can say about it.
 
 ## Set pieces and worked examples to recreate
 
@@ -698,6 +741,14 @@ the difference is untouched; the next lesson asks what heritability can say abou
    the missing premise (that between-group causes are of the same kind and in the same proportion as
    within-group causes) and says in one sentence, with a `<Ref>`, that the next lesson names it and
    asks what evidence could support or refute it.
+
+9. **Attack the verdict:** The lesson holds, as **strong**, that the tests are not biased against
+   Black Americans in the main US data. State the strongest case against that verdict in its best
+   form (the referred-sample threshold, Dolan's failures, and the charge that the criteria themselves
+   share the test's bias). Then say exactly what evidence would overturn the verdict: which sample
+   (representative, US), which test (invariance at the intercept level; regression lines against an
+   outcome not rated by people), and which result. The solution names the register's falsifier and
+   explains why a failure in a referred sample or another country does not meet it.
 
 Floor check: one warm-up (1); claims to refute (2); boundary probes (3, 4); derivation (5);
 research-shaped design (4c); document reasoning and corroboration (6, 7); FORWARD (8). Mix: retrieval

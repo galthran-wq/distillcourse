@@ -34,15 +34,66 @@ goal: Analyze Taine's explanation of the Revolution by the 'classical spirit' an
   never says what it is — `gobineau-inequality-of-races` takes up the theory that made race
   the cause of history. (ii) The organized minority that rules in the name of the many —
   `mosca-ruling-class` and `michels-and-pareto-oligarchy-and-elites` generalise Taine's
-  Jacobin machine and Le Bon's "the reign of crowds is the reign of committees". (iii) The
+  Jacobin machine and Le Bon's "the reign of crowds is the reign of committees" — this
+  lesson has decided only the narrow form for 1789–94 (a club network captured the
+  institutions; it did not make the crowds). (iii) The
   crowd as the subject of a new politics — `ortega-revolt-of-the-masses` (the mass-man, with
   Le Bon as the predecessor Ortega does not name) and `sorel-reflections-on-violence` (the
   myth as an image that moves masses). (iv) `dreyfus-affair-as-test` reads the street and
-  press record of 1898 against Le Bon's crowd and Taine's Jacobin.
+  press record of 1898 against Le Bon's crowd and Taine's Jacobin. This lesson has decided
+  that both men's account of who was in the crowd and why it acted fails on the record of
+  1789; what passes on is whether the crowd, whatever it is made of, decides outcomes —
+  the Affair decides that (the crowd explains the noise, not the verdict).
 - **Spine step:** "The late nineteenth century looks beneath institutions for what moves
   peoples: the crowd (Taine, Le Bon), the race (Gobineau, Chamberlain, Grant), the nation as
   will or as inheritance (Renan, Barrès, Maurras) — and the Dreyfus Affair puts them to the
   test"
+
+## VERDICT
+
+Recorded in `research/verdicts/REGISTER.md`, module 6, `taine-and-le-bon-revolution-and-crowd`.
+The lesson judges four claims; the grades are fixed.
+
+- **(a) Le Bon's law** — that a man in a crowd loses his conscious personality and acts by
+  suggestion. Verdict: **fails as a general psychology**. Grade: **strong**.
+- **(b) Taine's account of who acted** — the destitute and criminal "dregs", "vagabonds and
+  criminals" (`texts/taine/v2-revolution1-s2.txt` l.56–61, l.329). Verdict: **fails on the
+  same record**. Grade: **strong**.
+- **(c) Taine's organised-minority thesis** — survives in a narrower form: a club network
+  captured the institutions, but it did not make the crowds. Grade: **on balance**.
+- **(d) Le Bon's account of leaders' techniques** — affirmation, repetition, prestige, the
+  minority machine — **stands as description** (no grade beyond that; it is the part every
+  later student of mass politics uses).
+
+**What decides it.** (a) and (b) are decided by one question: who was in the crowd. The
+police and judicial records and the official list of the Bastille *vainqueurs* show settled
+artisans, journeymen and shopkeepers with trades and addresses, and crowds that chose their
+targets — toll-gates, grain stores, particular officials (Rudé, *The Crowd in the French
+Revolution*, 1959). That record was assembled against Taine's picture, and Le Bon took his
+picture from Taine, so it falls on both. Later crowd research finds people in crowds acting
+on a shared identity and its norms, not losing themselves (Reicher 1984; Drury & Stott; McPhail
+1991). For (c): the club network, the manufactured petitions and the abstaining moderates
+are on Taine's own archive record and have been restated by historians who did not share his
+horror of the Revolution; but the direction of the crowds by that network is the weak point.
+One reviewer of the later literature warns that the Palais-Royal's direction of the
+"bewildered masses" "deserves more skepticism than it has received", and that "the crowd was
+much more independent than many historians have allowed" (Sutherland 2019,
+`texts/audit-right-shading/sutherland-2019-rude-forum.txt` l.123–124). Hence "on balance",
+not "strong".
+
+**Strongest objection to the verdict.** Le Bon's reply: his law is about how people behave
+once assembled, not about who they are; respectable artisans can become a psychological
+crowd as easily as vagrants. It does not overturn the verdict on (a), for two reasons. The
+choice of targets is behaviour once assembled, and it is the behaviour of people acting on
+reasons (grain prices, tolls, a named official), which the law says the crowd has lost. And
+the law, so defended, protects itself: any assembly that acts reasonably is declared not to
+have been a "psychological crowd", so no observation could count against it. A law that
+survives only that way has stopped being a general psychology.
+
+**What would overturn it.** Crowd evidence showing undirected, target-blind violence as the
+rule — crowds of the period striking whatever lay in their path rather than chosen targets —
+and, for (b), membership records showing the crowds drawn mainly from the vagrant and
+criminal population.
 
 ## Sources to consult
 
@@ -163,6 +214,17 @@ goal: Analyze Taine's explanation of the Revolution by the 'classical spirit' an
     Madding Crowd*, 1991; S. Reicher's work on crowds acting on shared group norms) for the
     claim that individuals in crowds do not lose their identity but act on a shared one.
     State these findings as facts with their kind of evidence; names in References only.
+  - **Added for the verdict (REGISTER.md module 6):** Rudé, *The Crowd in the French
+    Revolution* (1959) — the occupational analysis of the *vainqueurs* and the police
+    records, the deciding evidence for (a) and (b) [not staged; cite as Rudé reports it,
+    from a library copy or a quotation checked against one]. S. Reicher, "The St. Pauls'
+    riot: an explanation of the limits of crowd action in terms of a social identity
+    model", *European Journal of Social Psychology* 14 (1984), and J. Drury & C. Stott on
+    crowd action as shared social identity [not staged]. D. M. G. Sutherland, contribution
+    to the H-France forum on Rudé (2019), staged at
+    `texts/audit-right-shading/sutherland-2019-rude-forum.txt` (l.123–124 for the two
+    sentences on the Palais-Royal and the crowd's independence) — the source of the "on
+    balance" grade on (c). Names in References only.
   - Le Bon's later readers: S. Freud, *Group Psychology and the Analysis of the Ego* (1921)
     ch. II is a long summary of Le Bon; Mussolini's stated admiration (widely reported; locate
     a primary source before stating it); the interwar propaganda manuals. Report as
@@ -280,7 +342,14 @@ Crowd).
    "the spirit of the race", which makes "the inferior characteristics of crowds … less
    accentuated" — the Latin crowd calls on the state, the English on private initiative.
    Name it as the theory's unexplained foundation (hand-off).
-9. **The OBJECTIONS at full strength, and what each theory survives.**
+9. **The OBJECTIONS at full strength — the weighing.** Heading as the verdict: "The crowds
+   of 1789 knew what they wanted: both theories fail on who was there". This section sets
+   each claim against its strongest objection and the evidence and reaches the register's
+   verdicts (see `## VERDICT`): Le Bon's law fails as a general psychology (**strong**);
+   Taine's "dregs" fail on the same record (**strong**); the organised minority survives
+   narrowed — it captured the institutions, it did not make the crowds (**on balance**,
+   with Sutherland's warning as the reason it is not stronger); Le Bon's techniques stand
+   as description.
    (a) *The historians against Taine.* The charge (stated as the course's own; names in
    References): Taine's transcriptions contain errors, and his archive was searched for
    horrors — he leaves out war and blockade as causes of the famine of 1793–95. The reply:
@@ -288,14 +357,17 @@ Crowd).
    carried the Revolution has been restated by historians who never shared Taine's horror
    of it. Concede both: Taine's figures are his selection and must be read as a thesis's
    evidence (his own method notes say as much).
-   (b) *Who was in the crowd.* The strongest empirical objection, and it falls on both men.
+   (b) *Who was in the crowd.* The strongest empirical objection, and the deciding one: it
+   falls on both men.
    When later historians read police records and the official list of those honoured for
    taking the Bastille, they found settled artisans, journeymen and shopkeepers with trades
    and addresses, not Taine's "dregs" or Le Bon's barbarians; and revolutionary crowds chose
    their targets — the toll-gates, the grain stores, particular officials — which a mind
    reduced to suggestion would not. Reply available to Le Bon: his claim is about how
    people behave once assembled, not about who they are; the reply concedes that the
-   crowd's actions have reasons that the theory calls irrational.
+   crowd's actions have reasons that the theory calls irrational, and it makes the law
+   unfalsifiable (any reasonable assembly "was not a crowd"). The lesson says so: the
+   reply does not rescue the law as a general psychology.
    (c) *The crowd hides interests.* From the left (`<Ref>` `marx-manifesto`): bread prices,
    feudal dues and tax are interests, not suggestions; calling the bearers of an interest
    "a crowd" moves the question from what they wanted to how they felt. Le Bon's own book
@@ -306,14 +378,25 @@ Crowd).
    slogans, leaders' affirmation and the minority machine are recognised by every later
    student of mass politics — which is why the book became a manual for its readers
    (reception: the 1921 psychoanalytic theory of the group; Mussolini's stated admiration).
-   The lesson ends on what each explains: Taine, why a cultivated elite could not stop a
-   revolution and how a minority took it over; Le Bon, how masses are moved — and neither,
-   why these crowds wanted what they wanted.
+   The section ends on what each explains: Taine, why a cultivated elite could not stop a
+   revolution and how a minority took over its institutions; Le Bon, how leaders work on
+   masses — and neither, why these crowds wanted what they wanted.
+
+**Conclusion.** State the verdict in plain words with its grades: on the record of who was in
+the crowds of 1789 and what they attacked, Le Bon's law of the crowd fails as a general
+psychology and Taine's crowd of vagrants and criminals fails as history (both **strong**);
+Taine's organised minority holds in a narrower form, as the capture of institutions by a club
+network rather than the making of crowds (**on balance**); Le Bon's account of affirmation,
+repetition and prestige stands as a description of how leaders work. What would overturn the
+first two: crowd evidence showing undirected, target-blind violence as the rule. Hand-off:
+Le Bon rests his crowd on "the spirit of the race" and never says what it is; the next
+lesson takes up the theory that made race the cause of history.
 
 Headings as claims, for example: "Privilege outlived the service that paid for it"; "The
 classical spirit: man in general, deduced"; "1789 as a dissolution"; "The Jacobin is a
 method before he is a party"; "A crowd is a new mind, not a sum"; "Affirmation, repetition,
-prestige"; "Juries, voters and parliaments are crowds too"; "Who was in the crowd".
+prestige"; "Juries, voters and parliaments are crowds too"; "The crowds of 1789 knew what
+they wanted: both theories fail on who was there".
 
 ## Set pieces and worked examples to recreate
 
@@ -388,10 +471,11 @@ prestige"; "Juries, voters and parliaments are crowds too"; "Who was in the crow
   "savages"). Do not quote them for colour. Where a reader must see the register (Le Bon's
   race substratum is load-bearing), quote the law in capitals (l.4596) and say what it
   claims.
-- **Contested, do not settle:** whether Taine's history is a scholarly work or a polemic is
-  itself the historians' dispute — give the charge and the reply. Whether Le Bon's crowd
-  exists as he describes it is an empirical question with evidence on both sides — give
-  both.
+- **What is settled and what is not:** whether Taine's history is a scholarly work or a
+  polemic is the historians' dispute about Taine — give the charge and the reply; it is not
+  the lesson's verdict. Whether Le Bon's crowd exists as he describes it IS decided, by the
+  evidence on who was in the crowds: the lesson states the verdict (`## VERDICT`) and its
+  grade, and gives Le Bon's best reply before rejecting it.
 - **Numbers (L12):** keepers — Taine's 53-in-100 peasant tax; the "three hundred thousand
   Jacobins" against twenty-six million French (Taine's estimate, framed as his); Le Bon's
   forty-and-forty (rhetorical, not data). Everything else in order-of-magnitude words.
@@ -399,9 +483,7 @@ prestige"; "Juries, voters and parliaments are crowds too"; "Who was in the crow
   later readers, and Taine's 1875 Preface are not in the dossier (see Sources). Le Bon's
   Lois psychologiques de l'évolution des peuples (1894), where the "soul of the race" is
   argued, is not in the dossier; The Crowd's own statements suffice.
-- **Register rule:** The course passes no verdict of its own on any author or idea: no
-  condemning or approving labels in its own voice. Judgement comes only through argument and
-  evidence; a label may appear only inside a quotation, with who applied it and when.
+- **Register rule:** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 
 ## FIGURE PLAN
 
@@ -475,7 +557,14 @@ prestige"; "Juries, voters and parliaments are crowds too"; "Who was in the crow
    machine of the Jacobins from the archives), and one claim of Burke's that Taine's
    evidence cannot test (that inherited institutions carry more reason than any
    individual).
-8. **FORWARD (E7) → `gobineau-inequality-of-races`:** Le Bon's law says the crowd's traits
+8. **Attack the verdict:** the lesson concludes that Le Bon's law fails as a general
+   psychology (strong). State the strongest objection in its best form — that the law
+   concerns behaviour once assembled, so the trades and addresses of the *vainqueurs* are
+   beside the point — and say what evidence would be needed to overturn the verdict: what
+   kind of crowd record, from which events, showing what pattern of targets. The solution
+   names undirected, target-blind violence as the rule, and explains why the "not a
+   psychological crowd" defence cannot supply it.
+9. **FORWARD (E7) → `gobineau-inequality-of-races`:** Le Bon's law says the crowd's traits
    are "less accentuated in proportion as the spirit of the race is strong". State what
    "race" must mean for this law to be testable, and what evidence would show one race's
    "spirit" to be stronger than another's. The solution notes that Le Bon never defines it,

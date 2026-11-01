@@ -9,8 +9,9 @@ goal: Analyze Landes's account of why Europe pulled ahead — political fragment
 
 - **Inherits:** From `weber-only-in-the-west`: the module's question in Weber's form (why rational
   science, law, bureaucracy and the capitalist firm appeared together "only in the West"), the
-  `protestant-ethic` and `rationalization` — and Weber's own disclaimer of a single cause, which
-  leaves open what *else* made Europe different. Landes calls himself Weber's heir ("Here Max
+  `protestant-ethic` and `rationalization`, with that lesson's verdict (on balance: the ethic was
+  not the main channel; the Protestant advantage ran through literacy) — and Weber's own disclaimer
+  of a single cause, which leaves the question of what *else* made Europe different. Landes calls himself Weber's heir ("Here Max
   Weber was right on", ch. 29) and treats the Protestant ethic as one input among several (ch. 12),
   so the lesson inherits Weber as a partial answer to be widened. From `greek-miracle`: the polis
   as power "in the middle" against the palace kingdom — Landes opens his political chapter with
@@ -22,8 +23,10 @@ goal: Analyze Landes's account of why Europe pulled ahead — political fragment
   (Landes quotes Burke: "a law against property is a law against industry"). From
   `what-measures-greatness`: the three measures of a civilization's greatness; Landes's is
   wealth and the capacity to make and spread techniques.
-- **Contributes:** The one move: Europe's lead is explained not by what Europe *had* (it was
-  poorer, smaller and later than China around 1000–1400) but by *who could stop whom*. A
+- **Contributes:** The one move: Europe's lead is explained not by what Europe *had* (around 1000
+  it was poorer, smaller and later than Song China; China led in living standards under the
+  Northern Song and had fallen behind Italy by 1300 — the module's dating, settled in
+  `the-borrowing-ledger`) but by *who could stop whom*. A
   continent of competing rulers gave subjects a right of exit, forced rulers to bargain with towns
   and merchants and to respect property, and left no single authority able to suppress a new
   technique — so inventions were not only made but kept, improved and spread ("the invention of
@@ -31,8 +34,14 @@ goal: Analyze Landes's account of why Europe pulled ahead — political fragment
   Ottoman world over printing, it did. Landes adds, last and most contested, that "culture makes
   all the difference". The lesson rebuilds the chain, tests it on Landes's own contrasts (Zheng
   He; the clock in China and Islam; printing; Japan as a "miniature of medieval Europe"; India),
-  and puts the strongest objections to it.
-- **Hands off:** (i) Landes asserts Europe's accomplishment but does not measure it; the attempt
+  and puts the strongest objections to it, saying for each whether Landes answers it. The
+  finding the lesson reaches on its own cases: fragmentation is necessary-not-sufficient — it
+  explains why techniques were not suppressed, and India shows it does not explain why they
+  were made.
+- **Hands off:** The lesson passes no module verdict: whether fragmentation, kinship, a
+  religious ethic or high-medieval institutions caused the lead is judged in
+  `the-borrowing-ledger` (cause: **open**, with what would settle it), and when the lead opened
+  is judged there too. (i) Landes asserts Europe's accomplishment but does not measure it; the attempt
   to count it is `murray-human-accomplishment` (FORWARD exercise). (ii) Fragmentation explains why
   innovations were not *suppressed*; it does not explain why so many Europeans *tried* — Landes's
   answer is "the market" and "culture", which he leaves undefined; a mechanism for that culture is
@@ -292,15 +301,31 @@ Calicut in India, 1497–99. Place both on a locator figure (FIGURE 1).
      law is universal (empires are ancient and everywhere, ch. 25), and the gains from empire were
      smaller than the gains from knowledge (Portugal, ch. 9: trade in commodities small "compared
      to trade in ideas"). Forward `<Ref colonial-balance-sheet>`.
-   Where the lesson stands (in the dry register, L9): the fragmentation-and-exit mechanism is the
-   best-supported part of the argument and the one Landes's critics largely accept; "culture" is
-   the least specified. The next lessons try to measure the outcome (Murray) and to give culture
-   a mechanism (Henrich).
+   Where the lesson stands (in the dry register, L9), objection by objection — whether Landes
+   answered it is a fact about the argument, and the lesson states it:
+   - *Selection of cases:* answered. The exit reply holds, and the residue is a narrowing (the
+     thesis explains Europe-wide outcomes, not any one country's), not a refutation.
+   - *Timing and inheritance:* not answered here. Landes's price-of-light and who-copied-whom
+     replies are claims about quality and direction, not dated output estimates. The dating is
+     decided in `the-borrowing-ledger` (`<Ref>`): the broad late-luck view fails for China as a
+     whole (China behind Italy by 1300), while the regional comparison around 1750 stays open —
+     state the forward Ref in one sentence, without the evidence.
+   - *The West's violence:* answered only by assertion. "The gains from empire were smaller than
+     the gains from knowledge" is a quantity Landes does not measure; the balance is weighed in
+     `colonial-balance-sheet` (`<Ref>`).
+   - *On the thesis itself:* the lesson's own cases show fragmentation is
+     **necessary-not-sufficient** — Japan supports it outside Europe, India shows it is not
+     enough without the market and whatever "culture" names. The fragmentation-and-exit
+     mechanism is the best-supported part of the argument and the one Landes's critics largely
+     accept; "culture" is the least specified. Whether it was *the* cause is not decided here:
+     the module's closing lesson judges fragmentation, kinship, a religious ethic and
+     high-medieval institutions together and finds the cause **open**. The next lessons try to
+     measure the outcome (Murray) and to give culture a mechanism (Henrich).
 
 Headings as claims (suggested): "Around 1000 nobody would have bet on Europe"; "Geography sets
 the odds, not the outcome"; "Division forced rulers to bargain"; "An invention a ruler banned went
 to his rival"; "The market and the academies kept Europeans trying"; "Four cases: Zheng He,
-printing, Japan, India"; "What 'culture' has to carry".
+printing, Japan, India"; "Fragmentation is needed, not enough: what 'culture' has to carry".
 
 ## Set pieces and worked examples to recreate
 
@@ -340,9 +365,7 @@ printing, Japan, India"; "What 'culture' has to carry".
 
 ## Pitfalls / subtleties to flag
 
-- **The label rule.** The course passes no verdict of its own on any author or idea: no condemning
-  or approving labels in its own voice. Judgement comes only through argument and evidence; a
-  label may appear only inside a quotation, with who applied it and when.
+- **The label rule.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Landes's register is polemical** ("goodthink", "Europhobia", "anti-intellectual", critics
   "zealous in their political correctness", ch. 2, l. 956). These are his words about his
   opponents; quote one if the argument needs it, attributed, dated 1998; never adopt the tone.

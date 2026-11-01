@@ -5,7 +5,7 @@ module: heredity-and-civilization
 type: core
 goal: Evaluate the evidence on the size and trend of the US Black–White gap in measured cognitive scores and on how much of it measured environments account for, and explain what the Flynn effect does and does not show about its cause
 
-Register rule (binding on the lesson): The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+Register rule (binding on the lesson): The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 
 This lesson is premise 3 of the module's four-premise argument (groups differ in mean on a test that
 measures the same thing in both) and the first evidence on the step from 3 to 4 (therefore partly genetic).
@@ -46,7 +46,39 @@ evidence in this lesson shows. Factual authority: `C/research/heredity-evidence-
   by the same kind of family (`adoption-studies-across-groups`, next). Its concept `placement-confound` is
   reached by the FORWARD exercise. Admixture and polygenic designs (`admixture-and-polygenic-scores`) come
   after; the audit of the 2025 meta-analysis used here as a trend source belongs to `national-data-audited`.
+  What this lesson decides: "the gap is fixed and never narrowed" and "SES explains it" (or "it is closing
+  now") both fail; the gap as it stands is not wholly genetic (**established**) and narrowed, then stopped
+  (**strong**). What passes on is the residual: whether it is unmeasured environment or partly genetic.
 - **Spine step:** "Heredity as an explanation of the gaps between peoples, tested premise by premise — what the tests measure, what heritability can and cannot imply, the hereditarian case at full strength, then the US gap, adoption, admixture and polygenic scores on the step from a real gap to a genetic one — then what follows politically whatever the answer, what ancient DNA shows, the rival explanations from geography and institutions, and the key datasets audited"
+
+## VERDICT
+
+- **Claim judged:** two rival histories of the US Black–White gap: (i) "the gap is fixed and has never
+  narrowed" (the 2005 reply's reading); (ii) "measured SES explains the gap", or "it is closing now".
+- **Verdict:** **both fail.** The gap narrowed by about 0.3–0.5 SD between cohorts born early in the century
+  and those born around 1970, then stopped on most series: **strong** for the trend. Parents' education and
+  income account for roughly half to two-thirds of the child gap and leave about 6 points (more in adults);
+  the gap as it stands is not wholly genetic, because it narrowed within decades, varies from near zero to
+  1.5 SD across districts and widened in maths after 2020: **established** for that limit. The Flynn effect
+  differs in structure from the gap (invariance fails between cohorts, holds between the groups), so it
+  shows environments can move scores by a gap-sized amount, not that the gap is environmental.
+- **What decides it:** dossier §§2–3 and 9 (research/heredity-evidence-review.md): the cohort series (Murray
+  2007 Table 4; Dickens & Flynn 2006; the adult Wechsler; the two NLSY cohorts; NAEP); the mediation tables
+  (Weiss & Saklofske 2020, Table 4: 12.8 → 8.3 → 6.7); the district study [abstract] and the 2023 NAEP
+  long-term-trend result; Bratsberg & Rogeberg 2018 and Wicherts et al. 2004 on the Flynn effect.
+- **Strongest objection, from each side.** Against the trend: the earliest estimates rest on army tests of
+  1917 and 1944–45 that disagree (1.16 vs 1.52 SD) and on samples that missed the rural South, so the
+  narrowing may be an artefact. It does not overturn the verdict: every cohort series, on different batteries
+  and samples, shows narrowing in the same cohorts, and the dispute is over its size, which is why the trend
+  is graded strong, not established. Against the SES limit: years of schooling and a zip-code income are
+  "only gross indicators", so better measures might account for the whole gap. It does not overturn the
+  verdict: it is a promissory note, and the control may over-correct as much as it under-corrects (SES is
+  partly downstream of ability), so the residual is neither a genetic share nor an environmental one.
+- **What would overturn it:** for the trend, one representative battery re-normed each decade and read by
+  birth cohort showing no narrowing; for the limit, an identified set of environmental causes whose measured
+  group difference times causal effect reproduces the whole gap on an invariant measure (which would settle
+  the residual as environmental), or a fixed gap across places and years (which the district and post-2020
+  data already contradict).
 
 ## Sources to consult
 
@@ -338,7 +370,12 @@ uses it); said once to be the sources' categories.
    default hypothesis (Ref lesson 2): the Flynn effect shows the default can fail between cohorts; it does not
    show it fails between these groups. Dossier constraint: "The Flynn effect proves the gap is environmental"
    is not made.
-10. **Where the evidence leaves premise 3 and the step to 4.** Problem: what can now be said, and what cannot?
+10. **The weighing: the gap narrowed, then stopped, and measured environment does not explain all of it.**
+    (Heading as a claim.) Set both rival histories at full strength against the series and against the
+    strongest objection on each side (VERDICT: the disagreeing army tests; SES as a gross indicator), and
+    reach the verdict in the course's voice: "fixed and never narrowed" fails, "SES explains it" and "it is
+    closing now" fail; the limit (not wholly genetic as it stands) is **established**, the trend **strong**.
+    Problem: what can now be said, and what cannot?
     The status lines (dossier §2, §3, "Overall answer" 2 and 4), stated plainly: the gap is real on the tests,
     measured the same way in both groups in the main datasets, about 0.75 SD in children, 1 SD in adults, 0.85
     SD in 2010s achievement data; it narrowed across cohorts born before about 1970 and stopped narrowing on
@@ -349,7 +386,10 @@ uses it); said once to be the sources' categories.
     it, and no evidence in this lesson excludes a genetic share. What would settle the trend: one
     representative battery re-normed on the same design each decade and analysed by birth cohort; what would
     settle the environmental share: an identified set of environmental causes whose measured group difference
-    times causal effect reproduces the gap on an invariant measure (dossier §§2–3). `<Conclusion>`: the reader
+    times causal effect reproduces the gap on an invariant measure (dossier §§2–3). `<Conclusion>`: the verdict
+    in plain words first: the claim that the gap is fixed and never narrowed fails, and so does the claim that
+    family income and education explain it; the course holds as **established** that the gap as it stands is
+    not wholly genetic, and as **strong** that it narrowed and then stopped. Then: the reader
     can now state the gap's size and history with their uncertainties, read an SES control in both
     directions, and say what the Flynn effect does and does not show; the open problem: measured SES leaves a
     residual that is either unmeasured environment or partly genetic, and the oldest design for separating
@@ -548,6 +588,14 @@ neither is in `research/images.yaml` at the time of writing.)
    and its confounds (age at placement, pre-adoptive history, which families take which children): the
    placement confound, which `adoption-studies-across-groups` names and applies to the studies that were run
    (`<Ref>`).
+
+9. **Attack the verdict:** The lesson holds as **strong** that the gap narrowed by about a third to a half of
+   an SD across cohorts born before about 1970. State the best case against that verdict: the earliest
+   numbers come from two wartime army tests that disagree by a third of an SD and from samples that missed
+   the rural South, and a one-time cross-section confounds age with cohort. Then say what evidence would
+   overturn the verdict, and what would only lower its grade. The solution separates the two: doubt about
+   the size lowers nothing below "narrowed", since every series agrees in direction; overturning needs a
+   representative battery re-normed by cohort that shows no change.
 
 Floor check: one warm-up (1); E6a boundary probe (4); E6b claims to refute (3, 5); E6c derivation (4); E6d
 research-shaped (2, 8). Exactly one FORWARD (8). E3 spaced items: 5, 6.

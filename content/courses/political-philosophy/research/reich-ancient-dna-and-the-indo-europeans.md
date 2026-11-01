@@ -5,7 +5,7 @@ module: heredity-and-civilization
 type: core
 goal: Explain what ancient DNA has shown about the population history of Europe and India — the farmer migrations, the steppe expansion behind the Indo-European languages — and analyze Reich's argument about genetic differences between populations
 
-Register rule (binding on the lesson): The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+Register rule (binding on the lesson): The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 
 Factual authority for everything this lesson says about genetic differences in cognitive traits:
 `research/heredity-evidence-review.md` (the dossier), §5 (polygenic scores, the height-selection artefacts,
@@ -52,13 +52,47 @@ off to `geography-or-institutions`.
 - **Hands off:** Reich concludes that average genetic differences between populations in cognitive
   traits are likely to be found, direction unknown, and that they should not change how individuals
   are treated; the module's own lessons have shown why no current design can yet find them (Ref
-  `admixture-and-polygenic-scores`). The question this lesson leaves is the one the module turns to
+  `admixture-and-polygenic-scores`). What this lesson decides: old pure races and "pots, not people"
+  are both refuted (**established**); Reich's inference to cognitive differences is **open**, with the
+  design that would settle it named (`admixture-and-polygenic-scores`, section 10). The question this
+  lesson passes on is the one the module turns to
   next: even granting that peoples have moved, mixed and been selected, does anything inherited explain
   the gaps between NATIONS — or do two explanations that never mention genes, geography and
   institutions, explain them better (`geography-or-institutions`)? The steppe herders' expansion is
   itself the bridge: why one population spread over others is a question Diamond answers with horses,
   wheels and germs.
 - **Spine step:** "Heredity as an explanation of the gaps between peoples, tested premise by premise — what the tests measure, what heritability can and cannot imply, the hereditarian case at full strength, then the US gap, adoption, admixture and polygenic scores on the step from a real gap to a genetic one — then what follows politically whatever the answer, what ancient DNA shows, the rival explanations from geography and institutions, and the key datasets audited"
+
+## VERDICT
+
+- **Claims judged:** (i) two opposite views of Europe's past: that peoples descend from old, pure races
+  formed in isolation (Grant, Chamberlain, Kossinna); and that cultures spread as ideas, "pots, not
+  people", without mass movement (the postwar consensus). (ii) Reich's inference that average
+  differences between populations in cognitive traits are likely to be found.
+- **Verdicts.** (i) **Both refuted.** Mass migrations replaced most of the earlier ancestry of whole
+  regions (about three-quarters steppe-related ancestry in Corded Ware Germany; about 90% of Britain's
+  earlier ancestry gone after the Beaker period; Reich l.1002–1004, l.1030), and every migrating people
+  was itself a recent mixture (the Yamnaya formed about 5,000 years ago from a northern and a southern
+  people; the northern European look is a Bronze Age composite). Grade: **established**. Iberia, where
+  Beaker pots spread without new people, shows both processes occurred, which refutes "pots, not
+  people" as a rule, not as a possibility. (ii) Reich's inference: **open**.
+- **What decides (i):** the ancient-genome record as Reich reports it (the passages listed under Sources) and the
+  primary papers the brief cites; the test of the race theories in section 7.
+- **Strongest objection to (i):** the record supports parts of the old picture (an eastern homeland
+  near Grant's grasslands; a male-led spread; Reich's own "uncomfortable support", l.1058), so the race
+  theories were partly right. It does not overturn the verdict: what was confirmed is migration and
+  dominance by a mixed population; what is refuted is purity and fixity, which is what the theories
+  claimed as their foundation.
+- **Why (ii) is open, and what would settle it:** the premise that selection had time to act is supported
+  (and the 2026 ancient-genome study shows selection on cognition-linked scores is detectable within one
+  region); the step to present differences between populations runs through the within/between gap and
+  through scores that do not travel across ancestries (`heritability-within-and-between-groups`,
+  `admixture-and-polygenic-scores`). The strongest objection to "open", from the hereditarian side
+  (the measured phenotypic gaps already point one way), fails because those gaps do not show their cause
+  (module verdict); from the other side ("will be found" is not evidence), it fails because no evidence
+  excludes a genetic share either. What would settle it: within-family genome-wide studies of cognition in
+  large non-European samples, scores validated within families in each ancestry, then compared; and the
+  sibling admixture design.
 
 ## Sources to consult
 
@@ -322,7 +356,10 @@ themselves can be read.
    - Undecided by this evidence: anything about the mental qualities of the migrants, or why they
      prevailed. Seam to link 8: the same scientist who demolished purity draws a further conclusion
      that the race theorists' critics did not expect.
-8. **From the findings to differences: Reich's argument (contested — label it so).** Reconstruct in
+8. **The weighing: pure races and "pots, not people" are both refuted; Reich's inference is open.**
+   (Heading as a claim; the reconstruction follows.) First state verdict (i) in the course's voice, from
+   section 7: **established**, with the strongest objection (the old picture partly confirmed) and why it
+   fails. Then Reich's argument, labelled contested. Reconstruct in
    steps, at full strength. (a) The consensus since the 1940s (race a social category) was hardened
    in 1972 by the finding that about 85 percent of human genetic variation lies within populations,
    with the conclusion that racial classification has no genetic significance; Reich calls what
@@ -368,10 +405,15 @@ themselves can be read.
      The Bell Curve was attacked; and the 2026 selection result shows that the neutrality on which
      upper bounds of a genetic difference rest cannot simply be assumed.
    - **Reply / state of play:** Reich's answer to both is that high-powered studies will decide and
-     that the evidence for cognitive traits does not yet exist; the course reports this and passes no
-     verdict. Dossier constraint: the lesson states no claim that ancient DNA or polygenic scores show
+     that the evidence for cognitive traits does not yet exist. The course's verdict: **open**, as a
+     finding: neither objection meets its burden (the observed gaps do not show their cause; "will be
+     found" is not evidence, and nor is its denial), and the lesson names what would settle it
+     (VERDICT). Dossier constraint: the lesson states no claim that ancient DNA or polygenic scores show
      a difference in genetic potential between present populations, and none that they show there is
-     none ("Claims the lessons must NOT make", both lists). Close: what the reader can now explain (the
+     none ("Claims the lessons must NOT make", both lists). Close (`<Conclusion>`): first the verdicts in
+     plain words: the idea of old pure races and the idea that cultures spread without people both fail
+     on the ancient genomes (**established**); whether populations differ genetically in cognitive traits
+     is **open**, and the lesson says what study would settle it. Then what the reader can now explain (the
      two migrations, the mixtures, the caste record, which race-theory claims the record supports and
      refutes, where Reich's inference stands) and the open problem handed to `geography-or-institutions`
      — whether the gaps between nations need anything inherited to explain them.
@@ -447,10 +489,7 @@ themselves can be read.
   ch. 12). Say once that the European story is the best documented, which is why the lesson is about
   Europe and India.
 - **Labels.** Reich applies condemning labels to named scientists, to Nazi ideology and to Hindutva;
-  the open letter and the critics apply labels to Reich. Register rule: The course passes no verdict
-  of its own on any author or idea: no condemning or approving labels in its own voice. Judgement
-  comes only through argument and evidence; a label may appear only inside a quotation, with who
-  applied it and when.
+  the open letter and the critics apply labels to Reich. Register rule: The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Do not re-teach:** Grant's three-race scheme, Chamberlain's thesis, Gobineau's ten civilizations,
   heritability, the Bell Curve's argument, the within/between point and the default hypothesis
   (`heritability-within-and-between-groups`), polygenic scores, their portability and the 2019
@@ -531,7 +570,14 @@ themselves can be read.
    vindicate his premise, his conclusion, both or neither? Write a claim–evidence–reasoning paragraph;
    the solution separates the empirical premise (confirmed) from the inference to what a nation is
    (not decidable by genetics) and notes Barrès's answer that a nation is accepted, not chosen.
-8. **FORWARD (E7) → `geography-or-institutions`:** the Yamnaya-related herders, a thinly spread
+9. **Attack the verdict:** The lesson holds as **established** that the ancient genomes refute the old
+   race theories. State the strongest case against that verdict: Grant placed the homeland near the
+   steppe, the spread was male-led and left a ruling layer, and Reich himself calls this "uncomfortable
+   support". Then say what evidence would be needed to overturn the verdict. The solution separates what
+   the theories claimed as foundation (purity, fixity since the Neolithic, a northern homeland) from what
+   was confirmed, and names the overturning evidence: a population sampled across millennia without
+   admixture, whose descendants carried the languages.
+10. **FORWARD (E7) → `geography-or-institutions`:** the Yamnaya-related herders, a thinly spread
    people, replaced most of the ancestry of central and north-western Europe within a few centuries. A
    race theorist of 1916 would have explained it by the conquerors' inborn qualities. List the other
    kinds of cause the lesson's own evidence points to (the wheel, the wagon and the horse; plague

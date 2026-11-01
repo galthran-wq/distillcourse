@@ -5,7 +5,7 @@ module: heredity-and-civilization
 type: core
 goal: Evaluate the transracial adoption and cross-parentage studies as tests of the genetic and environmental accounts of the gap, and explain why each side reads the same data as support
 
-Register rule (binding on the lesson): The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+Register rule (binding on the lesson): The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 
 Group labels: the studies use the census and social categories of their time and place ("Black",
 "White", "interracial", "black/white", "Asian/Indian", "West Indian or African", "mixed race",
@@ -44,9 +44,35 @@ background (scarr1976 l.462–464).
   placement, and the study that could (adoption at birth, placement independent of ancestry,
   birth-parent scores, testing in adulthood) will not be run; the question moved to designs that
   measure ancestry directly in the DNA of people raised in ordinary families. One sentence in the
-  `<Conclusion>` says so; the FORWARD exercise reaches it.
+  `<Conclusion>` says so; the FORWARD exercise reaches it. What this lesson decides: neither the
+  Minnesota study nor the Eyferth and Tizard studies decide the cause of the gap (**strong**); what passes
+  on is the question itself, now put to genomic designs.
 - **Spine step:** "Heredity as an explanation of the gaps between peoples, tested premise by premise — what the tests measure, what heritability can and cannot imply, the hereditarian case at full strength, then the US gap, adoption, admixture and polygenic scores on the step from a real gap to a genetic one — then what follows politically whatever the answer, what ancient DNA shows, the rival explanations from geography and institutions, and the key datasets audited"
 - Not module-final: no APPLICATION spec.
+
+## VERDICT
+
+- **Claim judged:** two opposite readings of the adoption record: (i) the Minnesota study shows the gap
+  surviving a good environment (the ordering 109/106/99/89 at seventeen); (ii) the Eyferth and Tizard
+  studies show no ancestry effect.
+- **Verdict:** **neither study decides.** Grade: **strong**.
+- **What decides it** (dossier §6 and §4; scarr1976, weinberg1992, the Waldman et al. 1994 reply, tizard1974,
+  Neisser 1997, Thomas 2017): in Minnesota, placement history, age at placement (9 against 32 months for the
+  mixed and two-Black-parent groups) and attrition travel with ancestry; birth parents' scores were never
+  measured; and the study's own authors deny the hereditarian reading ("consistent with both"). Eyferth and
+  Tizard are small, tested children young (when shared environment weighs most), and are confounded (the
+  fathers screened by the army; the nurseries' tiny cells, with no adopted child of two Black parents); the
+  primary Eyferth numbers are unread and the two secondary versions disagree on group labels.
+- **Strongest objection:** from the hereditarian side, the Minnesota ordering held across a decade and new
+  tests, and every confound would have to line up with ancestry to explain it away; from the environmental
+  side, two independent studies with roughly equal care both found near-zero differences. It does not
+  overturn the verdict. Each confound does line up with ancestry in the authors' own tables, which is why
+  neither reading can be preferred on these data; and two small studies with young testing do not add up to a
+  strong null. The verdict applies one standard to both readings: a design confounded with the variable of
+  interest decides nothing in either direction.
+- **What would overturn it:** adoption at birth, placement documented independent of ancestry, birth-parent
+  scores measured, testing in adulthood. The register and the dossier agree such a study is unlikely ever to
+  be run.
 
 ## Sources to consult
 
@@ -494,7 +520,10 @@ after 1945.
     prejudice, which would bias against them. Environmental reading: the strongest piece of "direct"
     evidence the 1996 task force could cite. Hereditarian reading: ambiguous for (i)–(iii). Both
     readings agree it is small, old, unread in the original by most who cite it, and unreplicated.
-11. **What adoption can and cannot settle.** Problem: put the four studies through the four
+11. **The weighing: no adoption study decides the cause of the gap, in either direction.** (Heading as a
+    claim; it replaces "What adoption cannot settle".) Set each reading at its strongest (the ordering that
+    survived a decade; the two near-zero differences) against the four conditions and reach the verdict in the
+    course's voice: neither decides, **strong**. Problem: put the four studies through the four
     conditions of section 2 (figure 7). Minnesota fails (ii) and (iii) and is small at (iv); the
     nurseries pass (ii) as far as anyone could check and fail (iv); the 1986 comparison is unread and
     young; the German study is unread, young, and screened. Status (dossier §6, stated in substance
@@ -508,13 +537,17 @@ after 1945.
     route is to measure ancestry itself, in the DNA, among people raised in ordinary families, and see
     whether it predicts scores — with its own version of the placement problem (one sentence, forward
     Ref `admixture-and-polygenic-scores`).
+    `<Conclusion>`: the verdict in plain words: the Minnesota study does not show the gap surviving a good
+    environment, and the German and English studies do not show that ancestry has no effect; no adoption
+    study decides the cause of the gap, and the course holds this as **strong**. Then what the reader can now
+    do (put any adoption study through the four conditions) and the hand-off sentence above.
 
 Headings as claims: "Adoption raises scores; the question is whether it equalises them"; "The
 experiment the question needs"; "Minnesota at seven: rearing moved the scores"; "Minnesota at
 seventeen: new tests, same order"; "The ordering as evidence for genes"; "The placement histories as
 evidence against"; "What each reading cannot explain"; "Equal nurseries, small samples"; "Black and
-White adoptive families"; "The occupation children and their secondary record"; "What adoption
-cannot settle".
+White adoptive families"; "The occupation children and their secondary record"; "No adoption study
+decides the cause, either way".
 
 ## Set pieces and worked examples to recreate
 
@@ -715,6 +748,14 @@ more clearly; the images pool has no candidate for this lesson.
    would still be there (appearance and how a person is treated; family circumstances that follow
    ancestry). The solution says in one sentence that this design is the next lesson's subject, and that
    its central dispute is exactly the link the reader named, with a `<Ref>`.
+
+9. **Attack the verdict:** The lesson holds as **strong** that no adoption study decides the cause of the
+   gap. Choose one side and state its best case against the verdict: either that the Minnesota ordering,
+   held across ten years and new tests, is too consistent with the national pattern to be produced by
+   placement alone, or that Eyferth and Tizard, independent and both near zero, together make a real null.
+   Then say what evidence would be needed to overturn the verdict for that side. The solution names the
+   register's falsifier (adoption at birth, placement independent of ancestry, birth-parent scores,
+   testing in adulthood) and shows that the case chosen fails at least one of the four conditions.
 
 Mix check: retrieval 1 (≈12%); document reasoning 4, 6 (25%); synthesis and argument 2, 3, 7, 8 (50%);
 one numerical boundary probe (5) justified under the numbers rule. E6 floor: claims to refute (2, 3),

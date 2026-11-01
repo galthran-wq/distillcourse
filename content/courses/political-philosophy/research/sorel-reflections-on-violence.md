@@ -37,18 +37,53 @@ goal: Analyze Sorel's argument that a class is held together by a myth rather th
   able to reconstruct the chain (decadence of social peace → myth versus utopia →
   violence versus force → an ethic of producers born of war) and to say why a doctrine
   built for a workers' strike could be lifted out whole by nationalists.
-- **Hands off:** Sorel leaves two problems open, and the module takes both. (i) He
+- **Hands off:** Sorel leaves one problem open, and this lesson decides a second. (i) He
   himself asks why the general strike breeds "sublimity" in some countries and not in
   others, and answers only "here national traditions play a great part" (Ch. VI end,
   p. 251) — the door through which the right takes the myth and swaps the class for the
   nation; `junger-storm-of-steel-and-the-worker` supplies a myth made not in a strike but
   at the front, and `moeller-van-den-bruck-third-reich` a national socialism against
-  Marx. (ii) An ethic of violence with no stated limit: the lesson ends with the
-  objection unrefuted, and `the-right-in-1933` tests what the cult of decision and
-  energy did when it met a movement that used both.
+  Marx. (ii) The limits of violence: this lesson decides that Sorel states them but
+  nothing in his theory secures them (**strong**), and that Jaurès's counter-claim fits
+  the British record (**on balance**). What passes on is the question of what a
+  doctrine without such a guard did when it met a movement that used myth and energy
+  — decided in `the-right-in-1933`.
 - **Spine step:** "The radical right turns from conserving to revolution — Sorel's myth,
   Jünger's front and Worker, Moeller's Third Reich, Evola's Tradition — and in 1933 its
   thinkers have to choose: Schmitt and Heidegger join, Spengler refuses"
+
+## VERDICT
+
+- **Claim judged:** an ethic of proletarian violence, carried by an irrefutable myth,
+  that keeps its own limits — no hatred, no revenge, no judicial killing of the
+  vanquished, war rather than vendetta.
+- **Verdict:** the limits are stated, not secured. Grade: **strong**. Second finding:
+  Jaurès's counter-claim, that votes and legality won the workers more than strikes,
+  fits the British record. Grade: **on balance**.
+- **What decides it (Sorel's own text, Hulme tr.):** the myth is irrefutable by design
+  ("not a description of things, but an expression of a determination to act", pp.
+  32–33; whether the strike is real "is of little importance", p. 137); violence is
+  judged only by its "remote consequences" for the revolution (Intro to First
+  Publication, pp. 47–49); and no one in the scheme is authorised to say when an act
+  has crossed from war into vendetta. A limit that nothing checks against evidence and
+  no one is charged to enforce is a description of character, not a rule. The record
+  of his readers agrees: on both extremes they carried the form (myth, violence,
+  contempt for bargaining) without the limits. For Jaurès: in Britain the vote and
+  statute brought the graduated income tax, national insurance (1911) and Labour in
+  office (1924) (Ref `british-franchise`, `marx-manifesto`); the French general-strike
+  campaign of May 1906 was partial and the eight-hour day came by law in 1919.
+- **Strongest objection:** Sorel's reply — the violence he means is the strike, not
+  the barricade; it needs "only a few short conflicts"; the bloodiest men in history
+  were optimists with power, not pessimists without it (p. 9). This has force against
+  the Terror and against the misreading that Sorel praises bloodshed. It does not
+  overturn the verdict, because it describes how little violence the myth needs, not
+  what would stop more: the restraint is still held by nothing but the movement's
+  temper. Jaurès's half is graded only on balance because one country's record does
+  not show that strikes added nothing alongside the vote.
+- **What would overturn it:** an institution in Sorel's scheme — inside the unions or
+  the movement — that could enforce the limits, deciding when an act is war and when
+  vendetta. For Jaurès's half: evidence that the British gains came chiefly from strike
+  pressure rather than from the vote and statute.
 
 ## Sources to consult
 
@@ -301,8 +336,10 @@ in 1906 and as a book in 1908. Three new terms per section at most.
    right's problem with Sorel is its own: it can take the form only by replacing the
    class with the nation, and the nation is a community of classes — the "social peace"
    Sorel despised. The next lessons are attempts to solve exactly that.
-8. **The OBJECTION at full strength: an ethic of violence with no account of its
-   limits.** State it as the course's own, from both sides. (a) The liberal and
+8. **Weighing — "Sorel states the limits of violence; nothing in his theory secures
+   them."** The section sets the claim against its strongest objection and the
+   evidence and reaches the verdict (see VERDICT). The objection is the course's own,
+   from both sides. (a) The liberal and
    socialist objection (Jaurès, quoted by Sorel himself, p. 20: "violence is the sign
    of temporary weakness"): legality and votes won the workers what strikes never did,
    and violence invites the state's far greater force. (b) The internal objection:
@@ -319,13 +356,27 @@ in 1906 and as a book in 1908. Three new terms per section at most.
    gives one: the violence he describes is the strike, not the barricade; it needs "only
    a few short conflicts"; and the bloodiest men in history were optimists with power,
    not pessimists without it (p. 9). The lesson concedes the reply's force about the
-   Terror and states the residue: the theory has no institution that could hold the
-   limits it describes — the problem `the-right-in-1933` returns to.
+   Terror, then weighs: the reply says how little violence the myth needs, not what
+   would stop more; the theory has no institution that could hold the limits it
+   describes, and its readers on both extremes took the form without them. Verdict, in
+   the course's voice: the limits are stated, not secured (**strong**). On (a), Jaurès's
+   claim fits the British record — the vote and statute brought the graduated income
+   tax, national insurance and Labour in office (Ref `british-franchise`, one clause) —
+   graded **on balance**, since one country does not show strikes added nothing. Say
+   what would overturn the main verdict: an institution in the scheme able to enforce
+   the limits.
+
+Conclusion: state the verdict in plain words with its grade — Sorel's limits on
+violence are stated, not secured (strong); Jaurès's rival claim fits the British record
+(on balance) — then the hand-off: the right could take Sorel's form only by swapping the
+class for the nation, and `junger-storm-of-steel-and-the-worker` follows an officer who
+found the myth at the front; whether a doctrine with no guard of this kind could refuse
+a movement that used myth and energy is decided in `the-right-in-1933`.
 
 Headings as claims (suggested): "Social peace as decadence"; "A myth is a will, not a
 forecast"; "Force imposes, violence breaks"; "Against taking the state"; "Morality from
-war: the producer"; "Why the left and the right could both use him"; "What limits the
-violence?".
+war: the producer"; "Why the left and the right could both use him"; "The limits are
+stated, not secured".
 
 ## Set pieces and worked examples to recreate
 
@@ -364,10 +415,7 @@ violence?".
 
 ## Pitfalls / subtleties to flag
 
-- **The register rule.** The course passes no verdict of its own on any author or idea:
-  no condemning or approving labels in its own voice. Judgement comes only through
-  argument and evidence; a label may appear only inside a quotation, with who applied it
-  and when.
+- **The register rule.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Terms to anchor (L11), and where:** syndicalism / syndicat and the CGT (section 1);
   the general strike (section 1 — a simultaneous stoppage of all trades meant to bring
   down the order, not to win a wage); Jaurès and the unified Socialist party (section 1);
@@ -500,6 +548,15 @@ violence?".
    The solution says in one sentence that the next lesson follows an officer who made the
    front itself such an image — and kept the battle while losing the certainty of victory
    ("We might be crushed, but surely we could not be conquered") — with a `<Ref>`.
+
+9. **Attack the verdict (E6b):** the lesson judged that Sorel's limits on violence are
+   stated, not secured (strong). Build the strongest case against that verdict — Sorel's
+   own reply (the strike, not the barricade; "a few short conflicts"; the optimists with
+   power as history's killers) and any argument that the producers' ethic itself is a
+   working restraint. Then say what evidence would be needed to overturn the verdict: an
+   institution in the scheme able to rule an act vendetta rather than war, or a
+   syndicalist movement whose violence stayed inside Sorel's limits because of the
+   doctrine, not despite it.
 
 ## Nietzsche cross-course links
 

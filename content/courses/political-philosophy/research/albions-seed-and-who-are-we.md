@@ -44,7 +44,58 @@ goal: Analyze Fischer's argument that four British folkways shaped American cult
   lesson after next examines. (iii) `carens-open-borders`: a nation defined by its creed alone
   is the premise the open-borders argument needs; Huntington is its strongest denial.
   (iv) `miller-strangers-in-our-midst`: Miller's civic / social / cultural integration is a
-  liberal-nationalist reply to Huntington's Anglo-conformity.
+  liberal-nationalist reply to Huntington's Anglo-conformity. What this lesson decides and
+  does not pass on: Jay's one people is false as stated (strong), and Huntington's 2004
+  forecast is judged criterion by criterion (failed on language; attachment rising with
+  generation; persistent identity and the education stall partly or wholly borne out).
+  What passes on is the narrower decline thesis — an elite that cannot say why its
+  inheritance deserves defence — which `america-and-the-english-decline` finds open.
+
+## VERDICT
+
+Two claims are judged here, and the lesson states both verdicts in its own voice.
+
+**(a) Jay's claim in Federalist 2** that Americans of 1787 were one people with the "same
+ancestors … same language … same religion". Verdict: **false as stated. Grade: strong.**
+Decided by Fischer's four British regional cultures, each with its own religion, rank order
+and idea of liberty, and by the population Jay's sentence leaves out: Africans (about one
+in six of the 1790 census), Indians outside the count, Germans in Pennsylvania, the Dutch in
+New York. "Same religion" holds only at the level of "Protestant", and Huntington's own 1790
+shares (estimates from surnames) put a fifth of whites outside "British". Strongest
+objection: Jay meant the free, English-speaking Protestant majority that would make the
+government, and on that majority his sentence is roughly true. It does not overturn the
+verdict: the claim as written is about "one united people", and even within that majority
+Fischer's four folkways differ on exactly the bonds Jay names (religion, manners,
+principles of government). Would be overturned by: evidence that the four regional
+cultures were a historian's construct, with no difference in religion, rank or law among
+the four hearths in 1787.
+
+**(b) Huntington's 2004 forecast** that Hispanic, chiefly Mexican, immigration would not
+assimilate. This is a liberal assimilation forecast set against a restrictionist one, and
+the record splits by criterion:
+- *Language:* the forecast **failed**. English proficiency is near-universal by the second
+  generation. Grade: **strong**.
+- *Attachment to the United States* **rises with generation** (Citrin et al. 2007), against
+  the "threat to American identity" claim. Grade: **on balance**.
+- *A persistent ethnic identity, endogamy and residential concentration into the fourth
+  generation* are **partly borne out**: "the majority of fourth generation Mexican Americans
+  continue to live in Hispanic neighborhoods, marry other Hispanics, and think of themselves
+  as Mexican" (Telles & Ortiz 2008, publisher's summary — secondary to the book; bind from
+  the book before quoting). Ethnic attrition (descendants who stop identifying as Hispanic)
+  may bias that sample toward those who kept the identity. Grade: **on balance**.
+- *Education* stalls after the second generation and declines in the third and fourth:
+  **borne out**. Grade: **on balance**.
+
+Strongest objection to (b): the restrictionist reply that language is the easiest criterion
+and identity and schooling the decisive ones, so the forecast's core held. It narrows the
+verdict but does not overturn it: Huntington himself made language the test ("only if they
+dream in English"), and on that test his forecast failed; on schooling it held, and the
+verdict says so. From the other side: Telles and Ortiz attribute the education stall to
+exclusion, not to a refusal to assimilate. That is a dispute about the cause, which the
+verdict does not decide; it records the outcome Huntington forecast. Would be overturned by:
+third- and fourth-generation data, corrected for ethnic attrition, showing schooling at
+parity with non-Hispanic whites (against the education item), or English loss in the third
+generation (against the language item).
 - **Spine step:** "The live question: what a nation is and who may join it — Scruton and
   Miller on the pre-political loyalty, America as England's heir from the Federalist to Who
   Are We?, the prophecies of displacement from Powell to Camus, Carens and Miller on borders,
@@ -180,7 +231,11 @@ All text paths are relative to
     Assimilation, and Race (Russell Sage, 2008) — language shift by the third generation, but
     stalled educational progress (partial support for Huntington on one criterion);
     National Academies of Sciences, The Integration of Immigrants into American Society (2015,
-    free PDF at nap.edu). Verify every figure taken from them.
+    free PDF at nap.edu). Verify every figure taken from them. The register's verdict rests on
+    Citrin et al. (2007) for attachment by generation and Telles & Ortiz (2008) for identity,
+    endogamy, concentration and schooling into the fourth generation: their numbers must be
+    bound from the article and the book, not from the publisher's summary (the summary quoted
+    in ## VERDICT is secondary). Neither is staged under `texts/`; obtain both.
   - The creed as self-standing, and its critique from the other side: the reading of America
     as a liberal, Lockean "fragment" of Europe (Hartz, The Liberal Tradition in America, 1955 —
     Huntington's named target); the "multiple traditions" reply that the inheritance also
@@ -290,7 +345,10 @@ brought from Britain, and disagree about whether it was one culture or four.
    reached them; Africans arrived from 1619 as neither settlers nor immigrants; the Indians
    were there first. Huntington's reply, from the text: the doctrine of "first effective
    settlement" (l.2391) — what counts is who set the institutions of the society others later
-   joined. The lesson leaves the reader to judge whether "effective" does the work honestly.
+   joined. The lesson says what the reply achieves: it answers the objection by narrowing the
+   claim. "Effective" means "set the institutions later arrivals joined", so the distinction
+   now records institutional precedence, which the record supports, and no longer says who
+   was there first, which it never could.
 6. **Where the Creed comes from.** Obvious attempt: from the Enlightenment — America as a
    Lockean, liberal fragment of Europe (the reading Huntington names as his target; scholar in
    References). Huntington: the Creed (liberty, equality, individualism, representative
@@ -339,20 +397,43 @@ brought from Britain, and disagree about whether it was one culture or four.
    defined by its settlers' core is not neutral among the people who later joined it; the
    Creed can be held as a standard against that culture, as the civil-rights movement held it.
    Huntington's reply, from the text: the Creed's universalism is itself the culture's product
-   and survives only while the culture does. The lesson concedes what the data concede, and
-   leaves the normative quarrel open.
-9. **What the two say about how a people is held together.** Close: Fischer — by inherited
-   practices of order, power and freedom that newcomers enter region by region; plural, and
-   freer for being plural. Huntington — by one inherited culture that newcomers join, whose
-   product is a creed; singular, and fragile once joining stops. Both against ancestry, both
-   against "creed alone". Open problem for the next lesson: if the culture came from England,
-   and England has since lost much of what it gave (Huntington, l.3295–3302, 3366–3373), does
-   the heir inherit the loss?
+   and survives only while the culture does. The lesson says what that reply does and does not
+   answer: it answers the claim that the Creed can stand without the culture (a causal claim
+   the course does not test here), and it does not answer the charge that the terms of joining
+   were set by one group — his text leaves that charge standing. The data are weighed in
+   link 9.
+9. **The weighing: Jay's one people was false as stated, and Huntington's forecast failed on
+   language and held on schooling.** Set each claim against its strongest objection and the
+   evidence, as in ## VERDICT. (a) Jay: the four folkways (links 2–4), the 1790 census (about
+   one in six enslaved) and Huntington's own shares; the objection that Jay meant the
+   Protestant majority, and why it fails (the four regions differ on the very bonds he names).
+   Verdict: false as stated, **strong**. (b) Huntington's six criteria (figure 6) against the
+   post-2004 record, criterion by criterion: language failed (**strong**); attachment rises
+   with generation (**on balance**); identity, endogamy and concentration into the fourth
+   generation partly borne out, with the attrition caveat (**on balance**); education stalls
+   and declines (**on balance**). The restrictionist objection (language is the easy test) and
+   the exclusion objection (the stall has another cause) each in two sentences, and why
+   neither moves the outcome recorded. Then the frame the two authors give it: Fischer — a
+   people held by inherited practices that newcomers enter region by region, plural and freer
+   for being plural; Huntington — by one culture that newcomers join, singular and fragile once
+   joining stops. Both against ancestry, both against "creed alone"; the record so far shows
+   joining by language and attachment and lagging by schooling, which is neither author's
+   prediction in full.
+
+   **Conclusion.** State the verdicts in plain words: Jay's sentence was false as stated
+   (strong); Huntington's forecast failed on language (strong); attachment to the United
+   States rises with generation, against his "threat" claim (on balance); and it was partly or wholly borne out on persistent identity and on schooling (on
+   balance each). Hand-off: if the culture came from England, and England has since lost much
+   of what it gave (Huntington, l.3295–3302, 3366–3373), does the heir inherit the loss? The
+   next lesson judges the broad decline forecast and finds the narrow one — an elite that
+   cannot say why its inheritance deserves defence — open.
 
 Headings as claims (suggested): "Something other than descent held the country together";
 "Four migrations carried four cultures"; "Four ideas of liberty"; "Folkways persist — the
 evidence and its limits"; "Settlers found, immigrants join"; "The Creed is Protestantism
-without God"; "A culture is not a race"; "Will the core survive? 2004 and after".
+without God"; "A culture is not a race"; "Will the core survive? 2004 and after"; "Jay's
+one people was false as stated, and Huntington's forecast failed on language and held on
+schooling".
 
 ## Set pieces and worked examples to recreate
 
@@ -428,9 +509,7 @@ without God"; "A culture is not a race"; "Will the core survive? 2004 and after"
 - **Do not run ahead:** the UK-decomposition passage (ch. 1, l.970–1000), the "faded in England"
   remark used as a thesis about decline, and the Bosnia–California comparison belong to the
   next two lessons; here they are at most a forward clause.
-- **Register.** The course passes no verdict of its own on any author or idea: no condemning
-  or approving labels in its own voice. Judgement comes only through argument and evidence; a
-  label may appear only inside a quotation, with who applied it and when. This applies to
+- **Register.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. This applies to
   "nativist", "deconstructionist", "multiculturalist" (Huntington's words — attribute them)
   and to the reviews of Huntington (report them as positions, with their evidence).
 - **Numbers (L12):** keepers — the four migrations' dates; "less than 20 percent"; Huntington's
@@ -524,7 +603,18 @@ without God"; "A culture is not a race"; "Will the core survive? 2004 and after"
    say it fails to account for (the shared English language and institutions all four regions
    used; the one Creed all four came to profess) and state what would have to be true for
    Fischer's claim to survive them.
-8. **FORWARD (E7) → `america-and-the-english-decline`:** Huntington writes that the
+8. **Attack the verdict:** State the strongest case that Huntington's forecast held — that
+   identity, endogamy, residential concentration and schooling, not language, are what decide
+   whether a people has been joined, and that Telles and Ortiz's fourth generation shows all
+   four lagging. Then say what evidence would be needed to overturn the verdict that the
+   forecast failed on language and attachment: name the measure (e.g. English use at home and
+   national attachment by generation in a survey that follows descendants who stop
+   identifying as Hispanic), the comparison group, and the result that would reverse each
+   item. The solution grants that the education item already stands with Huntington, shows
+   why ethnic attrition cuts both ways (it inflates measured persistence of identity and may
+   understate measured schooling), and states that the language verdict would fall only with
+   English loss in the third generation, which no study reports.
+9. **FORWARD (E7) → `america-and-the-english-decline`:** Huntington writes that the
    dissenting Protestantism the settlers brought "faded in England" while it took "new life"
    in America, and that the Tudor institutions "fundamentally changed in the United Kingdom"
    but persisted in the United States. In the same book he wonders whether the United Kingdom

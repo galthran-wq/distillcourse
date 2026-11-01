@@ -30,8 +30,17 @@ goal: Apply the sourcing drill to three empirical claims in the Case for Colonia
   claims, three cited studies, read for what they measured, on what data,
   against what comparison, and whether the claim as made survives. The result is
   a table of compressions — each citer's, in which direction — and a statement
-  of what remains a judgment the data cannot make.
-- **Hands off:** The module ends. The course's next module opens a new question
+  of what remains a judgment the data cannot make. Then, as the module's
+  closing lesson, the module verdict (see VERDICT): by what right Europeans
+  ruled, whether their rule left the ruled better or worse off, and what passes
+  to descendants.
+- **Hands off:** The module ends with its verdict: the titles from discovery,
+  donation, empire, unbelief and natural slavery fail (strong), and no lasting
+  rule over a self-governing people rests on the limited title (on balance);
+  a general ledger of net benefit or net harm is open, and by kind of colony
+  the evidence leans one way for settlement colonies and islands and the
+  other, without settling, for mainland sub-Saharan Africa; guilt does not pass
+  and liability can (strong). The course's next module opens a new question
   (`the-nation-and-its-defenders`: who "we" are), and the closing synthesis
   (`the-argument-assembled`) returns to "the West's judgment of its conquests"
   as one of three thematic halts. The one forward exercise reaches
@@ -66,6 +75,82 @@ goal: Apply the sourcing drill to three empirical claims in the Case for Colonia
   beside a standardised coefficient, what a welfare ratio of one means for a
   family — and ends in prose, an uncertainty statement and a corroborating
   passage.
+
+## VERDICT
+
+Binding: research/verdicts/REGISTER.md, module 14, module verdict (hosted here).
+Module question: by what right did Europeans rule other peoples, did their rule
+leave those peoples better or worse off, and does anything pass to the
+descendants of either side?
+
+- **Verdict and grades.** **Strong** on the failed titles, **on balance** on
+  the limited title; **open** on a general ledger, **on balance** by kind of
+  colony; **strong** on inheritance.
+- **(1) Title.** The titles from discovery, papal donation, the Emperor,
+  unbelief and natural slavery fail, on Vitoria's premises and on the consent
+  premise the course builds (**strong**; `<Ref>` vitoria-right-to-the-americas).
+  On Vitoria's own premises there was a limited title to intervene: defence of
+  the innocent against tyranny and human sacrifice "even if the victims
+  consent", and the rights of travel and trade. Whether a lasting conquest
+  could rest on it: **no, on balance** — the conqueror judged its own case.
+  Locke (ch. XVI: conquest is no origin of government) and Burke ("arbitrary
+  power … neither any man can hold nor any man can give") give no title to
+  lasting rule over a people that governed itself. The behavioural
+  "legitimacy" offered instead does not show consent; it shows that legitimacy
+  was graded, not nil (`<Ref>` colonial-balance-sheet).
+- **(2) Ledger.** The burden lies equally on anyone who asserts a net effect in
+  either direction.
+  - A general verdict of net benefit or net harm is **not established either
+    way: open**.
+  - Where Europeans settled, and on islands, colonial tenure goes with higher
+    income today. Islands with longer colonial tenure, instrumented by wind
+    patterns, are richer and have lower infant mortality, and years after 1700
+    count for more (Feyrer & Sacerdote, NBER w12546, 2006/*REStat* 2009;
+    abstract `research/texts/verdict-audit/nber-w12546-abstract.txt`).
+    Colonial European settlement shows "a strong and uniformly positive
+    relationship" with development, even at low settler shares (Easterly &
+    Levine, NBER w18162, 2012/2016; abstract
+    `research/texts/verdict-audit/nber-w18162-abstract.txt`). **On balance**:
+    an instrumented design on islands and a cross-country association.
+    Islands are not the African mainland.
+  - For sub-Saharan Africa the one Africa-specific assessment, Heldring &
+    Robinson (NBER WP 18566, 2012;
+    `research/texts/verification-2026-11/heldring-robinson-2012-nber-w18566.txt`),
+    concludes that colonialism "probably had a uniformly negative effect on
+    development in Africa" (abstract, l.51). It is a qualitative review
+    against stated counterfactuals, which its authors call "a very subjective
+    and speculative view" (l.936), and it also holds that "in the world
+    context, colonialism had very heterogeneous effects" (l.45). Easterly &
+    Levine's finding cuts against the extractive-institutions mechanism it
+    relies on. **Open**, with the best assessment leaning negative. What would
+    settle it: a border or timing discontinuity design on the mainland.
+  - Measured effects differ by kind of colony. Real urban wages rose in every
+    British colony studied, though East Africa stayed near subsistence for
+    decades (Frankema & van Waijenburg 2012). Heights in Kenya did not break
+    trend at colonization (Moradi 2009). Both are this lesson's audited claims.
+  - The slave trades, mostly before the Case's 1824 boundary, left a real and
+    lasting effect. In the one causal estimate on income it is large: a
+    one-standard-deviation smaller slave export goes with mean income of
+    $1,864 instead of $1,249, a 50% increase (Nunn 2007, OLS, "for purely
+    illustrative purposes"; the IV estimates are larger;
+    `research/texts/audit-right-shading/nunn-2007-slave-trades-mpra-wp.txt`
+    l.780–789). On trust there is an effect whose size the explained-variance
+    share does not give (this lesson's claim one).
+- **(3) Inheritance.** Liability can pass, guilt cannot (**strong**; `<Ref>`
+  inherited-guilt-and-reparations).
+- **Strongest objection.** From one side: the burden lies on whoever claims
+  alien rule was beneficial, so "open" lets the Case off. From the other: the
+  instrumented island design and the settlement association meet the course's
+  own test of a credible counterfactual, so "open" lets the critics off.
+- **Why it does not overturn the verdict.** One standard answers both: each
+  claim of net effect carries its own burden, and neither has met it across
+  colonies. The island design meets the test for islands; the settlement
+  association is an association; the Africa assessment is, by its authors'
+  account, subjective. No design covers many colonies of different kinds with
+  results in one direction.
+- **What would overturn it.** A credible counterfactual design with results in
+  one direction across many colonies of different kinds; for mainland
+  sub-Saharan Africa, a border or timing discontinuity design.
 
 ## Sources to consult
 
@@ -204,6 +289,33 @@ goal: Apply the sourcing drill to three empirical claims in the Case for Colonia
   Nunn citation (Gilley says Taylor cites a different Nunn paper, "A Model
   Linking Africa's Past to Its Current Underdevelopment", Journal of
   Development Economics 83 (2007)).
+- **For the module verdict (all named in the register):**
+  - **Heldring & Robinson, "Colonialism and Economic Development in Africa",
+    NBER WP 18566 (2012)** — full text staged at
+    `research/texts/verification-2026-11/heldring-robinson-2012-nber-w18566.txt`
+    (abstract l.40–56: "probably had a uniformly negative effect", three kinds
+    of colony; l.45 "very heterogeneous effects" in the world context; l.930–936
+    "a very subjective and speculative view"). State its design (qualitative
+    review against stated counterfactuals) and its hedge whenever its
+    conclusion is used. The Response concedes it "measures up well to the
+    highest standards of scientific inquiry" (`research/texts/gilley/response-to-my-critics-AQ2022.txt`).
+  - **Feyrer & Sacerdote, "Colonialism and Modern Income: Islands as Natural
+    Experiments", NBER w12546 (2006; *REStat* 91:2, 2009)** — abstract at
+    `research/texts/verdict-audit/nber-w12546-abstract.txt` (wind direction and
+    speed as instrument; tenure positively related to GDP per capita and
+    negatively to infant mortality; years after 1700 more beneficial). Abstract
+    only; read the paper before quoting tables.
+  - **Easterly & Levine, "The European Origins of Economic Development", NBER
+    w18162 (2012; *J. Econ. Growth* 2016)** — abstract at
+    `research/texts/verdict-audit/nber-w18162-abstract.txt` ("a strong and
+    uniformly positive relationship between colonial European settlement and
+    development"; no reversal at low settler shares). Abstract only.
+  - **Nunn, "The Long-Term Effects of Africa's Slave Trades", MPRA working
+    paper 2007 / *QJE* 123:1 (2008)** — staged at
+    `research/texts/audit-right-shading/nunn-2007-slave-trades-mpra-wp.txt`,
+    l.780–789 (standardised betas .36–.62; $1,249 → $1,864, "for purely
+    illustrative purposes" on OLS). Distinct from the Nunn–Wantchekon trust
+    paper this lesson audits.
 - **docs/playbook-history.md** — the sourcing drill (five steps) and the
   numbers rule 4 ("Computation only inside source inquiry… always ends in a
   prose interpretation, an uncertainty statement, and where possible a
@@ -315,33 +427,67 @@ lesson opens three.
 5. **What re-checking changes.** The KEEPER table (figure 3): three claims ×
    four columns — as the Response cites it | as the op-ed (or Taylor) cites it
    | what the study states | what it can be used to establish. Then the
-   finding stated as the course's own and not as a verdict on colonialism:
-   both citers compressed; the direction of each compression (toward "harm"
-   or toward "benefit"); the size of each (a scope shift of a century; a
-   population shift from recruits to a nation; a headline swapped for a
-   secondary finding) — the reader judges which compressions are larger and
-   whether they are symmetric. The second-order lesson: a balance sheet's
+   audit's finding, stated as the course's own: both citers compressed; the
+   direction of each compression (toward "harm" or toward "benefit"); the size
+   of each (a scope shift of a century; a population shift from recruits to a
+   nation; a headline swapped for a secondary finding). The lesson says, claim
+   by claim and once the papers are verified, which compression is larger and
+   whether they are symmetric — by the same standard for both citers — and
+   names the sentence of the paper that decides it. The second-order lesson: a balance sheet's
    entries are each a proxy with a population and a period; the aggregation
    into "on balance" is where argument, not data, lives — which is what the
    previous lesson said the two sides measure differently.
 
-6. **Departures named, and what stays open.** The idealisation (a ledger of
-   measured benefits and harms against a counterfactual) departs from the
-   artefact in the five ways the APPLICATION spec lists; state them in the
-   body as the section's bearing. Then one paragraph: the module began with a
-   theologian asking by what title Spain held America and ends with a reader
-   checking footnotes; what connects them is that every judgment of a
-   conquest has rested on an empirical premise — that the Indians had cities
-   and laws, that Bengal had law and property, that improvement was "actually
-   effected", that a wage rose — and the method for testing such premises is
-   the only part of the module's result that is not itself contested. The
-   course turns next to a different question (who "we" are); the closing
-   synthesis returns to this one.
+6. **Departures named.** The idealisation (a ledger of measured benefits and
+   harms against a counterfactual) departs from the artefact in the five ways
+   the APPLICATION spec lists; state them in the body as the section's
+   bearing. One paragraph: every judgment of a conquest in the module has
+   rested on an empirical premise — that the Indians had cities and laws, that
+   Bengal had law and property, that improvement was "actually effected", that
+   a wage rose.
+
+7. **The weighing — the titles fail, the general ledger is open, and liability
+   passes while guilt does not.** The module's verdict, reached in the
+   lesson's last body section (see VERDICT), one part at a time and with one
+   standard for both sides. (1) Title: recall the failed titles (strong) and
+   the limited title Vitoria left; the conqueror judged its own case, so no
+   lasting rule over a self-governing people rests on it (on balance); Locke's
+   ch. XVI and Burke's "arbitrary power" sentence agree. (2) Ledger: state the
+   burden rule first — whoever asserts a net effect in either direction carries
+   it. Then the designs the reader can now read with the drill: the island
+   design (Feyrer & Sacerdote) and the settlement association (Easterly &
+   Levine) for settlement colonies and islands (on balance); Heldring &
+   Robinson for the African mainland, with its design and its own hedge
+   ("very subjective and speculative") stated in the sentence that uses it
+   (open, leaning negative); this lesson's three audited claims as the
+   measured effects by kind of colony; Nunn's income estimate for the slave
+   trades ($1,249 against $1,864, OLS, "for purely illustrative purposes").
+   Verdict: a general ledger is open; by kind of colony, on balance. Set the
+   strongest objection from both sides ("open" lets the Case off; "open" lets
+   the critics off) and answer both with the one burden rule. (3)
+   Inheritance: liability can pass, guilt cannot (strong; recall, do not
+   re-argue). Close the section with what would overturn the open finding: a
+   credible counterfactual design with one-directional results across many
+   kinds of colony; for the mainland, a border or timing discontinuity
+   design.
 
 Headings fall out as: "A citation is a claim about a text"; "What one to two
 per cent of the variance means"; "Height as a record of childhood"; "A year's
 wage against a basket"; "Three claims, four columns"; "What the ledger's
-entries are made of".
+entries are made of"; "No title for lasting rule; no general ledger yet; a debt
+without guilt".
+
+**Conclusion.** States the module verdict in plain words with its grades:
+Europeans' titles from discovery, papal grant, empire, unbelief and natural
+slavery fail (strong), and the one limited title Vitoria left — intervention
+to defend the innocent — gave no right to lasting rule over a people that
+governed itself (on balance); whether colonial rule left the ruled better or
+worse off is not established either way across colonies (open), while by kind
+of colony the evidence favours settlement colonies and islands (on balance) and
+leans negative, without settling, for mainland sub-Saharan Africa; and liability
+can pass to descendants where guilt cannot (strong). Then the hand-off: the
+course turns to who "we" are (`the-nation-and-its-defenders`); the synthesis
+returns to this verdict.
 
 ## Set pieces and worked examples to recreate
 
@@ -409,11 +555,14 @@ entries are made of".
   paper.** The Moradi sentences, the Frankema–van Waijenburg sentences and
   the "one to two percent" figure are the audit's object; the brief reports
   them as the Response gives them, not as verified.
-- **No verdict on colonialism.** The lesson's finding is about compressions
-  and their direction. "Gilley was right" or "the critics were right" is the
-  conclusion the drill forbids; "the op-ed moved the period; the Response
-  moved the magnitude" is the kind of sentence it allows, once verified. The
-  register rule: The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+- **The audit's finding and the module verdict are two things.** The audit's
+  finding is about compressions and their direction: "the op-ed moved the
+  period; the Response moved the magnitude" is the kind of sentence it allows,
+  once verified. Three audited claims cannot carry "Gilley was right" or "the
+  critics were right" overall; the module verdict in the last section says
+  what the wider evidence does carry — open on a general ledger, on balance by
+  kind of colony — and states the same burden for both sides. The
+  register rule: The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Dates:** to the decade except 2005 (the survey round), 1880–1965 and
   1400–1900 (the studies' own periods), 2009/2011/2012 (publication), 2017 and
   2022 (the dispute).
@@ -510,6 +659,19 @@ Balance: all draw; 5–6 visuals.
    the three claims as the drill leaves it: the claim as made, the evidence as
    the paper gives it, the reasoning that connects or fails to connect them,
    and the one sentence stating what remains a judgment the data cannot make.
+9. **Attack the verdict.** The module finds a general ledger of colonial rule
+   open, leaning negative for mainland sub-Saharan Africa and positive for
+   settlement colonies and islands. Choose one side and state its strongest
+   objection in its best form — either "the burden lies on whoever defends
+   alien rule, and Heldring & Robinson meet any fair standard, so the verdict
+   should be net harm", or "Feyrer & Sacerdote's instrumented design is the
+   only credible counterfactual in the literature and it points to benefit,
+   so the verdict should be net benefit". Then say what evidence would be
+   needed to overturn the open finding: name the design (a border or timing
+   discontinuity on the African mainland; a credible counterfactual across
+   many kinds of colony), the data it would need, and the result that would
+   decide it. The solution applies one burden rule to both objections and
+   shows why each falls short of "established".
 
 ## Nietzsche cross-course links (where his ideas enter)
 

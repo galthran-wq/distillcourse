@@ -36,14 +36,56 @@ goal: Analyze how Locke's theory of property and Mill's theory of progress each 
   lapses or consequences. The lesson builds the "strategies of exclusion"
   reading as the course's own — a universal anthropology (free, equal, rational)
   gated by thick conditions of its exercise (education, maturity, civilization)
-  — gives Mill's own reasons at full strength first, and sets the reading
-  against the "contradiction" thesis without deciding for the reader.
-- **Hands off:** If the liberal justification of empire is tutelage — rule as
+  — gives Mill's own reasons at full strength first, sets the reading against
+  the "contradiction" thesis, and decides between them: the exclusions are
+  consequences of conditions written into the principles, not lapses (strong).
+- **Hands off:** Decided here: Locke's "waste" and Mill's tutelage follow from
+  their principles' own conditions (strong). What passes on: if the liberal
+  justification of empire is tutelage — rule as
   "the highest moral trust" to improve — what did a conservative who believed
   in inherited order say when an Englishman ruled Bengal as a despot? The
   expectation is that he defended the conqueror. `burke-against-hastings`
   breaks it. Mill's word "trust" (RG XVIII) and Burke's "trust" are the seam.
 - **Spine step:** "The West judges its own conquests: Vitoria's titles, Locke's waste land, Burke's impeachment of Hastings, Mill's tutelage, the colonial balance sheet, and whether guilt is inherited"
+
+## VERDICT
+
+Binding: research/verdicts/REGISTER.md, module 14, `locke-and-mill-on-empire`.
+
+- **Claim judged.** Locke's "waste" land (Second Treatise ch. V) and Mill's
+  tutelage of "backward states of society" (On Liberty ch. I; Representative
+  Government ch. XVIII): lapses from their principles, or consequences of
+  them?
+- **Verdict.** **Consequences.** Grade: **strong**.
+- **What decides it.** Both exclusions follow from conditions written into the
+  principles themselves. Locke's: property is created by value-adding labour
+  (Sects 37, 40–43), and land not improved and not brought into "the consent
+  of the use of their common money" lies "waste" and "in common" (Sect. 45) —
+  the labour criterion applied to land, with no extra premise. Mill's: the
+  exclusion stands in On Liberty itself, in the paragraph after the harm
+  principle — the doctrine is for "human beings in the maturity of their
+  faculties", not for "backward states of society", where "Despotism is a
+  legitimate mode of government in dealing with barbarians, provided the end
+  be their improvement" — and liberty is a secondary principle grounded in
+  utility and keyed to a stage. A lapse would be an exception the principle
+  forbids; these are applications the principle states.
+- **Strongest objection.** The contradiction thesis: empire contradicts
+  consent, representative government and equal citizenship, and Locke's own
+  ch. XVI forbids conquest; the exclusions are a betrayal, visible in the
+  liberal who said so plainly (Stephen's gunpowder, 1883) and in Mill's own
+  Mormon passage ("no community has a right to force another to be
+  civilised").
+- **Why it does not overturn the verdict.** Ch. XVI forbids taking a people's
+  country by war; it does not touch the labour criterion that makes unimproved
+  land unowned. The Mormon passage concerns dissenters inside a "civilized
+  community"; the clause that sorts communities is Mill's, in the same book.
+  Stephen shows that the deferral was indefinite in practice, not that it was
+  inconsistent with the theory. Where a principle names its own exclusion, the
+  exclusion is part of the principle.
+- **What would overturn it.** A reading on which Locke's labour criterion does
+  not apply to land without an added premise, or on which Mill's stage clause
+  can be removed from On Liberty without changing what the harm principle
+  covers.
 
 ## Sources to consult
 
@@ -333,7 +375,9 @@ without knowing what the theories say.
    — available at any stage of history, so the developmental argument has no
    purchase; and the fact that answers Mill's test from outside the theory:
    independent India gave the vote in 1950 to an electorate most of whom could
-   not read. State as the counterpoint; do not adjudicate.
+   not read. State as the counterpoint; say in one clause that it bears on
+   whether Mill's premise about stages was true, not on whether the exclusion
+   followed from it — the question the next section decides.
 
 8. **The objection inside Mill, carried to the end.** OL IV on the Mormons: "I
    am not aware that any community has a right to force another to be
@@ -342,14 +386,40 @@ without knowing what the theories say.
    speaking, no history" because custom rules it (OL III). So the clause does
    the sorting, and the question of the lesson is whether a sorting of that
    kind is a lapse in a liberal theory or the place where a liberal theory
-   decides who it is for. Leave the reader with the two passages and the two
-   theses.
+   decides who it is for. This is the objection in its best form; the
+   weighing is the next section.
+
+9. **The weighing — the exclusions are consequences of the principles, not
+   lapses.** The lesson's last body section reaches the verdict (see VERDICT).
+   Set the contradiction thesis at full strength (ch. XVI against conquest; the
+   Mormon passage; Stephen's gunpowder; the hardening after 1857) against the
+   test that decides it: is the exclusion an exception the principle forbids,
+   or an application the principle states? Locke: the labour criterion,
+   applied to land, makes unimproved land unowned (Sect. 45) — no premise is
+   added. Mill: the stage clause is in On Liberty's own statement of the harm
+   principle, and liberty is secondary to utility. So both are consequences.
+   Grade: **strong**. Then what the verdict does not say: it does not say the
+   premises were true (whether hunting peoples owned their ground, whether
+   peoples have "stages" — Gandhi's counterpoint and the 1950 franchise bear on
+   that), and it does not judge the men; it judges where the exclusion sits in
+   the argument. What would overturn it: a reading on which either exclusion
+   needs a premise the principle does not contain.
 
 Headings fall out as: "What Locke meant by waste"; "Conquest gives no title,
 labour does"; "A universal capacity and the price of admission"; "The scale of
 civilization: India as a child"; "Mill's case for a good despotism"; "Why
 responsibility to Parliament is the worst despotism"; "Lapse or consequence?";
-"Civilization as conduct".
+"Civilization as conduct"; "The Mormons and the barbarians"; "The exclusions
+follow from the principles".
+
+**Conclusion.** States the verdict in plain words with its grade: Locke's waste
+land and Mill's tutelage are not lapses from their principles but consequences
+of conditions those principles state — the labour criterion applied to land,
+and the stage clause in On Liberty itself (strong). The verdict concerns the
+argument, not the truth of its premises about other peoples, which the lesson
+has shown were contested from outside. Then the hand-off: Mill called the rule
+"the highest moral trust"; `burke-against-hastings` follows a conservative who
+used the same word to prosecute the man who ruled Bengal.
 
 ## Set pieces and worked examples to recreate
 
@@ -436,7 +506,7 @@ responsibility to Parliament is the worst despotism"; "Lapse or consequence?";
   1857, 1883, 1950. The 9/10–99/100 figure is Locke's and stays in his
   sentence. No GDP or population figures — none are in the dossier and none
   are needed.
-- **Register:** The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when. The lesson's conclusion is a question held open with
+- **Register:** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. The lesson's conclusion is a question held open with
   the two theses stated.
 
 ## FIGURE PLAN
@@ -541,6 +611,18 @@ Balance: 7 draw / 1 source — a close reading of two arguments.
    Mill's "vigorous despotism… for training the people" as the content of the
    trust, and why not. The solution points to empire-as-trust and geographical
    morality with a `<Ref>` to the next lesson.
+9. **Attack the verdict.** The lesson concludes that the exclusions are
+   consequences of the principles (strong). Build the strongest case that they
+   are lapses: take Locke's ch. XVI on conquest and Sect. 4's "all men…
+   free, equal and independent", and Mill's Mormon passage and his own
+   "selfish usurpers" test, and argue that each theory contains a principle
+   that, applied consistently, forbids the exclusion it also states. Then say
+   what evidence would be needed to overturn the verdict: a passage showing
+   that Locke's labour criterion was not meant to apply to land held by
+   hunting peoples, or that Mill's stage clause is detachable from the harm
+   principle without changing what it covers. The solution weighs the case
+   and says why a theory containing both a universal premise and its own
+   stated gate is not thereby self-contradictory.
 
 ## Nietzsche cross-course links (where his ideas enter)
 

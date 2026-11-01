@@ -5,7 +5,7 @@ module: heredity-and-civilization
 type: core
 goal: Analyze Diamond's geographical explanation and Acemoglu and Robinson's institutional explanation of the inequality between nations, and evaluate each against the other and against the hereditarian and cultural accounts
 
-Register rule (binding on the lesson): The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+Register rule (binding on the lesson): The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 
 Revised 2026-11-01 for the restructured module: this lesson is now ninth, after the four premises of the
 hereditarian argument have been tested on the US data (lessons 1–6), after the political lesson
@@ -52,8 +52,41 @@ has isolated a genetic component of national differences).
   rates of European settlers used to predict which colonies got which institutions. Whether those
   tables can carry the weight is the module's application, `national-data-audited`. The colonial
   origins of extractive institutions return in the empire module (`colonial-balance-sheet`,
-  `auditing-the-case-for-colonialism`).
+  `auditing-the-case-for-colonialism`). What this lesson decides: institutions can by themselves produce
+  gaps as large as any between nations (**established**); Diamond explains Eurasia's lead in 1500 at the
+  proximate level (**strong**); the hereditarian account needs an institutional term on its own data
+  (**strong**). What passes on: how the world's gaps divide among the four causes, which is **open** and
+  rests on the two tables `national-data-audited` audits.
 - **Spine step:** "Heredity as an explanation of the gaps between peoples, tested premise by premise — what the tests measure, what heritability can and cannot imply, the hereditarian case at full strength, then the US gap, adoption, admixture and polygenic scores on the step from a real gap to a genetic one — then what follows politically whatever the answer, what ancient DNA shows, the rival explanations from geography and institutions, and the key datasets audited"
+
+## VERDICT
+
+- **Claims judged:** (a) that institutions can by themselves produce gaps between nations as large as any
+  observed; (b) that geography explains Eurasia's lead over the other continents by 1500; (c) that national
+  differences in measured intelligence explain the gaps without an institutional term; (d) how much of the
+  world's gaps each cause explains.
+- **Verdicts.** (a) **Holds.** Grade: **established**. Same people, same place, different rules: Nogales
+  (household income about $30,000 against about a third of that across the fence; Why Nations Fail ch. 1
+  l.357–367) and the two Koreas, which Lynn and Vanhanen themselves treat as an institutional natural
+  experiment. (b) Diamond explains Cajamarca and Eurasia's lead in 1500 at the proximate level (guns, steel,
+  horses, germs, writing, centralised states), and his chain to food production and the axes is the best
+  ultimate account on offer: **strong** for the proximate level. (c) **Fails on its own data**: China and
+  Japan fall far below their IQ prediction in 1820 and 1900, which the authors attribute to autocracy, so the
+  hereditarian account needs an institutional term. Grade: **strong**. (d) World-scale apportionment:
+  **open**.
+- **What decides it:** the natural experiments for (a); Diamond's chain and its limit inside Eurasia for
+  (b); Lynn and Vanhanen's own tables and concessions ("necessary, but not sufficient") for (c); for (d),
+  that same-population comparisons hold ancestry and geography fixed by construction, so they show what
+  institutions can do and cannot apportion the world's gaps among genes, culture, geography and
+  institutions.
+- **Strongest objection:** to (a), the Koreas and Nogales are extreme cases; ordinary differences in
+  institutions may do much less, and "people, not places" (the reversal of fortune mostly disappears when
+  history is counted by the people's ancestors) says what the settlers carried mattered more than the
+  rules. It does not overturn (a), which is a claim about what institutions *can* do; it is the reason (d)
+  is open. To "open" on (d), from either side: each tradition claims Europe against China and the
+  reversal of fortune, which shows the cases do not discriminate, not that one side wins them.
+- **What would settle (d):** a design that varies one cause while holding the others fixed at world scale
+  (none exists); short of that, the two cross-country tables audited in `national-data-audited`.
 
 ## Sources to consult
 
@@ -274,16 +307,19 @@ Arizona–Sonora border, split when the United States bought the strip in 1853 (
    farming reached it about 2,000 years ago and Britain 5,500 years ago (the marriage-therapist
    analogy: the slap is not the cause of the divorce). Seam: each book explains its own question and
    fails on the other's. Neither mentions genes; the hereditarian account has its own attack on both.
-8. **The other two explanations on the same ground (genes, culture).** At full strength, briefly,
-   each with its evidence and the evidence against:
+8. **The weighing: institutions can make gaps as large as any between nations; no one cause apportions
+   the world's gaps.** (Heading as a claim.) First the other two explanations on the same ground (genes,
+   culture), at full strength, briefly, each with its evidence and the evidence against; then the weighing
+   table; then the verdicts in the course's voice:
    - **Hereditarian, against geography:** Lynn and Vanhanen's objections to Diamond (Africa had
      domesticable plants and animals — sorghum, millet, yams, guinea fowl; China and western Eurasia
      were cut off by the Himalayas and the Gobi as surely as by an ocean, so the east–west axis did not
      carry inventions — printing was reinvented, not borrowed); against institutions as the whole
      story: "people, not places" — the reversal of fortune largely tracks who lives in the former
      colonies now (when a country's history is counted by its people's ancestors rather than its
-     territory, the reversal mostly disappears; 2010 paper, References) — which leaves open whether what
-     the settlers carried was culture, skills, institutions or genes. A hereditarian synthesis also
+     territory, the reversal mostly disappears; 2010 paper, References) — which does not say whether what
+     the settlers carried was culture, skills, institutions or genes (part of why world-scale
+     apportionment is open). A hereditarian synthesis also
      makes geography and genes complements: farming, which geography placed, changed what was selected
      for (named in References; no adjudication). Dossier constraint (§7 and "Claims the lessons must
      NOT make"): at the national scale the lesson states the hereditarian account's claim as its
@@ -310,8 +346,17 @@ Arizona–Sonora border, split when the United States bought the strip in 1853 (
      politics, kinship and culture; and East Asian national IQs at or above Europe's predict the
      opposite of what happened before 1900, so the hereditarian must invoke institutions there); the
      reversal of fortune is claimed by institutions and by "people, not places". No case cleanly tests
-     genes between nations. The course passes no verdict.
-9. **Close (Conclusion).** The reader can now: distinguish proximate from ultimate causes; state each
+     genes between nations.
+   - **The verdicts** (VERDICT): institutions can by themselves produce gaps as large as any between
+     nations, **established**; Diamond explains Eurasia's lead in 1500 at the proximate level, **strong**;
+     the hereditarian account needs an institutional term on its own data, **strong**; how the world's gaps
+     divide among the four causes, **open**, with the strongest objection to each and what would settle the
+     open one.
+9. **Close (Conclusion).** The verdicts in plain words first: the Koreas and Nogales show that rules alone
+   can open a gap as wide as any between nations (**established**); Diamond's account of 1532 holds at the
+   proximate level (**strong**); the hereditarian account cannot explain China and Japan before 1900
+   without institutions (**strong**); how much of the world's gaps each cause explains is **open**. The
+   reader can now: distinguish proximate from ultimate causes; state each
    book's mechanism and its attack on the other; and say which case discriminates between which
    explanations. Open: at world scale every explanation rests on one table — national IQ estimates for
    the hereditarian, settler death rates for the institutionalist — and the next lesson takes both
@@ -370,9 +415,7 @@ Arizona–Sonora border, split when the United States bought the strip in 1853 (
   gotcha.
 - **Labels in the sources.** Diamond calls racial explanations "loathsome" and "racist"; Lynn and
   Vanhanen call Diamond's argument "obviously wrong"; Acemoglu and Robinson head their chapter on the rivals "Theories That Don't Work".
-  Register rule: The course passes no verdict of its own on any author or idea: no condemning or approving
-  labels in its own voice. Judgement comes only through argument and evidence; a label may appear only
-  inside a quotation, with who applied it and when.
+  Register rule: The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Colonialism's double edge.** Acemoglu and Robinson make colonial rule the author of extractive
   institutions in some places and of inclusive ones in settler colonies. Both halves stay; the moral
   ledger is the empire module's (`colonial-balance-sheet`, forward Ref in one clause at most).
@@ -447,7 +490,15 @@ Arizona–Sonora border, split when the United States bought the strip in 1853 (
 7. **Synthesis (E6c, a derivation the lesson did not do):** write the four explanations' accounts of why
    Europe and not China industrialised first, using the weighing table, and show which one the record of
    East Asian test scores puts under strain and how its authors answer.
-8. **FORWARD (E7) → `national-data-audited`:** the statistical form of the institutional theory uses the
+9. **Attack the verdict:** The lesson holds as **established** that institutions can by themselves produce
+   gaps as large as any between nations. State the strongest case against it: the two Koreas were one
+   people only on average, the North was cut off by war and sanction as well as by its rules, and Nogales's
+   two halves differ in who migrated to each. Then say what evidence would overturn the verdict. The
+   solution shows that sanctions and war are part of what the institutions produced or invited, that the
+   income gap at Nogales is too large for selective migration across one fence to explain, and names the
+   overturning evidence: a same-population divide where the institutional difference is large and the
+   income gap small.
+10. **FORWARD (E7) → `national-data-audited`:** the statistical form of the institutional theory uses the
    death rates of European soldiers and bishops in each colony around 1800 to predict which colonies got
    extractive institutions. State the chain of assumptions that must hold for those death rates to tell us
    about institutions and not about geography directly, and say what you would need to check in the

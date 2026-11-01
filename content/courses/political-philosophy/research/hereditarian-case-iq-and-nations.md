@@ -5,10 +5,13 @@ module: heredity-and-civilization
 type: core
 goal: Analyze at full strength, as its proponents make it, the case that part of the average differences in measured intelligence between groups and between nations is genetic and explains part of their differences in income, and identify which premise each line of its evidence rests on
 
-Register rule (binding on the lesson): The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+Register rule (binding on the lesson): The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 
 This lesson states the hereditarian case as its authors make it, with the evidence each of them cites and the
-wording each of them chose, and neither endorses nor dismisses it. It is the third lesson of a module organised
+wording each of them chose. It reconstructs; it does not judge the case's lines here, because each line is
+judged in the lesson that tests it, and the module's verdict on the whole is given in `national-data-audited`.
+Where the authors meet an objection, the lesson says whether their answer meets it (a fact about the argument).
+It is the third lesson of a module organised
 by the four premises of the hereditarian argument, laid out in `heritability-within-and-between-groups`:
 (1) the tests measure a real general ability that matters; (2) it is heritable within groups; (3) groups differ
 in mean on a test that measures the same thing in both; (4) therefore the gap is partly genetic. Lessons 1–2
@@ -69,7 +72,14 @@ the premise tags. The Bell Curve's and Lynn & Vanhanen's line pointers were re-c
   authors' own policy conclusions ("an IQ of 120 is an IQ of 120", the "two truths", the distributional model,
   "impossible to eradicate") (`gould-and-harden-on-heredity`); the national-IQ table, the African samples and
   the 2025 meta-analysis audited entry by entry (`national-data-audited`). The `<Conclusion>` names these in one
-  paragraph without previewing their answers.
+  paragraph without previewing their answers. Where each line is decided (register): the step from
+  within-group heritability, `heritability-within-and-between-groups` (already decided: invalid); bias and
+  invariance, `what-intelligence-tests-measure` (already decided: the tests are not biased in the main US data);
+  size, trend and SES, `us-gap-size-trend-and-environment`; adoption, `adoption-studies-across-groups`;
+  admixture and polygenic scores, `admixture-and-polygenic-scores`; China's lag and the institutional term,
+  `geography-or-institutions`; the national table and the module's question itself (the genetic share of the
+  gap), `national-data-audited`. Lessons 1–2 are already behind the reader, so the lesson may say in one clause
+  each what they decided.
 - **Spine step:** "Heredity as an explanation of the gaps between peoples, tested premise by premise — what the tests measure, what heritability can and cannot imply, the hereditarian case at full strength, then the US gap, adoption, admixture and polygenic scores on the step from a real gap to a genetic one — then what follows politically whatever the answer, what ancient DNA shows, the rival explanations from geography and institutions, and the key datasets audited"
 
 ## Sources to consult
@@ -484,7 +494,9 @@ lesson that tests it". Every section ends by placing its evidence on that skelet
     on individual overlap and individual treatment; shared — the explanatory form (inherited capacities of
     peoples explain the rank of their civilisations), and in Lynn and Vanhanen an origin story ("some 5,000
     years ago", p. 194) and a climatic-selection account that echo the nineteenth-century theories in shape.
-    Both lists as facts, no verdict. Then the `<Conclusion>`: what the reader can now do (lay the case out on
+    Both lists as facts; the comparison is about form and judges nothing about the evidence, which the later
+    lessons test (Gobineau's own thesis was judged in `gobineau-inequality-of-races`, and that verdict does not
+    reach the modern question). Then the `<Conclusion>`: what the reader can now do (lay the case out on
     the four premises, quote each author's own strength of claim, say which lesson tests each line), and the
     open problem for the next lesson in one sentence: the case's authors disagree among themselves about
     whether the gap they rely on has moved — narrowed by two or three points and perhaps stalled (1994), never
@@ -561,7 +573,7 @@ short (the evidence is tested later; the lesson shows its shape), and spends its
   journal provenance (Pioneer Fund, *Mankind Quarterly*, Ulster Institute) are not arguments about evidence
   and do not appear here; if anywhere, they are metadata in lesson 10's sourcing drill — and the same rule
   applies to the critics' provenance.
-- **Neither endorse nor dismiss.** The authors' guarded wording ("partly", "highly likely", "agnostic",
+- **Report the case at its own strength; judge it where it is tested.** The authors' guarded wording ("partly", "highly likely", "agnostic",
   "provisionally true", "quite probable", "necessary but not sufficient", "perhaps to 80%") is reported
   exactly — never strengthened (none claims to have measured a genetic difference; the opening says so) and
   never weakened (they do argue from evidence and say what would falsify them). Where the authors differ in

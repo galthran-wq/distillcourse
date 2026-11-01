@@ -3,16 +3,17 @@
 status: planned
 module: heredity-and-civilization
 type: core
-goal: Apply the sourcing drill to the key datasets of the hereditarian account (national IQ, in its 2002 and 2019 forms, and a meta-analysis of US studies) and of the institutional account (settler mortality), judge what each can support, and state what the module leaves settled and open
+goal: Apply the sourcing drill to the key datasets of the hereditarian account (national IQ, in its 2002 and 2019 forms, and a meta-analysis of US studies) and of the institutional account (settler mortality), judge what each can support, and judge how far the evidence of the module decides what causes the measured gaps between peoples
 
-Register rule (binding on the lesson): The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+Register rule (binding on the lesson): The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 
 The lesson's test is symmetry: the same questions, at the same depth and in the same order (entries →
 re-examination → reply → what survives), for the hereditarian tables and the institutional table — and
 for the downstream uses on both sides of the dispute (a hereditarian-side meta-analysis and a
-critic-side genetic bound). Its verdicts are about what each table can carry, never about which
-explanation of the gaps is right. Its last section states the module's status from the dossier,
-settled / open / what would close it, in both directions.
+critic-side genetic bound). Its lesson verdicts are about what each table can carry. Its last section is
+the module's verdict (REGISTER.md, module 13): on what causes the measured gaps, how firmly, and what would
+settle what is open, in both directions. "Open" there is a finding with its reasons and its tests, not a
+refuge.
 
 ## ARC (L10)
 
@@ -45,7 +46,12 @@ settled / open / what would close it, in both directions.
   audit propagate: what is wrong with an input table is wrong with every result built on it, on whichever
   side of the dispute. Then the module's close: the dossier's status, stated as settled / open / what
   would close it.
-- **Hands off:** The module's question stays open, and the lesson says exactly how far: no cross-country
+- **Hands off:** The module's verdict, stated in the `<Conclusion>`: the first three premises of the
+  hereditarian argument largely hold; the step from a real gap to a genetic one has not been made, so the
+  genetic share is **open**; the two limits (not wholly genetic as it stands; no evidence excludes a genetic
+  share) are **established**; the national tables carry an association with income and nothing about
+  genetic causes (**strong**); institutions alone have a clean natural experiment, which shows what they can
+  do and does not apportion the world's gaps. And the lesson says exactly how far: no cross-country
   table settles why nations differ; nothing in the national-IQ tables tests whether the differences they
   list are genetic; the US gap is not wholly genetic as it stands and no evidence excludes a genetic share;
   "what would settle it" was stated in `admixture-and-polygenic-scores` and is recalled. The institutional
@@ -87,6 +93,69 @@ settled / open / what would close it, in both directions.
     sampling error allows (I² = 98%), so its "mean" summarises a spread. The genetic bound departs: it
     takes a continental average from the national table as its input. All of these were made auditable by
     their authors, who published the derivations; every critique used that publication.
+
+## VERDICT
+
+### The module verdict (heredity-and-civilization)
+
+- **Question judged:** are the measured gaps between peoples, within the US and between nations, caused by
+  heredity, environment, geography or institutions, and in what proportion?
+- **Verdict and grades:** **open** on the genetic share; **established** on the two limits; **strong** on
+  what the national tables can carry.
+  - *The first three premises of the hereditarian argument largely hold.* The tests measure the same
+    abilities in both US groups and predict outcomes without bias against the lower-scoring group
+    (`what-intelligence-tests-measure`). Measured intelligence is substantially heritable within Western
+    populations (`heritability-within-and-between-groups`). The US gap is real: about 0.75 SD in recent child
+    norms, about 1 SD in adult norms (`us-gap-size-trend-and-environment`).
+  - *The fourth step, from a real gap to a genetic one, has not been made.* No design has measured a genetic
+    contribution free of confounding (`adoption-studies-across-groups`, `admixture-and-polygenic-scores`).
+    Measured environment does not account for the whole gap either: parental education and income leave
+    about 6 points of the child WISC gap.
+  - *Two limits are established.* The gap as it stands is not wholly genetic: it narrowed by several points
+    within decades, varies from near zero to 1.5 SD across school districts, and widened in maths after 2020.
+    And no evidence excludes a genetic share.
+  - *Between nations.* The association of measured skills with income survives better data. The lowest
+    national-IQ entries do not survive audit: the sub-Saharan African levels are biased low by about ten
+    points against the 2010 systematic review. Nothing in the national tables bears on whether the
+    differences are genetic.
+  - *Institutions.* Only institutions have a clean natural experiment behind them (the Koreas, Nogales;
+    `geography-or-institutions`). It shows institutions can produce gaps as large as any between nations. It
+    does not apportion the world's gaps.
+- **What decides it:** research/heredity-evidence-review.md, "Overall answer" 1–7 and "Claims the lessons
+  must NOT make" (both lists), with the lesson verdicts of the module.
+- **Strongest objection:** "open" is evasion, because the indirect evidence (heritability, invariance, the
+  Spearman pattern, admixture correlations, polygenic means, the stalled convergence) all points one way, and
+  a majority of surveyed experts put the genetic share above zero. It does not overturn the verdict. Each
+  line is logically uninformative about the between-group cause (heritability, invariance), confounded
+  (admixture slopes, which sum genetic and environmental effects of ancestry), invalid across ancestries at
+  present (polygenic means), or not evidence at all (opinion that correlates with the respondent's politics
+  and sex). The opposite objection, that the narrowing proves the gap environmental, fails for a matching
+  reason: it shows that part of the gap is environmental, not all of it.
+- **What would settle it:** a well-powered sibling-difference admixture design with observed skin colour and
+  local ancestry, and within-family GWAS of cognition in African-ancestry samples. For nations:
+  representative samples, invariance tested across countries, and means tracked through development.
+
+### The lesson verdicts (the tables)
+
+- (a) "Sub-Saharan African IQ is about 70" as a measurement → **not supported.** Grade: **strong**. The 2010
+  systematic review (Wicherts, Dolan & van der Maas) finds an N-weighted mean of 76.5 across 109 samples,
+  and samples meeting its criteria at about 80–82; the reply's exclusions tracked each sample's own mean
+  (biserial −.88). Strongest objection: the higher samples are urban and schooled, so representativeness
+  favours the low entries. It does not overturn the verdict, because blind raters found the reply's
+  inclusions tracked no objective feature of sampling, only the score; and even the critics' ~80 is a score
+  on Western norms with untested invariance, which the verdict states. Would be overturned by:
+  representative national samples, with invariance tested, averaging near 70.
+- (b) "National IQ differences are artefacts" → **fails.** Grade: **strong**. National IQ correlates
+  r = .88 with TIMSS mathematics, and harmonized learning outcomes for 164 countries show the same
+  association with income. Strongest objection: school tests are themselves conversions with their own
+  choices, and a 2022 critique holds comparable measures impossible in principle. It does not overturn the
+  verdict: the abstract-level critique gives no evidence for "impossible", and independent instruments agree
+  on the ordering. Would be overturned by: representative, invariance-tested data that dissolve the ordering.
+- (c) The settler-mortality causal estimate (Acemoglu, Johnson & Robinson 2001) → **open.** The 2012
+  recoding (Albouy) weakens the first stage on own-territory rates until the interval has no upper bound (verify, as in step 7); the reply holds
+  the assigned rates carry information. What would settle it: independent mortality data for the colonies
+  now assigned borrowed rates, and a test of the exclusion restriction (disease acting on income directly).
+  The correlation and the institutional account's other evidence (Nogales, the Koreas) stand either way.
 
 ## Sources to consult
 
@@ -524,7 +593,11 @@ prefers, or to trust both because both were published. The lesson's question is 
    Because: a derived result inherits the provenance of its inputs; the drill has to follow the number
    downstream, and it cuts whichever way the inputs cut.
 
-10. **The same questions to all the tables, and what the module leaves settled and open.** First the symmetry
+10. **The weighing: the gap is real and partly environmental, its genetic share is open, and the national
+   tables cannot decide it.** (Heading as a claim; it replaces "What the module leaves settled and open".) The
+   module's question set against everything the module has tested, against the strongest objection from each
+   side (VERDICT: "open is evasion"; "the narrowing proves it environmental"), reaching the module verdict in
+   the course's voice with its grades. First the symmetry
    (Figure 1 completed): all the tables rest on old, small, unrepresentative records or on filled gaps; all
    published their derivations, which is what made every audit possible; each drew a re-examination that
    changed entries and a reply that defended the conclusion. What survives differs with what was at stake: the
@@ -550,6 +623,13 @@ prefers, or to trust both because both were published. The lesson's question is 
      be wholly genetic, because it narrowed by several points within decades, varies from near zero to 1.5 SD
      across school districts, and widened in maths after 2020 — changes no genetic cause can produce on those
      time-scales; and no evidence excludes a genetic share.
+   - *Institutions* (Ref `geography-or-institutions`): only institutions have a clean natural experiment
+     behind them (the Koreas, Nogales); it shows they can produce gaps as large as any between nations, and
+     it does not apportion the world's gaps.
+   - *The strongest objection, answered* (VERDICT): "open" is evasion because the indirect evidence all
+     points one way; the reply line by line (uninformative, confounded, invalid across ancestries, not
+     evidence); and the opposite objection, that the narrowing proves the gap environmental, answered the
+     same way.
    - *Expert opinion* (§8): the American Psychological Association's task force (1996) found "no adequate
      explanation" available, with less support for the genetic than for the cultural accounts; a 2012 review
      in the same journal found "no new direct evidence"; a 2020 survey of 86 experts put the genetic share at
@@ -563,11 +643,19 @@ prefers, or to trust both because both were published. The lesson's question is 
      development.
    Because: the module's question is answered as far as the evidence goes and no further, in either direction;
    what remains open is open for stated reasons, with stated tests.
+   `<Conclusion>` (the module verdict in plain words): the tests measure the same abilities in both groups and
+   predict without bias; intelligence is substantially heritable within groups; the US gap is real. Whether
+   any of it is genetic has not been shown: the course holds the genetic share **open**, and says what study
+   would settle it. Two things are **established**: the gap as it stands is not wholly genetic, and no
+   evidence rules out a genetic share. Between nations, measured skills go with income, the lowest national
+   entries are too low by about ten points (**strong**), and nothing in the tables bears on genes; the rules
+   a country lives under can open a gap as wide as any. Then the hand-off: the settler-mortality table
+   compares colonies with colonies, and the next module asks "compared to what?".
 
 Headings fall out as: "A table is a list of claims"; "Ghana three times"; "Forty-eight children in Spain";
 "What the revision coded"; "The review, the reply and the rejoinder"; "Why the institutional table needed an
 instrument"; "Garrisons, campaigns and borrowed rates"; ★ "What a correlation carries"; "Where the numbers go
-next"; "What the module leaves settled and open".
+next"; "A real gap, partly environmental, its genetic share open".
 
 ## Set pieces and worked examples to recreate
 
@@ -750,7 +838,15 @@ Status lines the lesson must state in substance:
    would close it (`<Ref>` admixture-and-polygenic-scores), and nothing on the dossier's must-not list in either
    direction. Solution states the dossier's Overall answer 2–4 in the student's words and checks the draft
    against the list.
-8. **FORWARD (E7) → `colonial-balance-sheet`.** The settler-mortality table compares colonies with colonies.
+8. **Attack the verdict (the module's).** The course holds the genetic share of the US gap **open**. Write the
+   strongest case that this is evasion and that the evidence, taken together, makes a genetic share probable
+   (heritability, invariance, the Spearman pattern, positive admixture slopes, the stalled convergence, the
+   expert survey). Then write the strongest case from the other side that the evidence makes the gap
+   environmental (the narrowing, district variation, the post-2020 movement, the Flynn effect). For each, say
+   exactly what evidence would be needed to overturn the verdict in its direction. The solution sorts each
+   line into uninformative / confounded / invalid at present / not evidence, shows that the second case
+   proves only that part of the gap is environmental, and names the designs in the VERDICT.
+9. **FORWARD (E7) → `colonial-balance-sheet`.** The settler-mortality table compares colonies with colonies.
    Can it tell you whether colonial rule as such made the colonised richer or poorer than they would otherwise
    have been? Say what comparison would be needed and why the table cannot supply it. The solution says that
    the next module's balance-sheet lesson turns on exactly this — "compared to what?" — and that the article it

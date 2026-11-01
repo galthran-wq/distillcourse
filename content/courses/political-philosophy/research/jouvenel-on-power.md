@@ -3,7 +3,7 @@
 status: planned
 module: postwar-conservatism
 type: core
-goal: Analyze Jouvenel's natural history of Power — its growth through war, its alliance with the common man against the aristocracy, and democracy as the regime of its greatest extent — and evaluate it as an account of the modern state
+goal: Analyze Jouvenel's natural history of Power — its growth through war, its alliance with the common man against the aristocracy, and democracy as the regime of its greatest extent — and judge it against the record of state spending since 1870
 
 ## ARC (L10)
 
@@ -31,7 +31,9 @@ goal: Analyze Jouvenel's natural history of Power — its growth through war, it
   ruled, and because a Power that speaks as the general will meets no one who regards it as alien.
   Total war is the visible product of that growth. The lesson rebuilds the argument from the
   medieval king's forty-day army to the "social protectorate", then puts the strongest objection to
-  it: that the growth was asked for by the people it served.
+  it: that the growth was asked for by the people it served — and judges (see `## VERDICT`): the
+  growth is established, the law of near-uninterrupted growth fails after about 1990 (on balance),
+  and whether Power or the voters drove it is open.
 - **Hands off:** (i) Jouvenel's remedy is "intermediate social forces" that "enframe, protect and
   control the life of man, thereby obviating the intervention of Power" (XIX.10–11): which forces,
   and can they be rebuilt once the state has absorbed their functions? `kirk-and-nisbet-american-conservatism`
@@ -45,6 +47,44 @@ goal: Analyze Jouvenel's natural history of Power — its growth through war, it
   Jouvenel's history of Power, Oakeshott's disposition, Strauss's natural right, Voegelin's diagnosis
   of Gnosticism, Kirk's and Nisbet's American conservatism, Burnham's managers — tested on the
   Declaration of 1948"
+
+## VERDICT
+
+(From `research/verdicts/REGISTER.md`, Module 9, lesson verdict. Binding: carry each sub-claim and
+its grade exactly.)
+
+- **Claim judged:** Power has grown in extent almost without interruption, fastest under the regimes
+  that claim to give power to the people. The register splits it into four parts.
+  - **(a) The state's extent grew enormously across the democratising era. Established.** Government
+    spending averaged about 10.8% of output around 1870 and 41.9% in 1980 across fourteen industrial
+    countries (Tanzi 2005, Table 1, from Tanzi & Schuknecht 2000, Table I.1). Quote this one row
+    (the "Average" row) and no other figure for the long series. Precision for the writer: the table
+    lists fourteen countries, but only eleven have a figure for about 1870 (Canada, Ireland and New
+    Zealand are blank), so write "the industrial countries in the standard series" rather than
+    "fourteen" when quoting the 1870 average.
+  - **(b) As a law of near-uninterrupted growth, the thesis fails after about 1990. On balance.**
+    Several democracies cut government spending as a share of GDP for a decade or more with no war:
+    Canada 53.3% (1992) to 38.5% (2007), New Zealand 53.0% (1991) to 36.2% (2004), the Netherlands
+    56.4% (1995) to about 45% (2001–07) (IMF *Public Finances in Modern History*, via OWID). Caveats
+    the lesson states with the numbers: a share can fall because GDP grows; coverage changes in some
+    series (Sweden's 1993 jump is a series break and is not used); spending is one measure of extent,
+    not the whole of it (conscription, regulation and law are others).
+  - **(c) Whether Power's appetite or voters' demand drove the growth. Open.** The spending series
+    cannot tell the two apart. No sentence may say that the democrat's objection "confirms the
+    mechanism". What would settle it: cases where the franchise widened and spending did not follow,
+    or the reverse.
+  - **(d) Whether the "protected subject" is less free than the subject of the old intermediate
+    powers. Open** — a question of value, left to argument; the lesson states both sides' best case
+    and says the course's evidence cannot settle it.
+- **Strongest objection to the verdict:** from Jouvenel's side, the post-1990 cuts are shares of a
+  growing GDP, not absolute retreats, and spending is not extent — regulation and law grew while the
+  share fell, so (b) mistakes a ratio for the thing. It does not overturn (b): Jouvenel's own measure
+  is a ratio (Power's resources ÷ society's resources, ch. I translator's note), so a falling share
+  over a decade with no war is a reversal on his own terms; the objection is the reason (b) is graded
+  on balance, not strong, and the lesson says spending is one measure among several.
+- **What would overturn it:** for (b), evidence that the Canadian, New Zealand and Dutch falls are
+  artefacts of coverage, or that extent measured in conscription, regulation and law rose through
+  the same years enough to outweigh them; for (c), the franchise/spending cases above.
 
 ## Sources to consult
 
@@ -137,6 +177,18 @@ goal: Analyze Jouvenel's natural history of Power — its growth through war, it
   volume has no chapter on Jouvenel (grep confirms no mention); its "Montesquieu" chapter
   (Lowenthal, l.~25200–25215 "powers intermediate") supplies the source of Jouvenel's
   "makeweights" for a check.
+- **Tanzi, "The Economic Role of the State in the 21st Century", *Cato Journal* 25(3), 2005,
+  Table 1** — `C/research/texts/verification-2026-11/tanzi-2005-economic-role-of-the-state.txt`
+  (table at l.~127–148; the "Average" row: 10.8 about 1870, 41.9 in 1980). Bound to Tanzi &
+  Schuknecht, *Public Spending in the 20th Century* (2000), Table I.1. Quote one row consistently.
+  Tanzi is a scholar: References only; the figures are stated as the course's own.
+- **IMF, *Public Finances in Modern History* (government expenditure, % of GDP), via Our World in
+  Data** — `C/research/texts/audit-right-shading/imf-pfmh-gov-spending-gdp-selected.csv` (Canada
+  1992 53.3 → 2007 38.5; New Zealand 1991 53.0 → 2004 36.2; Netherlands 1995 56.4 → 2001–07 about
+  45). Do not use Sweden's 1993 value (series break). References only.
+- **Lindert, *Growing Public* (2004)** [UNVERIFIED: not read] — the demand-side account of social
+  spending's growth (voters, not Power), named only as the reading behind the democrat's objection;
+  References only, no figure taken from it.
 
 Names ONLY in References: Brogan, Fawcett, Huntington (translator), Viollet, Dicey, Duguit,
 Ihering, Pirenne, Frazer, Morgan, Bachofen. Names the BODY may use as part of the material (thinkers
@@ -263,18 +315,43 @@ therefore also its author's: a man who had seen the 1930s up close asks what mad
      extent after 1945 without incubating tyranny — which Jouvenel's own exception (England's
      surviving defences, XIII.6, XV.6) can absorb only by making the outcome depend on situations,
      not on the growth itself.
-   Where the lesson concedes and where it holds: the measurable claim — extent rose through war and
-   through the destruction of rival authorities from the twelfth century to 1945 — survives on the
-   numbers; the predictive claim — that democracy as such incubates tyranny — is a conditional ("in
-   the shape which we have given to it"), and the lesson states the condition. Jouvenel's later work
-   (Sovereignty, 1955; practical studies of housing, planning, pollution) shows the author himself
-   moving toward the liberal reading; one sentence, from Fawcett App. C.
+   Jouvenel's later work (Sovereignty, 1955; practical studies of housing, planning, pollution)
+   shows the author himself moving toward the liberal reading; one sentence, from Fawcett App. C.
+   The predictive claim — that democracy as such incubates tyranny — is a conditional ("in the shape
+   which we have given to it"), and the lesson states the condition. This section states the
+   objections; the judgement is link 9.
+9. **The weighing: Power's extent grew with democracy, but not as a law, and who drove it is open.**
+   Set Jouvenel's thesis against the objections of link 8 and the numbers, and reach the four-part
+   verdict of `## VERDICT`, one paragraph each, claim → evidence → bearing (L10e). (a) The growth is
+   real and large: the industrial countries of the standard series averaged about 10.8% of output in government
+   spending around 1870 and 41.9% in 1980 — **established**. (b) As a law of near-uninterrupted
+   growth it fails after about 1990: Canada, New Zealand and the Netherlands each cut spending's share
+   of GDP by eleven to seventeen points over a decade or more with no war (figures in `## VERDICT`),
+   and on Jouvenel's own measure — a ratio — that is a reversal; state the caveats (GDP growth, series
+   coverage, spending as one measure of extent) — **on balance**. (c) Whether Power's appetite or
+   voters' demand drove the growth is **open**: the series cannot tell the two apart, so neither
+   Jouvenel's mechanism nor the democrat's objection wins; say what would settle it (cases where the
+   franchise widened and spending did not follow, or the reverse). Do not write that the objection
+   "confirms the mechanism". (d) Whether the protected subject is less free than the subject of the
+   old intermediate powers is **open** — a question of value the evidence cannot decide; give each
+   side's best sentence and stop. Then the strongest objection to (b) — that a share of a growing GDP
+   is not a retreat of Power, and that regulation grew while spending fell — and why it lowers (b) to
+   on balance without overturning it. Close the section with what would overturn the verdict.
 
-Headings as claims (suggested): "War grew with the controls Power held"; "Measure the state by what
-it takes, not by its form"; "Men obey from habit and belief"; "Divine right and popular sovereignty
-grow from one trunk"; "Power grows against the notables, with the common man"; "Democracy masks
-Power and recruits its rivals"; "The protector state"; "What limits Power, and whether it should be
-limited".
+**Conclusion** (one or two short paragraphs, before Exercises): the verdict in plain words with its
+grades — the growth of the state's extent across the democratising era is established; Jouvenel's
+law of near-uninterrupted growth fails after about 1990, on balance; whether Power or the voters drove
+the growth is open, and so is whether the protected subject is less free. Then the hand-off: if
+intermediate social forces are the remedy, which ones, and can they be rebuilt once the state has
+absorbed their functions — Ref `kirk-and-nisbet-american-conservatism`.
+
+Headings as claims (suggested; nine body links is too many for 45 minutes — merge links 2–3 into
+one section and links 6–7 into one if the draft runs long): "War grew with the controls Power held";
+"Measure the state by what it takes, not by its form"; "Men obey from habit and belief"; "Divine
+right and popular sovereignty grow from one trunk"; "Power grows against the notables, with the
+common man"; "Democracy masks Power and recruits its rivals"; "The protector state"; "What limits
+Power: makeweights, and the objection that the people asked for it"; "The state's growth is
+established; Jouvenel's law is not, and its cause is open".
 
 ## Set pieces and worked examples to recreate
 
@@ -305,9 +382,7 @@ limited".
 
 ## Pitfalls / subtleties to flag
 
-- **Register rule:** The course passes no verdict of its own on any author or idea: no condemning or
-  approving labels in its own voice. Judgement comes only through argument and evidence; a label may
-  appear only inside a quotation, with who applied it and when.
+- **Register rule:** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Terms to anchor (L11), no more than three per section:** "Power" with a capital (Jouvenel's term
   for the governing apparatus and the men who run it — say so at first use, and that the
   translation keeps the capital); "extent" (the ratio); "Minotaur" (the Cretan monster fed with
@@ -425,7 +500,16 @@ limited".
    (taxes and conscription made permanent after wars the voters did not choose to prolong — VII.4;
    "everyone is potentially a minister") and state what would have to be true for the claim to
    survive (that the people can later take back what it granted — the reversibility Jouvenel denies).
-8. **FORWARD (E7) → `kirk-and-nisbet-american-conservatism`:** Jouvenel ends by saying that
+   The solution ends on the verdict: the post-1990 cuts in Canada, New Zealand and the Netherlands
+   are cases of a people taking back part of what it granted; who drove the growth stays open.
+8. **Attack the verdict.** The lesson judged Jouvenel's law of near-uninterrupted growth to fail after
+   about 1990, on balance. State the strongest objection in its best form: a falling share of a
+   growing GDP is not a retreat of Power, and in the same years the state's reach by regulation and
+   law grew. Then say what evidence would overturn the verdict: name the measure of extent other than
+   spending you would need (pages of regulation, share of employment set by public law, conscription
+   or its absence), the countries and years you would compare, and the result that would show
+   Power's extent rising through the 1990s in Canada, New Zealand and the Netherlands.
+9. **FORWARD (E7) → `kirk-and-nisbet-american-conservatism`:** Jouvenel ends by saying that
    intermediate social forces "enframe, protect and control the life of man, thereby obviating the
    intervention of Power". Name three such forces from this lesson (the family, the Church, the
    guild or union), and derive what happens to each one's hold on its members once the state takes

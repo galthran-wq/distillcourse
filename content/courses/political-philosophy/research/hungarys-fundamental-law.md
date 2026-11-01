@@ -41,12 +41,22 @@ goal: Apply Deneen's, Hazony's and Vermeule's accounts of post-liberal governmen
   where de Benoist wants a federation of peoples; a two-thirds majority that writes the rules of its
   own review where Vermeule's safeguard is the rulers' good faith); and (iii) what the critics
   (the Venice Commission, the European Union's institutions) and the defenders (the government and
-  its constitutional lawyers) each establish and each assume. No verdict on Hungary; a judgement on
-  what the case shows about the THEORIES.
-- **Hands off:** `the-argument-assembled` takes the module's answer — that every post-liberal
-  theory needs a people already held together by something liberalism cannot produce, and that
-  Hungary tried to write that something into its constitution — to the course's last open question:
-  the Böckenförde dilemma, whether a free state can produce the presuppositions it lives on.
+  its constitutional lawyers) each establish and each assume. Then the module's verdict (see
+  VERDICT): on the premise every post-liberal shares (a free state does not live on liberal
+  principles alone), on the Fourth Amendment, on whether the written presuppositions produced
+  cohesion, and on the liberal forecast that the system could not be voted out, which failed on
+  12 April 2026. The judgement is on the theories and on dated claims, not on the country or its
+  people.
+- **Hands off:** `the-argument-assembled` carries the course verdict. This lesson hands it the
+  module's answer as decided: liberal principles are necessary and, on balance, not sufficient —
+  a free state draws on a solidarity its procedures do not supply (Böckenförde's premise, which
+  Habermas grants in its motivational half); the post-liberal remedy as tried in Hungary showed
+  what its critics feared about the courts (the Fourth Amendment, strong) and has not shown the
+  cohesion it was written to secure (open); the liberal lock-in forecast failed (strong). What
+  passes on undecided is the open question with its test: whether a state can write the
+  presuppositions it lives on, and whether a free state can build a nation (the Third Republic
+  case) — settled only by a cohesion series that moves with constitutional change and not with the
+  economic cycle.
 - **Spine step:** "After liberalism: Deneen says it failed by succeeding, Hazony defends the order
   of national states, Vermeule the common good, de Benoist the right to difference — Hungary's
   constitution as the case — and the whole argument is assembled"
@@ -82,6 +92,73 @@ goal: Apply Deneen's, Hazony's and Vermeule's accounts of post-liberal governmen
     apart; (6) the people's "we" in the National Avowal is the nation, including Hungarians abroad,
     while the electorate is the citizens — the theories of the module do not say which is the
     constituent people.
+
+## VERDICT
+
+The module question: can a free state survive on liberal principles alone, and is the post-liberal
+remedy better? This lesson carries the module verdict (register, module 16) and one liberal
+forecast check. Grades are fixed: **on balance** on the premise; **open** on whether written
+presuppositions produce cohesion; **strong** on the Fourth Amendment; **strong** that the lock-in
+forecast failed.
+
+- **Claim 1 — the premise: a free state does not live on liberal principles alone.** Verdict:
+  **holds, on balance.** It draws on a solidarity, a readiness to bear burdens for strangers who
+  count as "us", which its procedures do not supply (Böckenförde). The premise is held by a
+  conservative (Scruton), a liberal of the left (Miller) and Jay in 1787 alike, and Carens concedes
+  it in his nonideal theory. Its strongest liberal interlocutor grants the motivational half:
+  Habermas, in the 2004 exchange with Ratzinger, holds that "liberal societal structures are
+  dependent on the solidarity of their citizens" and that if secularization goes "off the rails"
+  "the sources of this solidarity may dry up altogether" (`texts/audit-right-shading/habermas-ratzinger-2004-exchange-excerpt.txt`,
+  section (3) in his summary paragraph). He contests the other half, that the state cannot give
+  itself a secular (postmetaphysical) justification, and offers to give "Böckenförde's theory a
+  harmless meaning" (same file, section 4). Why only on balance: the falsifier is not yet bound.
+  The draft's falsifier ("a free state with no shared language, history or faith") could never be
+  met; the testable form is: trust and willingness to fund transfers to strangers do not fall where
+  shared identity or religion weakens. The cross-national diversity-and-trust literature is the
+  evidence to bind [not fetched].
+- **Claim 2 — "the state cannot command its presuppositions without ceasing to be free."**
+  Verdict: **open.** The Third Republic made "peasants into Frenchmen" through schools, roads and
+  conscription and stayed a parliamentary republic (E. Weber 1976) [secondary: publisher's
+  description only]. Bind before the course states it either way. What would settle it: the
+  Third Republic record read from Weber's text, set against the liberties of the period.
+- **Claim 3 — the Fourth Amendment (2013).** Verdict: **strong** that it was a majority overriding
+  its court. The constitution was written in four months by an alliance that won two-thirds of the
+  seats on 53% of the list vote, and it held two-thirds again on about 45% in 2014. The Fourth
+  Amendment reinstated provisions the Constitutional Court had annulled and repealed the Court's
+  earlier case law. This is the critics' fear about the courts, borne out. (It is not used as
+  evidence about Vermeule's theory, which it did not apply; see `vermeule-common-good-constitutionalism`.)
+- **Claim 4 — writing the presuppositions into the supreme law produced cohesion.** Verdict:
+  **open.** The demographic indicators the policy aimed at rose and then fell back — the total
+  fertility rate from about 1.23 (2011) to about 1.61 (2021) and about 1.38 (2024); marriages from
+  about 35,000 (2010) to about 64,000 (2022) and about 50,000 (2024) [secondary: OSW via search
+  summary; bind from KSH STADAT nep0006 and nep0077 before stating] — and no cohesion measure is in
+  the course. One election loss does not measure cohesion either way.
+- **Claim 5 — the liberal forecast check: the system could not be voted out.** Verdict:
+  **failed, strong.** On 12 April 2026 Tisza won 53.18% of the list vote and 141 of 199 seats;
+  Fidesz–KDNP won 38.61% and 52 seats; turnout 78.99% (National Election Office, binding result
+  as generated 7 May 2026; `texts/verification-2026-11/hungary-2026-nvi-results.txt`; the shares
+  are of all valid list votes). Cardinal acts still give any two-thirds majority an outsized lever,
+  including the new one (141 of 199 is itself above two-thirds): **on balance**.
+- **The answer the evidence supports:** liberal principles are necessary and, on balance, not
+  sufficient. The supplement they need comes from a people's own institutions and loyalties, which
+  the state can protect. Whether it can also write them is open (claims 2 and 4). Hungary is the
+  case each side reads as its proof, and it settles neither the premise nor the remedy.
+- **Strongest objection to the verdict:** the 2026 alternation shows that a national-Christian
+  constitution and free elections coexist, so the remedy is vindicated. The verdict accepts the
+  coexistence: the lock-in charge failed. It does not accept vindication. The winner's programme
+  is pro-EU on courts, media and prosecution (EPPO membership, judicial and media independence, a
+  two-term limit) [secondary: Reuters factbox, 10 Feb 2026, `texts/verification-2026-11/tisza-programme-reuters-factbox.txt`];
+  it is also restrictive on migration (it rejects the Pact's quotas and relocation), which narrows
+  the contrast. And the cohesion the text promised is unmeasured. The opposite objection — that
+  Hungary refutes the premise, since a free state that tried to write its presuppositions ended in
+  a constitution "of one party" — confuses the remedy with the premise: the Fourth Amendment counts
+  against the remedy as practised, not against the claim that liberal procedures need a supplement.
+- **What would overturn it:** for claim 1, trust and transfers that do not fall where shared
+  identity weakens; for the open cohesion finding, a cohesion series (trust, fertility, marriage,
+  civic participation) that moves with the constitutional changes and not with the economic
+  cycle; for claim 5, the new majority being prevented from governing by cardinal acts and
+  appointed bodies — which would revive a narrower form of the charge, entrenchment of policy
+  rather than of the party.
 
 ## Sources to consult
 
@@ -155,9 +232,38 @@ licence/reuse terms on each site):
 - **Election results** (National Election Office, `valasztas.hu`, official): list vote and seats
   for Fidesz–KDNP — 2010: about 53% of the list vote, 263 of 386 seats (68%); 2014: about 45%, 133 of
   199 (67%); 2018: about 49%, 133 of 199; 2022: about 54%, 135 of 199. Verify every figure on the
-  site. The 2026 parliamentary election (April 2026) — check the result and whether any party holds
-  two-thirds; state it in one sentence at most, since the lesson reads the text and its first
-  fifteen years, not the current government.
+  site. **The 2026 parliamentary election (12 April 2026) — staged and bound:**
+  `C/research/texts/verification-2026-11/hungary-2026-nvi-results.txt` (vtr.valasztas.hu,
+  `ListasJkv.json` and `Patko.json`, data version 05071600, the binding result as generated on
+  7 May 2026). Tisza 3,385,890 list votes, 53.18%, 141 of 199 seats (96 constituency + 45 list);
+  Fidesz–KDNP 2,458,337, 38.61%, 52 (10 + 42); Mi Hazánk 5.63%, 6; turnout 78.99% (6,408,362 of
+  8,112,646). The shares are of all valid list votes (as shares of party-list votes only: 53.53 /
+  38.87 / 5.67 — say which). Cite the result of 7 May; the "18 April" date for the final count is
+  not confirmed and must not be used. This result is the forecast check (EXPLANATION PLAN 8).
+- **Tisza's programme:** Reuters, "Factbox-Hungary's opposition Tisza party sets out policy plans
+  ahead of April election", 10 Feb 2026 [secondary],
+  `C/research/texts/verification-2026-11/tisza-programme-reuters-factbox.txt` — EPPO membership,
+  judicial and media independence, a two-term limit; rejects the EU migration pact's quotas and
+  relocation; keeps family benefits. The party's own programme text ("Működő és emberséges
+  Magyarország", 7 Feb 2026) was not reached — obtain it before quoting the party.
+- **KSH (Hungarian Central Statistical Office) STADAT tables nep0006 (fertility) and nep0077
+  (marriages)** [not fetched] — bind the fertility and marriage series before any figure in
+  VERDICT claim 4 is stated; until then the figures are [secondary: OSW Commentary 658, April
+  2025, via search summary].
+- **Habermas–Ratzinger exchange (Munich, January 2004)**, Habermas's "Pre-political Foundations of
+  the Democratic Constitutional State?" — staged excerpt
+  `C/research/texts/audit-right-shading/habermas-ratzinger-2004-exchange-excerpt.txt` (German
+  History Intersections translation; Habermas's sections 2–3 are elided in the staged text, so
+  quote only the summary paragraph and sections 4–5 as staged): the motivational concession
+  ("liberal societal structures are dependent on the solidarity of their citizens"; "off the
+  rails"; "may dry up altogether") and the offer to give "Böckenförde's theory a harmless meaning".
+  Habermas is named in the body as the interlocutor (L8a exception: his argument is what the
+  verdict weighs); Ratzinger in one clause at most.
+- **A diversity-and-trust source** (the cross-national literature on ethnic diversity, social trust
+  and support for redistribution) [not fetched] — the evidence the restated falsifier needs.
+- **Weber, *Peasants into Frenchmen: The Modernization of Rural France, 1870–1914* (Stanford UP,
+  1976)** [secondary: publisher's description only] — for VERDICT claim 2; not to be stated either
+  way until bound from the book.
 - **Comparative preambles** (for the claim-to-refute exercise and the defenders' case): Ireland
   1937 ("In the Name of the Most Holy Trinity"); Greece 1975 ("In the name of the Holy and
   Consubstantial and Indivisible Trinity"); Poland 1997 (God and "our culture rooted in the
@@ -313,8 +419,13 @@ two-thirds of the seats — the share needed to change the constitution.
    WILL (the majority removing the reasoned check — Vermeule's "law as will" in the form he
    attributed to his opponents)? The theory has no external test; its test is the authority's
    reasons. The lesson puts the government's stated reasons (from its reply to the Venice
-   Commission) beside the Commission's objection and leaves the reader to apply Vermeule's own
-   criterion.
+   Commission) beside the Commission's objection. What the course states: as a matter of record
+   the amendment is a majority overriding its court (module verdict, **strong**); whether the
+   majority's reasons make it determination or will is a question Vermeule's theory can answer only
+   from the authority's own good faith — the finding of `<Ref vermeule-common-good-constitutionalism>`
+   (the theory supplies no check of its own). The amendment was not an application of his theory,
+   so it is not evidence against it; it is a case of what a majority does where that check is the
+   only one asked of it.
 4. **Is this Deneen's post-liberalism?** The pre-liberal goods are all here: family, nation, faith,
    memory across generations ("We deny any statute of limitations" for crimes against the nation;
    "our fundamental cohesive values are fidelity, faith and love" — verify), against Deneen's
@@ -326,11 +437,14 @@ two-thirds of the seats — the share needed to change the constitution.
    the form it is likely to take" (l.923–925). Two readings, each stated at full strength: (a) the
    case is the strongman Deneen predicted, the demotic answer of a degraded citizenry; (b) the case
    is the national-scale protection of the local practices Deneen wants, against the "pincer" of a
-   distant state (Brussels) and a global market. The lesson does not choose; it shows which facts
-   each reading needs (how the institutions of local self-government fared — municipal powers were
-   in fact centralised after 2011, e.g. schools taken over by the state in 2013: verify — favours
-   (a); the family-policy and housing programmes, which are statutory, favour (b) only if they
-   strengthened households rather than the state's reach).
+   distant state (Brussels) and a global market. The lesson shows which facts each reading needs
+   (how the institutions of local self-government fared — municipal powers were in fact
+   centralised after 2011, e.g. schools taken over by the state in 2013: verify — favours (a); the
+   family-policy and housing programmes, which are statutory, favour (b) only if they strengthened
+   households rather than the state's reach), and says what the course's evidence decides: the
+   departure from Deneen's method is a fact about the text (theory by the state, not practice from
+   below); whether the programme strengthened the households and towns it names is the cohesion
+   question the module verdict finds **open**, with its test (link 8).
 5. **De Benoist's Europe or Hungary's? The theory furthest from the case.** The manifesto rejects
    "a 'Europe of Nations', a mere assemblage of national egos" (`<Ref de-benoist-european-new-right>`);
    the Hungarian government's European programme is precisely a Europe of nations. Where they meet:
@@ -380,24 +494,61 @@ two-thirds of the seats — the share needed to change the constitution.
    is (Vermeule l.1036; de Benoist I.3 on the "republic of judges"). (e) Mandated change through
    amendment is what constitutions provide for; eleven amendments in a decade (verify) is a fact,
    not an argument.
-8. **What the case shows about the theories** (the closing section before the Conclusion; L16).
-   Three findings, stated as the course's judgement on the THEORIES, not on Hungary: (i) the
-   post-liberal theories disagree on the case — Hazony's is the closest fit and is contradicted by
-   the EU clause; Vermeule's method fits the interpretive articles and his safeguard is exactly what
-   the critics say failed; Deneen's prescription is contradicted by the method and his prediction is
-   the critics' reading; de Benoist's Europe is the opposite of the government's; (ii) every one of
-   them assumes a check that the case tests — Hazony's cohesive majority nation that "can afford" to
-   grant minorities rights, Vermeule's officials' good faith, Deneen's local practice preceding
-   national theory — and the case shows how each check looks when a single majority holds the
-   pen; (iii) the liberal critique assumes neutral referees (a constitutional court, the
-   Commission) that the post-liberals deny exist; the case cannot settle that disagreement, because
-   the referees are a party to it. Leave the judgement of Hungary to the reader; state these three
-   about the theories.
+8. **Forecast check: "it cannot be voted out" (12 April 2026)** (300–500 words of lesson; L12d,
+   dated). *The forecast:* a charge common in liberal commentary through the 2010s and early 2020s
+   — the electoral law, the media tier and the cardinal acts had made the governing alliance
+   irremovable by election (the "lock-in" reading of links 6 and the votes-and-seats figure; state
+   it in the critics' own terms, attributed by kind of source — Venice Commission's concern that
+   cardinal acts lock in choices beyond an electoral cycle, the scholarly "autocratic legalism"
+   reading in References — and date the strongest version before 2026). *The record:* on 12 April
+   2026 Tisza won 53.18% of the list vote and 141 of 199 seats; Fidesz–KDNP 38.61% and 52 seats;
+   turnout 78.99%, the binding National Election Office result as generated on 7 May 2026. Power
+   changed hands by the electoral law the alliance had written. *Verdict:* the forecast **failed —
+   strong.** Then the narrower charge that survives, graded separately: cardinal acts still give
+   any two-thirds majority an outsized lever, including the new one, whose 141 seats are
+   themselves above two-thirds — **on balance**. What would overturn the failed verdict: the new
+   majority being prevented from governing by cardinal acts and appointed bodies — which would
+   revive a narrower form of the charge, entrenchment of policy rather than of the party. Keep it
+   to the result and its meaning for the forecast; no predictions about the new government (L12d).
+   Because: the course tests liberal forecasts by the same rule as the right's, and this one is
+   dated and decided.
+9. **The weighing: "Liberal principles are necessary, and not sufficient; the Hungarian remedy
+   proved neither the premise nor itself"** (the last body section before the Conclusion; L16,
+   L10e). First the three findings about the THEORIES, which stand as before: (i) the post-liberal
+   theories disagree on the case — Hazony's is the closest fit and is contradicted by the EU clause;
+   Vermeule's method fits the interpretive articles and the check it relies on is the one the
+   critics say was missing; Deneen's prescription is contradicted by the method and his prediction
+   is the critics' reading; de Benoist's Europe is the opposite of the government's; (ii) every one
+   of them assumes a check that the case tests — Hazony's cohesive majority nation that "can afford"
+   to grant minorities rights, Vermeule's officials' good faith, Deneen's local practice preceding
+   national theory; (iii) the liberal critique assumes neutral referees that the post-liberals deny
+   exist (and Hazony (b), no neutral civic state, is upheld in `<Ref hazony-virtue-of-nationalism>`).
+   Then the module verdict, weighed: the shared premise — a free state draws on a solidarity its
+   procedures do not supply — set against its strongest liberal interlocutor, Habermas, who grants
+   the motivational half and contests only the justificatory half (quote the two sentences; VERDICT
+   claim 1): **on balance**, held down because the testable falsifier (trust and transfers where
+   shared identity weakens) is not yet bound. The remedy: the Fourth Amendment as a majority
+   overriding its court (**strong**); cohesion from the written presuppositions (**open**: the
+   indicators rose and fell back, no cohesion measure, one election is not one); the lock-in
+   forecast failed (**strong**, link 8). The strongest objection — 2026 vindicates the remedy —
+   answered as in VERDICT: coexistence accepted, vindication not, because the winner's programme is
+   pro-EU on courts, media and prosecution (and restrictive on migration, which narrows the
+   contrast) and the cohesion is unmeasured. Close with what would overturn each part.
+
+**Conclusion** (L10): in plain words — a free state cannot live on liberal principles alone: on
+balance, since even Habermas grants that its structures depend on a solidarity they do not make.
+Hungary tried to write that solidarity into its supreme law. On the record so far the attempt
+showed what its critics feared about the courts (strong), has not shown the cohesion it was written
+to secure (open), and did not lock its authors in power, as liberal critics forecast (that forecast
+failed, strong). Hand-off: whether a state can write the presuppositions it lives on, or a free
+state build a nation (the Third Republic), is the open question the course verdict
+(`<Ref the-argument-assembled>`) takes, with the test that would settle it.
 
 Headings as claims (suggested): "The preamble is law"; "'We, the members of the Hungarian
 nation'"; "The public good written into the rule of interpretation"; "Theory by the state, not
 practice from below"; "Two maps of Europe"; "What the critics establish"; "What the defenders
-establish"; "What the case shows about the theories".
+establish"; "The lock-in forecast failed on 12 April 2026"; "Liberal principles are necessary,
+and not sufficient; the Hungarian remedy proved neither the premise nor itself".
 
 ## Set pieces and worked examples to recreate
 
@@ -426,6 +577,14 @@ establish"; "What the case shows about the theories".
 7. **C-286/12** (the judges' retirement age): the facts, the holding, and what the government did
    after it (a later law offering reinstatement or compensation — verify) — a short case of what an
    external court could and could not reverse.
+8. **12 April 2026: the forecast and the count** (EXPLANATION PLAN 8): the lock-in forecast stated
+   in its strongest dated form, then the National Election Office table (Tisza 53.18% → 141 of 199;
+   Fidesz–KDNP 38.61% → 52; turnout 78.99%; result of 7 May), then the verdict in one line — failed,
+   strong — and the surviving narrower point (any two-thirds majority, the new one included, holds
+   the cardinal-act lever; on balance).
+9. **Habermas grants half of Böckenförde** (EXPLANATION PLAN 9): the two sentences of the 2004
+   exchange (dependence on solidarity; "may dry up altogether") beside the "harmless meaning"
+   offer — the strongest liberal reply shown conceding the half the module verdict needs.
 
 ## Pitfalls / subtleties to flag
 
@@ -457,9 +616,7 @@ establish"; "What the case shows about the theories".
   of the EU vs the European Court of Human Rights (different courts — do not confuse them).
 - **Do not re-teach** Hazony, Vermeule, Deneen, de Benoist, Scruton, Burke, Oakeshott, Schmitt,
   Polybius, Madison: one clause and a `<Ref>` each; the new matter is the text and the record.
-- **Balance and register.** The course passes no verdict of its own on any author or idea: no
-  condemning or approving labels in its own voice. Judgement comes only through argument and
-  evidence; a label may appear only inside a quotation, with who applied it and when. This covers
+- **Balance and register.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right. This covers
   "illiberal democracy" (the prime minister's own phrase of 2014 and Zakaria's of 1997 — attribute
   each), "autocratic legalism" and "electoral autocracy" (critics' terms — attribute or omit),
   "Christian democracy" (the government's later self-description — attribute), and equally
@@ -475,8 +632,13 @@ establish"; "What the case shows about the theories".
   evidence, never settled in the course's voice. The numbers: "about two-thirds of its territory"
   (Trianon) and "over 400,000 deported in May–July 1944" are the standard figures — use them only
   if a claim needs them, with their frame.
-- **No current politics.** The lesson reads 2011–c. 2022 and the documents; the 2026 election gets
-  one sentence at most (verify the result). Do not predict.
+- **No current politics beyond the forecast check.** The lesson reads 2011–c. 2022 and the
+  documents; the 2026 election enters as the forecast check (link 8), with the bound National
+  Election Office figures and nothing about the new government's record. Do not predict.
+- **The verdict is on arguments and dated claims, never on the country, its voters or its
+  leaders.** "Strong" for the Fourth Amendment states what the amendment did (a majority
+  overrode its court); it is not a label for the government. The same standard scores the liberal
+  lock-in forecast as failed.
 - **Numbers (L12):** keeper numbers — two-thirds (the threshold); about 45% of the vote → two-thirds
   of the seats (2014); 262 to 44 (the adoption vote, verify). Everything else to a figure.
 
@@ -492,9 +654,11 @@ establish"; "What the case shows about the theories".
    with Article R(3) drawn as an arrow from the National Avowal into every other block ("interpreted
    in accordance with"), and Article 28 as an arrow into ordinary statutes ("presumed … the public
    good"). The preamble made law, in one picture.
-3. `draw:` (dataviz — follow the house dataviz rules) **votes vs seats, 2010–2022**: four paired bars
-   (list-vote share; seat share) for the governing alliance, a horizontal line at two-thirds. Data
-   from valasztas.hu, cited in credits/References; values to the nearest percent.
+3. `draw:` (dataviz — follow the house dataviz rules) **votes vs seats, 2010–2026**: five paired bars
+   (list-vote share; seat share) for the largest party or alliance — Fidesz–KDNP 2010–2022, Tisza
+   2026 (Fidesz–KDNP's 2026 pair beside it, muted) — a horizontal line at two-thirds. Data from
+   valasztas.hu (2026: the staged NVI file), cited in credits/References; values to the nearest
+   percent. The figure serves link 6 (the lock-in reading) and link 8 (its failure).
 4. `draw:` single `<Figure>` — **three tiers of law**: ordinary act (simple majority of MPs present)
    / cardinal act (two-thirds of MPs present) / Fundamental Law and amendments (two-thirds of all
    MPs), with examples of what sits in each tier (family policy, taxation's rules, elections, media,
@@ -574,7 +738,22 @@ establish"; "What the case shows about the theories".
    state organ to protect them. State the two ways this answers Böckenförde (the state CAN secure
    its presuppositions by constitutional command / the attempt shows that commanded presuppositions
    are no longer presuppositions) and which of the course's thinkers would give each answer. The
-   solution says, with a `<Ref>`, that the course's synthesis leaves this as its last open question.
+   solution says, with a `<Ref>`, that this module decided the premise (on balance) and left the
+   writing of presuppositions open, and that the course verdict takes it with the test that would
+   settle it (a cohesion series that moves with constitutional change, not the economic cycle; the
+   Third Republic record).
+9. **Attack the verdict (E6b):** The module verdict holds, on balance, that a free state does not
+   live on liberal principles alone. State the strongest objection in its best form — Habermas's:
+   the constitutional state can justify itself from secular reason, and its dependence on
+   solidarity is motivational and can be met by a "double learning process" between faith and
+   secular reason; or Rawls's: just institutions generate their own support. Then (a) say which
+   half of the premise the objection actually contests, and whether the verdict needs that half;
+   (b) name the evidence that would overturn the verdict — a cross-national series in which trust
+   and willingness to fund transfers to strangers do not fall where shared identity or religion
+   weakens — and say what such a study must control for (income, inequality, institutional
+   quality); (c) do the same for the forecast check: what record after 2026 would revive the
+   lock-in charge in its narrower form? The solution grades each answer against the verdict's own
+   falsifiers.
 
 ## Nietzsche cross-course links
 

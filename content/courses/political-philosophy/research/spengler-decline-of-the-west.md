@@ -44,7 +44,11 @@ goal: Analyze Spengler's morphology of Cultures — birth, Culture, Civilization
   Culture/Civilization → contemporaneity → Caesarism) and then asks what kind of
   claim a morphology is — the question the civilizations module later puts to
   Toynbee and Huntington.
-- **Hands off:** Three problems stay open. (i) Whether "decline" is a fact or a
+- **Hands off:** The lesson decides what the morphology's political forecasts
+  are worth: the twentieth-century forecast of dead parliaments failed
+  (strong), Caesarism is dated by Spengler to 2000–2200 and is untested
+  (open), and the fellah device makes the method proof against duration
+  (strong). Three problems pass on. (i) Whether "decline" is a fact or a
   mood: the next lesson, `ortega-revolt-of-the-masses` (1930), opens its attack on
   the decadence literature by asking people "not to be so simple-minded as to
   think of Spengler immediately" (XIV.2) and argues that technique cannot outlive
@@ -68,7 +72,64 @@ goal: Analyze Spengler's morphology of Cultures — birth, Culture, Civilization
   friend and enemy and the sovereign as he who decides the exception — and
   Weimar is the case"
 
+## VERDICT
+
+Lesson verdict (REGISTER.md, Module 7). The brief carries it exactly as graded
+there.
+
+- **Claim judged:** the morphology's claim to predict the West's political
+  future from its "contemporaries".
+- **Verdict:** the forecasts datable to the twentieth century failed in the
+  end, Caesarism is not yet testable, and the method protects itself from
+  refutation. Three graded parts:
+  - *The twentieth-century forecasts* — **strong** that they failed. What
+    Spengler dated to the twentieth century was the decay of parliaments and
+    the "informal sway of individuals": "As the English kingship became in
+    the nineteenth century, so parliaments will become in the twentieth, a
+    solemn and empty pageantry" (vol. 2, staged
+    `texts/spengler/vol2-perspectives-of-world-history.txt` l.22344), and
+    "There is no way back to the old parliamentarism" (l.20039). Personal
+    rule came to much of Europe in 1922–45, a partial hit. By the century's
+    end parliamentary government was restored and extended across Western and
+    then Eastern Europe, the reverse of the forecast.
+  - *Caesarism proper* — **open**. It is not a twentieth-century forecast.
+    His own Table III dates the "Formation of Caesarism" in the West to
+    2000–2200; the text agrees: "the transition from Napoleonism to Caesarism
+    … which occupies at least two centuries" (vol. 2 l.20049–20053), and
+    "from about the year 2000" (vol. 1 l.17136). The window is open, so the
+    forecast is untested. What would settle it: the record to 2200.
+  - *The fellah device* — **strong**. It reclassifies anything that outlives
+    its thousand years (Egypt, China), so duration can never count against
+    the theory.
+- **What decides it:** Spengler's own dated sentences and Table III, set
+  against the count of parliamentary democracies in Europe in 1920, 1938 and
+  2000 (Mazower, *Dark Continent*, ch. 1 [UNVERIFIED; bind before stating a
+  number]).
+- **Strongest objection:** the post-1945 parliaments are themselves the
+  "kept but dead" forms Spengler predicted — the constitution, the senate and
+  the party survive while real power is personal or financial. Why it does
+  not overturn the verdict: that reading would make the parliamentary
+  forecast unfalsifiable, which is the verdict's third point; a forecast that
+  counts working parliaments with alternating governments as hits has stopped
+  forecasting.
+- **What would overturn it:** for the first point, a reading on which the
+  post-1945 parliaments are "kept but dead" forms that names in advance what
+  observation would show a parliament alive — otherwise it collapses into the
+  third point. For Caesarism: the record to 2200.
+- **Brief correction (register):** the earlier phrase "Caesarism within the
+  twentieth century" is removed from this brief; Spengler did not date it so.
+
 ## Sources to consult
+
+- **Added for the verdict (REGISTER.md, Module 7):**
+  - Spengler, Table III, "'Contemporary' Political Epochs", vol. 1 (Atkinson
+    tr.), fold-out tables — staged
+    `research/texts/verification-2026-11/spengler-vol1-table-iii-political-epochs.txt`
+    (OCR read column by column; the Western Civilization cells are 1800–2000,
+    2000–2200, after 2200). The deciding text for the Caesarism dating.
+  - A count of parliamentary democracies in Europe in 1920, 1938 and 2000
+    (e.g. Mark Mazower, *Dark Continent: Europe's Twentieth Century*, 1998,
+    ch. 1) [UNVERIFIED; bind before any number is stated].
 
 - **Spengler, The Decline of the West, Vols. 1–2 (Atkinson tr., 1926/1928)** — summary
   index 11 (read whole: key_results, chapter_map, gems, figures); texts at
@@ -329,17 +390,39 @@ chain:
    concedes: Spengler never claimed proof — he claimed sight (link 2) — so the
    honest form of the question is not "is it false" but "what can a way of seeing
    be answerable to". Where it replies for him: the morphology does make dated
-   forecasts (Caesarism within the twentieth century, the return of professional
-   armies, "the last victories of money"), and dated forecasts can be checked; the
-   reader is left to check them in Exercise 5, and the civilizations module gives the rival
-   mechanism.
+   forecasts, and dated forecasts can be checked. **This step is the weighing**,
+   and it reaches the verdict in the course's voice. (1) What Spengler dated to
+   the twentieth century — parliaments becoming "a solemn and empty pageantry"
+   (vol. 2 l.22344), "no way back to the old parliamentarism" (l.20039): personal
+   rule came to much of Europe in 1922–45, a partial hit; by 2000 parliamentary
+   government was restored and extended across Western and then Eastern Europe
+   — the forecast failed in the end (**strong**). (2) Caesarism proper: read
+   Table III's Western column — "Formation of Caesarism", 2000–2200 — with
+   "at least two centuries" (l.20049–20053) and "from about the year 2000"
+   (vol. 1 l.17136); the forecast's window is open, so it is untested
+   (**open**; settled only by the record to 2200). (3) The fellah device makes
+   duration unable to count against the theory (**strong**). Then the
+   strongest objection at full strength — the post-1945 parliaments are the
+   forms "kept but dead" — and the answer: to count working parliaments as
+   dead forms is to make the forecast unfalsifiable, which is point (3), not a
+   rescue of point (1). The civilizations module gives the rival mechanism.
 
 Headings fall out as claims: "There is no world history, only eight Cultures" /
 "A Culture is an organism, so its history is a biography" / "One prime symbol runs
 through a Culture's mathematics, art and state" / "Civilization is the Culture's old
 age, not its opposite" / "Contemporaneity: how 100 BC predicts 1918" / "Caesarism,
 and Nietzsche as a symptom" / "What the morphology does not decide: Spengler's
-politics" / "What kind of claim is a morphology?"
+politics" / "The morphology's dated forecasts failed, its Caesarism is untested,
+and its method cannot be refuted" (the weighing; states the verdict).
+
+**Conclusion.** State the verdict in plain words with its grades: what
+Spengler dated to the twentieth century — the death of parliaments — failed
+(strong; a partial hit in 1922–45, reversed by 2000); the Caesarism he dated
+to 2000–2200 is not yet testable (open, until the record to 2200); and the
+fellah device protects the method from refutation by duration (strong). Then
+the hand-off: whether decline is a fact or a mood is Ortega's opening question
+(`ortega-revolt-of-the-masses`); what Spengler did when a would-be Caesar came
+in 1933 is `the-right-in-1933`.
 
 ## Set pieces and worked examples to recreate
 
@@ -457,10 +540,7 @@ politics" / "What kind of claim is a morphology?"
   lesson) may be named once as the author of the "commonplace" sentence; Toynbee
   and Huntington are far ahead — forward Refs only, with any thesis of theirs
   stated as the course's own.
-- **Register (exact rule).** The course passes no verdict of its own on any
-  author or idea: no condemning or approving labels in its own voice.
-  Judgement comes only through argument and evidence; a label may appear only
-  inside a quotation, with who applied it and when.
+- **Register (exact rule).** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Nietzsche:** nothing about Nietzsche's own meaning of transvaluation, eternal
   recurrence or politics is stated — Ref only (see below). Spengler's reading of
   eternal recurrence as a cyclical history is a misreading the course.yaml note
@@ -551,8 +631,10 @@ politics" / "What kind of claim is a morphology?"
    phase lengths and compute when the West's Caesarism and Second Religiousness
    would fall. Then state what observation between 1918 and today would have borne
    this out or not (his forecast of a return of professional armies; the "last
-   victories of money"). Solution shows the arithmetic and refuses a verdict — it
-   names what would count.
+   victories of money"). Solution shows the arithmetic and checks it against
+   Table III (Caesarism 2000–2200): the arithmetic agrees with Spengler's own
+   dating, so the Caesarism forecast is untested (open); the parliamentary
+   forecast he did date to the twentieth century failed (strong).
 6. **Synthesis (counter-argument stem, E3):** Mosca (1896) says peoples do not
    age, because "each new generation has all the vigor of youth", and that
    societies decline when their ruling class stops renewing itself. Name two facts
@@ -570,7 +652,19 @@ politics" / "What kind of claim is a morphology?"
    a warning, with the sentence that shows it; then say which allows a remedy
    (Polybius's mixed constitution) and which forbids one ("the freedom to do the
    necessary or to do nothing").
-8. **FORWARD (E7)** → `ortega-revolt-of-the-masses`: Spengler holds that technique
+8. **Attack the verdict:** The lesson concludes that Spengler's forecast of dead
+   parliaments failed (strong). State the strongest objection in its best
+   form: Europe's parliaments survive as forms while decisions pass to
+   central banks, courts, Brussels and personal leaders — the "informal sway
+   of individuals" behind constitutional forms kept but dead. Then say what
+   evidence would be needed to overturn the verdict: a measure, fixed in
+   advance, by which a parliament counts as dead (it does not remove
+   governments; its votes do not change outcomes) and a record showing
+   Europe's parliaments fail it. Solution: without such a measure the
+   objection turns the forecast into the unfalsifiable form the verdict's
+   third point names; with it, the reader must show that governments are no
+   longer removed by elections — which the record since 1945 does not show.
+9. **FORWARD (E7)** → `ortega-revolt-of-the-masses`: Spengler holds that technique
    and the Machine are the Faustian Culture's last work and run on through its
    Civilization. Ask whether a machine-civilization can run on after the men who
    use it have stopped understanding or caring for the science that made it: list

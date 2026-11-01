@@ -59,6 +59,13 @@ here they are recalled with a `<Ref>` and only what Cicero adds is taught.
   beyond the slug's thinker). The next lesson in course order is
   `hellenization-of-christianity`, whose Inherits clause relies on this
   lesson's "one law for all, each city its own gods".
+  (4) What this lesson decides and what it passes on (register, module 2, no
+  verdict): it settles two partial points — the diversity of customs does
+  not prove that justice is convention, and Laelius's "rule over those
+  better off ruled" inherits natural slavery's failure. Whether a natural law
+  exists, against convention, is not decided here; it is the course's long
+  arc, and the modern grounds for denying it are judged in
+  `strauss-natural-right-and-history`.
 - **Spine step:** "Rome turns Greek theory into practice: Polybius explains its
   rise by a mixed constitution that arrests the cycle of regimes, and Cicero
   defines the commonwealth as a people bound by agreed right under a natural
@@ -412,7 +419,21 @@ definition and the reply that put a law above every statute.
    Athens that happens to put Rome on top. The reply available in the text:
    the standard condemns Rome too — the Numantine case cuts both ways, and
    the Laws name Sulla's enacted law unjust — so it is not Rome's interest,
-   even when Rome's advocates use it. Leave the weighing to the reader.
+   even when Rome's advocates use it. Say what the exchange settles, as a
+   fact about the arguments. On (a): Laelius did not answer Philus's demand
+   for evidence — he offered a definition and the testimony of conscience —
+   so the existence of such a law is not established in this lesson. But one
+   half of Philus's case is answered: variety of customs is variety of
+   opinion about justice, and does not by itself prove that justice is
+   convention (the course states this as its own result). On (b): the reply
+   holds — the standard did condemn Roman acts (Numantia, Sulla's law), so
+   it is not simply Rome's interest. Then the point the course states
+   against Laelius himself: the title to empire in (c) above, rule over
+   those better off ruled, inherits natural slavery's failure (`<Ref>`
+   `aristotle-political-animal-and-natural-slavery`): no criterion, stated
+   in advance, picks out the peoples who are better off ruled, and in
+   Rome's case the mark was conquest. Whether natural law exists is carried
+   forward, not closed (Hands off 4).
 10. **One law, many gods** (hand-off paragraph, not a section of its own).
     Laws II gives the best commonwealth a religious code: citizens must be
     persuaded the gods watch, because oaths and treaties depend on it and an
@@ -421,8 +442,8 @@ definition and the reply that put a law above every statute.
     the State"; ancestral rites are kept; virtues may be deified, vices never.
     One sentence beside Polybius's religion as a check on the multitude
     (`<Ref>`): Cicero gives the same institution a reason inside natural law.
-    State the tension and leave it: one law for all nations, each city its
-    own gods. A sect that refuses the city's gods because its God is the only
+    State the tension and hand it on: one law for all nations, each city its
+    own gods (judged on the documents of 384 in `altar-of-victory`). A sect that refuses the city's gods because its God is the only
     one will test it (forward clause: `constantine-and-representation`).
 11. **★ The Dream of Scipio** (optional starred section; the core path must
     read correctly without it). Philus's strongest point was that justice
@@ -485,7 +506,7 @@ plus three additions; link 1 and 5 are short.
 
 ## Pitfalls / subtleties to flag
 
-- **Register.** The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+- **Register.** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Terms a newcomer will not know — anchor at first mention, at most three
   per section:** res publica (literally "the public thing"; translate once,
   then "commonwealth"); populus; *ius* (right; the root of "justice" in
@@ -531,12 +552,15 @@ plus three additions; link 1 and 5 are short.
 - **The egalitarian passage** (Laws I.28–30) is often read as a charter of
   human equality. Present the text, then the dispute as the course's own:
   its argument is about kinship and shared reason, and the same author ranks
-  men as fit or unfit to rule (III.36–37 in this lesson). Do not settle it;
-  an exercise does.
+  men as fit or unfit to rule (III.36–37 in this lesson). Say what the text
+  shows: the passage establishes one definition of man and shared reason,
+  not equal fitness to rule, and Cicero holds both; exercise 4 works it.
 - **Keep the imperial justification at full strength** (course.yaml notes):
   it is the argument Augustine will grant and turn and Vitoria will reject.
-  Present the strongest version, then the strongest objection; no
-  commentary of the course's own in either direction.
+  Present the strongest version, then the strongest objection, then the
+  course's finding on the argument (link 9): it inherits natural slavery's
+  failure, because nothing picks out in advance who is better off ruled. No
+  label for Cicero or for Rome; the finding is about the step.
 - **Kingship as best simple form** surprises readers who expect a republican
   to prefer the people. Keep it; it is in the text, and later monarchists
   quote it.

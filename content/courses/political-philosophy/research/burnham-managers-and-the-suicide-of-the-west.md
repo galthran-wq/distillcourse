@@ -3,7 +3,7 @@
 status: planned
 module: postwar-conservatism
 type: core
-goal: Analyze Burnham's thesis that a managerial class was replacing capitalists as the ruling class, and his later argument that liberalism is the ideology of Western contraction, and evaluate both
+goal: Analyze Burnham's thesis that a managerial class was replacing capitalists as the ruling class, and his later argument that liberalism is the ideology of Western contraction, and judge both against the record and Burnham's own test
 
 ## ARC (L10)
 
@@ -32,7 +32,9 @@ goal: Analyze Burnham's thesis that a managerial class was replacing capitalists
   book states and the second applies: ideologies express the interests and condition of a class, and
   are not refuted by facts. The lesson reconstructs both theses, tests the 1941 forecasts against
   1945, and turns Burnham's own test of an ideology — "what evidence might conceivably prove you
-  wrong?" — on his 1964 thesis.
+  wrong?" — on his 1964 thesis, and judges both (see `## VERDICT`): 1941's war forecasts failed and
+  its description of the managed corporation and the administrative state held, established; the
+  1964 thesis is not settled by 1989–91, open, with the evidence that would settle it named.
 - **Hands off:** (i) `udhr-read-against-the-right` (next): Burnham's 39-sentence test of liberalism
   ends with eight sentences taken from the 1948 Declaration — the module's application reads that
   document article by article. (ii) `lasch-revolt-of-the-elites`: thirty years later, a critic from
@@ -45,6 +47,41 @@ goal: Analyze Burnham's thesis that a managerial class was replacing capitalists
   Jouvenel's history of Power, Oakeshott's disposition, Strauss's natural right, Voegelin's diagnosis
   of Gnosticism, Kirk's and Nisbet's American conservatism, Burnham's managers — tested on the
   Declaration of 1948"
+
+## VERDICT
+
+(From `research/verdicts/REGISTER.md`, Module 9, lesson verdict. Binding: carry each part and its
+grade exactly.)
+
+- **(1941) Claim: the managers will replace owners as the ruling class, and the managerial powers will
+  win the war. → The war forecasts failed; the description of the managed corporation and the
+  administrative state held. Grade: established.** Germany was defeated, Russia did not split, and
+  capitalism was restored in western Europe (the edition's own DMR glosses: "This was Burnham's big
+  mistake"); the state grew, administrative agencies took over rule-making, and salaried managers
+  gained control of the large firm.
+- **(1964) Claim: liberalism is the ideology of Western suicide. → Not settled by 1989–91. Open.**
+  Burnham's own test reads: "if the contraction of the past fifty years should cease and be reversed,
+  then the ideology of liberalism, deprived of its primary function, will fade away"
+  (`C/research/texts/burnham/suicide-of-the-west.txt` l.2573). His "liberalism" is a specific
+  ideology — his nineteen propositions, guilt, accommodation in place of rollback — not liberal
+  democracy. The reversal of 1989–91 came under governments that had rejected détente in his sense.
+  So "liberal states won the Cold War" scores the test in the wrong sense of the word, and the growth
+  of the former imperial states after 1950 is beside a thesis he defined by territory ruled. Neither
+  reading of 1989–91 decides it.
+- **What would settle it:** a series on elite opinion on Burnham's propositions — rollback against
+  containment, decolonisation and guilt — from 1964 to 2000, to test whether those positions weakened
+  before the reversal (which would fit Burnham: the ideology faded and the contraction stopped) or
+  only after it (which would fit his test's prediction of fading once the function was gone, but
+  leave the causal claim unshown), or did not weaken at all (against him). The series is not in the
+  course; the lesson says so.
+- **Strongest objection to the verdict:** the critics' reading — the West reversed the contraction
+  while remaining liberal, so the thesis is refuted, not open. It does not overturn the verdict,
+  because it scores the test with "liberal" meaning liberal democracy, which Burnham's thesis is not
+  about; on his definition the governments that won the last decade of the Cold War had rejected the
+  liberal positions he named. From the other side, the heirs' reading — the reversal came despite
+  liberalism and so confirms him — needs the same missing series to show the positions had weakened
+  first.
+- **What would overturn it (move it off open):** the elite-opinion series above.
 
 ## Sources to consult
 
@@ -320,22 +357,42 @@ ideology to the creed of the class he now opposed. One plain sentence makes the 
       fade away". Between 1989 and 1991 the Soviet bloc collapsed and much of eastern Europe joined
       Western institutions; liberalism did not fade. Readings: for Burnham's heirs, the reversal came
       despite liberalism, through the rearmament and resolve he called for; for his critics, liberal
-      states won the Cold War and the test refutes the thesis. The lesson sets out both and leaves the
-      weighing to the reader.
+      states won the Cold War and the test refutes the thesis. Both are set out here at full strength;
+      link 11 weighs them.
     - *The managerial thesis as description without a test:* the ruling-class definition is testable
       (incomes, control of access), but Burnham's own figures (Soviet income shares, the German state
       share of national income, "half or more" of Americans dependent on government) are asserted
       without sources — the reader should know which numbers are his.
-    Where the lesson concedes and holds: 1941's description of the large organization and the
-    administrative state lasted and its forecast of the war's winner did not; 1964's premise
-    (contraction by acreage) is true on its own measure, while its explanation (a failure of will
-    expressed by liberalism) is an argument whose test is stated and whose evidence is disputed.
+11. **The weighing: the managers came, the managerial powers lost, and the suicide thesis is open.**
+    Set both theses against their strongest objections and the record and reach the verdict of
+    `## VERDICT`, claim → evidence → bearing (L10e). (i) 1941: the scorecard of link 6 decides it —
+    the war forecasts failed and the description of the managed corporation and the administrative
+    state held — **established**. (ii) 1964: the premise (contraction by acreage) is true on its own
+    measure; the thesis that liberalism is the ideology of the contraction is scored by Burnham's own
+    test (l.2573). Read the test with his definition of liberalism (the nineteen propositions, guilt,
+    accommodation in place of rollback), not with liberal democracy: the reversal of 1989–91 came
+    under governments that had rejected détente in his sense, so "liberal states won" scores it in
+    the wrong sense of the word, and the postwar growth of the former imperial states is beside a
+    thesis defined by territory ruled. The heirs' reading needs evidence that the positions weakened
+    before the reversal; the critics' needs the word to mean what Burnham did not mean. **Open** — and
+    say what would settle it: a series on elite opinion on rollback against containment and on
+    decolonisation and guilt, 1964–2000, showing whether those positions weakened before or after the
+    reversal. The course does not have the series and says so.
+
+**Conclusion** (one or two short paragraphs, before Exercises): the verdict in plain words with its
+grades — established: Burnham's 1941 description of who runs the large organization and the
+administrative state held, and his forecasts of who would win the war failed; open: whether
+liberalism, in his sense, is the ideology of the West's contraction — 1989–91 does not settle it, and a
+series on elite opinion from 1964 to 2000 would. Then the hand-off: the last eight of his thirty-nine
+sentences are articles of the 1948 Declaration, which the next lesson reads against the module's
+critics (`udhr-read-against-the-right`).
 
 Headings as claims (suggested): "Three theories, one survivor"; "A ruling class is defined by control";
 "Abolishing property did not abolish class"; "Only the managers are technically necessary"; "Three
 roads to one society"; "The forecasts against the record"; "The West contracts with its power intact";
 "Nineteen propositions"; "Guilt, the enemy on the right, and the foxes"; "The test Burnham set
-himself".
+himself"; "The managers came, the managerial powers lost, and the suicide thesis is open". Eleven
+sections is too many for 45 minutes: merge links 2–3 and links 4–5 if the draft runs long.
 
 ## Set pieces and worked examples to recreate
 
@@ -364,9 +421,7 @@ himself".
 
 ## Pitfalls / subtleties to flag
 
-- **Register rule:** The course passes no verdict of its own on any author or idea: no condemning or
-  approving labels in its own voice. Judgement comes only through argument and evidence; a label may
-  appear only inside a quotation, with who applied it and when.
+- **Register rule:** The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **The opening's "square miles":** Burnham gives no square-mile or percentage counts; his measure is
   the colours of an atlas and the phrase "cut to less than half of what it was in 1914". The opening
   is fixed; the first Suicide section states the measure exactly as Burnham does and says it is his
@@ -410,7 +465,7 @@ himself".
   mind"). One sentence; do not make the biography the argument.
 - **Balance:** the 1941 thesis and the 1964 thesis each at full strength first (the automobile company
   and the atlas are persuasive and should feel so), then the objections from the democratic record,
-  from the decolonized side, and from Burnham's own falsification test. The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+  from the decolonized side, and from Burnham's own falsification test. The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 
 ## FIGURE PLAN
 
@@ -480,7 +535,13 @@ himself".
    measure for "contraction" and for "liberalism" between 1964 and 2000, what result would confirm and
    what would refute it, and why the events of 1989–91 do not settle it without a further premise
    (whose doing the reversal was).
-8. **FORWARD (E7) → `udhr-read-against-the-right`:** the last eight of Burnham's 39 sentences are
+8. **Attack the verdict.** The lesson graded Burnham's 1964 thesis open. State the strongest objection
+   in its best form — that the West reversed its contraction in 1989–91 while remaining liberal, so the
+   thesis is refuted — and then the strongest objection from the other side — that the reversal came
+   from leaders who had rejected détente, so the thesis is confirmed. For each, name the premise it
+   needs that the course's evidence does not supply, and describe the series (whose opinion, on which
+   of Burnham's propositions, which years) that would move the verdict off open in its direction.
+9. **FORWARD (E7) → `udhr-read-against-the-right`:** the last eight of Burnham's 39 sentences are
    articles of the 1948 Declaration (e.g. "The will of the people shall be the basis of the authority
    of government"; "Everyone, as a member of society, has the right to social security"). For three
    of them, name the L-proposition each one expresses and say what Burnham's use of them assumes about

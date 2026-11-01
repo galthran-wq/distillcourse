@@ -55,19 +55,24 @@ goal: Analyze Weber's question why rational science, law, bureaucracy and capita
   consumption, and the resulting conduct outlived its religious root (the iron
   cage). Then the evidence and the objections, from the left, the right and the
   data, each at full strength, and Weber's own disclaimers — so the reader leaves
-  knowing what the thesis claims, what it explicitly does not claim, and which parts
-  of it are still contested.
-- **Hands off:** Weber traced "only one side of the causal chain" — ideas acting on
-  conduct — and left the institutions, the states and the rest to "a combination of
-  circumstances". The next lesson, `landes-european-exceptionalism`, takes up the
+  knowing what the thesis claims, what it explicitly does not claim, and the
+  course's verdict on it (on balance): the Protestant ethic is not borne out as the
+  main channel of the Protestant advantage, which ran through literacy; Weber's
+  description of Western rationalization stands.
+- **Hands off:** The lesson decides the Protestant-ethic thesis (on balance: not the
+  main channel; the Protestant advantage ran through Bible-reading schooling; the
+  description of rationalization stands). What it does not decide is the module's
+  question — why the West at all — which stays with the module and is judged in
+  `the-borrowing-ledger` (cause: open). Weber traced "only one side of the causal
+  chain" — ideas acting on conduct — and left the institutions, the states and the
+  rest to "a combination of circumstances". The next lesson, `landes-european-exceptionalism`, takes up the
   other side: why a divided Europe let new conduct and new inventions survive that a
   single ruler could have stopped (the FORWARD exercise arrives there by asking what
   political fact let Luther and Calvin survive at all). Further on, one clause each
   and no content: `murray-human-accomplishment` counts the West's output in science
   and art and credits Christianity among its causes; `henrich-church-and-kinship`
   moves the cause from the Reformation back to the medieval Church's family rules and
-  re-reads the Protestant evidence with modern natural experiments (Prussian
-  literacy, Augsburg 1555); `pomeranz-and-goody-the-rival-thesis` answers that the
+  sets out the Augsburg 1555 natural experiment at length; `pomeranz-and-goody-the-rival-thesis` answers that the
   "only in the West" list misreads Eurasia — Chinese accounting, Eurasian
   bourgeoisies, Asian cities — and that the lead came late; `the-borrowing-ledger`
   grades what the West took from others (Weber himself grants "there was printing in
@@ -78,6 +83,48 @@ goal: Analyze Weber's question why rational science, law, bureaucracy and capita
   exceptionalism from religion, fragmentation, accomplishment and kinship; Pomeranz
   and Goody answer that the West was one link in a long chain of exchange; the
   borrowing ledger tests both"
+
+## VERDICT
+
+- **Claim judged.** Weber's thesis as he held it, not the one he disclaimed ("such a
+  foolish and doctrinaire thesis as that the spirit of capitalism … could only have
+  arisen as the result of certain effects of the Reformation", l. 2782): ascetic
+  Protestantism had an elective affinity with the spirit of rational capitalism and
+  accelerated it — the religious ethic was the channel through which Protestant
+  populations came to outperform Catholic ones.
+- **Verdict.** Not borne out as the main channel; the description of Western
+  rationalization stands. Grade: **on balance**.
+- **What decides it.** (1) In 272 cities of the German-speaking Holy Roman Empire,
+  1300–1900, there are "no effects of Protestantism on economic growth" measured by
+  city population (Cantoni 2015; staged working-paper version
+  `texts/verification-2026-11/cantoni-2010-wp-protestant-reformation.txt` l. 16, l.
+  73). (2) In Prussian county data of the late nineteenth century, with distance to
+  Wittenberg as an instrument for Protestantism, Protestantism did raise prosperity,
+  but "Protestants' higher literacy" accounts "for most of the gap in economic
+  prosperity" (Becker & Woessmann 2009;
+  `texts/verification-2026-11/becker-woessmann-2009-abstract.txt`). Protestantism
+  mattered, through Bible-reading schooling, not through a work ethic. (3) Capital
+  accounting predates the Reformation: double-entry book-keeping was printed at
+  Venice in 1494 (Pacioli) and in use in Italian cities a century before — though
+  Weber distinguished capitalism's technique from its rational ethic, so this narrows
+  the thesis rather than refuting it. (4) What stands: the Author's Introduction's
+  inventory of systematic, calculable forms is a description no objection in the
+  lesson dissolves; each objection answers the question differently.
+- **Strongest objection to the verdict.** The literacy channel may itself be the
+  ethic at work: Bible-reading was a religious duty, and a disciplined, schooled
+  population is what Weber's worldly asceticism would produce; city size and county
+  income are also not the "spirit" Weber described, which was a conduct of whole
+  groups, not an aggregate growth rate. Why it does not overturn the verdict:
+  Weber's mechanism runs from predestination-anxiety to methodical acquisition and
+  saving, not from scripture to reading; a channel that works as well for Lutherans
+  (who lacked the Calvinist anxiety) as for Calvinists is not the channel he
+  proposed; and the one study that measures growth over six centuries finds no
+  Protestant effect at all. The objection keeps the grade at on balance rather than
+  strong: neither study measures conduct directly.
+- **What would overturn it.** Evidence that Calvinist conduct, not literacy, explains
+  Protestant economic performance where the two can be separated — for example,
+  Calvinist against Lutheran populations of equal literacy, or Protestant groups of
+  low literacy outperforming Catholic groups of equal literacy.
 
 ## Sources to consult
 
@@ -294,10 +341,16 @@ goal: Analyze Weber's question why rational science, law, bureaucracy and capita
   on the Protestant Ethic (re-examines Offenbacher's Baden figures; verify chapter
   and claims before stating any); Sascha O. Becker and Ludger Woessmann, "Was Weber
   Wrong? A Human Capital Theory of Protestant Economic History", *Quarterly Journal
-  of Economics* 124:2 (2009), 531–596; Davide Cantoni, "The Economic Effects of the
-  Protestant Reformation: Testing the Weber Hypothesis in the German Lands",
-  *Journal of the European Economic Association* 13:4 (2015), 561–598 (no effect of
-  Protestantism on city growth 1300–1900 — verify the finding before stating it);
+  of Economics* 124:2 (2009), 531–596, doi:10.1162/qjec.2009.124.2.531 (CONFIRMED;
+  abstract staged at `research/texts/verification-2026-11/becker-woessmann-2009-abstract.txt`
+  — the verdict's literacy finding; state it in the course's voice, quote the
+  abstract's "accounting for most of the gap" if needed); Davide Cantoni, "The
+  Economic Effects of the Protestant Reformation: Testing the Weber Hypothesis in the
+  German Lands", *Journal of the European Economic Association* 13:4 (2015),
+  561–598, doi:10.1111/jeea.12117 (CONFIRMED; working-paper version staged at
+  `research/texts/verification-2026-11/cantoni-2010-wp-protestant-reformation.txt`
+  — 272 cities, 1300–1900, "no effects of Protestantism on economic growth", l. 16;
+  the verdict's growth finding);
   Werner Sombart, *Der moderne Kapitalismus* (1902) and *Die Juden und das
   Wirtschaftsleben* (1911) — the rival German account Weber's notes answer; Raymond
   de Roover, *The Rise and Decline of the Medici Bank* (1963) for Italian banking;
@@ -511,8 +564,10 @@ would count as an answer? The chain:
    advantage is explained by literacy — Bible-reading for every believer — rather
    than by a work ethic; a different study of the German lands finds no Protestant
    effect on city growth over six centuries. State these as findings with their
-   scope, point forward to `henrich-church-and-kinship` (where the natural experiments
-   are set out) in one sentence, and do not adjudicate.
+   scope (Becker & Woessmann: Prussian counties, late nineteenth century, distance
+   to Wittenberg as the instrument; Cantoni: 272 cities, 1300–1900, city population
+   as the measure); they carry the verdict in link 10, and the Augsburg natural
+   experiment stays `henrich-church-and-kinship`'s (forward Ref, one clause).
    (c) *Scotland and Holland.* Scotland, Calvinist from the 1560s, stayed poor until
    after the Union of 1707; Holland, the richest economy of the seventeenth century,
    had a merchant elite that was largely Arminian (the anti-predestinarian party)
@@ -521,7 +576,7 @@ would count as an answer? The chain:
    entrepreneurs came from the rising middle and lower bourgeoisie. The Scottish reply
    from Weber's side: the ethos can be present while capital, markets and
    institutions are lacking — which is the "combination of circumstances" clause
-   doing work; the reader is asked (Exercise 4) whether that reply makes the thesis
+   doing work; the reader is asked (Exercise 3) whether that reply makes the thesis
    harder to test.
    (d) *The objection from the right: a corruption, and a philosophical source.*
    (Ref `strauss-natural-right-and-history`.) Weber's crucial link is the popular
@@ -547,13 +602,41 @@ would count as an answer? The chain:
    step is psychological. Where it holds: the question of the Author's Introduction
    survives every objection above, because each objection answers it differently
    rather than dissolving it — which is why the module's next five lessons exist.
-   No verdict in the course's voice.
+10. **The weighing: the ethic is not the main channel; the rationalization stands.**
+   Question: with the thesis restated as Weber held it — an elective affinity that
+   accelerated rational capitalism — and the objections on the table, which way does
+   the evidence point? Set the claim against its strongest defence and the two
+   modern studies (all in the VERDICT section above): the six-century city panel
+   finds no Protestant effect on growth; the Prussian data find a Protestant effect
+   that literacy accounts for "most of"; Italian book-keeping narrows the claim to the
+   ethic, not the technique. Then the strongest objection to the verdict at full
+   strength — Bible-reading was itself a religious duty, so the literacy channel may be
+   the ethic in another form — and why it fails as a rescue: Lutherans read too, without
+   the Calvinist anxiety that is the hinge of Weber's derivation (link 6), so a channel
+   both confessions share is not the one he proposed. State the verdict: on the
+   evidence the course has, Protestantism mattered to Europe's economic record, but
+   through schooling, not through the ethic Weber derived; the thesis is **not borne
+   out as the main channel — on balance**, because neither study measures conduct
+   directly. What stands is the description of Western rationalization in the Author's
+   Introduction, which no objection dissolved. What would overturn the verdict:
+   Calvinist conduct, not literacy, explaining Protestant performance where the two
+   can be separated.
+
+**Conclusion** (the `<Conclusion>` block): states the verdict in plain words with its
+grade — Weber's question stands and his description of a West that made science, law,
+administration and the firm systematic stands with it; his answer, the Protestant ethic
+as the channel, is not borne out on balance, because where its effect can be measured
+it runs through literacy, and over six centuries of German city growth it does not show
+at all. Then the hand-off: if religion is not the main channel, the political fact that
+let Luther and Calvin survive — a Europe no single ruler could close — is the next
+candidate (`landes-european-exceptionalism`).
 
 Headings as claims: "'Only in the West': a claim about form, not about possession" /
 "Heredity set aside, not denied" / "Greed is everywhere; capital accounting is not" /
 "A puzzle in the Baden figures" / "A duty to make money, against the habit of working
 less" / "From the calling to the anxiety of proof" / "The monastery door slammed: work
-without enjoyment" / "The iron cage" / "Five objections and what survives them".
+without enjoyment" / "The iron cage" / "Five objections and what survives them" /
+"Protestantism paid through schooling, not through the ethic".
 
 ## Set pieces and worked examples to recreate
 
@@ -610,7 +693,7 @@ without enjoyment" / "The iron cage" / "Five objections and what survives them".
   (e.g. not "Eurocentric" in the course's voice; if the word is used, it is quoted
   with who used it and when).
 - **Register rule.**
-  The course passes no verdict of its own on any author or idea: no condemning or approving labels in its own voice. Judgement comes only through argument and evidence; a label may appear only inside a quotation, with who applied it and when.
+  The course judges arguments, not people: no condemning or approving labels for any author in its own voice; a label may appear only inside a quotation, with who applied it and when. It does pass verdicts on arguments: where the lesson stages a dispute it has the evidence to settle, and in every module's closing lesson, it says which side wins, how firmly (established / strong / on balance / open) and why, as recorded in research/verdicts/. "Open" is a finding, stated with what would settle it, never a way to avoid one. The same tests apply to the left and the right.
 - **Borrowings.** Weber's own sentence concedes printing in China; the lesson does not
   add its own claims about transfers. If the opening's "printing" is glossed, it is
   with Weber's distinction (printing existed; the Press did not), and the question of
@@ -668,8 +751,9 @@ without enjoyment" / "The iron cage" / "Five objections and what survives them".
   Protestant Ethic itself is new here.
 - **Do not anticipate the module.** Landes's fragmentation, Murray's counts, Henrich's
   Church, Pomeranz's coal and Goody's Eurasia each get a forward clause at most. The
-  modern natural experiments on Protestantism (Prussia, Augsburg) are stated in one
-  sentence as findings in link 9b and are the Henrich lesson's to set out.
+  Prussian literacy finding (Becker & Woessmann) and the city-growth finding
+  (Cantoni) are this lesson's evidence for its verdict (links 9b, 10); the Augsburg
+  1555 natural experiment is the Henrich lesson's to set out.
 - **L8a:** Weber, Strauss, Franklin, Fugger, Luther, Calvin, Baxter, Wesley, Bunyan,
   Augustine, Marx, Machiavelli, Bacon, Hobbes, Carlyle are figures whose texts or
   lives are the material and may be named. Offenbacher's study is the source of the
@@ -693,7 +777,8 @@ without enjoyment" / "The iron cage" / "Five objections and what survives them".
 - **Dossier thinness:** none for Weber (full text and notes) or Strauss. The
   objections' literature (Samuelsson, Hamilton, Becker–Woessmann, Cantoni, Marshall,
   Trevor-Roper, de Roover) is NOT in the dossier beyond Landes's and Henrich's
-  reports of it; the writer states each finding only to the precision those reports
+  reports of it, except Becker–Woessmann (abstract) and Cantoni (working paper),
+  now staged and confirmed; the writer states each finding only to the precision those reports
   or the writer's own reading of the paper support, cites it, and does not quote it.
   The German "letzten Menschen" behind Parsons's "last stage" must be checked in the
   1920 German text before the Nietzsche link is used.
@@ -761,13 +846,7 @@ without enjoyment" / "The iron cage" / "Five objections and what survives them".
 
 ## EXERCISE PLAN (E6/E7 + playbook-history mix)
 
-1. **Retrieval (warm-up, E3 spiral):** Match each phrase to its author and lesson,
-   and say in one line what kind of cause of a civilization's rise it names (blood,
-   an encounter, power, a form of conduct): "the impulse of the white races"
-   (Gobineau); "challenge and response" (Toynbee); "an extraordinary peak of power"
-   (Huntington — who explains the West's position, not its origin; the solution says
-   so); "a specific and peculiar rationalism" (Weber). Solution with Refs.
-2. **Document reasoning (sourcing drill):** The heredity paragraph (Author's Intro,
+1. **Document reasoning (sourcing drill):** The heredity paragraph (Author's Intro,
    p. xlii). Metadata first: author, 1920, the introduction to a three-volume
    collection of comparative studies of religion, written in Germany for scholars.
    Prediction before reading: what would you expect a German professor in 1920 to say
@@ -775,7 +854,7 @@ without enjoyment" / "The iron cage" / "Five objections and what survives them".
    paragraph be USED to establish about Weber's thesis — and what can it not establish
    about heredity? Solution: it establishes a priority of method, not a finding in
    either direction.
-3. **Derivation the lesson did not do (playbook-history rule 4):** From the Baden
+2. **Derivation the lesson did not do (playbook-history rule 4):** From the Baden
    figures, compute each confession's share of advanced pupils divided by its share
    of population (Protestant 48/37, Catholic 42/61.3, Jewish 10/1.5), and the ratio
    of taxable capital per head. State what the ratios show, what the thesis predicts
@@ -783,21 +862,21 @@ without enjoyment" / "The iron cage" / "Five objections and what survives them".
    handles it (a different "pariah" capitalism, ch. 5 n. 58) — then say whether that
    move strengthens or weakens the inference from these figures. End with the
    uncertainty statement (one province, one year, no control for town residence).
-4. **Boundary probe:** Scotland after 1560 — Calvinist doctrine, discipline and
+3. **Boundary probe:** Scotland after 1560 — Calvinist doctrine, discipline and
    schools, and poverty until after 1707. Run the thesis on it twice: once with the
    ethic as a sufficient cause (it fails — say why), once with the ethic as one of
    "a combination of circumstances" (it survives — say what the other circumstances
    are). Then state the cost: what observation could now count against the thesis at
    all? Solution: only a case where the conditions were present, the ethic present,
    and the conduct absent — and name what that would require.
-5. **Claim to refute:** "Weber showed that Protestants are richer because their
+4. **Claim to refute:** "Weber showed that Protestants are richer because their
    religion taught them to seek wealth." Name the three steps that are wrong (the
    ethic condemned enjoyment of wealth; the effect was unintended; the claim is about
    a conduct in early modern groups, not about Protestants' incomes) and quote the
    sentence of Weber's that is the best evidence for each. Then say which modern
-   finding gives the claim's first half a different explanation (literacy), with a
-   pointer to `henrich-church-and-kinship`.
-6. **Synthesis (counter-argument stem, Strauss):** Someone claims, with Strauss, that
+   finding gives the claim's first half a different explanation (literacy, the
+   Prussian county data of link 9b).
+5. **Synthesis (counter-argument stem, Strauss):** Someone claims, with Strauss, that
    the capitalist spirit came from Machiavelli, Bacon and Hobbes and only passed
    through Puritanism. First name the fact in Weber's own essay that best SUPPORTS
    the claim (his chosen specimen of the spirit, Franklin, is a document "free from
@@ -809,7 +888,7 @@ without enjoyment" / "The iron cage" / "Five objections and what survives them".
    for the claim to stand (that the pastors' ethic was itself shaped by the new
    philosophy, or that being its "carrier" is all Puritanism did). Recall Hobbes's
    account of the passions in one clause (Ref `hobbes-state-of-nature-and-covenant`).
-7. **Synthesis (E3, measures):** Weber's question sentence calls the West's forms
+6. **Synthesis (E3, measures):** Weber's question sentence calls the West's forms
    "of universal significance and value" and adds "(as we like to think)". Using the
    three measures of greatness (Ref `what-measures-greatness`), say which measure the
    sentence uses, what the parenthesis concedes, and whether Weber's later iron-cage
@@ -817,6 +896,17 @@ without enjoyment" / "The iron cage" / "Five objections and what survives them".
    up"; the parenthesis concedes the selection is a European valuation; the iron cage
    says the form spread and emptied — the same "failed because it succeeded" shape the
    course meets again at its end (no Ref needed beyond `what-measures-greatness`).
+7. **Attack the verdict (claim to refute, aimed at the course):** The course
+   concludes, on balance, that the Protestant ethic was not the main channel and that
+   literacy was. State the strongest objection to that verdict in its best form (the
+   duty to read scripture was itself part of the ethic; city size and county income
+   are not the conduct Weber described), then say exactly what evidence would be
+   needed to overturn the verdict. Solution: a design that separates Calvinist conduct
+   from literacy — Calvinist against Lutheran populations of equal schooling, or
+   low-literacy Protestant groups outperforming equally literate Catholic ones — with
+   a measure of conduct (saving, hours worked, reinvestment) rather than growth alone;
+   and the reason the Lutheran comparison bites (the anxiety of proof in link 6 is
+   Calvinist).
 8. **FORWARD (E7)** → `landes-european-exceptionalism`: Luther was condemned at the
    Diet of Worms in 1521 and survived under the protection of his own prince, the
    Elector of Saxony; Calvin's Geneva was a small independent city; the Dutch
