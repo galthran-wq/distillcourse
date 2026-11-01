@@ -1,0 +1,56 @@
+# Taught: kallipolis-and-the-philosopher-king
+
+## Problem
+To read justice "in large letters", Socrates builds a city from need, admitting nothing unless the previous step forces it: who belongs in which class, who decides, what the citizens must be told? Answer reached: need → one man, one art → luxury → war → a professional guard, which is the danger every later institution answers (education/censorship, the tale of the metals, the camp); justice = each part doing its own, in city and three-part soul (= the soul's health, out of the ring's reach); the three waves push unity to its limit and put rule in the hands of those who know the good; the Cave says why they must be compelled. Four assumptions named (natures differ and can be sorted; most must be shaped and told a story; unity is the highest civic good; there is a good the few can know). Aristotle's objection from care left standing; the lesson does not adjudicate.
+
+## Explained
+- Why not describe an actual city: Athens the obvious candidate ("school of Hellas", Ref thucydides#what-holds-the-city-together); Thrasymachus carried the Melos thesis inside every city (Ref thrasymachus#thrasymachus-the-law-is-what-the-rulers-interest-says-it-is), so an actual city's justice = its rulers'; "the true creator is necessity"; *Kallipolis* = "beautiful city", "the city in speech" — intro
+- First city from need (369b–c quoted); one man, one art derived from two reasons (natures differ; work spoils if not done at the right time); city grows by itself (smiths, herdsmen, merchants/surplus, market + money, shopkeepers, hired labourers); Example table: each addition's need, nobody commands — "Need makes the first city…" / ### One man, one art
+- Healthy city: justice "in their dealings", no government needed; assumption: natural aptitudes real and sortable; reversal seam vs Pericles' citizen who judges public business and the "useless" non-participant (Ref thucydides#the-citizen-who-judges): one man, one art will take public business out of the shoemaker's hands — ### Where justice is not yet
+- City of pigs / fevered city ("true and healthy" vs "fever-heat", built anyway to see injustice originate); luxury → more land → war; war is a craft ⇒ full-time soldiers; break with the hoplite phalanx (Ref greek-miracle#the-hoplite-phalanx) and with Pericles' courage "not of art but of nature" (Ref thucydides#what-holds-the-city-together); watch-dogs turned wolves (416a); KeyFact: every later institution makes the armed class safe for the unarmed — "Luxury makes war…" (### From couches to war / War is a craft / The guard is the problem)
+- thumos (spirit); guardian spirited + gentle; the philosophic dog (knowing/not knowing, 376a–b quoted); "philosopher" = lover of wisdom enters here — ### Spirited and gentle at once
+- Education: music (poetry, stories) + gymnastics; stories before reasons (378d–e quoted); censorship (Hesiod's Cronus, Homer's gods' wars, wailing heroes); "founders of a State, not poets"; god good and unchanging; Aside: imitation, modes, medicine; assumption: character formed before it can judge — ### Stories come before reasons
+- Lifelong tests (labours, pains, pleasures/terrors, "colts amid noise"); split: guardians (rulers) vs *auxiliaries*; producers; three classes — ### The guard is tested and divided
+- True lie (ignorance in the soul) vs lie in words (enemies, madman's sword — Ref thrasymachus#the-returned-sword, myths of the past); lying a rulers' privilege, "as medicine"; private man lying to rulers worse (389b–c quoted) — ### Two kinds of lie
+- Tale of the metals (414d–415d quoted): earth-born brothers; gold/silver/brass-and-iron; children re-sorted by metal; oracle; Glaucon "not in the present generation… their sons"; *gennaion pseudos* ("noble", Jowett "royal"); assumption: the many cannot be governed by the truth about why they are governed; open question: if natural, why a lie? — ### The tale of the metals
+- Guardians' camp: no property, no gold/silver, rations, common meals; 417a–b quoted; education + camp = two-part answer to watch-dog problem — ### The guardians' camp
+- Four virtues by residue: wisdom (rulers, smallest class), courage (dyed-in opinion, sea-purple wool), temperance (agreement on who rules, "like a harmony"), justice = each class doing its own ("tumbling out at our feet"); greatest injustice = climbing classes; chooses the proportional equality (Ref greek-miracle#two-equalities-the-city-could-not-reconcile) — ### Three virtues located, the fourth left over
+- Principle of opposites (archer: one hand pushes, other pulls); thirsty man who refuses ⇒ reason vs appetite; Leontius (439e–440a quoted) ⇒ spirit, ally of reason ("shepherd… dog") — ### The soul has three parts
+- Justice as the soul's health (444c–d quoted) answers Glaucon's second-class good; ring can't touch it; division of labour "a shadow of justice"; KeyFact: most citizens just only by obeying others' reason — ### Justice is the soul's health
+- First wave: women guardians (bald vs hairy cobblers; relevant differences only) — ### First wave
+- Second wave: common wives/children, unity as greatest good, "mine"/"not mine", finger's pain; breeding like hunting dogs, rigged lots, "considerable dose of falsehood", nurses, infants "put away"; assumption: attachment movable from one's own to the city — ### Second wave
+- Book V seam: with justice found, Socrates was turning to the four worse cities when stopped (sets up decline-of-regimes).
+- Third wave: painter's perfect man = pattern; 473c–d quoted; philosopher = lover of whole of wisdom; *knowledge* (of beauty itself, the same in every case, so fixed) vs *opinion* (of beautiful things, beautiful in one respect and ugly in another; double/half); only a judgment fixed on the just/good itself can decide between cases; correct opinion enough to obey a ruling, not to make one — ### Third wave
+- Ship of State (488a–e quoted): owner = people, sailors = politicians, star-gazer = philosopher; Athens's assembly as the material (Mytilene reversal 427, Ref thucydides#a-rebel-ally-and-a-decree; Sicily 415 "all alike fell in love"); Book I craft argument made political (Ref thrasymachus#whom-does-a-craft-serve-…); sailors deny steering can be taught — ### The Ship of State
+- Adeimantus's objection and the painted statue (Example, 3 steps + "does the reply meet it?"): happiness of the whole, not a class — ### Inside the text
+- Aristotle (384–322, Plato's student 20 years, *Politics*) objection from care (II.3 quoted; "watery" love, "your own and your only one"); same form, differ on one fact about attachment; city a plurality; producers undefined, "two states in one" (garrison on farmers, unity's arrangement splits the city); same souls always rule (gold from birth, no rotation among equals, armed spirited silver class shut out of office for life = faction); whole not happy unless parts are (evenness analogy) — ### Outside the text
+- Pattern reply (IX "laid up in heaven"); possible but improbable, chance; leaves the care objection standing — ### What the text can answer
+- The good; the Sun analogy (one paragraph) — ### What the ruler knows
+- Cave (514a–b quoted), five stages, gloss after the story; "poor servant of a poor master"; prisoners would kill the liberator = Socrates executed 399 (Ref thrasymachus) — ### The Cave
+- Education = turning the whole soul, not sight into blind eyes; clever rogue — ### Education turns the soul round
+- Compulsion to descend; the city raised them so they owe their turn; 520c–d quoted ("most reluctant to govern … best"); reluctance as qualification; completes Book I's reluctant good men (Ref thrasymachus#socratess-answer-and-what-it-leaves-standing); Aside: curriculum by age (20, 30, 35, 50) — ### The compulsion to descend
+- Clean tablet; send out everyone over ten — ### How such a city would begin
+
+## Notation
+- Greek terms: thumos (spirit), Kallipolis, gennaion pseudos, dialectic (Aside only). Italicised defined terms: guardians, auxiliaries, true lie, lie in words, reason/appetite/spirit, knowledge/opinion, good.
+- "Guardians" = all soldiers in Book II, then only the tested rulers once auxiliaries are split off (### The guard is tested and divided). Classes: rulers / auxiliaries / producers.
+- "What the step assumes" run-in paragraph closes each construction step.
+- Translation: Jowett (Republic), Jowett–Ross (Politics); Stephanus numbers in Quote sources and References only.
+
+## Running cases
+- Keeper facts: KeyFact 1 (every later institution answers the armed class); KeyFact 2 (most citizens just only by obeying others' reason). The four named assumptions (Conclusion).
+- Figures (drawn): first-city-1..5 (FigureSequence), guardian-nature.svg, metals.svg, city-soul.svg (KEY IMAGE), ship-of-state.svg, all-say-mine.svg, cave-1..5 (FigureSequence), reluctant-rulers.svg. Photographs: shoemaker-workshop.jpg (Athenian black-figure pelike, 5th c. BC, Ashmolean Museum AN 1986-1908 G.247), float-right in ### One man, one art; acropolis-over-the-city.jpg (Acropolis and Lycabettus from Philopappos Hill), after the opening, before the first city.
+- Example tables: first city built from need; painted statue (objection inside the text).
+- Exercises: (1) retrieval chain need → army + Book I craft argument (E3 thrasymachus); (2) sourcing drill on the metals tale + paired Diodotus "best counsellor … lie" (E3 thucydides): who lies to whom; (3) refute "metals = caste"; (4) boundary probe: zero philosophers (courage/temperance survive as opinion, wisdom cannot, decay); (5) derive second wave from unity and Aristotle's objection from care; (6) counter-argument: Adeimantus ≠ Aristotle; (7) paired passages Book I vs Book VII reluctant rulers; (8) FORWARD: one wrong sorting → decline-of-regimes (Ref).
+
+## Assumed
+- thrasymachus-and-the-ring: large letters; Glaucon's demand and classes of goods; ring of Gyges; craft argument (physician, pilot, shepherd); returned sword; reluctant good men; Thrasymachus's thesis; Socrates executed 399; Plato, Glaucon, Adeimantus anchored.
+- thucydides-power-and-justice: Pericles, "school of Hellas", the citizen who judges / "useless", courage "not of art but of nature" vs Spartan drill, Mytilene decree and reversal, Diodotus's counsellor who must lie, Sicily "fell in love". Four single-clause Refs plus Ex. 2; nothing re-taught.
+- greek-miracle: hoplite phalanx; the two equalities (proportional vs one share each); sourcing questions.
+
+## Left open
+- What happens when a birth is mistimed / a sorting goes wrong; decline through timocracy, oligarchy, democracy, tyranny → decline-of-regimes (Conclusion, Ex. 8).
+- Aristotle's attack on unity, natural hierarchy, the many's judgment → aristotle-political-animal-and-natural-slavery, aristotle-regimes-and-the-middle (not Ref'd in body).
+- Plato's second-best city → platos-laws-second-best-city (not Ref'd).
+- The best regime "in speech", possible but improbable → strauss-natural-right-and-history (not Ref'd; Strauss in References only).
+- Philosopher's pleasures are truest (Book IX) promised, not shown. Divided Line not taught. Popper's reading in References only. Nietzsche link omitted.
