@@ -13,6 +13,7 @@ import type { LoadedCourse } from "./load";
 import { CONCLUSION_ANCHOR, lessonPage } from "./locator";
 import { stringAttr, type MdxJsxNode } from "./mdx-jsx";
 import { SITE_URL } from "./site";
+import { gradedAttrs, gradedNote, gradedTests, isGraded, type GradedName } from "./graded";
 import { isReadable } from "./visibility";
 
 /**
@@ -32,11 +33,18 @@ export function markdownUrl(page: string): string {
   return `${SITE_URL}${page}.md`;
 }
 
-type Counter = "definition" | "theorem" | "example" | "remark";
+type Counter =
+  | "definition"
+  | "theorem"
+  | "example"
+  | "remark"
+  | "verdict"
+  | "postulate"
+  | "thesis";
 
 // Lemma, Proposition and Corollary count on Theorem's counter, as the page's
 // stylesheet numbers them (Theorem 3.1, Lemma 3.2).
-const ENVIRONMENTS: Record<string, { counter: Counter; end?: string }> = {
+const ENVIRONMENTS: Record<string, { counter: Counter; end?: string; lessonWide?: true }> = {
   Definition: { counter: "definition" },
   Theorem: { counter: "theorem" },
   Lemma: { counter: "theorem" },
@@ -44,7 +52,14 @@ const ENVIRONMENTS: Record<string, { counter: Counter; end?: string }> = {
   Corollary: { counter: "theorem" },
   Example: { counter: "example", end: "◇" },
   Remark: { counter: "remark" },
+  Verdict: { counter: "verdict" },
+  // A derivation's premises and theses run through the lesson: Postulate 3.
+  Postulate: { counter: "postulate", lessonWide: true },
+  Thesis: { counter: "thesis", lessonWide: true },
 };
+
+/** What an h2 resets (globals.css); the lesson-wide counters run on. */
+const SECTION_COUNTERS = { definition: 0, theorem: 0, example: 0, remark: 0, verdict: 0 };
 
 const CALLOUTS: Record<string, string> = { KeyFact: "Key fact", Task: "Task", Aside: "Aside" };
 
@@ -188,7 +203,7 @@ function convert(node: RootContent, w: Walk): RootContent[] {
       // h2 is the section counter and resets the environment counters (globals.css).
       if (node.depth === 2) {
         w.section++;
-        w.counters = { definition: 0, theorem: 0, example: 0, remark: 0 };
+        w.counters = { ...w.counters, ...SECTION_COUNTERS };
       }
       break;
     case "link":
@@ -204,10 +219,12 @@ function convertJsx(node: Jsx, w: Walk): RootContent[] {
   const name = node.name ?? "";
   const env = ENVIRONMENTS[name];
   if (env !== undefined) {
-    const number = `${w.section}.${++w.counters[env.counter]}`;
-    const title = stringAttr(node, "title");
+    const count = ++w.counters[env.counter];
+    const number = env.lessonWide ? `${count}` : `${w.section}.${count}`;
+    const title = isGraded(name) ? gradedNote(gradedAttrs(node)) : stringAttr(node, "title");
     const head = strong(`${name} ${number}${title !== undefined ? ` (${title})` : ""}.`);
-    return ended(headed(head, children(node, w)), env.end);
+    const body = ended(headed(head, children(node, w)), env.end);
+    return isGraded(name) ? [...body, ...testsLine(name, node)] : body;
   }
   const callout = CALLOUTS[name];
   if (callout !== undefined) {
@@ -237,6 +254,16 @@ function convertJsx(node: Jsx, w: Walk): RootContent[] {
       return ref(node, w);
   }
   throw new Error(`<${name}> has no Markdown mapping (lib/content/markdown-export.ts)`);
+}
+
+/** The line under a graded statement, as the page sets it; none when no test is given. */
+function testsLine(name: GradedName, node: Jsx): RootContent[] {
+  const line = gradedTests(name, gradedAttrs(node)).flatMap(([label, value]) => [
+    text(" "),
+    emphasis(label),
+    text(` ${value}`),
+  ]);
+  return line.length > 0 ? [paragraph(...line.slice(1))] : [];
 }
 
 /** The passage, its source under it, then the original as a blockquote of its own. */
@@ -326,7 +353,7 @@ export function mdxToMarkdown(source: string, at: MarkdownSource): string {
     ...at,
     ids: headingIds(source),
     section: 0,
-    counters: { definition: 0, theorem: 0, example: 0, remark: 0 },
+    counters: { ...SECTION_COUNTERS, postulate: 0, thesis: 0 },
     exercise: 0,
     figure: 0,
   };

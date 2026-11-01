@@ -34,6 +34,7 @@ import {
   probeImageFile,
 } from "./images";
 import { collectJsx, stringAttr } from "./mdx-jsx";
+import { GRADED, isGraded } from "./graded";
 import { figurePrefix, inlineSvg, unscopedSelectors } from "./figure-svg";
 
 export interface Diagnostic {
@@ -66,6 +67,9 @@ const ALLOWED_COMPONENTS = new Set([
   "Proof",
   "Example",
   "Remark",
+  "Verdict",
+  "Postulate",
+  "Thesis",
   "KeyFact",
   "Task",
   "Conclusion",
@@ -318,6 +322,32 @@ function lintLessonMdx(
         rule: "ref-target",
         file,
         message: `<Ref lesson="${target ?? "?"}"> does not resolve to a lesson in this course`,
+      });
+    }
+  }
+
+  // env-grade: a graded statement off its fixed scale would be read as
+  // firmer than the lesson earned; a thesis must name what it follows from.
+  for (const node of jsx) {
+    const name = node.name ?? "";
+    if (!isGraded(name)) continue;
+    const { grades, gradeRequired } = GRADED[name];
+    const grade = stringAttr(node, "grade");
+    const onScale = (grades as readonly string[]).includes(grade ?? "");
+    if (grade === undefined ? gradeRequired : !onScale) {
+      diags.push({
+        level: "error",
+        rule: "env-grade",
+        file,
+        message: `<${name} grade="${grade ?? "?"}">: grade must be one of ${grades.map((g) => `"${g}"`).join(", ")}`,
+      });
+    }
+    if (name === "Thesis" && stringAttr(node, "from") === undefined) {
+      diags.push({
+        level: "error",
+        rule: "env-grade",
+        file,
+        message: `<Thesis> without from="…": a thesis names the postulates and verdicts it follows from`,
       });
     }
   }

@@ -122,13 +122,16 @@ never duplicate them in the MDX. The body is a free-form textbook chapter:
 `##` sections (numbered automatically, listed in the right-hand contents
 sidebar), KaTeX math, and the component vocabulary from
 `docs/components.md`: numbered environments `Definition`, `Theorem`,
-`Lemma`, `Proposition`, `Corollary`, `Proof`, `Example`, `Remark`; `Figure`, `Demo`, `Aside`; an `## Exercises`
+`Lemma`, `Proposition`, `Corollary`, `Proof`, `Example`, `Remark`,
+`Verdict`, `Postulate`, `Thesis`; `Figure`, `Demo`, `Aside`; an `## Exercises`
 section of `<Exercise>` blocks with collapsible `<Solution>`s; a final
 `<References>` section.
 
 The validator checks the shell, not the prose: unknown components,
 unparseable MDX, demo-name mismatches, a `<Figure src>` with no file behind
-it, a broken/truncated image, an uncredited sourced image, and a `$…$` span
+it, a broken/truncated image, an uncredited sourced image, a
+`<Verdict>`/`<Postulate>` whose `grade` is missing or off its scale, a
+`<Thesis>` with a grade off the scale or no `from` (`env-grade`), and a `$…$` span
 that holds prose rather than math (`stray-math`: a dollar amount written as
 a bare `$` pairs with the next one and KaTeX swallows the text between) are
 errors; a

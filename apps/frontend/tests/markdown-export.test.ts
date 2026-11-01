@@ -78,6 +78,41 @@ describe("mdxToMarkdown", () => {
     expect(md(`<${name}>\n\nBody text.\n\n</${name}>`)).toBe(`> **${label}.** Body text.`);
   });
 
+  it("heads a verdict with its own counter and grade, its tests on one line under the claim", () => {
+    const out = md(
+      [
+        "## One",
+        "<Theorem>Statement.</Theorem>",
+        '<Verdict grade="strong" decidedBy="the post-1689 record." overturnedBy="showing the limits did not bind.">',
+        "The settlement lasted.",
+        "</Verdict>",
+        '<Verdict grade="open">Unsettled.</Verdict>',
+      ].join("\n\n"),
+    );
+    expect(out).toContain(
+      "**Verdict 1.1 (strong).** The settlement lasted.\n\n" +
+        "*Decided by:* the post-1689 record. *Would be overturned by:* showing the limits did not bind.\n\n" +
+        "**Verdict 1.2 (open).** Unsettled.",
+    );
+  });
+
+  it("numbers postulates and theses through the lesson, the thesis headed by its derivation", () => {
+    const out = md(
+      [
+        "## One",
+        '<Postulate grade="argued" grounds="the argument of §1.">\n\nOrder needs a sovereign.\n\n</Postulate>',
+        "## Two",
+        '<Postulate grade="strong">Men fear death.</Postulate>',
+        '<Thesis grade="on balance" from="P1, P2; Verdict 2.1">So obey.</Thesis>',
+      ].join("\n\n"),
+    );
+    expect(out).toContain(
+      "**Postulate 1 (argued).** Order needs a sovereign.\n\n*Grounds:* the argument of §1.",
+    );
+    expect(out).toContain("**Postulate 2 (strong).** Men fear death.");
+    expect(out).toContain("**Thesis 1 (on balance; from P1, P2; Verdict 2.1).** So obey.");
+  });
+
   it("quotes the passage with its source, then the original as a second blockquote", () => {
     const out = md(
       [
