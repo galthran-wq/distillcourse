@@ -51,7 +51,9 @@ refuge.
   genetic share is **open**; the two limits (not wholly genetic as it stands; no evidence excludes a genetic
   share) are **established**; the national tables carry an association with income and nothing about
   genetic causes (**strong**); institutions alone have a clean natural experiment, which shows what they can
-  do and does not apportion the world's gaps. And the lesson says exactly how far: no cross-country
+  do and does not apportion the world's gaps; regimes and freedom are not explained mainly by genes
+  (**strong**), and culture persists across generations and is not put on at will (**strong**) —
+  `hungarys-fundamental-law` takes the second into what holds a people together. And the lesson says exactly how far: no cross-country
   table settles why nations differ; nothing in the national-IQ tables tests whether the differences they
   list are genetic; the US gap is not wholly genetic as it stands and no evidence excludes a genetic share;
   "what would settle it" was stated in `admixture-and-polygenic-scores` and is recalled. The institutional
@@ -101,7 +103,9 @@ refuge.
 - **Question judged:** are the measured gaps between peoples, within the US and between nations, caused by
   heredity, environment, geography or institutions, and in what proportion?
 - **Verdict and grades:** **open** on the genetic share; **established** on the two limits; **strong** on
-  what the national tables can carry.
+  what the national tables can carry; **strong** that regimes and freedom are not explained mainly by
+  genes; **strong** that culture persists across generations and is not put on at will (round 2; see
+  "Regimes and culture" below).
   - *The first three premises of the hereditarian argument largely hold.* The tests measure the same
     abilities in both US groups and predict outcomes without bias against the lower-scoring group
     (`what-intelligence-tests-measure`). Measured intelligence is substantially heritable within Western
@@ -134,6 +138,121 @@ refuge.
 - **What would settle it:** a well-powered sibling-difference admixture design with observed skin colour and
   local ancestry, and within-family GWAS of cognition in African-ancestry samples. For nations:
   representative samples, invariance tested across countries, and means tracked through development.
+
+### Regimes and culture (round 2, author's review — part of the module verdict)
+
+Two verdicts stand beside the module verdict. They answer a question the module's data raise and
+the gap verdict does not: whether the kind of regime a people lives under, and how free it is, is
+explained mainly by its genes. Sources are staged in `texts/round2-regimes/` (and
+`texts/acemoglu-robinson/`, `texts/liberal-forecasts/integration/`); line numbers refer to the
+staged files.
+
+- **Verdict R1: regimes and freedom are not explained mainly by genes. Grade: strong.** Five
+  natural experiments hold ancestry fixed and vary the regime within a lifetime:
+  - *The Koreas.* Before division Korea had "an unprecedented homogeneity in terms of language,
+    ethnicity, and culture" (Why Nations Fail, l.683); the differences "did not exist prior to
+    the end of the Second World War" (l.769); a tenfold income gap by the late 1990s (l.779);
+    one is a hereditary dictatorship, the other a democracy.
+  - *Taiwan.* Martial law from 1949 "until 1987" (ROC portal, `taiwan-gov-portal-history.txt`
+    l.148, l.182; exact days 19/20 May 1949 – 15 July 1987 [secondary]); the first direct
+    presidential election in 1996 (l.198); Freedom House 2025: Free, 94/100
+    (`fh-fiw2025-taiwan.txt`). The same population under both regimes: "nearly 95 percent" Han
+    (`taiwan-gov-portal-people.txt` l.86), descended mostly from Fujian and Guangdong migrants of
+    the past few centuries; in 10,801 Taiwan Biobank participants 79.9% have southern Han
+    ancestry, 5% northern Han and 14.5% a third group "similar to other southern Han Chinese"
+    (Chen et al., *Hum Mol Genet* 2016, `chen-2016-taiwan-biobank-han-structure.txt` l.249,
+    l.284, l.603). The 1949 arrivals numbered about 1.2 million (portal l.146); a 2004 survey
+    quoted by Chen gives post-1949 mainlanders 8%, Min-Nan 73.3%, Hakka 13.4%, indigenous 1.9%
+    (l.255). The often-quoted "13% mainlanders" is **not bound** — use 8% (2004 survey) or
+    1.2 million arrivals.
+  - *The two Germanies.* One population, divided by military defeat and an Allied border; "ex
+    ante uniform", with no significant income difference between the future East and West in
+    1928–36 (Alesina & Giuliano 2015, `alesina-giuliano-2015-culture-and-institutions-iza.txt`
+    l.1265–1278, n.58). By 1950 the East's output per head was about half the West's ($2,102
+    against $4,281, 1990 $) and in 1989 still under half ($8,422 against $18,016)
+    (`owid-two-germanies-gdp-per-capita-tcb2015.txt`, Conference Board via OWID): the gap opened
+    under occupation and the East never closed it. Note for the writer: this is not a fresh
+    divergence after 1950; say "opened between the 1930s and 1950, and never closed".
+  - *Germany across 1919–1949.* One population lived under a parliamentary republic
+    (1919–33), a dictatorship (1933–45) and two opposed regimes from 1949 [dates standard;
+    Weimar counts bound elsewhere in the course, `CHANGELOG.md` "Weimar counts confirmed"].
+  - *Spain and Portugal.* Dictatorships to the mid-1970s, democracies since: Portugal's
+    constitution of 2 April 1976 "after the break with the previous authoritarian regime"
+    (`assembleia-republica-revisoes-constitucionais.txt` l.11–17); Spain's constitution
+    sanctioned 27 December 1978 (`cortes-1978-12-27-sancion-constitucion.txt`; Franco's death in
+    1975 [secondary]). Output per head roughly quintupled in both, 1950–1989 (Spain $2,189 to
+    $11,582; Portugal $2,086 to $10,372; same OWID file).
+  What decides it: a gene pool cannot change in a generation, and in each case the regime did.
+  Genes may still shape the range of what a population sustains easily; the natural experiments
+  show that range is wide enough to hold a hereditary dictatorship and a free democracy within
+  one ancestry. Would be overturned by: evidence that the populations diverged genetically on
+  relevant traits within the periods (selective emigration on a scale that changes the means),
+  which none of the sources shows.
+- **Verdict R2: culture persists across generations and is not put on at will. Grade: strong.**
+  The World Values Survey finds "both massive cultural change and the persistence of distinctive
+  cultural traditions"; heritage "leaves an imprint on values that endures despite
+  modernization" (Inglehart & Baker 2000, abstract, `inglehart-baker-2000-abstract.txt`). The
+  trust of American descendants of immigrants is "significantly influenced by the country of
+  origin", into the fourth generation (Algan & Cahuc, *AER* 2010,
+  `algan-cahuc-2010-inherited-trust.txt` l.5–11, l.401–411). Values change "gradually, if ever,
+  but rarely within two generations" (Alesina & Giuliano 2015, l.418–421). The course's own
+  finding: 91% of those raised Muslim in France keep the religion, against 67% of those raised
+  Catholic, and across fifteen countries second-generation Muslims keep first-generation
+  religiosity while Christians converge (INSEE 2023; Güveli & Platt 2023;
+  `murray-strange-death-of-europe`, strong). Regimes also shape culture: East Germans remain
+  more pro-government after reunification (Alesina & Giuliano l.1272–1275). The two verdicts fit
+  together: what persists is carried by upbringing and institutions, and it moves when
+  institutions change, slowly.
+- **Objection (author's review) (a), at full strength:** "Peoples live as they want. Some
+  peoples — Muslims and the Chinese — do not understand or want freedom, and that is genetic:
+  culture is made by people with certain genes." Its best form: gene–culture coevolution is a
+  real field — "culture normally evolves more rapidly than genes, creating novel environments
+  that expose genes to new selective pressures", with effects theory suggests "were profound"
+  (Richerson, Boyd & Henrich, *PNAS* 2010, `richerson-boyd-henrich-2010-gene-culture-coevolution.txt`
+  l.147; lactase persistence the canonical case, l.223); selection on alleles associated with
+  cognition is detected in ancient DNA (Akbari et al. 2026, `texts/round2-west/`); and the
+  surveys do record real value differences. The answer: what holds is the value difference, and
+  it is cultural (R2) — Pew finds majorities for sharia as official law in South Asia (84%) and
+  the Middle East and North Africa (74%) (`pew-2013-worlds-muslims-overview.txt` l.167); the
+  fault line between Muslim and Western publics is gender equality and sexual liberalization,
+  "Eros far more than Demos" (Norris & Inglehart 2002, l.23–36). What fails is "do not want
+  freedom" as a description of preferences about government: the difference in support for democracy between Islamic and Western societies is "extremely
+  modest" (Norris & Inglehart l.505–530); at least 73% in eight
+  Arab countries hold that democracy, despite its problems, is the best system (Arab Barometer
+  VIII, 2025, l.145); Senegal is rated Free (69/100). And "it is genetic" fails on the natural
+  experiments: Taiwan is a Chinese population that lived under martial law and chose democracy,
+  rated Free 94/100. Gene–culture coevolution works over millennia (lactase); the regimes in R1
+  changed in years. Grade unchanged: R1 strong.
+- **Objection (author's review) (b):** "The best Germans were killed in the war, so the
+  post-war population was not the same." Full strength: German military dead were over 5.3
+  million (Bundestag text archive 2011, `bundestag-2011-textarchiv-ueberfall-sowjetunion.txt`
+  l.73, citing the standard figure [secondary for Overmans 1999; book not read]), concentrated
+  in young men. The answer: the losses came from the whole Reich, and no source the course holds
+  shows a difference between East and West per head [not bound — say so]; the Weimar republic
+  and its fall happened before the war, in the undepleted population; the 1928–36 East–West
+  parity and the 1950 gap opened under occupation, not by any selection the war could make
+  between the zones; and the post-war recovery in the West was built by those who remained.
+  Selection by war deaths would have to depress the East and spare the West, and nothing shows
+  it did.
+- **Objection (author's review) (c):** "East Germany was ruled by a foreign ressentiment
+  culture imposed by the USSR." Conceded in part: the regime came from Moscow and was held by
+  Soviet arms. The rest answered with numbers: the population was German — 18.4 million at the
+  1950 census, 17.1 million in 1961, 16.4 million in 1989 (Statistisches Jahrbuch 1990, Anhang
+  DDR, `statjb-brd-1990-anhang-ddr-bevoelkerung.txt` l.14–18); Soviet forces were a garrison,
+  not settlers — 337,800 soldiers and 208,400 dependants and civilian staff under the 1991–94
+  withdrawal plan (BT-Drs. 12/1064, l.200–203; about 340,000 soldiers, withdrawal completed
+  31 August 1994, Bundesregierung Bulletin 1994, l.327–329); about 3 million fled the GDR
+  between 1949 and summer 1961 (Bundesarchiv, `bundesarchiv-mfs-lexikon-republikflucht.txt`
+  l.279); the regime fell in 1989. That is the point of the case: an imposed regime governed the
+  same people for forty years, which is a regime explanation, not a genetic one. The objection
+  concedes R1.
+- **Objection (author's review) (d):** "The Taiwanese are not the same Chinese population."
+  Answer from the population facts above: nearly 95% Han, mostly of Fujian and Guangdong
+  descent, genetically clustering with southern Han Chinese (Chen et al. 2016); about 1.2
+  million arrived in 1949 from across the mainland. Taiwan differs from the mainland in history
+  (Japanese rule 1895–1945 [standard dates, not bound]) and institutions, not in a way the genetic data show. And the case
+  does not need mainland comparison: the same Taiwanese population lived under martial law to
+  1987 and under democracy after.
 
 ### The lesson verdicts (the tables)
 
@@ -412,6 +531,21 @@ NAEP, ABCD, WISC-R, Raven's Progressive Matrices.
 **Factual authority:** `C/research/heredity-evidence-review.md` (the dossier). §7 for every national-IQ claim;
 §2 for the meta-analysis; §5 for the bound; §8 and "Overall answer" for the close.
 
+- **Round 2 (author's review): regimes, genes and culture.** Staged under `texts/round2-regimes/` with
+  sidecars, cited in VERDICT "Regimes and culture" by line: ROC government portal (history, people,
+  government pages); Chen et al., *Hum Mol Genet* 25(24) 2016 (Taiwan Biobank); Freedom House FIW 2025
+  (Taiwan, Indonesia, Senegal); Alesina & Giuliano, "Culture and Institutions", *JEL* 2015 (IZA DP);
+  Conference Board GDP per head via OWID; Statistisches Jahrbuch 1990, Anhang DDR; Bundesarchiv,
+  "Republikflucht"; BT-Drs. 12/1064 and Bundesregierung Bulletin 1994 (Soviet withdrawal); Bundestag text
+  archive 2011 (the 5.3 million, [secondary] for Overmans 1999, not read); Cortes 1978 and Assembleia da
+  República (Iberian constitutions); Inglehart & Baker, *ASR* 2000 (abstract); Algan & Cahuc, *AER* 2010;
+  Richerson, Boyd & Henrich, *PNAS* 2010; Norris & Inglehart 2002 (KSG working paper, third-party copy);
+  Pew, *The World's Muslims* 2013 (overview and ch. 1); Arab Barometer VIII (2025); PIIE 2011 on the
+  Asian Barometer [secondary]. Already held: `acemoglu-robinson/why-nations-fail.txt` l.683, l.767–779;
+  `liberal-forecasts/integration/insee-2023-diversite-religieuse-teo2.txt`,
+  `guveli-platt-2023-religiosity-migrants-natives.txt`. Names in References only, except as objects of
+  study.
+
 ## EXPLANATION PLAN (L0)
 
 Time budget for est_minutes 45 (the writer keeps to it): links 1–4 and 6–7 are the core (~25 min); link 5
@@ -626,6 +760,27 @@ prefers, or to trust both because both were published. The lesson's question is 
    - *Institutions* (Ref `geography-or-institutions`): only institutions have a clean natural experiment
      behind them (the Koreas, Nogales); it shows they can produce gaps as large as any between nations, and
      it does not apportion the world's gaps.
+   - *Regimes are not mainly genetic; culture persists* (round 2, author's review; VERDICT "Regimes and
+     culture"). A short paragraph pair, then the objections. R1 (**strong**): the Koreas, Taiwan under
+     martial law 1949–87 and democratic since, Germany from Weimar to 1933 to the two states of 1949, Spain
+     and Portugal to the mid-1970s — each the same ancestry under opposite regimes within a lifetime. R2
+     (**strong**): beside it, the record that culture is inherited and slow — the World Values Survey's
+     persistent cultural zones, origin-country trust into the fourth generation of American descendants,
+     second-generation Muslim religiosity in Europe (`<Ref murray-strange-death-of-europe>`). Then the four
+     **Objections (author's review)** in their best form, each answered in two or three sentences with the
+     VERDICT's numbers: (a) peoples live as they want, Muslims and the Chinese do not want freedom, and
+     culture is made by people with certain genes — gene–culture coevolution stated as a real field
+     (lactase), the value differences conceded as cultural and persistent, "do not want freedom" and "it is
+     genetic" answered by the surveys on democracy and by Taiwan; (b) the best Germans died in the war —
+     over 5.3 million military dead conceded, answered by Weimar's fall before the war, the 1928–36
+     East–West parity and the gap opening under occupation; (c) the GDR was a foreign culture imposed —
+     the imposition conceded, the population German (18.4 million in 1950), the Soviet presence a garrison
+     (about 340,000 soldiers), three million fled before 1961 and the regime fell in 1989; (d) the
+     Taiwanese are not the same Chinese population — nearly 95% Han, southern Han in the genetic data, and
+     the same population on both sides of 1987. The bridge sentence: whatever genes contribute to the gaps
+     in measured ability (open, above), they do not decide whether a people is free; what it inherits and
+     cannot put on at will is its culture, which is where the course's last modules take the question of
+     what holds a people together (`<Ref hungarys-fundamental-law>`, forward).
    - *The strongest objection, answered* (VERDICT): "open" is evasion because the indirect evidence all
      points one way; the reply line by line (uninformative, confounded, invalid across ancestries, not
      evidence); and the opposite objection, that the narrowing proves the gap environmental, answered the
@@ -649,13 +804,16 @@ prefers, or to trust both because both were published. The lesson's question is 
    would settle it. Two things are **established**: the gap as it stands is not wholly genetic, and no
    evidence rules out a genetic share. Between nations, measured skills go with income, the lowest national
    entries are too low by about ten points (**strong**), and nothing in the tables bears on genes; the rules
-   a country lives under can open a gap as wide as any. Then the hand-off: the settler-mortality table
+   a country lives under can open a gap as wide as any. Regimes and freedom are not explained mainly by
+   genes (**strong**): the same people have lived under dictatorship and democracy within one lifetime, in
+   Korea, Taiwan, Germany, Spain and Portugal. Culture, by contrast, is inherited and slow to change
+   (**strong**). Then the hand-off: the settler-mortality table
    compares colonies with colonies, and the next module asks "compared to what?".
 
 Headings fall out as: "A table is a list of claims"; "Ghana three times"; "Forty-eight children in Spain";
 "What the revision coded"; "The review, the reply and the rejoinder"; "Why the institutional table needed an
 instrument"; "Garrisons, campaigns and borrowed rates"; ★ "What a correlation carries"; "Where the numbers go
-next"; "A real gap, partly environmental, its genetic share open".
+next"; "A real gap, partly environmental, its genetic share open" (its last part may carry the sub-head "The same people, opposite regimes").
 
 ## Set pieces and worked examples to recreate
 
@@ -846,6 +1004,17 @@ Status lines the lesson must state in substance:
    exactly what evidence would be needed to overturn the verdict in its direction. The solution sorts each
    line into uninformative / confounded / invalid at present / not evidence, shows that the second case
    proves only that part of the gap is environmental, and names the designs in the VERDICT.
+8b. **Attack the verdict (round 2, author's review): regimes and genes.** State in its best form the
+   objection that peoples live as they want and that a people's culture, and so its regime, is made by its
+   genes (gene–culture coevolution; the surveys' value differences). Then (i) say which part the course
+   concedes (the value differences, and that they persist — R2) and which it rejects (R1), on what natural
+   experiments; (ii) take the strongest rejoinder to each experiment (the war dead; the GDR as an imposed
+   regime; Taiwan as a different population) and say what fact answers it; (iii) say what evidence would
+   overturn R1 (genetic divergence on relevant traits within the periods, e.g. selective emigration large
+   enough to move the means — the GDR's three million emigrants are the case to compute: what share of a
+   population of 18 million, and what trait difference would they need to carry?). Model answer gives the
+   share (about one in six) and says why even a selective emigration of that size would explain a regime's
+   persistence less well than the Soviet garrison and the Wall.
 9. **FORWARD (E7) → `colonial-balance-sheet`.** The settler-mortality table compares colonies with colonies.
    Can it tell you whether colonial rule as such made the colonised richer or poorer than they would otherwise
    have been? Say what comparison would be needed and why the table cannot supply it. The solution says that

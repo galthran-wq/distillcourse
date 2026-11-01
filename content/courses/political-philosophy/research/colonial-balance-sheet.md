@@ -100,6 +100,20 @@ Binding: research/verdicts/REGISTER.md, module 14, `colonial-balance-sheet`.
   counterfactual at all; for (b), comparators matched on the conditions that
   made them hard to colonise; for (c), evidence of consent given by those
   ruled, under conditions in which refusal was possible.
+- **Objection (author's review) — required.** "All the colonies became much
+  better after being colonised and much worse after independence." It is the
+  Case's own fourth argument ("The Costs of Anti-Colonialism") pushed to a
+  uniform claim, and the lesson states it at full strength at link 4 with the
+  post-independence collapses named and bound to data (Zimbabwe, the Congo,
+  Guinea-Bissau, Uganda, Mozambique, Angola, Ghana, Sierra Leone). It does not
+  bear on the three charges judged here; it is a claim about the ledger, and
+  the ledger is weighed in `auditing-the-case-for-colonialism`, where the
+  uniform claim is answered with the counter-cases (India under British rule
+  1870–1947 and after 1991; Singapore, Botswana and South Korea after
+  independence; the Congo Free State) and the module verdict names the
+  collapses. This lesson gives the objection and one paragraph of answer, and
+  hands the weighing on. Data: `research/texts/empire-round2/`
+  (Maddison Project Database 2023 extract; World Bank life expectancy).
 
 ## Sources to consult
 
@@ -118,6 +132,16 @@ Binding: research/verdicts/REGISTER.md, module 14, `colonial-balance-sheet`.
   l.780–789 (the slave trades and income). Here they show only that the
   critical literature runs counterfactual designs, in both directions; their
   results are weighed in `auditing-the-case-for-colonialism`. References.
+
+- **Post-independence records (author's review, round 2)** — staged in
+  `research/texts/empire-round2/`: Maddison Project Database 2023 extract
+  (`maddison-mpd2023-selected.csv`; GDP per head in 2011 dollars; cite Bolt &
+  van Zanden 2024 and, in any figure showing fewer than twelve countries, the
+  country sources the workbook lists); World Bank WDI life expectancy at birth
+  (`worldbank-life-expectancy-SP.DYN.LE00.IN.csv`); Sanderson, *Population*
+  55:2 (2000), on the Congo's colonial demography; the Wikipedia estimates
+  map for the Free State (`[secondary]`). Used at link 1 (the Free State's
+  range) and link 4 (the objection). References.
 
 - **Gilley, "The Case for Colonialism" (Third World Quarterly, 8 September
   2017, withdrawn; reprinted Academic Questions 31:2, 2018)** — index **7**;
@@ -289,7 +313,19 @@ September 2017) and leave the controversy for link 7.
    the second of two phases of European empire, dated from 1824 — so the
    conquest of the Americas (Vitoria's subject, `<Ref>`), the Atlantic slave
    trade, and Leopold II's Congo Free State (1885–1908, the king's private
-   estate, not a Belgian colony) fall outside it. Give both sides at strength:
+   estate, not a Belgian colony) fall outside it. One sentence binds what the
+   scope excludes, with its uncertainty: no census was taken before 1924, so
+   the Free State's population loss is estimated, from about one million
+   (Sanderson's demographic modelling, 2020, which takes the low end as the
+   most plausible) to about ten million (Hochschild 1998, following the
+   Belgian commission of 1919, which said the population had been "reduced by
+   half"); Sanderson (*Population* 55:2, 2000) shows that the colonial
+   literature's depopulation figures rested on impressions, not counts
+   (`research/texts/empire-round2/sanderson-2000-population-congo-belge-mythe-realite.txt`
+   l.130–171, 845–859; the 1–5 million range and the 2020 study are
+   `[secondary]` via `research/texts/empire-round2/wikipedia-atrocities-congo-free-state.txt`
+   l.112–116 — the writer cites Sanderson 2020 only after reading it). Give
+   both sides at strength:
    the critics' charge that excluding the Congo is convenient; the author's
    reply that scholars should know the difference between a private estate and
    a state, and that the Free State is "the best argument for colonialism"
@@ -361,7 +397,47 @@ September 2017) and leave the controversy for link 7.
    hundred thousand people, rice output fell from its late-colonial peak to
    under half by 1980, and the gain in life expectancy slowed (bind every
    number in its sentence; verify each against the text before using; two
-   keepers at most). The critics' replies: a hard case chosen (Portugal's was
+   keepers at most).
+   **Objection (author's review) — state it at FULL STRENGTH here, in its best
+   form, before any reply.** "All the colonies became much better after being
+   colonised and much worse after independence." Its best author is the Case
+   itself (original, "The Costs of Anti-Colonialism":
+   "Guinea-Bissau seems like an extreme case. It is not. Of the eighty
+   countries that threw off the colonial 'yoke' after World War II, at least
+   half experienced similar trauma while most of the rest limped on"; the
+   World Bank's 1996 finding that "the majority had better capacity at
+   independence than they now possess"). Then name the collapses plainly and
+   bind each to the Maddison Project Database 2023 (GDP per head in 2011
+   dollars, `research/texts/empire-round2/maddison-mpd2023-selected.csv`):
+   **Zimbabwe** — $2,369 in 1998, $1,198 in 2008, a halving in ten years
+   after the land seizures of 2000, and still $1,704 in 2022, below the $2,275
+   of 1974 under the Rhodesian government; **the Congo** — $1,192 in 1960, the
+   year of independence, $414 in 2002 after the Congo crisis, Mobutu and the
+   wars of 1996–2003, and $844 in 2022, still 29% below 1960; **Guinea-Bissau**
+   — $1,458 in 1974, $1,207 in 1980; **Uganda** — $1,382 in 1970, $858 in 1986
+   (Amin and the second Obote government); **Mozambique** — $2,778 in 1970,
+   $1,482 in 1992 at the end of the civil war, $1,088 in 2022; **Angola** —
+   $2,818 in 1970, $1,384 in 1990; **Ghana** — $1,978 at independence in 1957,
+   $1,487 in 1983; **Sierra Leone** — $1,635 in 1990, $829 in 2000 after the
+   civil war. Say plainly: these are real collapses, and no account of the
+   ledger may leave them out. Two cautions bound to the same sources, stated after the
+   objection and not instead of it: the late-colonial figures for Mozambique
+   and Angola are for economies with large settler populations who left at
+   independence, so GDP per head fell partly because the richest residents
+   departed; and life expectancy did not follow income down — in the Congo it
+   rose from 40.8 years in 1960 to 61.9 in 2023, in Guinea-Bissau from 41.6 in
+   1974 to 64.1 (World Bank WDI, `research/texts/empire-round2/worldbank-life-expectancy-SP.DYN.LE00.IN.csv`;
+   on the current UN series Guinea-Bissau's gain after independence is faster
+   than in the colonial war years, so the Case's own life-expectancy figures
+   for it should not be repeated without that check). One paragraph of answer
+   here, the weighing in the module's last lesson: the claim as the author
+   states it is uniform, and a uniform claim falls to counter-cases — India,
+   Singapore, Botswana, South Korea (`<Ref>` auditing-the-case-for-colonialism,
+   one sentence) — while the collapses it names are real and stand. The Case
+   itself is less uniform than the objection ("the independence era has not
+   been an unalloyed bad. A few postcolonial states are in reasonable
+   health"); quote that sentence too.
+   The critics' replies: a hard case chosen (Portugal's was
    the last and most violent decolonisation; the war is the cost of the
    refusal to leave, not of leaving); post-colonial failure as colonial legacy
    (Taylor) against "everything is rooted in antecedents tells us nothing about

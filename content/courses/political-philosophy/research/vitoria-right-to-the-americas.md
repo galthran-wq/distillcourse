@@ -94,8 +94,52 @@ Binding: research/verdicts/REGISTER.md, module 14, `vitoria-right-to-the-america
   is on balance rather than strong.
 - **What would overturn it.** A mechanism in Vitoria's scheme letting a
   neutral party judge whether a refusal had occurred and whether war was due.
+- **Objection (author's review) — required, stated at FULL STRENGTH at
+  step 9a before the weighing.** "They were stronger and more capable — that
+  is all the right you need." It is the title Vitoria's list leaves out
+  because his whole lecture assumes it is none: the right of the stronger.
+  Its best forms are in the course already: the Athenians at Melos ("the
+  strong do what they can and the weak suffer what they must", `<Ref>`
+  thucydides-power-and-justice), Thrasymachus ("justice is nothing else than
+  the interest of the stronger", `<Ref>` thrasymachus-and-the-ring), and — the form the lesson
+  quotes, because it claims right and not only fact — Callicles in the
+  *Gorgias* (483d–484c): "nature herself intimates that it is just for the
+  better to have more than the worse, the more powerful than the weaker", and
+  "the oxen and other possessions of the weaker and inferior properly belong
+  to the stronger and superior" (Jowett, `research/texts/empire-round2/plato-gorgias-jowett-pg1672.txt`
+  l.4402–4433). Add the fact that gives it force here: a few hundred Spaniards
+  took two empires, and Vitoria's Letter to Arcos concedes the conquistadors
+  "can allege no title other than iure belli". **The answer.** (i) As a
+  description, it is upheld: cities and empires at war have taken what they
+  could, and the course's own verdict on Melos says so (on balance;
+  `<Ref>` thucydides-power-and-justice — recall, do not re-argue). (ii) As a
+  theory of right, it collapses right into success. If strength is the title,
+  then every colony that won its independence — the United States in 1783,
+  Haiti in 1804, Spanish America in the 1820s, Algeria in 1962 — had the same
+  right to expel its rulers as they had to conquer it, and any armed party
+  that crosses an undefended border acquires a right by crossing. A title
+  that passes to whoever wins next distinguishes nothing from a fact; it
+  leaves no ground to say that anything ought to be otherwise, including the
+  objector's own complaints against what the stronger do to him. Socrates'
+  reply to Callicles makes the same point from inside the theory: "the many
+  are by nature superior to the one" (488d, l.4598–4599), so by Callicles'
+  own criterion the laws of equality he despises are the just ones. (iii)
+  Vitoria's own text already rejects it: "enlargement of empire cannot be a
+  cause of just war" (On the Law of War §11, `research/texts/vitoria/political-writings.txt`
+  l.16059). So the
+  objection does not change verdict (a): it is one more title that fails on
+  Vitoria's premises, and on any premises that distinguish a right from a
+  power (**strong**).
 
 ## Sources to consult
+
+- **Plato, *Gorgias*, tr. Jowett (Project Gutenberg #1672)** — staged at
+  `research/texts/empire-round2/plato-gorgias-jowett-pg1672.txt`: Callicles'
+  speech 483b–484c (l.4390–4433: the law of nature against the law of the
+  many; Xerxes; Heracles and Geryon's oxen; "the slave would rise in
+  rebellion and be lord over us"); Socrates' reply 488b–489b (l.4580–4600).
+  Public domain; quote short. Used only for the author's-review objection
+  (step 9a).
 
 - **Vitoria, Political Writings (ed. Pagden & Lawrance, CUP 1991)** — summaries.json
   index **41** (the FULL read; index 2 is a toc-only read "from memory" with
@@ -378,13 +422,41 @@ lesson's chain is his own quaestio.
    Vitoria left undecided was taken up on both sides within a decade. Nothing
    more — the dossier has only the pointer.
 
+9a. **Objection (author's review): the right of the stronger.** Required;
+   state it at FULL STRENGTH before any reply (see VERDICT for the texts).
+   Question: if every title fails, was not the conquest its own title? "They
+   were stronger and more capable — that is all the right you need." Give it
+   its best authors — the Athenians at Melos and Thrasymachus by `<Ref>` (one
+   clause each), Callicles quoted (*Gorgias* 483d: "nature herself intimates
+   that it is just for the better to have more than the worse"; Heracles
+   taking Geryon's oxen "according to the law of natural right") — and its
+   best fact: a few hundred men took two empires, and Vitoria's own Arcos
+   letter says the conquerors had no title but the law of war. Then the
+   answer in two halves, kept apart. As description: upheld — `<Ref>`
+   thucydides-power-and-justice, whose verdict is that the Athenian thesis
+   describes how cities at war behaved (on balance). As a theory of right: it
+   collapses right into success. Whoever wins next has the same title, so it
+   gives the colonised who won independence — the United States, Haiti,
+   Spanish America, Algeria — the same right to expel the conquerors, and
+   anyone who crosses an undefended border a right by crossing; it leaves no
+   ground for saying that anything ought to be otherwise, which is the one
+   thing a claim of right exists to say. Socrates' reply to Callicles turns it
+   on itself: "the many are by nature superior to the one" (488d), so the laws
+   of equality are by Callicles' standard just. Vitoria had already struck it:
+   "enlargement of empire cannot be a cause of just war". Because: a right
+   that is lost whenever its holder becomes weaker is not a right but a
+   description of who holds power now. One paragraph of 200–300 words; it
+   strengthens part (a) of the weighing, it does not open a new verdict.
+
 10. **The weighing — the unjust titles fail; the just titles were a licence.**
    This is the lesson's last body section and it reaches the verdict (see
    VERDICT). First, (a): restate in three sentences why every unjust title
    fails on Vitoria's premises — dominium follows reason, not grace; discovery
    needs res nullius; no jurisdiction over non-subjects — and say plainly that
    this part is **strong**: the failure is Vitoria's own argument, and no later
-   reader has repaired a title he struck. Then (b): set the objection's best
+   reader has repaired a title he struck — nor has the bare right of the
+   stronger (step 9a), which fails as a title because it passes to whoever
+   wins next. Then (b): set the objection's best
    form (step 8's reply: the restraints are real and sincere, and their author
    condemned their breach) against the ladder's structure. Ask the one
    question that decides it: who judges whether a refusal occurred, whether
@@ -402,7 +474,7 @@ Headings fall out as: "A verdict of conscience, not a fact of possession";
 "Did the Indians own anything? Four denials"; "Seven titles, and the law each
 fails"; "What is left: the right to travel, trade and preach"; "What a refused
 right licenses"; "The law of war that measures the war"; "The eighth title and
-the exchequer"; "Did the just titles license the conquest?"; "At Valladolid the undecided title was argued both ways";
+the exchequer"; "Did the just titles license the conquest?"; "Strength describes the conquest and gives it no right"; "At Valladolid the undecided title was argued both ways";
 "The just titles were a licence, because the party that judged the refusal made
 the war".
 
@@ -630,6 +702,17 @@ Balance: 6 draw / 2 source — a close reading of an argument stays draw-heavy.
    conditions stopped a Spanish war before it began. The solution checks the
    texts and finds neither, and says why that keeps the grade at on balance
    rather than raising it.
+10. **Attack the verdict — the right of the stronger (author's review).**
+   State in its best form the claim that superior strength and capability are
+   all the right a conqueror needs (Callicles' "law of nature", the Athenians
+   at Melos). Then answer two questions: what would the claim have to say
+   about Haiti in 1804 or Algeria in 1962, and what would it have to add to
+   avoid granting them the same right — and, once added, is the addition
+   still "strength"? The solution: as description the claim stands (the
+   Thucydides verdict); as right it either grants every successful rebellion
+   and every unopposed invasion the same title, or it adds a criterion other
+   than strength (capability used for the conquered's good, say) — which is
+   the eighth title, judged next lesson.
 
 ## Nietzsche cross-course links (where his ideas enter)
 

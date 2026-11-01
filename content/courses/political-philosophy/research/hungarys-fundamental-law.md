@@ -99,7 +99,8 @@ The module question: can a free state survive on liberal principles alone, and i
 remedy better? This lesson carries the module verdict (register, module 16) and one liberal
 forecast check. Grades are fixed: **on balance** on the premise; **open** on whether written
 presuppositions produce cohesion; **strong** on the Fourth Amendment; **strong** that the lock-in
-forecast failed.
+forecast failed; **strong** that regimes and freedom are not explained mainly by genes and
+**strong** that culture persists and is not put on at will (claim 6, round 2).
 
 - **Claim 1 — the premise: a free state does not live on liberal principles alone.** Verdict:
   **holds, on balance.** It draws on a solidarity, a readiness to bear burdens for strangers who
@@ -139,6 +140,44 @@ forecast failed.
   as generated 7 May 2026; `texts/verification-2026-11/hungary-2026-nvi-results.txt`; the shares
   are of all valid list votes). Cardinal acts still give any two-thirds majority an outsized lever,
   including the new one (141 of 199 is itself above two-thirds): **on balance**.
+- **Claim 6 — what the solidarity is made of: genes or culture (round 2, author's review).**
+  Two verdicts carried from `national-data-audited` (VERDICT "Regimes and culture", where the
+  evidence is set out by line): **regimes and freedom are not explained mainly by genes —
+  strong** (the Koreas; Taiwan under martial law 1949–87 and a Free democracy since, a
+  population nearly 95% Han and genetically southern Han; Germany from Weimar through 1933 to
+  the two states of 1949; Spain and Portugal to the mid-1970s); and **culture persists across
+  generations and is not put on at will — strong** (World Values Survey cultural zones; trust
+  inherited from the origin country into the fourth generation, Algan & Cahuc 2010; values that
+  change "rarely within two generations", Alesina & Giuliano 2015; the course's own finding that
+  second-generation Muslims in Europe keep first-generation religiosity, INSEE 2023 and Güveli &
+  Platt 2023). Bearing on this lesson: the solidarity Böckenförde's premise names is inherited
+  as culture, which is why a state can protect it more easily than it can write it (claims 2
+  and 4 stay open; claim 1 keeps its grade, since R2 is not the trust-and-transfers series the
+  falsifier asks for).
+  - **Objection (author's review), at full strength:** "Peoples live as they want. Some peoples —
+    the author names Muslims and the Chinese — do not understand or want freedom, and that is
+    genetic; culture is made by people with certain genes." Its best form: gene–culture
+    coevolution is a real field (Richerson, Boyd & Henrich, *PNAS* 2010: culture creates
+    environments that select on genes; lactase persistence the textbook case); ancient DNA shows
+    selection on alleles associated today with cognition and schooling (Akbari et al., *Nature*
+    2026); the value surveys record real and lasting differences, and immigrants' children keep
+    them. The answer: (i) the value differences are conceded, and they are cultural and
+    persistent (R2): majorities for sharia as official law in South Asia (84%) and the Middle
+    East and North Africa (74%) (Pew 2013, l.167); the gap between Muslim and Western publics is
+    on gender equality and sexual liberalization — "Eros far more than Demos" (Norris & Inglehart
+    2002); (ii) "do not want freedom" fails as a description of what these publics say about
+    government: the difference in support for democracy is "extremely modest" (same, l.505–530);
+    at least 73% in eight Arab countries call democracy the best system despite its problems
+    (Arab Barometer VIII, 2025, l.145); Senegal is rated Free; (iii) "it is genetic" fails on the
+    natural experiments: Taiwan is a Chinese population that lived under martial law and has been
+    a democracy rated Free (94/100) since, and coevolution acts over millennia while these
+    regimes changed in years. The rejoinders — that the war killed Germany's best, that the GDR
+    was a foreign imposition, that the Taiwanese are a different population — are answered in
+    `national-data-audited` and recalled in one sentence each (`<Ref national-data-audited>`).
+  - What this changes for the module: the question "what holds a people together" is answered on
+    the side of an inherited culture, slow to change and not chosen at will, not on the side of
+    ancestry; that strengthens the conservative half of the premise (the supplement is inherited,
+    not legislated) and weakens any reading of it as descent.
 - **The answer the evidence supports:** liberal principles are necessary and, on balance, not
   sufficient. The supplement they need comes from a people's own institutions and loyalties, which
   the state can protect. Whether it can also write them is open (claims 2 and 4). Hungary is the
@@ -153,7 +192,9 @@ forecast failed.
   Hungary refutes the premise, since a free state that tried to write its presuppositions ended in
   a constitution "of one party" — confuses the remedy with the premise: the Fourth Amendment counts
   against the remedy as practised, not against the claim that liberal procedures need a supplement.
-- **What would overturn it:** for claim 1, trust and transfers that do not fall where shared
+- **What would overturn it:** for claim 6, R1 — genetic divergence on relevant traits within the
+  natural experiments' periods; R2 — second- and third-generation values converging on the
+  receiving society within a generation across several countries; for claim 1, trust and transfers that do not fall where shared
   identity weakens; for the open cohesion finding, a cohesion series (trust, fertility, marriage,
   civic participation) that moves with the constitutional changes and not with the economic
   cycle; for claim 5, the new majority being prevented from governing by cardinal acts and
@@ -341,6 +382,17 @@ and every journalist. Named in the body as actors or institutions: Viktor Orbán
 alliance, the Venice Commission, the European Commission, Parliament and Court of Justice, the
 Hungarian Constitutional Court; Saint Stephen. Thinkers taught in the module may be named with a
 `<Ref>`.
+
+- **Round 2 (author's review) — claim 6.** Sources staged in `texts/round2-regimes/` and cited by
+  line in `national-data-audited` (VERDICT "Regimes and culture"); for this lesson: Pew, *The
+  World's Muslims* (2013), `pew-2013-worlds-muslims-overview.txt` l.167, l.281;
+  `norris-inglehart-2002-islam-and-the-west-ksg-wp.txt` l.23–36, l.505–530 (third-party copy of
+  the KSG working paper); `arab-barometer-viii-democracy-2025.txt` l.145, l.170–176;
+  `fh-fiw2025-taiwan.txt`, `fh-fiw2025-senegal.txt`;
+  `richerson-boyd-henrich-2010-gene-culture-coevolution.txt` l.147, l.223;
+  `algan-cahuc-2010-inherited-trust.txt`; `alesina-giuliano-2015-culture-and-institutions-iza.txt`
+  l.418–421; `inglehart-baker-2000-abstract.txt`; the Asian Barometer figures only via
+  `piie-2011-democracy-in-asia-asiabarometer.txt` [secondary — do not state as decisive].
 
 ## EXPLANATION PLAN (L0)
 
@@ -533,14 +585,24 @@ two-thirds of the seats — the share needed to change the constitution.
    forecast failed (**strong**, link 8). The strongest objection — 2026 vindicates the remedy —
    answered as in VERDICT: coexistence accepted, vindication not, because the winner's programme is
    pro-EU on courts, media and prosecution (and restrictive on migration, which narrows the
-   contrast) and the cohesion is unmeasured. Close with what would overturn each part.
+   contrast) and the cohesion is unmeasured. Then claim 6 in one paragraph and its objection in
+   another (VERDICT claim 6): what the solidarity is made of — not genes (**strong**: the same
+   peoples under opposite regimes within a lifetime, Taiwan above all) but an inherited culture
+   that persists and is not put on at will (**strong**); the **Objection (author's review)** —
+   peoples live as they want, Muslims and the Chinese do not want freedom, and culture is made
+   by genes — stated at full strength with gene–culture coevolution, the value differences
+   conceded as cultural, "do not want freedom" and "genetic" answered by the democracy surveys
+   and by Taiwan; the German and Taiwanese rejoinders recalled from `<Ref national-data-audited>`
+   in one sentence each. Close with what would overturn each part.
 
 **Conclusion** (L10): in plain words — a free state cannot live on liberal principles alone: on
 balance, since even Habermas grants that its structures depend on a solidarity they do not make.
 Hungary tried to write that solidarity into its supreme law. On the record so far the attempt
 showed what its critics feared about the courts (strong), has not shown the cohesion it was written
 to secure (open), and did not lock its authors in power, as liberal critics forecast (that forecast
-failed, strong). Hand-off: whether a state can write the presuppositions it lives on, or a free
+failed, strong). What holds a people together is not its genes — the same peoples have lived
+free and unfree within a lifetime (strong) — but a culture it inherits and cannot put on at will
+(strong). Hand-off: whether a state can write the presuppositions it lives on, or a free
 state build a nation (the Third Republic), is the open question the course verdict
 (`<Ref the-argument-assembled>`) takes, with the test that would settle it.
 
@@ -754,6 +816,15 @@ and not sufficient; the Hungarian remedy proved neither the premise nor itself".
    quality); (c) do the same for the forecast check: what record after 2026 would revive the
    lock-in charge in its narrower form? The solution grades each answer against the verdict's own
    falsifiers.
+10. **Attack the verdict (round 2, author's review):** State in its best form the objection that
+   peoples live as they want, that some peoples do not want freedom, and that culture is made by
+   people with certain genes. Separate its three claims (a value difference exists; it concerns
+   freedom; it is genetic), grade each against the evidence of claim 6, and name the observation
+   that would overturn the course's grade on each (for "genetic": a natural experiment in which
+   one ancestry could not sustain a free regime under institutions that sustained it elsewhere;
+   for the value claim: second-generation convergence). The solution shows the course conceding
+   the first, rejecting the third, and splitting the second between government (fails) and
+   particular liberties (persisting differences on sharia and gender).
 
 ## Nietzsche cross-course links
 

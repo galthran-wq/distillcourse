@@ -136,7 +136,32 @@ descendants of either side?
     `research/texts/audit-right-shading/nunn-2007-slave-trades-mpra-wp.txt`
     l.780–789). On trust there is an effect whose size the explained-variance
     share does not give (this lesson's claim one).
-- **(3) Inheritance.** Liability can pass, guilt cannot (**strong**; `<Ref>`
+  - After independence some former colonies collapsed, and the verdict names
+    them. On the Maddison Project Database 2023 (GDP per head, 2011 dollars;
+    `research/texts/empire-round2/maddison-mpd2023-selected.csv`): Zimbabwe
+    fell from $2,369 in 1998 to $1,198 in 2008, a halving in ten years after
+    the land seizures of 2000, and in 2022 ($1,704) was still below its 1974
+    level under the Rhodesian government ($2,275); the Congo stood at $1,192
+    in 1960 and $414 in 2002, and in 2022 ($844) was still 29% below its
+    level at independence; Uganda fell by 38% between 1970 and 1986,
+    Mozambique by 47% between 1970 and 1992, Angola by 51% between 1970 and
+    1990, Ghana by 25% between independence in 1957 and 1983, Sierra Leone by
+    half in the 1990s, Guinea-Bissau by 17% in 1974–80. Equally, the uniform
+    claim that every colony did better under colonial rule and worse after it
+    **fails** (**strong**): India's income per head rose 16% in the 77 years
+    from 1870 to 1947 ($850 to $985) and was lower in 1947 than in 1913
+    ($1,073), then rose 3.8-fold between 1991 and 2022 ($2,062 to $7,766);
+    after independence Singapore rose twentyfold (1965–2022), Botswana
+    nearly twenty-five-fold (1966–2022), South Korea from $1,548 in 1960 to $41,321;
+    and the Congo Free State, a colonial regime by any definition but the
+    Case's, cost somewhere between about one and about ten million lives (no
+    census before 1924; Sanderson's modelling at the low end, Hochschild at
+    the high). The post-independence record, like the colonial one, varies —
+    by kind of colony and by what the independent government did: South and
+    North Korea had the same colonial past and in 2022 stood at $41,321 and
+    $1,569. What the collapses do not show by themselves is what colonial rule
+    did: a before-and-after comparison is not a counterfactual, and the burden
+    rule applies to it as to every other entry. Liability can pass, guilt cannot (**strong**; `<Ref>`
   inherited-guilt-and-reparations).
 - **Strongest objection.** From one side: the burden lies on whoever claims
   alien rule was beneficial, so "open" lets the Case off. From the other: the
@@ -151,8 +176,61 @@ descendants of either side?
 - **What would overturn it.** A credible counterfactual design with results in
   one direction across many colonies of different kinds; for mainland
   sub-Saharan Africa, a border or timing discontinuity design.
+- **Objection (author's review) — required, stated at FULL STRENGTH in the
+  weighing (step 7).** "All the colonies became much better after being
+  colonised and much worse after independence." Best form: the Case's "Costs
+  of Anti-Colonialism" (`research/texts/gilley/case-for-colonialism-original-AQ2018.txt`:
+  of eighty countries independent after 1945 "at least half experienced
+  similar trauma while most of the rest limped on"; the World Bank's 1996
+  "the majority had better capacity at independence than they now possess";
+  Guinea-Bissau's rice and life expectancy), and the collapses named above,
+  with their numbers. It is a before-and-after argument, and its best evidence
+  is real: the collapses happened and are not explained away by "colonial
+  legacy" alone (Gilley: that everything has antecedents "tells us nothing
+  about causation"). **Why it does not change the verdict.** As a uniform
+  claim it fails on counter-cases from the same database: India stagnated
+  under British rule (1870–1947) and grew fast after 1991; Singapore,
+  Botswana and South Korea (a Japanese colony to 1945) grew fastest after
+  independence; the Congo Free State is a colonial catastrophe. Two honest
+  complications go in the same paragraph: South Korea's income also rose
+  under Japanese rule (from $1,108 in 1911 to $1,975 in 1940), and India's
+  fast growth came after the 1991 reforms, not at independence (1950–1990:
+  $987 to $2,087) — both point the same way, that the outcome turned on what
+  each government did, colonial or independent, not on the flag. Botswana and
+  North Korea are the pair that shows it: a British protectorate whose income
+  per head rose nearly twenty-five-fold after independence ($663 in 1966,
+  $16,352 in 2022), and half of a Japanese colony that fell from $2,456 in
+  1990 to $1,569 in 2022.
+  The verdict therefore stays: **by kind of colony** (and, after independence,
+  by kind of government), **on balance**; a general ledger **open**. What
+  would change it: evidence that independence itself, rather than the
+  policies of particular governments, caused the declines — e.g. a design
+  comparing otherwise similar territories that became independent at
+  different dates.
 
 ## Sources to consult
+
+- **Post-independence and colonial-era records (author's review, round 2)** —
+  staged in `research/texts/empire-round2/`: Maddison Project Database 2023
+  extract, `maddison-mpd2023-selected.csv` (GDP per head in 2011 dollars,
+  1820–2022, for IND, ZWE, COD, SGP, BWA, KOR, PRK, GNB, UGA, AGO, MOZ, GHA,
+  SLE and others; cite Bolt & van Zanden, *Journal of Economic Surveys* 2024,
+  and — in a figure with fewer than twelve countries — the country sources
+  the workbook lists: India to 1870 Broadberry, Custodis & Gupta 2015; Korea
+  1911–1990 Cha et al. 2020; Zimbabwe to 1950 Broadberry & Gardner 2022;
+  Singapore to 1959 Sugimoto 2011); World Bank WDI life expectancy,
+  `worldbank-life-expectancy-SP.DYN.LE00.IN.csv` (shows the Zimbabwe fall of
+  the 1990s–2000s is matched in Botswana, i.e. the HIV epidemic, not the
+  regime: use income, not life expectancy, for Zimbabwe's collapse); Sanderson,
+  *Population* 55:2 (2000), `sanderson-2000-population-congo-belge-mythe-realite.txt`
+  (l.130–171: the 1919 commission's "réduite de moitié"; de Saint Moulin's
+  15–20 million c.1885 to 10 million c.1925; l.845–859: colonial
+  depopulation figures built on impressions, not data); the Free State
+  estimates map, `wikipedia-atrocities-congo-free-state.txt` l.112–116
+  (`[secondary]`: Sanderson 2020, 1–5 million, low end most plausible;
+  Hochschild ~10 million; Ndaywel è Nziem 5–10 million; Vansina's
+  retraction; Louis and Stengers, "wild guesses") — Sanderson 2020 and
+  Hochschild are cited only after the writer reads them.
 
 - **Gilley, "A Response to My Critics" (Academic Questions 35:1, 2022)** — index
   **7**; text `research/texts/gilley/response-to-my-critics-AQ2022.txt` (316
@@ -452,7 +530,10 @@ lesson opens three.
    standard for both sides. (1) Title: recall the failed titles (strong) and
    the limited title Vitoria left; the conqueror judged its own case, so no
    lasting rule over a self-governing people rests on it (on balance); Locke's
-   ch. XVI and Burke's "arbitrary power" sentence agree. (2) Ledger: state the
+   ch. XVI and Burke's "arbitrary power" sentence agree; and the bare right of
+   the stronger, offered in place of a title, was weighed and failed as a
+   theory of right (`<Ref>` vitoria-right-to-the-americas, one clause: it
+   gives the same right to every colony that won its independence). (2) Ledger: state the
    burden rule first — whoever asserts a net effect in either direction carries
    it. Then the designs the reader can now read with the drill: the island
    design (Feyrer & Sacerdote) and the settlement association (Easterly &
@@ -462,6 +543,25 @@ lesson opens three.
    (open, leaning negative); this lesson's three audited claims as the
    measured effects by kind of colony; Nunn's income estimate for the slave
    trades ($1,249 against $1,864, OLS, "for purely illustrative purposes").
+   Then the **Objection (author's review)**, at full strength and before any
+   reply (see VERDICT): "all the colonies became much better after being
+   colonised and much worse after independence" — the Case's "Costs of
+   Anti-Colonialism" in its own words, and the collapses named with their
+   numbers (Zimbabwe 1998–2008, the Congo since 1960, Uganda, Mozambique,
+   Angola, Ghana, Sierra Leone, Guinea-Bissau). Grant what is true in it, in
+   the course's voice: these collapses happened, they were large, and the
+   ledger must carry them. Then the counter-cases from the same database,
+   one sentence each and every number bound (India 1870–1947 and after 1991;
+   Singapore; Botswana; South Korea, with its colonial-era growth stated; the
+   Congo Free State with its range of estimates and the reason for the range);
+   the two pairs that locate the cause (North and South Korea; Botswana and
+   Zimbabwe, neighbours); and the conclusion: the uniform claim fails
+   (strong), and the post-independence record, like the colonial one, varies
+   by kind of colony and by what the government did. Figure: a small-multiples
+   line chart of GDP per head (Maddison 2023, log scale), eight panels —
+   India, Zimbabwe, the Congo, Guinea-Bissau, Singapore, Botswana, South
+   Korea, North Korea — with the year of independence marked on each (credit
+   the country sources: fewer than twelve countries).
    Verdict: a general ledger is open; by kind of colony, on balance. Set the
    strongest objection from both sides ("open" lets the Case off; "open" lets
    the critics off) and answer both with the one burden rule. (3)
@@ -484,7 +584,12 @@ to defend the innocent — gave no right to lasting rule over a people that
 governed itself (on balance); whether colonial rule left the ruled better or
 worse off is not established either way across colonies (open), while by kind
 of colony the evidence favours settlement colonies and islands (on balance) and
-leans negative, without settling, for mainland sub-Saharan Africa; and liability
+leans negative, without settling, for mainland sub-Saharan Africa; that
+several former colonies collapsed after independence — Zimbabwe, the Congo,
+Uganda, Mozambique, Angola, Sierra Leone among them — while others, from
+India after 1991 to Singapore, Botswana and South Korea, grew faster than
+they ever had under colonial rule, so that the claim that every colony did
+better under colonial rule and worse after it fails (strong); and liability
 can pass to descendants where guilt cannot (strong). Then the hand-off: the
 course turns to who "we" are (`the-nation-and-its-defenders`); the synthesis
 returns to this verdict.
@@ -672,6 +777,18 @@ Balance: all draw; 5–6 visuals.
    many kinds of colony), the data it would need, and the result that would
    decide it. The solution applies one burden rule to both objections and
    shows why each falls short of "established".
+10. **Attack the verdict — the author's objection.** State in its best form
+   the claim that the colonies became much better under colonial rule and much
+   worse after independence: name the three strongest post-independence
+   collapses with their Maddison figures and the Case's sentence on the eighty
+   countries. Then say what evidence would be needed to turn it from a
+   before-and-after comparison into a verdict on colonial rule — e.g.
+   otherwise similar territories that became independent at different dates,
+   compared over the same years — and what the counter-cases (India, Botswana,
+   South Korea) would have to turn out to be for the uniform claim to stand.
+   The solution grants the collapses, shows that the uniform claim fails on
+   the counter-cases, and names the pairs (the two Koreas; Botswana and
+   Zimbabwe) that point to government rather than flag.
 
 ## Nietzsche cross-course links (where his ideas enter)
 

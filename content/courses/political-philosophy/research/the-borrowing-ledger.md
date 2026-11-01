@@ -41,13 +41,18 @@ Every borrowing is stated with its own grade of confidence, never as one flat li
   shared Eurasian exchange): neither pure answer survives. The broad late-luck view fails on
   timing (**strong**); the lead opened in the late Middle Ages, in Italy first, decisive in
   north-western Europe in the early modern period (**on balance**); an ancient lead in wealth or
-  technique fails (**strong**) — Song China was ahead and Europe borrowed heavily — and the
-  difference lies in what Europe did with its borrowings; the cause (fragmentation, kinship, a
-  religious ethic, high-medieval institutions) is **open**.
+  technique fails (**strong**) — Mesopotamia and Egypt came first, Rome was of one order with
+  Han China, and the Song and the Islamic world were ahead around 1000, when Europe borrowed
+  heavily — and Europe's trailing then was the collapse after Rome, a shock and not a
+  deficiency (**on balance**); the old lead is in political thought and philosophy, and the
+  difference in wealth lies in what Europe did with its borrowings; the cause (fragmentation,
+  kinship, a religious ethic, high-medieval institutions, and genetic selection in Clark's
+  sense) is **open**.
 - **Hands off:** The module closes having decided its timing question and left its causal one
   open, with what would settle it (within-Europe designs that separate the timing of
   kin-dissolution, state competition and literacy, and show which predicts where innovation was
-  kept); the question it leaves is whether the differences between
+  kept; for the genetic candidate, dated polygenic-score series for England, the continent and
+  China, 1000–1800); the question it leaves is whether the differences between
   peoples that the ledger records are themselves to be explained by something deeper —
   heredity (the next module, which opens by asking what an intelligence test measures,
   `what-intelligence-tests-measure`, and states the hereditarian case in
@@ -80,7 +85,9 @@ Every borrowing is stated with its own grade of confidence, never as one flat li
   inheritance, or late luck inside a shared Eurasian exchange?
 - **Verdict.** Neither pure answer survives. Grades are split and must be carried exactly:
   **strong** that the broad late-luck view fails on timing; **on balance** on when the lead
-  opened; **open** on cause.
+  opened; **strong** that there was no continuous Western lead from the Greeks; **on balance**
+  that Europe's trailing around 1000 was the collapse after Rome, a shock and not a deficiency;
+  **open** on cause, with the genetic candidate (Clark) among the five.
   - *Late luck.* The broad late-luck view — that the gap opened after 1800 — fails for China as
     a whole. China "led the world in living standards during the Northern Song dynasty, but had
     fallen behind Italy by 1300"; its output per head fell through the Qing, and "by 1750 the gap
@@ -91,16 +98,90 @@ Every borrowing is stated with its own grade of confidence, never as one flat li
     became decisive in north-western Europe in the early modern period. **On balance.** The lead
     in recorded science opens from about 1400 on Murray's count (`murray-human-accomplishment`),
     with the caveat that pre-1400 Islamic and Chinese work is where source bias would bite.
-  - *Ancient inheritance.* An ancient lead in wealth or technique fails: Song China was ahead,
-    and Europe borrowed heavily — paper and numerals secure transfers, gunpowder probable (this
-    lesson's ledger). **Strong.** What Europe did with its borrowings — the mechanised paper
-    mill, corned powder, print that no one could suppress — is where the difference lies.
-  - *Cause.* Fragmentation (Landes), kinship (Henrich), a religious ethic (Weber) and an
-    inheritance of institutions from the high Middle Ages (the Church's kinship rules,
-    corporations, universities, chartered towns) are each partly supported, and none is
-    decisive. **Open.** What would settle it: within-Europe designs that separate the timing of
-    kin-dissolution, state competition and literacy, and show which predicts where innovation
-    was kept.
+  - *Ancient inheritance (restated in round 2 against the author's objection below).* A
+    continuous Western lead from the Greeks to the present, "almost always ahead by a large
+    margin", **fails: strong**. Writing, cities, law codes and mathematics came first in
+    Mesopotamia and Egypt (proto-cuneiform at Uruk c. 3350–3200 BC; Hammurabi r. c. 1792–1750 BC;
+    Old Babylonian mathematics c. 1800–1600 BC, Plimpton 322 and YBC 7289), and the Greek alphabet
+    is the Phoenician one adapted (late 9th or early 8th c. BC) [all secondary: encyclopaedia,
+    `texts/round2-west/ancient-near-east-dated-facts-wikipedia.txt`; uncontested dates, not
+    decisive alone]. Rome was comparable to Han China, not far ahead of it: the Han census of
+    2 AD reports 57.7 or 59.6 million people (Scheidel 2012, l.57), against 44–70 million for the
+    Roman Empire on current estimates (Scheidel & Friesen 2009, l.296–311, l.428–434); Roman
+    output per head of about $610–700 (1990 GK$) against Maddison's conjectural $450 for China in
+    year 1 — a Roman edge in the point estimates, inside the uncertainty of conjectural figures.
+    **On balance** that the two empires were of one order. Around 1000 the Islamic world and Song
+    China were ahead of western Europe (Maddison, conjectural: Iraq and Iran $650, China $466,
+    western Europe $427, Italy $450; Pamuk & Shatzmiller 2014 on Middle Eastern wages above
+    subsistence after the Justinian plague [abstract]; Broadberry, Guan & Li on the Song). Europe
+    borrowed heavily from them — paper and numerals secure transfers, gunpowder probable (this
+    lesson's ledger). **Strong.**
+  - *Why Europe trailed around 1000 (new in round 2): a shock, not a deficiency.* Europe's
+    position in 1000 was the result of the collapse of the western Roman economy, not of a lasting
+    incapacity: Maddison's conjectural series puts Italy at $809 in year 1 and $450 in 1000, and
+    western Europe at $576 and $427; Greenland ice records European lead emissions (a proxy for
+    mining and smelting) at a peak under the Empire, plunging from the Antonine plague and "low
+    for >500 years" (McConnell et al., *PNAS* 2018, abstract); the material collapse of the
+    fifth- to seventh-century West (Ward-Perkins 2005), with sub-Roman Britain below the pre-Roman
+    Iron Age, granted even by a reviewer on the opposing side ("stuff happened, bad stuff, lots of
+    it", O'Donnell, *BMCR* 2005.07.69, l.97); "'catastrophe' is not too strong a word" for
+    fifth-century Britain (Wickham 2005, p. 307, quoted in Roach's review [secondary]). The
+    recovery was fast by pre-modern standards: western Europe $427 (1000) to $771 (1500), Italy
+    $450 to $1,100, ahead of China ($600) by 1500 and of China by 1300 on Broadberry's accounts.
+    **On balance** (conjectural per-head series; the two books read through reviews; the lead
+    proxy begins its fall before 476, so the decline was long as well as sudden).
+  - *What is true in the claim of an old Western lead.* In political thought and philosophy the
+    lead is Greek and old: political argument as a public practice arose in Greece (`greek-miracle`,
+    on balance). In science the lead opens from about 1400 (`murray-human-accomplishment`, strong
+    for the sciences); in wealth from about 1300 in Italy and decisively in the north-west in the
+    early modern period (on balance); the margin has widened since. What Europe did with its
+    borrowings — the mechanised paper mill, corned powder, print that no one could suppress — is
+    where the difference lies.
+  - *Cause (restated in round 2 with the genetic contender).* Five candidates, each graded:
+    fragmentation (Landes), kinship (Henrich), a religious ethic (Weber) and an inheritance of
+    institutions from the high Middle Ages (the Church's kinship rules, corporations,
+    universities, chartered towns) are each partly supported, and none is decisive. The fifth is
+    genetic: differential fertility of the rich in England 1200–1800 spread "bourgeois" traits
+    through the population (Clark, *A Farewell to Alms*, 2007; with Cochran & Harpending, *The
+    10,000 Year Explosion*, 2009, on recent selection generally). Its graded parts:
+    (i) the rich had more surviving children — **strong**, but not English: the same advantage
+    is found in southern Germany, Austria, France, Sweden and Switzerland (Allen, *JEL* 2008,
+    l.1310–1315), so it cannot by itself explain why England or the West came first;
+    (ii) social status persists across generations at a rate that fits an additive genetic
+    model (a correlation falling by a factor of only 0.79 a generation over 422,374 English
+    people, 1600–2022, Clark, *PNAS* 2023) — the pattern **strong**, the mechanism **not shown**:
+    Clark himself writes "there is no proof here that additive genetic transmission causes
+    social status" (l.84), critics hold that wealth and other non-genetic transmission mimic the
+    pattern (Benning et al. 2023–25, abstracts; Breen 2015), and his surname data give the same
+    persistence (0.7–0.9) in China, Japan, Korea and Taiwan (Clark 2014, l.414–415), so it does
+    not mark England off; (iii) selection on alleles associated today with test scores and
+    schooling is real in West Eurasia over the Holocene, but "largely driven by selection before
+    ~2000 BP, after which χ tends toward zero" (Akbari et al., *Nature* 2026, l.177), and the
+    schooling signal replicates with East Asian effect sizes — against a selection window
+    concentrated in England 1200–1800; (iv) East Asian populations score at or above European
+    ones on school tests today (PISA 2022 [secondary: ranking table citing OECD]) and fall far
+    below their predicted income in 1820 and 1900 (`geography-or-institutions`, strong), while
+    China did not industrialise first — a genetic account must add an institutional term on its
+    own data; (v) regimes and growth change within one population in a generation (the Koreas;
+    the two Germanies), faster than selection can act. The genetic contender as a cause of the
+    West's lead: **open**, and on the evidence read its England-specific form (selection unique
+    to England explains why England came first) **fails, on balance**. The whole cause:
+    **open**. What would settle it: for the four cultural and institutional candidates,
+    within-Europe designs that separate the timing of kin-dissolution, state competition and
+    literacy and show which predicts where innovation was kept; for the genetic one, polygenic
+    scores from dated remains or documented lineages in England, the continent and China,
+    1000–1800, showing a rise in England ahead of its comparators, and within-family genomic
+    designs on Clark's lineages that separate genes from inherited wealth.
+  - *Objection (author's review): "The West was almost always ahead, by a large margin."* At full
+    strength: Greek philosophy, mathematics and political science; Roman law, engineering and an
+    empire of fifty-odd million; a heavy blow from Rome's fall; then a fast recovery, an Italian
+    lead by 1300 and a widening margin ever since — so the Song and Abbasid interlude is the
+    exception, caused by a shock, not evidence of equality. The answer, by part: the shock is
+    **conceded and becomes the verdict** above (on balance); the recovery and widening margin are
+    **conceded** (Maddison 1000–1500; Broadberry, Guan & Li); the "almost always ahead by a large
+    margin" **fails** on what came before the Greeks (Mesopotamia and Egypt, the borrowed
+    alphabet), on Rome's parity with Han China, and on the Islamic world and Song China in
+    800–1200 (strong). The lead that is old is the lead in political thought and philosophy.
 - **What decides it.** The national accounts (Broadberry, Guan & Li, *JEH* 78, 2018; abstract
   `texts/verdict-audit/broadberry-guan-li-2017-abstract.txt`) for the timing; Li & van Zanden
   (*JEH* 72, 2012) for the delta–Netherlands gap in the 1820s; this lesson's ledger for the
@@ -116,10 +197,18 @@ Every borrowing is stated with its own grade of confidence, never as one flat li
   Europe built from its borrowings are themselves the old, unique inheritance. That claims a
   cause, which is the open part of the verdict; the ledger shows only that the difference lay
   in what was done with borrowed techniques, not why.
+  A third objection (round 2): that the genetic account is the deeper cause beneath all four
+  cultural ones — culture is made by people with certain genes. The verdict keeps it as a
+  candidate at full strength and grades its parts above; it does not overturn "open", because
+  its author concedes the mechanism is unproven, its fertility premise holds across Europe, and
+  the ancient-DNA signal it needs fades before the window it names.
 - **What would overturn it.** On timing: independent national accounts putting China as a
   whole at north-western Europe's output per head in 1750. On the ancient inheritance: evidence
-  of a European lead in wealth or technique before 1000. On cause: the within-Europe design
-  above, which would turn "open" into a finding.
+  of a European lead in wealth or technique over Han China, the Abbasid world or the Song beyond
+  the uncertainty of the estimates. On the shock: per-head estimates showing western Europe
+  already behind before the third century. On cause: the within-Europe design above, or for the
+  genetic candidate the dated polygenic-score series and within-family designs above, either of
+  which would turn "open" into a finding.
 
 ## Sources to consult
 
@@ -299,6 +388,60 @@ Every borrowing is stated with its own grade of confidence, never as one flat li
   Nineteenth Century", *Journal of Economic History* 72 (2012) (not staged; state date and
   direction only). Per-head dollar figures [UNVERIFIED]: do not state them. Names in
   References only.
+- **Round 2 (author's review) — the genetic contender and the "always ahead" objection.** All
+  staged under `C/research/texts/round2-west/` with `.meta.yaml` sidecars; line numbers refer to
+  the staged files. Names in References only, except Clark, who may be named in the body as the
+  author of the thesis weighed (as Landes and Pomeranz are).
+  - G. Clark, "The inheritance of social status: England, 1600 to 2022", *PNAS* (2023) —
+    `clark-2023-pnas-inheritance-of-social-status.txt`: 422,374 people, correlation falling by
+    0.79 a generation (l.24–26); additive model with marital genetic correlation 0.57 (l.34);
+    the caveats "no proof here that additive genetic transmission causes social status" (l.84)
+    and that a genetic share would not by itself rule out interventions (l.89–90).
+  - Clark, *A Farewell to Alms* (2007), chs. 6, 7, 9 as posted by the author —
+    `clark-2007-farewell-ch06-survival-of-the-richest.txt` l.38–39 (richest leave more than
+    twice the surviving children of the poorest, wills 1250–1800);
+    `clark-2007-farewell-ch09-emergence-of-modern-man.txt` l.33 ("probably mostly culturally,
+    but also potentially genetically"). Clark's reply to his reviewers,
+    `clark-2008-ereh-response-defense-malthusian.txt` l.562–576 ("To conclude that the mechanism
+    was genetic changes we need further information"). *The Son Also Rises* (2014) ch. 1,
+    `clark-2014-son-also-rises-ch01-intro.txt` l.414–415 (persistence 0.7–0.9 in England, the
+    US, India, Japan, Korea, China, Taiwan, Chile, Sweden), l.536–542. Clark, "Hereditarian
+    Fallacies?", EHES WP 285 (2025), `clark-2025-ehes285-hereditarian-fallacies.txt` (his reply
+    to Benning et al. and Lala & Feldman).
+  - Reviews: R. C. Allen, *JEL* 46(4) 2008, 946–973, `allen-2008-jel-review-farewell-to-alms.txt`
+    (from l.1024; rich-fertility advantage elsewhere in Europe l.1310–1315; low heritability by
+    either channel l.1268); D. McCloskey, *EREH* 12 (2008), `mccloskey-2008-ereh-comment-...txt`;
+    H.-J. Voth, *EREH* 12 (2008), `voth-2008-ereh-clarks-intellectual-sudoku.txt` (l.85–96:
+    European rich compared with Chinese and Japanese noblemen, not like with like); K. G.
+    Persson, *EREH* 12 (2008); J. de Vries, *JEH* review (volume [UNVERIFIED]) (the fertility
+    evidence is mainly Suffolk testators); R. Breen, *JEH* 2015 review of *The Son Also Rises*
+    (volume [UNVERIFIED]). Benning et al., bioRxiv 10.1101/2023.11.01.565061 (abstracts only);
+    Lala & Feldman, *PNAS* 121(48) 2024 (full text; its phrase that Clark holds disparities
+    "ineradicable" is contradicted by Clark l.89–90 — do not repeat it).
+  - Cochran & Harpending, *The 10,000 Year Explosion* (2009) — not read [UNVERIFIED beyond
+    reviews]; E. Hagen's review, *Evolution and Human Behavior* 30 (2009) 453–455,
+    `hagen-2009-ehb-review-10000-year-explosion.txt` (l.78–79 the 100-fold acceleration claim;
+    l.91, l.117 on evidence); Hawks et al., *PNAS* 104(52) 2007 (abstract); Cochran, Hardy &
+    Harpending 2006 (abstract).
+  - A. Akbari et al., "Ancient DNA reveals pervasive directional selection across West
+    Eurasia", *Nature* 654 (2026), doi:10.1038/s41586-026-10358-1,
+    `akbari-et-al-2026-nature-directional-selection.txt` l.177 (χ for test scores, income,
+    schooling; "largely driven by selection before ~2000 BP"), l.179, l.183 (caveats). Kong et
+    al., *PNAS* 114(5) 2017 and Hugh-Jones & Abdellaoui, *Behavior Genetics* 52 (2022)
+    (abstracts: selection against education-associated scores in the 20th century).
+  - PISA 2022 means for East Asian and European systems,
+    `pisa-2022-means-east-asia-europe.txt` [secondary: check against OECD Table I.B1.2.1 before
+    stating numbers].
+  - For the "always ahead" objection: Maddison, *Historical Statistics* (GGDC 2010),
+    `maddison-2010-historical-statistics-extract.txt` (conjectural for years 1 and 1000 — say
+    so); Scheidel & Friesen 2009 (`scheidel-friesen-2009-pswpc-size-of-roman-economy.txt`);
+    Scheidel 2012 on the Han census (`scheidel-2012-pswpc-han-roman-state-revenue.txt` l.57);
+    Scheidel ed., *Rome and China* (2009) [not read: cite the two papers above instead];
+    McConnell et al., *PNAS* 115(22) 2018 (abstract); Ward-Perkins, *The Fall of Rome and the
+    End of Civilization* (2005) [book not read; O'Donnell's review, *BMCR* 2005.07.69]; Wickham,
+    *Framing the Early Middle Ages* (2005) [book not read; Roach's review, secondary];
+    Pamuk & Shatzmiller, *JEH* 74(1) 2014 (abstract); dated Near Eastern facts
+    (`ancient-near-east-dated-facts-wikipedia.txt`, secondary).
 - **Names only in References:** every scholar above (Broadberry, Guan, Li, van Zanden, Bloom, Tsien, Needham, Hunter,
   Partington, Chase, Andrade, Carter, Hobson, Eisenstein, Pettegree, Edwards, Plofker, Ifrah,
   Sigler, Roberts, Parker, Hoffman, Mokyr, Joseph, Gimpel, White, Pacey, Sivin). May be named in
@@ -465,21 +608,50 @@ know what exactly was borrowed — and how one knows.
    count placing the scientific lead from about 1400 and the caveat on pre-1400 sources
    (`<Ref murray-human-accomplishment>`). (ii) *Inheritance.* The ledger the reader has just
    built refutes an ancient lead in wealth or technique: Song China was ahead and Europe
-   borrowed paper and numerals for certain, gunpowder probably — **strong**. The difference lies
-   in what Europe did with the borrowings (the mechanised mill, corned powder, print no one
-   could suppress). (iii) *Cause.* Fragmentation, kinship, Weber's ethic and the high-medieval
+   borrowed paper and numerals for certain, gunpowder probably — **strong**. Then the
+   **Objection (author's review)** at full strength, in its own paragraph: the West was almost
+   always ahead by a large margin — Greeks, Romans, a blow from Rome's fall, a fast recovery and
+   a widening margin. Concede what the record carries: the collapse is real and is why Europe
+   trailed around 1000 — a shock, not a deficiency (**on balance**: Italy from about $809 to
+   $450 per head on Maddison's conjectural series; the Greenland lead record low for five
+   centuries; the material collapse described by Ward-Perkins and Wickham), and the recovery was
+   fast (western Europe $427 to $771 between 1000 and 1500). Answer what it does not: the Greeks
+   were not first (writing at Uruk c. 3200 BC, Hammurabi c. 1750 BC, Babylonian mathematics, the
+   Phoenician alphabet), Rome and Han China were of one order (57.7 or 59.6 million in the Han
+   census of 2 AD against 44–70 million Romans; per-head estimates within each other's
+   uncertainty), and the Abbasid world and the Song were ahead around 1000 (**strong** that
+   there was no continuous lead). State what is true in it: the Greek lead in political thought
+   and philosophy is old (`<Ref greek-miracle>`); the lead in science opens about 1400, in
+   wealth about 1300 in Italy, and has widened since. The difference lies in what Europe did
+   with the borrowings (the mechanised mill, corned powder, print no one could suppress).
+   (iii) *Cause.* Five candidates. Fragmentation, kinship, Weber's ethic and the high-medieval
    institutions (the Church's kinship rules, corporations, universities, chartered towns) are
-   each partly supported and none decisive — **open**; state what would settle it
-   (within-Europe designs separating the timing of kin-dissolution, state competition and
-   literacy, and showing which predicts where innovation was kept). Close the section with the
-   verdict as one sentence: neither pure answer survives.
+   each partly supported and none decisive. The fifth, stated at full strength as its author
+   states it and recalled from `<Ref henrich-church-and-kinship>` where it is staged against
+   Henrich: the rich out-bred the poor in England for six centuries and spread patience,
+   literacy and work into the whole population, "probably mostly culturally, but also
+   potentially genetically"; status persists over four centuries in a pattern that fits
+   additive genetic inheritance. Grade it part by part (VERDICT): the fertility premise strong
+   but not English; the persistence pattern strong, its genetic mechanism unshown on its
+   author's own statement; the ancient-DNA signal real but fading before 2000 BP; East Asian
+   test scores at or above Europe's without an East Asian industrial revolution; regimes and
+   growth changing within one population faster than selection acts. The England-specific
+   genetic account fails **on balance**; the genetic contribution as such is **open**. The cause
+   is **open**; state what would settle each part (within-Europe designs separating the timing
+   of kin-dissolution, state competition and literacy; dated polygenic-score series for
+   England, the continent and China 1000–1800, and within-family designs on Clark's lineages).
+   Close the section with the verdict as one sentence: neither pure answer survives.
 
 **Conclusion** (the `<Conclusion>` block): states the module verdict in plain words with its
 split grades — the West did not pull ahead late and by luck alone: China as a whole had fallen
-behind Italy by 1300 (strong); nor did it inherit an ancient lead, since it borrowed from a
-China that was ahead (strong); the lead opened in the late Middle Ages and became decisive in
-the early modern north-west (on balance), and lay in what Europe did with what it borrowed; why
-Europe did that is open, with the design that would settle it. Then the hand-off: the next
+behind Italy by 1300 (strong); nor did it hold a lead from the Greeks on, since Mesopotamia
+and Egypt came first, Rome was of one order with Han China, and Europe around 1000 borrowed
+from a Song China and an Islamic world that were ahead (strong) — though it trailed then
+because of the collapse after Rome, a shock and not a deficiency (on balance); the old lead is
+in political thought and philosophy; in wealth the lead opened in the late Middle Ages and
+became decisive in the early modern north-west (on balance), and lay in what Europe did with
+what it borrowed; why Europe did that is open — five candidates, Clark's genetic one among
+them — with the designs that would settle it. Then the hand-off: the next
 module takes the gap between nations, not between techniques, as its problem.
 
 Headings as claims: "What would prove a borrowing"; "Paper: a chain of mills from Samarkand to
@@ -641,6 +813,20 @@ Middle Ages, for reasons still open".
    only after 1700; the open cause — the within-Europe design that separates kin-dissolution,
    state competition and literacy. The solution also says why the women's-earnings reply bears
    on the regional comparison and not on China as a whole.
+7b. **Attack the verdict (author's review, round 2):** two objections in their best form.
+   (a) "The West was almost always ahead by a large margin; the medieval gap was Rome's fall."
+   Say which part of it the module verdict now accepts (the shock, the recovery, the old lead
+   in political thought), which part fails and on what record (pre-Greek Near East, Rome and
+   Han, the Abbasid world and the Song), and what evidence would reverse the failing part
+   (per-head estimates putting Rome clearly above Han China beyond their uncertainty, or western
+   Europe ahead of the Islamic world around 900). (b) "The cause is genetic: the rich out-bred
+   the poor" (Clark). State it at full strength with its 2023 persistence evidence; then name
+   the three findings that keep it open rather than supported (the author's own "no proof"
+   caveat; the rich-fertility advantage elsewhere in Europe; the ancient-DNA signal fading
+   before 2000 BP) and specify the study that would move it to "supported" (polygenic scores
+   from dated English, continental and Chinese remains or lineages, 1000–1800, rising first in
+   England; within-family designs separating genes from inherited wealth). Solution names what
+   result would instead refute it.
 8. **FORWARD (E7) → `what-intelligence-tests-measure`:** both theses in this module explain the
    West's distinction by culture, institutions or circumstance and leave the people's own
    capacities equal. State what kind of evidence an explanation by inherited differences would
