@@ -15,7 +15,7 @@ import { counterLabels } from "./utils/counters";
 function markdownLabels(md: string): string[] {
   return [
     ...md.matchAll(
-      /\*\*((?:Definition|Theorem|Lemma|Proposition|Corollary|Example|Remark) \d+\.\d+|Exercise \d+)[ .]|(Figure \d+\. )/g,
+      /\*\*((?:Definition|Theorem|Lemma|Proposition|Corollary|Example|Remark|Verdict) \d+\.\d+|(?:Postulate|Thesis|Exercise) \d+)[ .]|(Figure \d+\. )/g,
     ),
   ].map((m) => m[1] ?? m[2]);
 }

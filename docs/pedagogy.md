@@ -313,6 +313,27 @@ only by someone who already knows the material.
   computational study the reader can run. The section states which of the
   module's results the artifact uses and where the artifact departs from
   the idealisation. A list of further reading is not an application.
+- **L17 — A verdict is stated once, graded, and no firmer than its grade.**
+  For subjects whose disputes are settled by evidence and argument —
+  history, philosophy, political theory, social science, contested
+  empirical claims. A lesson that stages a dispute and has the evidence to
+  settle it states its answer in a `<Verdict>` at the end of the section
+  that weighs the two sides, graded on the fixed scale — established,
+  strong, on balance, open — with what decided it and what would overturn
+  it; `open` is a finding and says what would settle it. The
+  `<Conclusion>` repeats the verdict in plain words. Nowhere — the
+  Verdict, the Conclusion, the prose around them — is the claim put more
+  firmly than its grade. A lesson with no dispute it can settle (a
+  reconstruction, a theory tested later) has no Verdict; one is never
+  invented to fill the slot. A lesson that sets out a doctrine as a
+  derivation states its premises as `<Postulate>`s, each graded — `argued`
+  for a value premise, which is argued for rather than measured — and what
+  follows as `<Thesis>`es naming the postulates and verdicts each follows
+  from; a thesis is no firmer than the weakest premise it rests on. Math
+  and ML lessons use none of the three: there a result is proved or
+  measured, and a verdict has no place. Where the course keeps a verdict
+  register (`research/verdicts/REGISTER.md`), each Verdict carries the
+  register's claim and grade.
 
 ## Exercise rules (E)
 
