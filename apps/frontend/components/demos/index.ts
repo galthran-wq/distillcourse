@@ -112,4 +112,5 @@ export const demos: Record<
   IsolationSplitter: () => import("./fraud-ml/IsolationSplitter"),
   IdentifierDegreeCap: () => import("./fraud-ml/IdentifierDegreeCap"),
   RestartWalkPropagator: () => import("./fraud-ml/RestartWalkPropagator"),
+  DriftDetectorTuner: () => import("./fraud-ml/DriftDetectorTuner"),
 };
