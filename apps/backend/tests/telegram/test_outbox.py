@@ -84,3 +84,34 @@ async def test_markup_fallback_keeps_the_keyboard(
     await Outbox(session=session, link=link).send("<b>x", keyboard=KEYBOARD)
 
     assert [(item.html, item.keyboard) for item in bot.sent] == [(False, KEYBOARD)]
+
+
+@pytest.mark.parametrize(
+    ("name", "deliver"),
+    [
+        ("send_photo", lambda outbox: outbox.send_photo(b"png", caption="<b>c")),
+        ("edit_message_text", lambda outbox: outbox.edit_text(5, "<b>hi")),
+        ("edit_message_caption", lambda outbox: outbox.edit_caption(5, "<b>c")),
+    ],
+)
+async def test_markup_the_parser_refuses_goes_out_unformatted(
+    session: AsyncSession,
+    link: TgLink,
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    deliver: Callable[[Outbox], Awaitable[object]],
+) -> None:
+    """Every delivery treats an unparseable caption or edit as `send` does."""
+    calls: list[bool] = []
+
+    async def refusing(*_args: Any, html: bool = True, **_kwargs: Any) -> int:
+        calls.append(html)
+        if html:
+            raise api.MarkupRejected("can't parse entities")
+        return 7
+
+    monkeypatch.setattr(api, name, refusing)
+
+    await deliver(Outbox(session=session, link=link))
+
+    assert calls == [True, False]

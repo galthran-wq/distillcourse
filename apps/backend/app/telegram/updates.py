@@ -1,7 +1,7 @@
 import asyncio
 import uuid
-from collections.abc import Awaitable, Callable
-from contextlib import suppress
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -14,7 +14,7 @@ from app.harness import runner
 from app.harness.limits import LimitExceeded
 from app.harness.prompts import ContextBlock
 from app.harness.repository import HarnessRepository
-from app.models import Chat
+from app.models import Chat, TgLink
 from app.review import repository as review
 from app.review import subject
 from app.scheduling import policy
@@ -48,6 +48,7 @@ PAIRED = (
 )
 BUSY = "Still finishing the previous message. Send that again in a minute."
 FAILED = "Something went wrong on my side. Send that again in a minute."
+TAP_FAILED = "Something went wrong on my side. Press that again in a minute."
 CLEARED = "The learner cleared the thread; nothing before this point is yours."
 
 
@@ -118,6 +119,16 @@ def parse(payload: dict[str, Any]) -> Update | Tap | None:
     if tg_chat_id is None or not isinstance(text, str) or not text.strip():
         return None
     return Update(update_id=update_id, tg_chat_id=tg_chat_id, text=text.strip())
+
+
+async def dismiss(payload: dict[str, Any]) -> None:
+    """Answer a button press `parse` dropped. Telegram spins a pressed button
+    until it is answered, in a group as anywhere else."""
+    query = payload.get("callback_query") or {}
+    callback_id = query.get("id")
+    if isinstance(callback_id, str):
+        with suppress(api.TelegramError):
+            await api.answer_callback(callback_id)
 
 
 async def _clear(repo: HarnessRepository, chat: Chat) -> str:
@@ -230,54 +241,65 @@ async def _answer(
             await asyncio.sleep(RUN_WAIT_SECONDS)
 
 
+async def _learner(session: AsyncSession, tg_chat_id: int) -> TgLink | None:
+    link = await repository.link_for_chat(session, tg_chat_id)
+    if link is not None and link.status != "active":
+        # They are reaching us, so whatever broke the channel is over.
+        await repository.set_status(session, link, "active")
+    return link
+
+
+@asynccontextmanager
+async def _guarded(outbox: Outbox, failed: str, what: str) -> AsyncIterator[None]:
+    """The top of a background task: nothing catches what escapes here, the
+    update id is already recorded so Telegram will not deliver it again, and an
+    update that ends in silence is a bot that looks dead. Saying so is best
+    effort — the channel may be what broke."""
+    try:
+        yield
+    except api.BotBlocked:
+        # The outbox has recorded that the channel is down. There is nowhere
+        # left to say anything about it.
+        return
+    except Exception:
+        logfire.exception(what)
+        with suppress(Exception):
+            await outbox.send(failed)
+
+
 async def handle(
     session_factory: async_sessionmaker[AsyncSession], update: Update
 ) -> None:
     """One incoming message, end to end. Runs after the webhook has answered
     Telegram, so how long the tutor thinks is nobody's timeout."""
     async with session_factory() as session:
-        link = await repository.link_for_chat(session, update.tg_chat_id)
         command, _, argument = update.text.partition(" ")
         if command == "/start":
             await _pair(session, update, argument.strip())
             return
+        link = await _learner(session, update.tg_chat_id)
         if link is None:
             await api.send_message(update.tg_chat_id, PAIR_FIRST, html=False)
             return
-        if link.status != "active":
-            # They are writing to us, so whatever broke the channel is over.
-            await repository.set_status(session, link, "active")
         repo = HarnessRepository(session, link.user_id)
         chat = await thread.of(session, link.user_id)
         outbox = Outbox(session=session, link=link)
         handler = _COMMANDS.get(command)
         typing = asyncio.create_task(_typing(update.tg_chat_id))
         try:
-            try:
-                if handler is None:
-                    await _answer(repo, chat, outbox, update.text)
-                else:
-                    await outbox.send(await handler(repo, chat))
-            except runner.RunBusy:
-                await outbox.send(BUSY)
-            except LimitExceeded as exc:
-                # A cap is not an error to swallow: the learner is told why the
-                # tutor stopped answering, or the bot looks broken.
-                await outbox.send(str(exc))
-        except api.BotBlocked:
-            # The outbox has recorded that the channel is down. There is
-            # nowhere left to say anything about it.
-            return
-        except Exception:
-            # Nested so this covers the two answers above as well. It is the
-            # top of a background task: nothing catches what escapes here, the
-            # update id is already recorded so Telegram will not deliver the
-            # message again, and an update that ends in silence is a bot that
-            # looks dead. Saying so is best effort — the channel may be what
-            # broke.
-            logfire.exception("telegram update failed")
-            with suppress(Exception):
-                await outbox.send(FAILED)
+            # Nested so the guard covers the answers below as well.
+            async with _guarded(outbox, FAILED, "telegram update failed"):
+                try:
+                    if handler is None:
+                        await _answer(repo, chat, outbox, update.text)
+                    else:
+                        await outbox.send(await handler(repo, chat))
+                except runner.RunBusy:
+                    await outbox.send(BUSY)
+                except LimitExceeded as exc:
+                    # A cap is not an error to swallow: the learner is told why
+                    # the tutor stopped answering, or the bot looks broken.
+                    await outbox.send(str(exc))
         finally:
             typing.cancel()
 
@@ -293,19 +315,9 @@ async def handle_tap(
     if handler is None:
         return
     async with session_factory() as session:
-        link = await repository.link_for_chat(session, tap.tg_chat_id)
+        link = await _learner(session, tap.tg_chat_id)
         if link is None:
             return
-        if link.status != "active":
-            await repository.set_status(session, link, "active")
         outbox = Outbox(session=session, link=link)
-        try:
+        async with _guarded(outbox, TAP_FAILED, "telegram tap failed"):
             await handler(outbox, tap)
-        except api.BotBlocked:
-            return
-        except Exception:
-            # The top of a background task, as in `handle`: what escapes here
-            # is lost, and a button that does nothing reads as a dead bot.
-            logfire.exception("telegram tap failed")
-            with suppress(Exception):
-                await outbox.send(FAILED)

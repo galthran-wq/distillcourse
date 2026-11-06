@@ -66,6 +66,16 @@ def test_a_callback_from_a_group_is_nothing() -> None:
     assert updates.parse(tap("test:a", chat_type="group")) is None
 
 
+async def test_a_button_pressed_in_a_group_is_still_answered(
+    client: AsyncClient, bot: Bot, pressed: list[tuple[int, updates.Tap]]
+) -> None:
+    """Dropped, but not left spinning for whoever pressed it."""
+    await deliver(client, tap("test:a", chat_type="group"))
+
+    assert bot.answered == ["cb-1"]
+    assert pressed == []
+
+
 @pytest.mark.parametrize(
     "query",
     [
@@ -145,3 +155,19 @@ async def test_a_tap_reopens_a_broken_link(
     await session.refresh(link)
     assert link.status == "active"
     assert len(pressed) == 1
+
+
+@pytest.mark.usefixtures("link")
+async def test_a_failed_tap_asks_for_another_press(
+    client: AsyncClient, bot: Bot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Not "send that again": the learner typed nothing."""
+
+    async def broken(_outbox: Outbox, _tap: updates.Tap) -> None:
+        raise RuntimeError("card handler failed")
+
+    monkeypatch.setitem(updates.TAP_HANDLERS, "test", broken)
+
+    await deliver(client, tap("test:a"))
+
+    assert bot.texts == [updates.TAP_FAILED]

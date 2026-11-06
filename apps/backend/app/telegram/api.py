@@ -109,11 +109,14 @@ async def send_photo(
     photo: str | bytes,
     *,
     caption: str | None = None,
+    html: bool = True,
     keyboard: Keyboard | None = None,
 ) -> int:
     payload: dict[str, Any] = {"chat_id": tg_chat_id}
     if caption is not None:
-        payload |= {"caption": caption, "parse_mode": "HTML"}
+        payload["caption"] = caption
+        if html:
+            payload["parse_mode"] = "HTML"
     payload = _with_keyboard(payload, keyboard)
     if isinstance(photo, str):
         sent = await _call("sendPhoto", payload | {"photo": photo})
@@ -123,26 +126,38 @@ async def send_photo(
 
 
 async def edit_message_text(
-    tg_chat_id: int, message_id: int, text: str, *, keyboard: Keyboard | None = None
+    tg_chat_id: int,
+    message_id: int,
+    text: str,
+    *,
+    html: bool = True,
+    keyboard: Keyboard | None = None,
 ) -> None:
-    payload = {
+    payload: dict[str, Any] = {
         "chat_id": tg_chat_id,
         "message_id": message_id,
         "text": text,
-        "parse_mode": "HTML",
     }
+    if html:
+        payload["parse_mode"] = "HTML"
     await _call("editMessageText", _with_keyboard(payload, keyboard))
 
 
 async def edit_message_caption(
-    tg_chat_id: int, message_id: int, caption: str, *, keyboard: Keyboard | None = None
+    tg_chat_id: int,
+    message_id: int,
+    caption: str,
+    *,
+    html: bool = True,
+    keyboard: Keyboard | None = None,
 ) -> None:
-    payload = {
+    payload: dict[str, Any] = {
         "chat_id": tg_chat_id,
         "message_id": message_id,
         "caption": caption,
-        "parse_mode": "HTML",
     }
+    if html:
+        payload["parse_mode"] = "HTML"
     await _call("editMessageCaption", _with_keyboard(payload, keyboard))
 
 

@@ -39,6 +39,7 @@ async def webhook(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "not json")
     update = updates.parse(payload)
     if update is None:
+        background.add_task(updates.dismiss, payload)
         return {"ok": True}
     if not await repository.first_sighting(session, update.update_id):
         return {"ok": True}

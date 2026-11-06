@@ -14,25 +14,43 @@ from app.telegram.api import answer_callback, send_message
 CALL = {"chat_id": 4242, "text": "entropy is the average surprisal"}
 
 
+@dataclass
+class Posted:
+    method: str = ""
+    json: dict[str, Any] | None = None
+    data: dict[str, str] | None = None
+    files: dict[str, Any] | None = None
+
+
 def answering(
-    monkeypatch: pytest.MonkeyPatch, status: int, description: str = ""
-) -> None:
-    """Telegram's side of one call, without the network.
+    monkeypatch: pytest.MonkeyPatch,
+    status: int = 200,
+    description: str = "",
+    result: dict[str, Any] | None = None,
+) -> Posted:
+    """Telegram's side of one call, without the network, and what was posted.
 
     The rest of the suite stubs `send_message` and raises these exceptions
     itself; this is the one place the mapping from a response to them is the
     thing under test.
     """
-    body: dict[str, Any] = {"ok": status == 200, "result": {"message_id": 5}}
+    body: dict[str, Any] = {
+        "ok": status == 200,
+        "result": {"message_id": 5} if result is None else result,
+    }
     if description:
         body["description"] = description
+    posted = Posted()
 
-    async def post(
-        _self: httpx.AsyncClient, _url: str, **_kwargs: Any
-    ) -> httpx.Response:
+    async def post(_self: httpx.AsyncClient, url: str, **kwargs: Any) -> httpx.Response:
+        posted.method = url.rsplit("/", 1)[-1]
+        posted.json = kwargs.get("json")
+        posted.data = kwargs.get("data")
+        posted.files = kwargs.get("files")
         return httpx.Response(status, json=body)
 
     monkeypatch.setattr(httpx.AsyncClient, "post", post)
+    return posted
 
 
 async def test_a_call_that_worked_returns_the_result(
@@ -92,28 +110,6 @@ async def test_a_network_failure_is_a_telegram_error(
         await api._call("sendMessage", CALL)
 
 
-@dataclass
-class Posted:
-    method: str = ""
-    json: dict[str, Any] | None = None
-    data: dict[str, str] | None = None
-    files: dict[str, Any] | None = None
-
-
-def recording(monkeypatch: pytest.MonkeyPatch, result: dict[str, Any]) -> Posted:
-    posted = Posted()
-
-    async def post(_self: httpx.AsyncClient, url: str, **kwargs: Any) -> httpx.Response:
-        posted.method = url.rsplit("/", 1)[-1]
-        posted.json = kwargs.get("json")
-        posted.data = kwargs.get("data")
-        posted.files = kwargs.get("files")
-        return httpx.Response(200, json={"ok": True, "result": result})
-
-    monkeypatch.setattr(httpx.AsyncClient, "post", post)
-    return posted
-
-
 KEYBOARD: api.Keyboard = [
     [
         {"text": "A", "callback_data": "card:1:a"},
@@ -127,7 +123,7 @@ MARKUP = {"inline_keyboard": KEYBOARD}
 async def test_a_message_with_buttons_returns_its_id(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    posted = recording(monkeypatch, {"message_id": 17})
+    posted = answering(monkeypatch, result={"message_id": 17})
 
     message_id = await send_message(4242, "<b>Which?</b>", keyboard=KEYBOARD)
 
@@ -144,7 +140,7 @@ async def test_a_message_with_buttons_returns_its_id(
 async def test_a_message_without_buttons_carries_no_markup(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    posted = recording(monkeypatch, {"message_id": 3})
+    posted = answering(monkeypatch, result={"message_id": 3})
 
     await send_message(4242, "plain", html=False)
 
@@ -154,7 +150,7 @@ async def test_a_message_without_buttons_carries_no_markup(
 async def test_an_edit_replaces_text_and_buttons(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    posted = recording(monkeypatch, {"message_id": 17})
+    posted = answering(monkeypatch, result={"message_id": 17})
 
     await api.edit_message_text(4242, 17, "Right.", keyboard=KEYBOARD)
 
@@ -169,7 +165,7 @@ async def test_an_edit_replaces_text_and_buttons(
 
 
 async def test_a_caption_edit(monkeypatch: pytest.MonkeyPatch) -> None:
-    posted = recording(monkeypatch, {"message_id": 17})
+    posted = answering(monkeypatch, result={"message_id": 17})
 
     await api.edit_message_caption(4242, 17, "Figure 2")
 
@@ -182,10 +178,32 @@ async def test_a_caption_edit(monkeypatch: pytest.MonkeyPatch) -> None:
     }
 
 
+async def test_unformatted_edits_and_captions_carry_no_parse_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """What the outbox falls back to when Telegram will not parse the HTML."""
+    posted = answering(monkeypatch, result={"message_id": 17})
+
+    await api.edit_message_text(4242, 17, "<b>x", html=False)
+    assert posted.json == {"chat_id": 4242, "message_id": 17, "text": "<b>x"}
+
+    await api.edit_message_caption(4242, 17, "<b>x", html=False)
+    assert posted.json == {"chat_id": 4242, "message_id": 17, "caption": "<b>x"}
+
+    await api.send_photo(
+        4242, "https://distillcourse.example/f.png", caption="<b>x", html=False
+    )
+    assert posted.json == {
+        "chat_id": 4242,
+        "photo": "https://distillcourse.example/f.png",
+        "caption": "<b>x",
+    }
+
+
 async def test_a_keyboard_edit_to_none_takes_the_buttons_off(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    posted = recording(monkeypatch, {"message_id": 17})
+    posted = answering(monkeypatch, result={"message_id": 17})
 
     await api.edit_message_keyboard(4242, 17, None)
 
@@ -196,7 +214,7 @@ async def test_a_keyboard_edit_to_none_takes_the_buttons_off(
 async def test_a_keyboard_edit_sends_the_new_buttons(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    posted = recording(monkeypatch, {"message_id": 17})
+    posted = answering(monkeypatch, result={"message_id": 17})
 
     await api.edit_message_keyboard(4242, 17, KEYBOARD)
 
@@ -206,7 +224,7 @@ async def test_a_keyboard_edit_sends_the_new_buttons(
 async def test_an_answered_tap_with_and_without_a_toast(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    posted = recording(monkeypatch, {})
+    posted = answering(monkeypatch, result={})
 
     await answer_callback("cb-1")
     assert posted.method == "answerCallbackQuery"
@@ -217,7 +235,7 @@ async def test_an_answered_tap_with_and_without_a_toast(
 
 
 async def test_a_photo_by_url_is_json(monkeypatch: pytest.MonkeyPatch) -> None:
-    posted = recording(monkeypatch, {"message_id": 21})
+    posted = answering(monkeypatch, result={"message_id": 21})
 
     message_id = await api.send_photo(
         4242, "https://distillcourse.example/f.png", caption="Fig", keyboard=KEYBOARD
@@ -239,7 +257,7 @@ async def test_a_photo_from_bytes_is_multipart(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Every multipart field is a string, so the keyboard travels as JSON."""
-    posted = recording(monkeypatch, {"message_id": 22})
+    posted = answering(monkeypatch, result={"message_id": 22})
     png = b"\x89PNG\r\n\x1a\n"
 
     message_id = await api.send_photo(4242, png, keyboard=KEYBOARD)
@@ -267,7 +285,7 @@ async def test_an_edit_that_changes_nothing_is_not_an_error(
 async def test_callback_data_over_telegrams_limit_is_refused_before_sending(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    recording(monkeypatch, {"message_id": 1})
+    answering(monkeypatch, result={"message_id": 1})
     long = [[{"text": "x", "callback_data": "card:" + "é" * 30}]]
 
     with pytest.raises(AssertionError):
@@ -277,7 +295,7 @@ async def test_callback_data_over_telegrams_limit_is_refused_before_sending(
 async def test_the_webhook_asks_for_button_presses(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    posted = recording(monkeypatch, {})
+    posted = answering(monkeypatch, result={})
 
     await api.set_webhook("https://distillcourse.example/api/tg/webhook", "s")
 
