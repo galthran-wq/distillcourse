@@ -323,7 +323,6 @@ async def test_a_reminder_waits_for_a_transport_instead_of_being_cancelled(
 async def went_unanswered(
     session: AsyncSession, user: User, count: int, *, last: datetime
 ) -> None:
-    """`count` review messages in a row that timed out, the latest at `last`."""
     for days in range(count):
         row = await due_review(session, user, note=f"ignored {days}")
         row.status = "done"
@@ -346,9 +345,8 @@ async def test_a_silent_learner_is_held_until_the_wait_is_over(
     assert await repository.silence(session, user.id) == 4
     for row in rows:
         await session.refresh(row)
-    # Held to day 7, not dropped.
     assert [(row.status, row.due_at) for row in rows] == [
-        ("deferred", last + timedelta(days=7))
+        ("deferred", policy.tomorrow_open(NOON, WAKING))
     ] * 2
 
 
@@ -357,12 +355,22 @@ async def test_any_message_from_the_learner_ends_the_wait(
 ) -> None:
     await went_unanswered(session, user, 4, last=NOON - timedelta(days=3))
     row = await due_review(session, user)
+    with replying():
+        await worker.cycle(session, NOON)
+    await session.refresh(row)
+    assert row.status == "deferred"
+
     await HarnessRepository(session, user.id).add_messages(
         thread, [ModelRequest(parts=[UserPromptPart(content="hi")])], role="user"
     )
-
+    await session.execute(
+        update(Message)
+        .where(Message.chat_id == thread.id)
+        .values(created_at=NOON + timedelta(hours=1))
+    )
+    await session.commit()
     with replying():
-        await worker.cycle(session, NOON)
+        await worker.cycle(session, NOON + timedelta(hours=2))
 
     await session.refresh(row)
     assert await repository.silence(session, user.id) == 0
