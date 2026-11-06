@@ -1,0 +1,591 @@
+A payment of EUR 60 at a petrol station is ordinary; the same payment thirty minutes after one in another country is not. Aggregates summarise a card's past in fixed windows, but the order of events is lost. Can a model read a card's last ten payments as a sequence, and on which kind of payments does the order carry information that the aggregates do not?
+
+Take two cards at 18:35, each paying €60 in Belgium. Each paid four times in the previous 24 hours, with the same amounts in the same countries, and each last paid at 18:05.
+
+<Figure
+  src="./figures/two-cards.svg"
+  alt="Two timelines of five payments each. Card A pays in Belgium three times, then in Spain at 18:05, then in Belgium at 18:35. Card B pays in Spain at 21:00 the evening before, then three times in Belgium, then in Belgium at 18:35. Below them: both cards have 4 payments in 24 hours worth 109 euros, 3 in Belgium worth 65 euros, 1 in Spain worth 44 euros, and 30 minutes since the last payment."
+  caption="Card A went from Spain to Belgium in thirty minutes; card B flew home in the morning."
+/>
+
+The 24-hour <Ref lesson="transaction-aggregates" id="the-same-window-a-narrower-question">windows and conditional windows</Ref> of the features module and <Ref lesson="behavioural-profiles" id="the-time-since-the-previous-payment">the gap since the previous payment</Ref> all give the same values for both cards, and the 7- and 30-day windows do too if the cards' earlier weeks match. Only the order differs, and only card A is physically impossible.
+
+The obvious repair is another column. A short conditional window separates these two cards: payments in Spain in the hour before 18:35 number one on card A and none on card B. So does "previous payment in a different country, less than an hour ago", which is close to <Ref lesson="fraud-detection-system" id="rules-beside-the-model-two-tools-with-different-upkeep">the scoring rule</Ref> of the first lesson. Either has to be chosen in advance for this pattern, and it fixes this pattern and no other. Five payments in three amount bands can be ordered in $3^5 = 243$ ways, before time gaps or countries enter, and someone has to guess which orderings matter. The alternative is to give a model the payments themselves, in order, and let training find the patterns. <Ref lesson="worldline-model-comparison" id="three-rows-that-read-the-cards-past">The eight-family comparison</Ref> scored three such models and left open what they compute and when the order is worth reading.
+
+## Which rows form the sequence: an entity and a fixed length
+
+A network needs every input in the same shape, and a card's history has no fixed length. In one simulated training week, customer 0 has 12 payments and other cards have one or two. "All of the card's past" also includes months that say nothing about a card stolen this morning. The input has to be a fixed number of the card's latest payments.
+
+<Definition title="landmark sequence">
+The *landmark* is the entity whose history forms the sequence, usually the card. For a payment $i$ on that card, its landmark sequence of length $T$ is the card's $T$ latest payments in time order, ending with payment $i$: an array of $T$ rows and $D$ columns, labelled with the label of payment $i$ alone.
+</Definition>
+
+Every payment gets its own overlapping sequence, so the number of training rows does not change. The sequence obeys <Ref lesson="point-in-time-features" id="two-ways-a-training-row-can-know-too-much">the point-in-time rule</Ref>: it holds payment $i$'s own fields and earlier rows, each row's features computed as of that row. The card is the usual landmark because card fraud is someone else paying with it. A terminal can be a landmark too. On the simulator's fifteen inputs with $T = 5$, the array has shape $(5, 15)$.
+
+How long should $T$ be? The window should reach back past a fraudulent run into the owner's own payments, so that the model sees both. On a European processor's card stream from 2015, a compromised account carried about four frauds, so 5 is the shortest length that shows frauds and non-frauds together, and 10 is the natural second try.
+
+### Short histories: a padding row
+
+A card's first payments have fewer than $T$ rows behind them. Dropping those rows fails twice: the bank has to score every payment, and a sequence model and a forest tested on different rows cannot be compared. So the missing slots are filled.
+
+Append one extra row to the feature matrix, the *padding row*, and point every missing slot at it. Its values are zeros or the training means, and on standardised inputs these are the same row: an average payment. A network cannot tell that row from a real average payment unless a flag says so, as <Ref lesson="neural-tabular-detectors" id="exercises">the last exercise of the network lesson</Ref> found. The appended row also means padded and full sequences take the same code path, with no special case in the data loader.
+
+### Building the sequences without a loop
+
+Storing the array per payment would take $5 \times 15 = 75$ numbers per row. The usual arrangement stores five row numbers instead and looks the features up when a batch is built. Those row numbers come from one pandas operation on the table sorted by time.
+
+<Example title="the index matrix of one card">
+Customer 0's twelve payments in a training week sit at rows 1888, 10080, 12847, …, 63977 of the time-sorted table. Group the table by customer and take each row's own number shifted by $k$ within its group: `shift(0)` is the row itself, `shift(1)` the card's previous row, and the card's first row has nothing to shift from and gets a missing value. Asking for $k = 4, 3, 2, 1, 0$ gives five columns, oldest first. The payment at row 37972 gets $[12847, 15627, 18908, 22842, 37972]$; the one at row 10080 gets $[\text{pad}, \text{pad}, \text{pad}, 1888, 10080]$.
+</Example>
+
+```python
+df = pd.DataFrame({"card": card_ids, "row": np.arange(len(card_ids))})  # sorted by time
+g = df.groupby("card")["row"]
+seq = pd.DataFrame({f"tx_{n}": g.shift(T - 1 - n) for n in range(T)})
+pad_row = len(X)                                     # X gains one row at the end
+seq = seq.fillna(pad_row).astype(int).to_numpy()
+X_pad = np.vstack([X, X.mean(axis=0)])
+batch = X_pad[seq[batch_rows]]                       # shape (batch, T, D)
+```
+
+<FigureSequence
+  name="landmark"
+  alt="A strip of customer 0's twelve row numbers above an empty matrix of twelve rows and five columns headed shift(4) to shift(0). Frame 1 marks payment 37972 to score. Frame 2 lights its window of five rows and fills its matrix row. Frame 3 marks payment 10080, whose matrix row holds three pad entries, 1888 and 10080. Frame 4 shows the whole matrix, with pad entries in the first four rows."
+  caption="One card's index matrix, filled one row and then all at once."
+/>
+
+<Task>
+Step to frame 4 and count the slots holding `pad`. There should be 4 + 3 + 2 + 1 = 10 across four rows of twelve. Then predict the count of padded rows at $T = 10$ before opening the exercise below.
+</Task>
+
+<Exercise>
+For the same twelve payments: (a) write the row of the payment at 15627 for $T = 3$; (b) write the row of the payment at 10080 for $T = 3$; (c) how many of the twelve rows contain padding at $T = 10$?
+
+<Solution>
+(a) $[10080, 12847, 15627]$. (b) $[\text{pad}, 1888, 10080]$. (c) Row $r$ has $r - 1$ earlier payments, so it is padded while $r - 1 < 9$: rows 1 to 9, nine of twelve. At $T = 10$ most of the sequences of a card paying twelve times a week contain padding if they are built from that week alone.
+</Solution>
+</Exercise>
+
+<Remark title="where the history starts">
+Row 1888 is customer 0's first payment of that training week, not of the card's life. Sequences built inside a training or test block, as here, pad rows whose earlier payments exist in the log. A deployed pipeline builds the matrix on the whole log and then selects the block's rows; <Ref lesson="delayed-labels-prequential" id="what-the-delay-block-is-and-is-not">the delay block's payments</Ref> may enter as history in the same way they enter a window.
+</Remark>
+
+### Undersampling has to keep a sequence whole
+
+The rare class is usually handled by dropping genuine rows, as in <Ref lesson="undersampling-calibration" />. Here a dropped row disappears from the next four sequences as well, the time gaps across the hole become wrong, and the model trains on an order that never happened. Two arrangements avoid this: keep every row available for lookup and sample only which rows serve as targets, or sample whole accounts.
+
+## How a network reads a sequence of five payments
+
+Flattening the array into 75 inputs for <Ref lesson="neural-tabular-detectors" id="one-output-unit-read-as-pfraud">the feed-forward network</Ref> runs into the problem its last exercise found: "amount three steps back" and "amount two steps back" are unrelated inputs, so a burst learned at one position is not recognised at another. What has to change is that the same weights are applied at every position.
+
+### A 1-D convolution: one filter slid along time
+
+Take two standardised columns per payment, amount and log-gap, and one filter that spans two neighbouring payments. It has one weight per column per slot. Choose weights that respond to short gaps and a large newest amount: older slot $(0, -1)$, newer slot $(1, -1)$.
+
+<Example title="one filter over five payments">
+The card's five rows, as (amount, log-gap): $(0.1, 0.3)$, $(-0.2, 0.8)$, $(1.5, -1.0)$, $(1.8, -1.2)$, $(-0.1, 0.4)$. Payments 3 and 4 are a burst. The filter's output on each neighbouring pair is older gap times $-1$, plus newer amount, minus newer gap:
+
+- pair (1, 2): $-0.3 - 0.2 - 0.8 = -1.3$
+- pair (2, 3): $-0.8 + 1.5 + 1.0 = 1.7$
+- pair (3, 4): $1.0 + 1.8 + 1.2 = 4.0$
+- pair (4, 5): $1.2 - 0.1 - 0.4 = 0.7$
+
+Move the burst one slot earlier and the output 4.0 appears one slot earlier: the same weights respond at whichever position the burst occupies.
+</Example>
+
+<Definition title="one-dimensional convolution">
+A filter of length $L$ over a sequence with $D$ columns holds $L \times D$ weights and a bias. Its output at position $j$ is the weighted sum of rows $j - L + 1, \ldots, j$ plus the bias, passed through a nonlinearity. A layer has $F$ such filters, and its output has $F$ columns and $T - L + 1$ rows.
+</Definition>
+
+During training the weights are learned, so nobody picks the burst pattern in advance.
+
+<Figure
+  src="./figures/conv.svg"
+  alt="Three arrays left to right. An input array of 5 rows, one per payment with the oldest on top, by 15 columns, with two adjacent payment rows highlighted in amber. An arrow labelled 100 filters of length 2 leads to an array marked (4, 100), 4 rows by 100 columns, with one amber cell joined to the highlighted rows. An arrow labelled 50 filters of length 2 leads to a smaller array marked (3, 50), then to a dense layer and sigmoid."
+  caption="The shapes of a two-layer stack on five payments, drawn schematically: time shrinks by length − 1 per layer, and the columns become the filter count."
+/>
+
+One hundred filters of length 2 on $(5, 15)$ cost $100 \times (2 \times 15 + 1) = 3{,}100$ weights, where flattening cost 37,500 in a 500-unit first layer. To keep the sequence at length 5, pad $L - 1$ zero rows on the old side before each layer, giving $(5, 100)$ then $(5, 50)$. Padding on the old side keeps output slot $j$ aligned with payment $j$, so the last slot is the payment being scored. The result then goes to a dense layer and a sigmoid, either flattened or through a max over time. The max answers "did this pattern occur anywhere" and throws away where.
+
+The convolution's flaw is its reach. A slot sees $L$ payments after one layer, and two layers of length 2 see only three neighbouring payments, so a longer pattern needs more layers or longer filters, chosen in advance.
+
+### A recurrent layer: a state carried forward
+
+Instead of a fixed reach, carry a vector along the sequence and update it at each payment:
+
+$$
+s_j = W\sigma(s_{j-1}) + U x_j + b, \qquad s_0 = 0,
+$$
+
+where $x_j$ is row $j$ of the sequence, $s_j$ the *state* after it, $\sigma$ the hyperbolic tangent applied to each component, and $W$, $U$, $b$ the same at every step. The final state $s_T$ goes to a hidden layer and a sigmoid. The state is a fixed-size summary of however many payments were read, so it does what an aggregate does, with the summary learned. With a 100-dimensional state on fifteen inputs the layer has $1{,}500 + 10{,}000 + 100 = 11{,}600$ parameters, whatever $T$ is.
+
+<Example title="a recurrence sees what a sum does not">
+Use one-dimensional state, $W = 0.5$, $U = 1$, $b = 0$, and a card with a single large standardised amount, 2, among zeros. A sum over the window gives 2 wherever the 2 sits.
+
+- Input $(0, 0, 0, 0, 2)$: final state $2$.
+- Input $(0, 0, 2, 0, 0)$: states $0, 0, 2, 0.5\tanh 2 = 0.482, 0.5\tanh 0.482 = 0.224$; final state $0.224$.
+- Input $(2, 0, 0, 0, 0)$: states $2, 0.482, 0.224, 0.110, 0.055$; final state $0.055$.
+
+The same numbers in another order give another final state.
+</Example>
+
+### Why the plain recurrence is hard to train
+
+That example also shows the difficulty. Suppose the large amount in the first position should have raised the score. An early payment has no weight of its own to raise: the only weight on $x_k$ is $U$, the same at every position. Training moves $U$ along the derivative of the loss with respect to $U$, so what matters is how much of that derivative comes from the early payment.
+
+Nudge $U$ in the example and follow the final state. For the input $(0, 0, 0, 0, 2)$ the nudge acts on the last step, $s_5 = W\tanh(s_4) + 2U$, so $\partial s_5 / \partial U = 2$. For $(2, 0, 0, 0, 0)$ it acts on the first step, $s_1 = 2U$, and has four steps to travel. Each step multiplies it by $\partial s_i / \partial s_{i-1} = W\tanh'(s_{i-1})$, which on that example's states is $0.035$, $0.400$, $0.476$, $0.494$. So $\partial s_5 / \partial U = 2 \times 0.0033 = 0.0066$, and the same amount contributes 300 times less from the first position than from the last.
+
+In general $U$ enters at every position. Backpropagation unrolls the recurrence into a network with one layer per payment, and for the loss $E$ at the end, with one-dimensional state, the chain rule gives a sum with one term per position:
+
+$$
+\frac{\partial E}{\partial U}
+= \sum_{k=1}^{T} \frac{\partial E}{\partial s_T}\,
+\Biggl(\prod_{i=k+1}^{T} \frac{\partial s_i}{\partial s_{i-1}}\Biggr) x_k .
+$$
+
+Payment $k$'s term contains a product of $T - k$ factors, so it shrinks or grows with that product. Each factor is $W\tanh'(s_{i-1})$, and $|\tanh'| \le 1$, so the product is at most $|W|^{T-k}$ in size.
+
+<Figure
+  src="./figures/rnn.svg"
+  alt="Five input boxes x1 to x5 feed five state circles s1 to s5 through arrows labelled U; states are linked left to right by arrows labelled W, and s5 leads to the output p. Above each state a bar shows the gradient bound: 0.0625, 0.125, 0.25, 0.5 and 1 from s1 to s5."
+  caption="At W = 0.5, the first payment's term in the gradient carries four factors of at most one half."
+/>
+
+With $|W| = 0.5$ the bound is $0.0625$ across five payments and $0.002$ across ten. If $|W|$ is above 1 the factors can grow instead: with $W = 1.5$ and states near 0, where $\tanh' \approx 1$, the product is about 5 across five payments and 38 across ten. A vanishing gradient means the model cannot learn that the payment nine steps back mattered, and an exploding one throws the weights away in one step. Five payments is a short chain, so the difficulty is modest at $T = 5$ and grows quickly from there. The matrix version of the bound, with the largest singular value of $W$ in place of $|W|$, is left to the exercises.
+
+### The LSTM: a path the gradient can survive
+
+Two remedies are mechanical. Clipping rescales a gradient whose norm exceeds a threshold, which stops explosions. A penalty and a small initialisation keep $W$ from growing. Neither helps a gradient that is already tiny.
+
+What has to change is the factor itself. Setting $W = 1$ does not do it. The factor is then $\tanh'(s_{i-1})$, and after the large amount of the example above, a state of 2, that is $\tanh'(2) = 0.07$: the squashing that keeps the state bounded shrinks the gradient most right after the payment worth remembering. One fixed $W$ also has to serve every payment, so it cannot hold on to one and let go of the next.
+
+So take the squashing and $W$ off the path that carries the memory. Keep a second number beside the state, the *memory cell* $c_j$. A plain running sum, $c_j = c_{j-1} + u_j$, would have a factor of exactly 1, and it would be another aggregate, keeping everything forever. To make it selective, scale the old value and the new one by numbers recomputed at each payment:
+
+$$
+c_j = f_j\, c_{j-1} + g_j\, u_j .
+$$
+
+Here $u_j$ is the content proposed by this payment, and $f_j$ and $g_j$ are *gates*, numbers between 0 and 1 computed by the network from the current row and the previous state. The *forget gate* $f_j$ near 1 keeps the cell and near 0 erases it. The *input gate* $g_j$ decides how much gets written. With the gates taken as given, the derivative can be read straight off the update:
+
+$$
+\frac{\partial c_j}{\partial c_{j-1}} = f_j .
+$$
+
+$W$ and $\tanh'$ are gone from that factor.
+
+<Example title="the same large amount, held in a cell">
+Take the input $(2, 0, 0, 0, 0)$, which left a final state of $0.055$ in the plain recurrence. Suppose the first payment writes $g_1 u_1 = 2$, the size of the input, and the next four leave the cell alone, with $f_j = 0.95$ and $g_j = 0$. In the full model below a single step writes less than 1, and 2 is chosen only to keep the comparison with the plain recurrence simple. The factors do not depend on it. The cell runs $2, 1.9, 1.805, 1.715, 1.629$. Between the first payment and the last there are four factors, so $\partial c_5 / \partial c_1 = 0.95^4 = 0.815$, about 13 times the plain recurrence's bound of $0.0625$. Across ten payments it is $0.95^9 = 0.63$ against $0.002$.
+</Example>
+
+<Figure
+  src="./figures/lstm-cell.svg"
+  alt="Five input boxes x1 to x5 under five cell circles c1 to c5, linked left to right by arrows labelled f = 0.95. Only x1 writes to the cell, with g1 u1 = 2; the others have g = 0, and the cell values run 2, 1.9, 1.805, 1.715, 1.629. Above each cell two bars: amber, the derivative of c5 with respect to ck, 0.815, 0.857, 0.903, 0.95, 1; blue, the plain recurrence's bound at W = 0.5, 0.0625, 0.125, 0.25, 0.5, 1."
+  caption="The gates here are chosen by hand. Training has to find such values, and this path is how the first payment's term in the gradient survives to set them."
+/>
+
+<Exercise>
+Same cell, but the fourth payment closes the forget gate: $f_4 = 0.1$, with $f_2 = f_3 = f_5 = 0.95$ and $g_j = 0$ after the first payment. Compute $c_5$ and $\partial c_5 / \partial c_1$. How does this small factor differ from the plain recurrence's?
+
+<Solution>
+The cell runs $2, 1.9, 1.805, 0.1805, 0.1715$, and $\partial c_5 / \partial c_1 = 0.95 \times 0.95 \times 0.1 \times 0.95 = 0.086$. The factor is small here because the gate, computed from the fourth payment, erased the cell on that payment; the next card's gates can differ. At $W = 0.5$ the bound is small on every card and every payment, whatever they hold.
+</Solution>
+</Exercise>
+
+Two limits on that derivative. The gates themselves read the previous state, so the full gradient has further paths through them; what the cell adds is one path whose factor can sit near 1. And $f_j \le 1$ stops that path from growing, while the others still can, so clipping stays in use.
+
+The cell is not read directly, for two reasons. Nothing caps it: each step can add to what it holds, and the example's cell already holds 2, so a $\tanh$ bounds what the gates and the classifier read. And a card may need to hold a payment in memory without that payment acting on every later decision, so a third gate, the *output gate* $o_j$, decides how much of the cell to show. The result is the state: $s_j = o_j \tanh(c_j)$. So an LSTM carries two vectors. The cell is the memory, and the state is what the next payment's gates and the classifier read.
+
+<Definition title="one LSTM step">
+With $\operatorname{sig}$ the sigmoid, $\odot$ multiplication per component, and $s_0 = c_0 = 0$:
+
+$$
+\begin{aligned}
+f_j &= \operatorname{sig}(W_f s_{j-1} + U_f x_j + b_f), \\
+g_j &= \operatorname{sig}(W_g s_{j-1} + U_g x_j + b_g), \\
+o_j &= \operatorname{sig}(W_o s_{j-1} + U_o x_j + b_o), \\
+u_j &= \tanh(W_u s_{j-1} + U_u x_j + b_u), \\
+c_j &= f_j \odot c_{j-1} + g_j \odot u_j, \\
+s_j &= o_j \odot \tanh(c_j).
+\end{aligned}
+$$
+
+Each of the four lines with weights has the shape of the plain recurrence's update, so a 100-dimensional layer on fifteen inputs has $4 \times 11{,}600 = 46{,}400$ parameters, again whatever $T$ is.
+</Definition>
+
+In code the layer returns three things, and the classifier takes one of them.
+
+```python
+class SequenceNet(torch.nn.Module):
+    def __init__(self, n_inputs=15, n_state=100, n_hidden=100):
+        super().__init__()
+        self.lstm = torch.nn.LSTM(n_inputs, n_state, batch_first=True)
+        self.hidden = torch.nn.Linear(n_state, n_hidden)
+        self.out = torch.nn.Linear(n_hidden, 1)
+
+    def forward(self, x):                      # x: (batch, T, D)
+        all_states, (final_state, final_cell) = self.lstm(x)
+        return torch.sigmoid(self.out(torch.relu(self.hidden(final_state[0]))))
+```
+
+`final_state` is $s_T$, with shape $(1, \text{batch}, 100)$, and `[0]` drops the leading dimension, which counts layers. `final_cell` is $c_T$, discarded because $s_T$ already shows what the output gate lets through. `all_states` holds $s_1, \ldots, s_T$, shape $(\text{batch}, T, 100)$, unused here.
+
+Cross-entropy, Adam, standardised inputs, dropout and epochs chosen on validation weeks carry over unchanged from <Ref lesson="neural-tabular-detectors" />.
+
+## Which payment did the model lean on: attention
+
+The final state mixes every payment read, and it cannot be asked which of them raised the score. It also has to carry all that information through one vector. <Ref lesson="worldline-model-comparison" id="three-rows-that-read-the-cards-past">The attention row</Ref> of the comparison uses `all_states` instead, the state after every payment, and weights them.
+
+The weights cannot be one fixed set per position, because which earlier payment matters depends on the payment being scored: card A's €60 in Belgium has reason to lean on the state after the payment in Spain thirty minutes before, and a routine payment does not. So build a vector from the payment being scored, the *context*, and compare it with each state. The comparison is a dot product, which is large where the two vectors point the same way. Those scores can be negative and have no fixed total, so used directly as weights they would stretch or flip the output depending on how well the states happen to match. A softmax makes them positive and makes them sum to 1, so the output stays a mix of the states, on their scale. <Ref lesson="graph-neural-networks" id="what-is-learned-and-what-is-fixed">The attention layer of the graph lesson</Ref> normalised a score per neighbour the same way; here the sum runs over positions.
+
+<Example title="three states and a context">
+Take three states $h_1 = (1, 0)$, $h_2 = (0.5, 0.5)$, $h_3 = (0, 2)$ and a context vector $c = (0, 1)$. Score each state by its dot product with $c$: $0, 0.5, 2$. A softmax turns the scores into weights: $e^0, e^{0.5}, e^2$ are $1, 1.649, 7.389$, summing to $10.04$, so the weights are $0.100, 0.164, 0.736$. The output is the weighted sum of the states: $0.100\,h_1 + 0.164\,h_2 + 0.736\,h_3 = (0.18, 1.55)$. That vector goes to the classifier in place of the final state.
+</Example>
+
+<Exercise>
+Same states, with context $c = (1, 0)$. Compute the weights and the output.
+
+<Solution>
+Scores $1, 0.5, 0$; exponentials $2.718, 1.649, 1$, sum $5.367$; weights $0.506, 0.307, 0.186$. Output $0.506\,(1, 0) + 0.307\,(0.5, 0.5) + 0.186\,(0, 2) = (0.660, 0.526)$. The context chose a different state.
+</Solution>
+</Exercise>
+
+In a fraud model the context is a learned linear projection of the scored payment's row to the size of a state, trained with the rest of the network. Each prediction then comes with a weight per position. It is tempting to read those as a statement of where the signal came from. To see what to check first, take an LSTM with $T = 5$ trained on the simulator's fifteen inputs, on <Ref lesson="neural-tabular-detectors" id="a-week-to-watch-that-is-not-the-test-week">the hold-out training week</Ref> of 11–17 July 2018, and weight its five states on one row of a training batch by two contexts, neither of which was trained for the task.
+
+<Figure
+  src="./figures/attention.svg"
+  alt="Two bar charts over positions 1 to 5. Left, context from an untrained projection: 0.25, 0.26, 0.24, 0.15, 0.10. Right, context equal to the final state: 8e-9, 5e-8, 1.36e-6, 1.24e-3, 0.9988."
+  caption="The same five states of an LSTM trained on one simulated week, weighted by two contexts. Neither pattern is a finding about fraud."
+/>
+
+On the left the context is a random projection, and the weights stay spread because it favours no state much. On the right the context is the final state $h_5$ itself, and the weight on position 5 is 0.9988. The cause is arithmetic: a vector usually scores highest against itself, recent states resemble it most, and the softmax exponentiates the differences. The ratios of neighbouring weights at the end, $0.9988 / 0.00124 \approx 800$ and $0.00124 / 0.00000136 \approx 900$, correspond to score differences of only about 7, since $e^7 \approx 1{,}100$. The earlier positions shrink in the same way, in order of age.
+
+<KeyFact>
+A weight near 1 on the last position says how the context was built before it says anything about the payment. An attention weight can be read as an explanation only after the context has been trained on the task, and even then it describes what the model used, which is checked as any explanation is in <Ref lesson="alert-explanations" />.
+</KeyFact>
+
+## Does the sequence carry anything the aggregates do not?
+
+From the opening example one would expect a model that reads the order to beat features that discard it. An order can only give a fraud away if the genuine order is regular enough for a break to show. Card-present payments, where the card is physically at a terminal (face-to-face, in <Ref lesson="financial-crime-typology" id="card-fraud-a-label-that-does-arrive">the typology's</Ref> terms), obey opening hours and geography, so a card's genuine payments follow one another in a constrained way, and a hop like card A's stands out. Online, almost any attribute can change from one payment to the next on a genuine card: a shop in another country at any hour is ordinary, so a jump says little. The prediction is a gain on card-present payments and little online. Testing it takes both streams, each with and without the aggregates, since the aggregates may already hold what the order would add.
+
+### The experiment
+
+The data is the European stream behind that choice of $T$: three months of card payments, modelled as two separate streams, with labels from investigators and customer disputes.
+
+| Stream | Training rows, 1 Mar–25 Apr | Fraud share in training | Test rows, 8–31 May | Fraud share in test |
+|---|---|---|---|---|
+| Card-present | 4.3 million | 0.81% | 4.7 million | 0.05% |
+| E-commerce | 2.9 million | 1.48% | 3.3 million | 0.42% |
+
+- **Split.** Validation runs 26–30 April. The week before the test block is <Ref lesson="delayed-labels-prequential" id="the-label-clock">the label delay</Ref>.
+- **Sampling.** Training sets are sampled by whole accounts: one million draws, each taking a genuine account with probability 0.9 and a compromised one with probability 0.1. That is why training fraud shares are above the test shares.
+- **Models.** A random forest reads only the payment being scored. An LSTM with two recurrent layers, the second taking the first layer's `all_states` as its input sequence, and a logistic output reads the last 5 or the last 10. Each is tuned on a coarse grid on the validation days.
+- **Same rows.** Every payment with fewer than nine earlier payments on its card is removed, so both models face identical rows. The fairness is bought by leaving new cards out of the comparison, so the padding row plays no part in it.
+- **Inputs.** Three sets: *raw fields* (time, type, entry mode, amount, merchant group and country, cardholder country, card type, bank; no identifiers); those plus the *gap*, the minutes since the card's previous payment; those plus *14 aggregates*, counts and sums over the previous 24 hours <Ref lesson="transaction-aggregates" id="conditioning-the-window-on-the-kind-of-payment">conditioned</Ref> on combinations of merchant category, merchant country and entry mode.
+- **Categorical fields.** The forest takes each one as an integer code. The LSTM takes each through a trained <Ref lesson="neural-tabular-detectors" id="categorical-inputs-embeddings">embedding</Ref> of dimension $\lceil \log_2 |C| \rceil$, as the network lesson set aside for this case, with the time split into categorical parts such as weekday and hour. A row of the sequence is those vectors joined to the numeric fields.
+- **Score.** AUCPR, the area under the precision-recall curve that <Ref lesson="alert-budget-metrics" id="what-the-team-sees-at-each-fraud">average precision</Ref> sums in rectangles, per test day and averaged over the 24 days. The results are single runs with no error bars. The experiment recorded payment-level scores only and no daily card ranking, so CP@100 is not available here.
+
+<Figure
+  src="./figures/results.svg"
+  alt="Grouped bars of AUCPR for forest and LSTM. Card-present: raw fields 0.138 and 0.200; plus gap 0.170 and 0.231; plus gap and aggregates 0.241 and 0.246. E-commerce: raw fields 0.179 and 0.180; plus gap 0.236 and 0.192; plus gap and aggregates 0.394 and 0.380."
+  caption="The LSTM's gain appears on raw card-present fields, is absent online, and closes on both streams once aggregates are in. Compare bars within a panel: the base rates differ eightfold."
+/>
+
+### How much of a gap is noise
+
+Which differences between a forest and an LSTM are believable? The table can supply its own rough scale, because some of its columns should barely differ. The forest reads only the last payment, so its "5" and "10" columns differ only in the random draws of the fit.
+
+| Stream | Inputs | Forest, 5 | LSTM, 5 | Forest, 10 | LSTM, 10 |
+|---|---|---|---|---|---|
+| Card-present | raw | 0.138 | 0.200 | 0.135 | 0.229 |
+| | + gap | 0.170 | 0.231 | 0.172 | 0.217 |
+| | + aggregates | 0.241 | 0.246 | 0.242 | 0.236 |
+| E-commerce | raw | 0.179 | 0.180 | 0.179 | 0.178 |
+| | + gap | 0.236 | 0.192 | 0.228 | 0.238 |
+| | + aggregates | 0.394 | 0.380 | 0.404 | 0.402 |
+
+The forest moves by at most 0.010 between its two columns. The LSTM has no such clean pair, since its two columns also differ in length. But going from 5 to 10 moves it up in three rows and down in three, by as much as 0.046, so length has no consistent effect and much of that movement may be run-to-run noise. A difference between the two models carries the wobble of both, so the larger number is the one to judge it against. Below, every comparison is read against 0.046: a rough upper estimate from one pair of runs per row, not an error bar.
+
+Each number is a mean over 24 days, and the days themselves move a lot. Plotted day by day, the AUCPR of the forest and of the length-10 LSTM varies widely and follows a common trend, whatever the input set. On card-present payments both reach their lowest on the same dates, 9–10 and 25–26 May, and inspecting those days found no calendar or public event to explain them. A hard day looks like a property of the stream, not of a model.
+
+### What survives that noise
+
+**Card-present, raw fields: a gain, by a modest margin.** AUCPR goes from 0.138 to 0.200 at length 5 and from 0.135 to 0.229 at length 10. Those gaps, 0.062 and 0.094, are 1.3 and 2 times the scale, with the same sign at both lengths. The gain also shows in the region a team works. AUCPR@0.2 stops the area at recall 0.2, where the maximum is 0.2, so dividing by 0.2 gives the mean precision over the first fifth of the frauds: 43% for the forest, 54% for the LSTM.
+
+**E-commerce, raw fields: nothing.** 0.179 against 0.180, and 0.179 against 0.178 at length 10. The gap alone is worth more to the forest (0.236) than the whole sequence is to the LSTM on raw fields.
+
+**With the gap added: the same pattern, less clearly.** On card-present payments the LSTM leads by 0.061 and 0.045 (0.170 against 0.231, 0.172 against 0.217), so one length clears the scale and the other only reaches it. Online the forest leads by 0.044 at length 5 and the LSTM by 0.010 at length 10, both inside the scale and with opposite signs: no lead for either.
+
+**With aggregates: a tie on both.** 0.241 against 0.246 on card-present payments, 0.394 against 0.380 online, 0.404 against 0.402 at length 10. The largest gap in these rows, 0.014, is under a third of the scale. Mean precision over the first fifth of the frauds is 56% for both on card-present payments and 79% for both online. Online, the aggregates raise the forest more than the sequence raises anything: the gap and aggregates together more than double its AUCPR (0.179 to 0.394); the aggregates alone add two thirds (0.236 to 0.394).
+
+The predicted pattern appeared: a gain where payments are constrained, none where they are not. This design cannot credit that gain to order. A forest on raw fields has no history at all and the LSTM reads the earlier rows, so 0.138 to 0.200 measures history and order together. Nor can two streams prove that constraint is the cause, since card-present payments also differ in other ways (a PIN, for one, and an eightfold lower fraud rate).
+
+### Why aggregates close the gap, when they discard the order
+
+Cards A and B cannot be told apart by the 24-hour aggregates of this experiment, yet those aggregates match the LSTM. The tie is evidence that much of the LSTM's gain on raw fields was history: hand the forest a summary of the earlier rows that keeps no order, and the difference goes. The order those windows lose is also less than it first appears. A conditional aggregate is computed against the payment being scored: <Ref lesson="transaction-aggregates" id="the-same-window-a-narrower-question">"zero payments in this country today, beside a busy plain window"</Ref> already compares the last row with what preceded it, and the gap says how soon it followed. Much of what an order can reveal about the *latest* payment is this comparison. What these aggregates cannot express is the order among the earlier rows, which is what separates card A from card B. The tie suggests that this remainder is small on these streams. That reading is an inference: an LSTM's state cannot be queried for what it tracks, so the experiment does not show it directly.
+
+<KeyFact>
+An LSTM's lead over a forest appears only on card-present payments and only without aggregates. Build the aggregates first: with them in the input, the difference between the two models stayed well inside the noise on both streams.
+</KeyFact>
+
+## Are the two models finding the same frauds?
+
+A tie in AUCPR says that two models place about as many frauds high in their rankings. It does not say the same frauds, and if they differ, a second model may be worth keeping although it raises no score. <Ref lesson="worldline-model-comparison" id="measuring-the-overlap">The Jaccard index</Ref> from the eight-family comparison measures the overlap once both models are cut at recall 0.2, so that each returns the same number of true positives: 470 of the 2,350 card-present test frauds.
+
+<FigureSequence
+  name="tp-overlap-jaccard"
+  alt="Two frames, each a 9 by 9 heat map of the Jaccard index between the true-positive sets of nine models, on a colour scale from dark blue at 0 through green at 0.5 to dark red at 1, with a dark red diagonal. Rows and columns run: RF BASE, RF TDELTA, RF AGG, LSTM (S) BASE, TDELTA, AGG, LSTM (L) BASE, TDELTA, AGG. Frame 1, card-present: the three forests agree at about 0.4 to 0.6, the six LSTMs at about 0.3 to 0.5, and the rectangle of forest against LSTM is blue, at about 0.15 to 0.3. Frame 2, e-commerce: forest BASE and TDELTA agree at about 0.7, while forest AGG sits near 0.3 with both. The four LSTMs without aggregates agree at about 0.6 to 0.75, the two LSTM AGG models agree at about 0.6 with each other and about 0.3 to 0.4 with the other four. Forest against LSTM is about 0.2 to 0.45, highest between forest AGG and the LSTM AGG models."
+  caption="Overlap of the frauds caught at recall 0.2: card-present payments, then e-commerce. RF is a forest; LSTM (S) and (L) read 5 and 10 payments; BASE is raw fields, TDELTA adds the gap, AGG adds aggregates. On card-present payments the colours run warmer within a family than between families. Online the models given aggregates pull toward each other across the families."
+  float="right"
+  width={380}
+/>
+
+Nine models per stream give the matrices of pairwise overlaps in the figure, and the table averages them by family. Six are LSTMs, one per input set and length. Three are forests, one per input set, since a forest reads only the last payment and has no length to vary; the matrices do not say which of each forest's two fits above they hold.
+
+| Mean Jaccard index | Between forests | Between LSTMs | Forest against LSTM |
+|---|---|---|---|
+| Card-present | 0.508 | 0.378 | 0.252 |
+| E-commerce | 0.475 | 0.508 | 0.350 |
+
+An index of 0.25 means each model shares 40% of its catches with the other, and 0.35 means 52%. Those two are the figures the comparison lesson quoted, but they answer a wider question than the one asked here. The last column averages 18 forest-LSTM pairs. Eight have aggregates on one side only, so their scores do not tie, and eight have none, which no bank would deploy. The pairs a bank would weigh have aggregates on both sides, the tie of the previous section, and there are two of them per stream: the forest against the LSTM of each length.
+
+So read those cells directly. The figure gives these as colours only, so the values below are read off the colour bar. Read the same way, all six means in the table above come out within 0.01 of their printed values.
+
+| Jaccard index, read off the colour bar | Forest AGG against the two LSTM AGG | Share of catches in common | Forest AGG against the other forests | LSTM AGG against the other four LSTMs |
+|---|---|---|---|---|
+| Card-present | 0.26, 0.28 | 41–44% | 0.41, 0.47 | 0.30–0.42 |
+| E-commerce | 0.44, 0.42 | 59–61% | 0.32, 0.38 | 0.34–0.38 |
+
+**Card-present: the overlap stays low.** Two models that tie at 0.241 and 0.246 have less than half their catches in common, and the forest given aggregates remains closer to the other forests than to either LSTM.
+
+**E-commerce: the overlap rises, and the family lines give way.** About 60% of the catches are shared. The forest given aggregates is closer to the LSTMs given aggregates than to the other forests, and those LSTMs are closer to it than to the four LSTMs without aggregates. Online the input set sorts these models more than the family does. The raw-field pairs also tie online, at 0.179 and 0.180, with an index of about 0.39, which is 56% in common.
+
+So on card-present payments the aggregates close the score gap and leave the models different. That is the measurement behind <Ref lesson="neural-tabular-detectors" id="four-things-that-come-naturally-to-a-network">the fourth reason to train a network</Ref> beside a tree ensemble, which that lesson could only name. Online they close much of the difference as well, so a second model has less to add there. Whether a combination pays is a separate question, which <Ref lesson="worldline-model-comparison" id="what-the-overlap-means-for-the-eight-families">the comparison lesson</Ref> left to a rank-averaging backtest. This experiment did not run one either.
+
+## Turning a sequence into a column: likelihood features
+
+A forest cannot read a sequence, and a sequence network costs two to three times a feed-forward network's already long search, per candidate, as <Ref lesson="worldline-model-comparison" id="what-the-compute-bought">the comparison's compute table</Ref> shows. Could the sequence be compressed into a number a forest can use? The natural number is a probability: how likely is this card's recent sequence under a model of how such sequences go?
+
+### A hidden Markov model and the likelihood of a sequence
+
+Bucket each amount into low (below €50), mid (€50 to €200) or big (above €200). Suppose a card moves between two hidden conditions, *everyday* and *spree*. Each step it may switch, and each condition has its own mix of buckets.
+
+<Definition title="hidden Markov model">
+An HMM has $K$ hidden states with a start distribution $\rho$; a transition matrix $A$, where $A_{zz'}$ is the probability of moving from state $z$ to $z'$ and depends only on $z$; and emission probabilities $B_z(o)$ of observing symbol $o$ in state $z$. Its parameters are fitted by the expectation-maximisation procedure of classical-ml's mixture models, known here as Baum–Welch.
+</Definition>
+
+The states are never observed, so a sequence's *likelihood*, the probability the model gives those symbols, has to sum over every path through the states. That is $K^T$ paths: 8 for two states and three symbols, about ten million for five states and ten symbols. Work a small case and see which paths can be merged.
+
+<Example title="the likelihood of low, big, big under a genuine model">
+Illustrative parameters for a model fitted on genuine sequences: $\rho = (0.9, 0.1)$ for (everyday, spree); everyday stays with 0.95 and moves to spree with 0.05; spree stays with 0.7 and moves back with 0.3; emissions for (low, mid, big) are $(0.6, 0.3, 0.1)$ in everyday and $(0.1, 0.2, 0.7)$ in spree.
+
+**Low.** Keep one number per state, the probability of seeing low and being in that state: everyday $0.9 \times 0.6 = 0.54$, spree $0.1 \times 0.1 = 0.01$.
+
+**Big.** Two paths end in everyday:
+
+- everyday then everyday: $0.54 \times 0.95 \times 0.1 = 0.0513$
+- spree then everyday: $0.01 \times 0.3 \times 0.1 = 0.0003$
+
+What happens at the next step depends only on being in everyday now, not on how the card got there, so both paths are multiplied by the same numbers from here on. Moving to spree and emitting big, for instance, multiplies each by $0.05 \times 0.7 = 0.035$, and $0.0513 \times 0.035 + 0.0003 \times 0.035 = (0.0513 + 0.0003) \times 0.035$. So their sum, $0.0516$, can stand in for both. The two paths ending in spree merge the same way: $0.54 \times 0.05 \times 0.7 + 0.01 \times 0.7 \times 0.7 = 0.0189 + 0.0049 = 0.0238$.
+
+**Big again**, now from the two merged numbers: everyday $(0.0516 \times 0.95 + 0.0238 \times 0.3) \times 0.1 = 0.0056$; spree $(0.0516 \times 0.05 + 0.0238 \times 0.7) \times 0.7 = 0.0135$.
+
+The likelihood is $0.0056 + 0.0135 = 0.0191$, the sum over all eight paths, reached with two numbers per step.
+</Example>
+
+<Figure
+  src="./figures/hmm-trellis.svg"
+  alt="Two rows of boxes, everyday and spree, across three steps labelled low, big, big. Everyday holds 0.54, 0.0516, 0.0056; spree holds 0.01, 0.0238, 0.0135. Arrows join every box to both boxes of the next step. The two arrows entering the everyday box at step 2 are amber, labelled 0.0513 and 0.0003, and that box is amber. At the right, 0.0056 plus 0.0135 equals 0.0191."
+  caption="Eight paths, and at each step only as many numbers as there are states."
+/>
+
+Each number kept is a *forward value*: $f_j(z)$ is the probability of the first $j$ symbols **and** of being in state $z$ at step $j$. The example's three steps are then a recursion:
+
+$$
+f_1(z) = \rho_z B_z(o_1), \qquad
+f_j(z') = \Bigl[\sum_z f_{j-1}(z) A_{zz'}\Bigr] B_{z'}(o_j), \qquad
+\text{likelihood} = \sum_z f_T(z).
+$$
+
+The merge rests on the Definition's clause that a move depends only on the current state. Each step costs about $K^2$ multiplications, so the whole sequence costs about $K^2 T$ in place of $K^T$: 250 against ten million for five states and ten symbols.
+
+<Exercise>
+A second model, fitted on sequences holding a fraud, has $\rho = (0.5, 0.5)$, everyday stays with 0.6, spree stays with 0.8, and the same emissions. Compute the likelihood of low, big, big. How many times more likely is the sequence under this model than the genuine one?
+
+<Solution>
+Low: $(0.3,\; 0.05)$. Big: everyday $(0.3 \times 0.6 + 0.05 \times 0.2) \times 0.1 = 0.019$; spree $(0.3 \times 0.4 + 0.05 \times 0.8) \times 0.7 = 0.112$. Big: everyday $(0.019 \times 0.6 + 0.112 \times 0.2) \times 0.1 = 0.00338$; spree $(0.019 \times 0.4 + 0.112 \times 0.8) \times 0.7 = 0.06804$. The likelihood is $0.0714$, about 3.7 times the genuine model's $0.0191$. Low, low, low goes the other way: $0.0488$ under this model and $0.1789$ under the genuine one, a ratio of 0.27.
+</Solution>
+</Exercise>
+
+### Eight models, eight columns
+
+A likelihood under genuine sequences alone is <Ref lesson="anomaly-detection-framing" id="one-fuzzy-ball-or-two-what-a-boundary-around-normal-buys">the one-ball rule</Ref>: unusual, but not necessarily toward fraud. Fitting a second model on sequences that contain fraud gives the two-ball version, since the exercise's ratio asks which of the two the sequence looks more like. Two more choices double the set again. The sequence can be the card's or the terminal's, because a compromised terminal shows in its own stream. The symbol can be the amount or the gap.
+
+<Figure
+  src="./figures/hmm-eight.svg"
+  alt="A two by four grid. Rows: the card's last three payments and the terminal's last three payments. Columns: amounts and gaps under sequences holding no fraud, then amounts and gaps under sequences holding a fraud. Each cell holds a log likelihood."
+  caption="Three binary choices give eight HMMs. Each payment's eight log-likelihoods go into the forest as columns."
+/>
+
+The fraud-side models are statistics of labels, so they fall under <Ref lesson="point-in-time-features" id="every-statistic-of-labels-target-encoding">the same rule as a terminal's fraud rate</Ref>: they may only read labels that had arrived. That covers training rows too, since a row that helped fit a fraud-side model is scored by a model that has seen its label.
+
+The test ran on the same 2015 months: forests of 300 trees, trained to 26 April, validated to 30 April, tested 8–31 May after a seven-day gap, without the account sampling or the nine-predecessor filter above, so the numbers do not compare with the previous table. Each HMM has 5 hidden states and scores the current payment and two before it, so a payment with fewer than two earlier payments on its card or on its terminal has no likelihood, and the experiment dropped it. That removed about a fifth of the payments and, going by the test-set counts for that condition, cut test frauds from 2,764 to 1,305 on card-present payments and from 18,472 to 15,650 online. This is the first failure of dropping short histories: the bank still has to score those payments, and over half the card-present frauds lie outside the card-present lifts below. AUCPR, mean of three runs, standard deviation at most 0.009:
+
+| Inputs beside the HMM columns | E-commerce: without → with | Card-present: without → with |
+|---|---|---|
+| Raw fields | 0.212 → 0.298 (+41%) | 0.082 → 0.152 (+85%) |
+| + card aggregates | 0.343 → 0.375 (+9%) | 0.144 → 0.170 (+18%) |
+| + card and terminal aggregates | 0.383 → 0.397 (+4%) | 0.167 → 0.177 (+6%) |
+
+The lift is largest on raw fields and shrinks as the aggregates get richer. In percent it is larger on card-present payments (+85% against +41%), from a lower base; in AUCPR points it is larger online in every row (0.086 against 0.070, 0.032 against 0.026, 0.014 against 0.010). Unlike the LSTM, which added nothing online, these columns add 41% to raw fields online and still 4% on top of the richest aggregates.
+
+Does order matter online after all, then? The design cannot say, because the columns bring in more than order. Six of the eight read the gap, which alone lifted the forest 0.179 to 0.236 above, or the terminal's stream, which the LSTM never saw, so the online lift cannot be credited to order. And a forest on raw fields has no history at all, so, as with the LSTM, history and order arrive together. The split was not measured: no run here drops those six columns or shuffles the symbols inside a sequence.
+
+<Aside>
+**Counting instead of fitting.** A cheaper sequence score uses no hidden states. Slide a window of fixed length along a sequence, look up how often each window occurs in a reference set of genuine sequences, and report the share of windows rarer than a threshold $\lambda$: $|\{i : L(w_i) < \lambda\}| / t$ for $t$ windows, with $L(w)$ the window's relative frequency. It comes from intrusion detection on system-call traces and is an anomaly score in the sense of <Ref lesson="anomaly-detection-framing" />. Its table grows as the symbol count to the power of the window length, so symbols have to stay few.
+</Aside>
+
+## Why the simulator shows no gain, and what the real stream shows
+
+<Ref lesson="worldline-model-comparison" id="one-comparison-that-changes-one-thing">The comparison lesson</Ref> ran these models, tuned on the same four folds as the rest, on the simulator with $T = 5$ and on the Belgian e-commerce stream. Reading the card's earlier payments added nothing to average precision on the simulator: 0.675 for the feed-forward network, 0.665 for the LSTM and 0.667 with attention. On the real stream it went up, from 0.084 to 0.104 and 0.105.
+
+<Figure
+  src="./figures/sim-real.svg"
+  alt="Two bar charts of average precision with whiskers. Simulator: XGBoost 0.687, feed-forward 0.675, CNN 0.599, LSTM 0.665, attention 0.667. Belgian e-commerce: XGBoost 0.095, feed-forward 0.084, CNN 0.093, LSTM 0.104, attention 0.105. On the simulator the sequence models are at or below the others; on the real stream they are above, with whiskers of about 0.02 to 0.03."
+  caption="Same fifteen inputs, same folds. Against the feed-forward network, the history adds nothing on the simulator; on the real stream its gain clears the weekly noise for attention alone, by 0.001."
+/>
+
+### The simulator: nothing in the order to find
+
+The simulator's result follows from its <Ref lesson="canonical-datasets" id="three-scripted-frauds">three scripts</Ref>. Scenario 2 hits whoever pays at a compromised terminal, and scenario 3 multiplies a random third of a leaked card's payments. No fraud depends on what the card did just before it, payment times centre on noon, and a customer's terminals sit in a fixed radius with no travel. The patterns a script does leave, a terminal's fraud rate and an amount against the card's mean, are already in the fifteen inputs. The extra rows repeat those summaries. The benchmark's sequences are also built inside each block, as in the Remark above, so 4 of customer 0's 12 rows are padded even though its history exists, which may understate the models a little.
+
+### The real stream: a rise that barely separates
+
+Under <Ref lesson="delayed-labels-prequential" id="prequential-folds-a-spread-across-weeks">the one-standard-deviation rule</Ref>, <Ref lesson="worldline-model-comparison" id="one-comparison-that-changes-one-thing">that comparison</Ref> left the LSTM's gap over the feed-forward network unseparated and attention's clear of its pair's deviation by 0.001. Those deviations are stated to two decimals, so the margin is smaller than their rounding.
+
+XGBoost reads no earlier rows and reaches 0.095, with the sequence models 0.009 and 0.010 above it, inside its deviation of 0.03. So part of the feed-forward network's shortfall may belong to the network and not to the missing history. That agrees with the 2015 experiment, which found no e-commerce gain for an LSTM over a forest once aggregates were in.
+
+The comparison lesson read the rise as something in the order of a card's payments surviving the 1-, 7- and 30-day windows. This evidence does not carry that reading, for two reasons. One of two models clearing the rule by less than the rounding is a hint, not a finding. And even a firm gain would not show that *order* is the cause: an LSTM also reads the earlier rows' own fields, such as the fraud rates of the terminals the card visited before, which nothing in the current row holds. As with the raw-field LSTM and the HMM columns, history and order arrive together. Separating them takes one more run, not yet made: retrain with each sequence's earlier rows shuffled, and if the gain stays, it was history.
+
+<Conclusion>
+You can now build fixed-length sequences per card with a padding row and a group-by shift, compute the shapes of a convolution stack, say why a recurrence's gradient is a product and how an LSTM's cell gives it a factor that can sit near 1, compute a sequence's likelihood with the forward recursion, and tell an attention weight from an explanation. On the evidence, an LSTM reading raw fields gains over a forest with no history on card-present payments (AUCPR 0.138 to 0.200) and not online (0.179 against 0.180), a gain the design cannot split into history and order, and with aggregates in the input the gap closes on both. With aggregates on both sides, a forest and an LSTM still have less than half their catches in common on card-present payments (Jaccard about 0.27) and about 60% online (about 0.43). So the reason left to try a sequence model is strongest on card-present payments, as a second model measured on prequential folds rather than as a replacement. Build the aggregates first.
+
+All these results come from one split or a few weeks, and the models were trained once. The 2015 daily curves, moving on a common trend with hard days the experiment could not explain, are what <Ref lesson="concept-drift" /> takes up: what changes in a stream from one day to the next, and how to measure it before labels arrive.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+A convolution stack reads sequences of shape $(10, 20)$: 64 filters of length 3, then 32 filters of length 2. Give the output shape after each layer without padding and with old-side padding, the number of weights in each layer, and how many payments one slot of the last layer sees.
+
+<Solution>
+Without padding: $10 - 2 = 8$ gives $(8, 64)$; $8 - 1 = 7$ gives $(7, 32)$. With padding of $L - 1$ rows: $(10, 64)$ and $(10, 32)$. Weights: first layer $64 \times (3 \times 20 + 1) = 3{,}904$; second layer $32 \times (2 \times 64 + 1) = 4{,}128$. Reach: the second layer's filter spans two slots, each seeing three payments and offset by one, so $3 + 2 - 1 = 4$ payments out of ten. The move to keep is that time shrinks by $L - 1$ per layer, columns become the filter count, and weights do not depend on $T$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Cards A and B of the opening. (a) Write one hand-built column that separates them. (b) Construct cards C and D, with five payments each, whose 24-hour aggregates and gap agree, and which your column does not separate, although one of them contains an impossible hop. (c) What does this say about the choice between more columns and a sequence model, and what does the experiment in this lesson add to that?
+
+<Solution>
+(a) "The previous payment was in a different country and less than an hour ago": 1 for A, 0 for B.
+
+(b) Move the impossible hop one step back. C: Belgium 21:00 yesterday, Belgium 12:30, Spain 17:40, Belgium 18:05, Belgium 18:35. D: Spain 21:00 yesterday, Belgium 12:30, Belgium 17:40, Belgium 18:05, Belgium 18:35. Give the same amounts by country. On both, the previous payment is in Belgium, so the column reads 0; the 24-hour windows and the 30-minute gap agree; only C went from Spain to Belgium in 25 minutes.
+
+(c) You can repair this too, with "any hop among the last four gaps", and each repair names a pattern someone thought of. A sequence model needs no one to think of it, given enough examples. The experiment says how much that is worth: on these streams, with aggregates in the input, nothing measurable in AUCPR. The argument for a sequence model is therefore not that columns cannot express order, but that a second model finds different frauds. That argument also depends on the stream: with aggregates on both sides, the index is about 0.27 on card-present payments, so about 43% of the catches are shared, and about 0.43 online, so about 60% are. It is stronger on card-present payments.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the matrix form of the bound the lesson gave in one dimension. For $s_i = W\sigma(s_{i-1}) + Ux_i + b$ with $\sigma = \tanh$ applied per component: (a) write $\partial s_i / \partial s_{i-1}$; (b) bound $\lVert \partial s_T / \partial s_k \rVert$ in terms of $\lVert W \rVert$, the largest singular value; (c) what follows when $\lVert W \rVert < 1$, and what is necessary for growth? (d) Why does gradient clipping fix explosion and not vanishing?
+
+<Solution>
+(a) $\partial s_i / \partial s_{i-1} = W\,\mathrm{diag}(\sigma'(s_{i-1}))$, where $\sigma'$ is applied per component.
+
+(b) The spectral norm is submultiplicative, and a diagonal matrix's norm is its largest absolute entry, here at most 1 because $0 < \tanh' \le 1$. So $\lVert \partial s_T / \partial s_k \rVert \le \prod_{i=k+1}^{T} \lVert W \rVert \cdot 1 = \lVert W \rVert^{T-k}$.
+
+(c) If $\lVert W \rVert < 1$, the Jacobian shrinks at least exponentially in $T - k$, and with it payment $k$'s term in $\partial E / \partial U$. Contrapositively, growth requires $\lVert W \rVert > 1$. That condition is necessary and not sufficient, since small $\tanh'$ values can still shrink the product. For a symmetric $W$ the largest singular value is the largest absolute eigenvalue.
+
+(d) Clipping multiplies a gradient by a factor below 1 when its norm exceeds a threshold, keeping its direction, so a huge gradient becomes a usable one. A vanishing gradient is below the threshold and untouched; raising it would need a scale per path, and the overall gradient is dominated by recent payments anyway, so the early ones would stay invisible. A remedy has to change the factors themselves, which is what the LSTM's cell does: its factor is the gate $f_j$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Set $T = 1$ in the plain recurrence, with $s_0 = 0$. (a) What does the network reduce to, and what does it know about the card? (b) Now set $T = 10$ with zero padding on standardised inputs, and score a card's first payment. What does the recurrence compute over the nine padded steps, and what can the network learn from it? (c) Why would an experiment that removes all rows with fewer than nine predecessors not reveal the problem in (b)?
+
+<Solution>
+(a) $\sigma(0) = 0$, so $s_1 = Ux_1 + b$, a linear layer. Followed by the hidden layer and sigmoid, this is <Ref lesson="neural-tabular-detectors" id="one-output-unit-read-as-pfraud">the feed-forward network</Ref>, with the first layer's output left linear. It sees only the current row. It knows the card's past only through whatever aggregates are in that row, so the comparison with a feed-forward network measures nothing at $T = 1$.
+
+(b) With $x_j = 0$ the recurrence is $s_j = W\sigma(s_{j-1}) + b$ for nine steps, the same nine steps on every new card. That produces one fixed vector, a learned starting state, independent of the payment. The current payment then enters at step 10. Since zero is also the standardised average payment, the network cannot distinguish "nine average payments" from "no history" unless a flag says so, and with a flag it can use how new a card is as a signal.
+
+(c) No first-payment row is scored at all. Those rows have no effect on the reported numbers, and any behaviour of the model on new cards, good or bad, is unmeasured. Before deploying, those rows must be scored in a validation run.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague's summary: "The LSTM beat the random forest on card-present data, so sequence models are the better detector." Refute it from this lesson's table, name the step that fails, and write the sentence the data supports.
+
+<Solution>
+The statement generalises from the card-present rows without aggregates. It is true of raw fields (0.138 against 0.200, gap 0.062 against a noise scale of up to 0.046, a gain by a modest margin) and of raw fields plus the gap (0.170 against 0.231, 0.172 against 0.217). Three further rows break it. With aggregates, 0.241 against 0.246 on card-present payments is well inside that scale, and at length 10 the order reverses (0.242 against 0.236). Online the raw-field gap is zero, and with the gap feature the forest leads at length 5 (0.236 against 0.192) and the LSTM at length 10 (0.228 against 0.238), both inside the scale, so the LSTM has no lead there. The failing step is reading a comparison *without aggregates* as a comparison of detectors: no bank deploys a detector without them, and the forest's deficit in those rows is how little history it has, none on raw fields and only the gap beside them.
+
+A supported sentence: "Reading the earlier payments helps when a model otherwise has little or no history and the stream is card-present; with aggregates in the input neither family leads in AUCPR on either stream, and the two catch mostly different frauds on card-present payments and overlap more online." Even that is a single split with no error bars, and it is measured in AUCPR rather than at the team's budget.
+</Solution>
+</Exercise>
+
+<Exercise>
+An account-level sample. A stream has 1,000,000 accounts over the training period, each making 40 payments: 2,000 accounts are compromised, each with 4 frauds, and the rest are genuine. Keep every compromised account, and keep genuine accounts so that kept accounts are 90% genuine. (a) Compute the fraud share of the stream and of the sample. (b) Read a keep rate $\beta$ off those shares as in <Ref lesson="undersampling-calibration" id="reading-β-off-a-training-set">the calibration lesson</Ref>, and correct a model output of 0.5 with it. (c) At what rate were genuine payments really kept? Apply the lesson's test of <Ref lesson="undersampling-calibration" id="when-the-coin-looks-at-the-payment">whether the coin looks at the payment</Ref>. What does this imply for the corrected number?
+
+<Solution>
+(a) Stream: $8{,}000 / 40{,}000{,}000 = 0.02\%$. Sample: 2,000 compromised accounts are 10%, so 18,000 genuine accounts are kept, out of 998,000, a rate of $0.018$. That gives 20,000 accounts, 800,000 payments and 8,000 frauds: $1\%$.
+
+(b) $\beta = \pi(1 - \pi_s) / (\pi_s(1 - \pi)) = 0.0002 \times 0.99 / (0.01 \times 0.9998) = 0.0198$. Then $p' = \beta p_s / (\beta p_s - p_s + 1) = 0.0099 / 0.5099 = 0.0194$.
+
+(c) There are two rates, not one. A genuine payment on a genuine account was kept with probability 0.018, and a genuine payment on a compromised account with probability 1 (72,000 of the 792,000 genuine payments in the sample). The 0.0198 is their average. The coin looks at the account, which depends on other payments' labels, and the selection is not on the row's own label and a random draw. So no single $\beta$ exists. In a region of inputs reached mostly by compromised accounts, genuine payments were barely thinned, and the output needs nearly no correction: an output of 0.5 could really be about 0.5, not 0.019. The formula gives an approximation of unknown error, and only a reliability check on unselected stream payments can size it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce the simulator's result. Build $T = 5$ sequences with the group-by shift on the fifteen inputs. Train a small 1-D CNN and an XGBoost on the same four prequential folds and forward test weeks as <Ref lesson="gbm-model-selection" id="three-test-numbers-for-one-model-class">the tree-ensemble lesson</Ref>. Report AP and CP@100 with weekly standard deviation. State beforehand what counts as agreeing with the benchmark values below, and then rebuild the sequences on the whole log rather than inside each block. What do you expect, and what would change your mind about why the simulator shows no gain?
+
+Benchmark values: CNN AP 0.599, CP@100 0.288; XGBoost AP 0.687, CP@100 0.303.
+
+<Solution>
+Possible answer. Keep the delay block as history and use mean or zero padding. A CNN with 100 filters of length 2, one or two layers, a max over time, then a dense layer of 100 and a sigmoid, trained with Adam, batch 64 to 256 and 10 to 40 epochs on the folds, is a fair match for those values. Agreement can be defined as within one weekly standard deviation (about 0.01 to 0.02), with CP@100 differences under two cards a day read as noise, as <Ref lesson="alert-budget-metrics" id="what-each-disagreement-means">the metrics lesson</Ref> states. A gap on AP with a CP@100 tie is the expected shape.
+
+Rebuilding on the whole log removes padding from all but the youngest cards. Since at about 2 payments a day a five-payment sequence fills within a few days, around a third of a week's rows change. Expect a small rise at most, because the scripts leave nothing in the order. To test the explanation directly, add a fourth scripted fraud to the generator that depends on order, such as a ×5 payment only directly after a payment at a distant terminal, within an hour. If the explanation is right, the sequence model should then gain on that scenario's frauds while XGBoost on the fifteen inputs does not. If it does not, the explanation or the model's training is wrong. The transferable move is to test a "no gain because the signal is absent" claim by planting the signal.
+</Solution>
+</Exercise>
+
+<Exercise>
+Illustrative daily AUCPR for a forest and an LSTM on eight consecutive days, with the day's fraud share in percent:
+
+| Day | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|
+| Forest | 0.10 | 0.22 | 0.18 | 0.30 | 0.14 | 0.26 | 0.12 | 0.20 |
+| LSTM | 0.13 | 0.24 | 0.22 | 0.31 | 0.15 | 0.30 | 0.12 | 0.25 |
+| Fraud share | 0.03 | 0.06 | 0.05 | 0.09 | 0.04 | 0.07 | 0.03 | 0.06 |
+
+(a) Compute the Pearson correlation between the two models' daily scores. (b) Compare the standard deviation of each model's daily score with the standard deviation of the daily difference. (c) Which is the better account of why a day is hard: a property of a model, or a property of the day? What in the fraud-share row supports this, and what can that row not settle?
+
+<Solution>
+(a) Means 0.19 and 0.215. Sums of products of deviations: covariance sum 0.0350, squared sums 0.0336 and 0.0386. So $r = 0.0350 / \sqrt{0.0336 \times 0.0386} = 0.97$.
+
+(b) The daily standard deviations are 0.069 and 0.074. The differences $0.03, 0.02, 0.04, 0.01, 0.01, 0.04, 0, 0.05$ have mean 0.025 and standard deviation 0.018, about a quarter of either. Most of the daily movement is shared, which is why <Ref lesson="worldline-model-comparison" id="what-makes-one-week-unlike-another">paired comparisons</Ref> of models are so much sharper than unpaired ones.
+
+(c) A property of the day: two different models with different inputs fall on the same days. The forest's correlation with the fraud share here is 0.99, consistent with precision-type metrics rising with the base rate. The real 2015 stream shows the same co-movement across its 24 test days, on any model and input set, with the two card-present minima on the same dates. But there the relation with fraud share is looser and has exceptions, and the experiment's own inspection found no calendar event behind the hard days. A correlation with the base rate cannot separate a change in $p(y)$ from a change in the payments or in what fraud looks like. Naming and measuring those is the problem of <Ref lesson="concept-drift" />.
+</Solution>
+</Exercise>
+
+<References>
+1. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 7, section "Sequential models and representation learning" (the landmark variable, customer 0's rolling-window table, the padding transaction, the group-by shift, the Conv1d shape walk-through, the LSTM module, the two attention-weight demonstrations, the prequential grids and the benchmark summary); Ch. 7, section "Real-world data" (the same models on Worldline e-commerce transactions). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+2. J. Jurgovsky, M. Granitzer, K. Ziegler, S. Calabretto, P.-E. Portier, L. He-Guelton, O. Caelen, "Sequence Classification for Credit-Card Fraud Detection," *Expert Systems with Applications* 100, 2018, pp. 234–245 — Sec. 3.1 (the recurrence and the product of Jacobians), Sec. 3.3 (the card-present and e-commerce hypothesis), Sec. 4.1 and Table 1 (splits, account sampling, the nine-predecessor alignment, the delay week), Sec. 4.2 (categorical embeddings), Sec. 4.4 (AUCPR, AUCPR@0.2, Jaccard index), Sec. 5, Tables 4–5 and Figs. 3–5 (results and overlaps). https://doi.org/10.1016/j.eswa.2018.01.037
+3. Y. Lucas, P.-E. Portier, L. Laporte, L. He-Guelton, O. Caelen, M. Granitzer, S. Calabretto, "Towards Automated Feature Engineering for Credit Card Fraud Detection Using Multi-Perspective HMMs," *Future Generation Computer Systems*, 2020 — Sec. 2 and Table 1 (the eight models), Sec. 3 (data and split), Sec. 4.1 and Figs. 3–4 (PR-AUC with and without the HMM columns). https://arxiv.org/abs/1909.01185
+4. Y. Lucas, J. Jurgovsky, "Credit Card Fraud Detection Using Machine Learning: A Survey," arXiv:2010.06479, 2020 — Sec. 5.1.1 (HMMs, the three amount buckets), Sec. 5.1.2 (recurrent networks against aggregates), Sec. 5.2 (counting-based window scores). https://arxiv.org/abs/2010.06479
+5. A. Srivastava, A. Kundu, S. Sural, A. K. Majumdar, "Credit Card Fraud Detection Using Hidden Markov Model," *IEEE Transactions on Dependable and Secure Computing* 5(1), 2008, pp. 37–48 — low, mid and big amounts as HMM symbols.
+6. L. R. Rabiner, "A Tutorial on Hidden Markov Models and Selected Applications in Speech Recognition," *Proceedings of the IEEE* 77(2), 1989, pp. 257–286 — Sec. III-A (the forward procedure), Sec. III-C (Baum–Welch).
+7. R. Pascanu, T. Mikolov, Y. Bengio, "On the Difficulty of Training Recurrent Neural Networks," *ICML*, 2013 (arXiv:1211.5063) — Sec. 2.1 (the singular-value condition for vanishing and exploding gradients), Sec. 3.2 (gradient clipping).
+8. S. Hochreiter, J. Schmidhuber, "Long Short-Term Memory," *Neural Computation* 9(8), 1997, pp. 1735–1780 — the memory cell, input and output gates. https://doi.org/10.1162/neco.1997.9.8.1735
+9. F. A. Gers, J. Schmidhuber, F. Cummins, "Learning to Forget: Continual Prediction with LSTM," *Neural Computation* 12(10), 2000, pp. 2451–2471 — the forget gate. https://doi.org/10.1162/089976600300015015
+10. D. Bahdanau, K. Cho, Y. Bengio, "Neural Machine Translation by Jointly Learning to Align and Translate," *ICLR*, 2015 — Sec. 3.1 (softmax-normalised weights over all hidden states). https://arxiv.org/abs/1409.0473
+11. A. Dal Pozzolo, O. Caelen, Y.-A. Le Borgne, S. Waterschoot, G. Bontempi, "Learned Lessons in Credit Card Fraud Detection from a Practitioner Perspective," *Expert Systems with Applications* 41(10), 2014, pp. 4915–4928 — Sec. 4 (a card's history over a time frame, summarised by aggregation).
+12. A. Correa Bahnsen, D. Aouada, A. Stojanovic, B. Ottersten, "Feature Engineering Strategies for Credit Card Fraud Detection," *Expert Systems with Applications* 51, 2016, pp. 134–142 — the conditional aggregation procedure the 14 aggregates follow.
+13. C. Warrender, S. Forrest, B. Pearlmutter, "Detecting Intrusions Using System Calls: Alternative Data Models," *IEEE Symposium on Security and Privacy*, 1999 — threshold-based counting of rare windows.
+</References>

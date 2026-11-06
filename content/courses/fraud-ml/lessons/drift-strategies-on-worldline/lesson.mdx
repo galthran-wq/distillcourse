@@ -1,0 +1,470 @@
+Over 422 days of real card payments, dozens of ways of keeping a fraud model current are ranked against each other day by day. They differ in whether and how often the model is retrained, how far back its training data reaches, whether past frauds are kept, and how the classes are rebalanced. Which ordering comes out, and what does the ordering measure about the stream?
+
+<Ref lesson="stream-learning-and-adaptation" id="the-fraud-models-memory-and-its-cadence">The previous lesson</Ref> derived a design on a simulator: retrain as often as labels arrive, hold a long memory, keep the frauds if rows are short. Each column of its table could be read, because the change had been planted on a known day and was of a known kind. A real stream comes with no such key. Nobody knows on which days the fraud of 2012 changed, or how, so an order of strategies cannot be read off against a date.
+
+So the order has to be taken apart. Each comparison in it holds some things fixed and varies one, and it is that one thing it measures.
+
+## The experiment: 422 days of one processor's online payments
+
+Knowing what a comparison holds fixed starts with what every strategy shares: the stream, the inputs, the scores and the labels. The stream is a subset of the e-commerce payments of a Belgian processor, from 1 February 2012 to 20 May 2013. It holds 2,202,228 payments over 422 days, a mean of 5,218 a day, with fraud under 0.4%. So a day averages at most about 21 frauds, a quarter of <Ref lesson="canonical-datasets" id="three-scripted-frauds">the simulator's 85</Ref>. Each day is a *chunk*, as in the previous lesson.
+
+Each payment has 45 variables: its own fields, and aggregates of the card's previous 90 days, such as average spend per week and the gap since the last payment. The card's identifier is not an input, because <Ref lesson="delayed-labels-prequential" id="why-the-cards-identity-stays-out-of-the-features">an identifier lets a model memorise the cards whose fraud it has already seen</Ref>.
+
+Three scores are computed per chunk: <Ref lesson="alert-budget-metrics" id="average-precision-the-precision-at-each-fraud-averaged">AP</Ref>, ROC-AUC and <Ref lesson="alert-budget-metrics" id="precision-at-k-the-metric-cut-where-the-team-cuts">$P@k$</Ref> at a fixed budget whose value is not reported. All three count payments, not cards. Every strategy learns from a chunk's labels on the night after it, complete and correct, which no bank can do. Undersampling is random, so every run is repeated five times.
+
+The experiment reports those scores in one form only: for each comparison, a bar chart of rank sums with one panel per metric. A rank sum is built from each day's ranking of the strategies, and the next section defines it. No AP value is published, and no chart says how many days it ranked. Three numbers with no metric named read AP, AUC, $P@k$, in that order.
+
+### One naming rule
+
+A strategy is a choice on each of six axes, and its name lists them.
+
+<Figure
+  src="./figures/name-anatomy.svg"
+  alt="The name RF.Under.Daily.5M.Update.90K split into six tiles, with a line below for each: the learner, the balancer, how often a model is built, how many newest models vote, what the training set is, and how far back it reaches."
+  caption="The axes of the experiment. The charts below write these names out in words."
+/>
+
+The three memory rules are <Ref lesson="stream-learning-and-adaptation" id="three-ways-to-fill-the-training-set">the previous lesson's</Ref>: *Static* trains once on the first $K$ days, *Update* retrains on the latest $K$, and *Forget* retrains on every fraud so far with the genuine payments of the latest $K_{\text{gen}}$ days. $K_{\text{gen}} = 0$ means only the current day's genuine payments, since a model needs some. Under Forget the frauds pile up, so with few genuine days kept they would come to outnumber the genuine payments. A rule stops that: once the frauds make up 40% of the set, each new fraud replaces an old one.
+
+$M$ is new in this form. Keep the $M$ newest models of one rule and average their scores with the weights <Ref lesson="stream-learning-and-adaptation" id="three-ways-to-fill-the-training-set">you have seen</Ref>, $w_m = (\text{Prec}_m - \text{Prec}_{\min})/(\text{Prec}_{\max} - \text{Prec}_{\min})$, with $\text{Prec}_m$ each model's $P@k$ on the latest chunk.
+
+The balancers are <Ref lesson="imbalance-techniques-revisited">module 2's</Ref>, always applied to the training set just before fitting. *Under* undersamples to 50/50. <Ref lesson="imbalance-techniques-revisited" id="synthetic-frauds-smote">SMOTE</Ref> adds synthetic frauds between neighbouring real ones. *EasyEnsemble* is <Ref lesson="imbalance-techniques-revisited" id="balanced-ensembles-the-gain-is-not-the-balance">balanced bagging</Ref> at daily scale: five models per chunk, each on a different 50/50 undersample.
+
+Undersampling to 50/50 leaves two rows per fraud: the fraud and one genuine payment. That holds under every memory rule for *Under* and for each of EasyEnsemble's draws, so the size of such a set follows from the frauds it holds. SMOTE's set is larger, because its synthetic frauds count among the frauds.
+
+<Task>
+Read `RF.SMOTE.Weekly.5M.Forget.30Kgen` in words before going on. It should come out as: a random forest with SMOTE, a new model each week, the five newest voting, each trained on all past frauds and the last 30 days of genuine payments.
+</Task>
+
+## Why rank the days instead of averaging AP
+
+The obvious comparison is the mean AP of each strategy over the stream. It fails because days are not equally easy, and because they differ for every model at once. <Ref lesson="sequence-models-for-transactions" id="how-much-of-a-gap-is-noise">The daily scores of a forest and an LSTM</Ref> rise and fall together; on <Ref lesson="worldline-model-comparison" id="what-makes-one-week-unlike-another">ten months of European online payments</Ref> three detectors all peaked in the month with the most compromised cards and sank in the month with the fewest. So a mean is mostly a statement about the rich days.
+
+<FigureSequence
+  name="rank-days"
+  alt="A table of three strategies over five days. Frame 1 shows daily AP and mean AP, with Static highest at 0.178 because of 0.60 on day 1. Frame 2 adds each day's ranks, 3 for the best. Frame 3 adds the rank sums: Static 7, Update 12, Forget 11."
+  caption="Five invented days. One rich day decides the mean, and four of the five days go against the mean's winner."
+/>
+
+<Task>
+Before frame 3, add Static's ranks and say on how many days it was last. Then lower Static's day-1 AP from .60 to .45. Which rank changes, and which mean?
+</Task>
+
+Static's mean falls to .148 and it drops from first to last on the mean. No rank moves, because .45 is still the best on day 1. A rank records who led and throws away by how much. That is both its use and its cost.
+
+<Definition title="rank sum">
+With $S$ strategies scored on each of $D$ days, let $r_{s,d}$ be the rank of strategy $s$ on day $d$: $S$ for the best score, 1 for the worst, ties sharing their average. The *rank sum* of $s$ is $\sum_{d=1}^{D} r_{s,d}$, and its *mean rank* is that sum over $D$. Summing ranks in this way is the first step of the *Friedman test*.
+</Definition>
+
+So a bar in these charts is not a score. It can run from $D$ (last on every day) to $SD$ (first on every day), and strategies with no difference between them all sit at $D(S+1)/2$. Nor is a rank sum a property of a strategy alone: it depends on who else is in the field and on which days are counted.
+
+### A chart of rank sums checks itself
+
+Each day hands out the ranks $1, \dots, S$ once, so the bars of any chart must add up to $D \cdot S(S+1)/2$. That identity turns a chart into a statement of how many days it ranked. Measuring the published bars gives:
+
+| Chart | Strategies $S$ | Sum of all bars | Days ranked $D$ |
+|---|---|---|---|
+| Static models, by learner and window | 7 | 6,776 | 242 |
+| Update, by cadence, $K$ and $M$ | 12 | 18,876 | 242 |
+| Forget, by $K_{\text{gen}}$ and $M$ | 9 | 18,990 | 422 |
+| Balancers by memory rule | 9 | 10,890 | 242 |
+| All together | 27 | 68,800 | 182 |
+
+So only one chart ranks all 422 days. These day counts are inferred from the bars, since no chart states its own, and why most charts rank fewer is not reported. The natural guess is that they drop early days: 90 days to fill the aggregates and 90 to fill a training window would account for the 180 missing from 242. But the Forget chart needs the same aggregates and still ranks all 422, and the guess leaves the 240 missing from the 27-strategy chart unexplained. So the cause of the difference is unknown, and so is which days each chart leaves out. Two things follow regardless: two bars can only be compared inside one chart, and a Static model is scored for 182 to 242 days, not 422.
+
+### How far apart must two bars be?
+
+<Ref lesson="stream-learning-and-adaptation" id="exercises">The previous lesson's last exercise</Ref> ranked three strategies on 20 days of the replacing world and got Static 25.5, Forget 39, Update 55.5. Is 13.5 between Static and Forget anything but noise?
+
+Under no difference, a strategy's rank on a day is a uniform draw from $1, \dots, S$, so how far two mean ranks stray from each other by chance can be approximated, and it shrinks with $D$. That gives a yardstick that needs nothing about AP at all.
+
+<Definition title="critical difference">
+Two strategies differ at the 5% level, among $S$ compared over $D$ days, if their mean ranks differ by at least
+$$
+\text{CD} = q \sqrt{\frac{S(S+1)}{6D}},
+$$
+where $q$ is the 5% point of the *studentized range* (the widest gap among $S$ normal draws, in standard deviations) divided by $\sqrt{2}$: $q = 2.34$ at $S = 3$, $2.85$ at $S = 6$, $3.10$ at $S = 9$, $3.27$ at $S = 12$, $3.70$ at $S = 27$. On rank sums the distance is $\text{CD} \times D$. Comparing all pairs in this way is the *Nemenyi test*.
+</Definition>
+
+The square root is the standard deviation of the difference between two mean ranks, not of one mean rank (the exercises derive it). The studentized range is stated in units of a single draw's standard deviation, and the difference between two independent draws has $\sqrt{2}$ of those units, so dividing by $\sqrt{2}$ puts the 5% point on the scale of the root. $q$ grows with $S$ because the widest gap among many no-different strategies grows with how many you look at.
+
+<Example title="three strategies, twenty days">
+$\text{CD} = 2.34 \sqrt{3 \times 4 / (6 \times 20)} = 2.34 \times 0.316 = 0.741$ in mean rank, or $0.741 \times 20 = 14.8$ on rank sums.
+
+Update against Static: $30 \geq 14.8$, separated. Update against Forget: $16.5 \geq 14.8$, separated, narrowly. Forget against Static: $13.5 < 14.8$, not separated.
+</Example>
+
+<Exercise>
+The 9-strategy chart has $D = 242$. Compute the distance on rank sums, and decide whether its two best strategies on AP, at 1,813 and 1,733, are separated. Write the formula with numbers before opening.
+
+<Solution>
+$\text{CD} = 3.10 \sqrt{9 \times 10 / (6 \times 242)} = 3.10 \times 0.249 = 0.772$, so $0.772 \times 242 = 187$. The gap is 80, under half of that. They are not separated.
+</Solution>
+</Exercise>
+
+The published charts mark something else: a bar is shaded if a paired $t$-test on the two strategies' daily ranks finds it not significantly worse than the best. That test asks about one pair at a time and is then applied to every strategy against the leader, so it makes no allowance for the number of comparisons. It also uses the pair's own spread of daily gaps, where the critical difference assumes the spread of level strategies. Both make it mark far fewer strategies as level. On the 27-strategy chart on AP it marks 2 as level with the best, where the critical difference of 560 keeps 9; dropping the allowance alone would still keep 4.
+
+Neither test allows for a third thing. Daily ranks are not independent draws. A model trained on 90 days shares 89 of them with the next night's model, and a frozen model's days all come from one fit. Dependent days carry less information than their count says, which widens the true distance. A spread-out field narrows it: the root assumes every strategy is level, but two near-equal leaders swap only a few places a day, so their daily gap varies far less than that. So the critical difference is a conservative yardstick for such a pair, not a bound, and a gap inside it means not shown, not level.
+
+<KeyFact>
+A rank-sum chart says how often one strategy led another, not by how much. Read a gap against the critical difference: beyond it is a difference, inside it is not shown. The test assumes level strategies and independent days, and neither holds.
+</KeyFact>
+
+## Which learner the charts hold fixed
+
+Every later chart reads a gap between two ways of handling time, and that reading needs the same learner in every bar. So the experiment settles the learner first, on models trained once and undersampled, with windows of up to 90 days. The random forest on 90 days took 1,687 of a possible 1,694 on AP among 7 strategies over 242 days, which puts it first on all but at most 7 days. Even the forest on 30 days, at 1,221, stood above the best SVM or neural network at 836. So the later charts use the forest almost alone, and a gap between two of their bars is not a gap between learners.
+
+This looks like it contradicts <Ref lesson="worldline-model-comparison" id="card-precision-at-100-one-band-for-all-eight">the eight families</Ref> that tied at the budget on another stretch of Belgian payments. It compares something else. There each family had a grid over prequential folds, and no search is reported here, where each learner sees a 50/50 set of a few thousand rows. So read this as what comes out of a forest and two rivals on small balanced sets, not as a ruling on neural networks.
+
+## The model trained once: how far behind, and why
+
+A model trained once should fall behind a stream that moves. Nobody planted a change in this stream, so does it, and if it does, what can the gap between it and a retrained model be made of?
+
+<Figure
+  src="./figures/overall-ranks.svg"
+  alt="Horizontal bars for 27 strategies on AP. At the top, EasyEnsemble daily Forget 90 at 4,279 and SMOTE daily Update 90 at 4,229. Other daily Forget and Update strategies follow down to 2,526. All Static forests fall between 2,191 and 1,387, and Static SVMs and neural networks below that, down to 222."
+  caption="Every adaptive strategy on AP stands above every Static one. At the top, a dashed line shows that the ranking of the first nine is not separated by the critical difference."
+/>
+
+For each balancer and each metric, Static comes last among the three memory rules. On AP every retrained forest stands above every Static forest, and the same holds on $P@k$. On AUC there is one exception: Static on 120 days, at 2,832, passes a pool of 30 Forget models, at 2,769.
+
+### What the gap can and cannot be
+
+To say what the gap measures, take the cleanest pair: the same forest, the same undersampling, the same 90 days of rows, trained once or trained daily.
+
+| 27 strategies, 182 days | AP | AUC | $P@k$ | Mean rank on AP |
+|---|---|---|---|---|
+| `RF.Under.Daily.1M.Update.90K` | 2,950 | 3,440 | 3,404 | 16.2 |
+| `RF.Under.One.1M.Static.90K` | 1,816 | 2,106 | 2,138 | 10.0 |
+
+All three gaps are above 1,100 against a critical difference of 560. Now strike out what the gap cannot be.
+
+**Not the difficulty of a day.** Both strategies are ranked inside the same day, so a rich or poor day cannot favour either.
+
+**Not the base rate.** A <Ref lesson="concept-drift" id="which-change-moves-the-boundary">prior shift</Ref> multiplies all the odds by one factor and keeps the right order of payments. It moves AP on both models of a day together, and a within-day rank does not see it.
+
+**Not the number of rows.** The two training sets have the same 90 days at the same 50/50, so about the same size.
+
+One candidate stays on the list: Static's window is taken here as the stream's first days, and if nothing before February 2012 fed its 90-day aggregates, those are thinner than Update's; neither point is reported.
+
+What remains is the age of the rows, and possibly the fill of their aggregates. One unlucky fit cannot explain it, since the Static rows on four windows and three balancers all fall short. And age alone costs nothing: in <Ref lesson="stream-learning-and-adaptation" id="three-ways-to-fill-the-training-set">the previous lesson's world with no change</Ref>, Static scored 0.70 and $K = 30$ scored 0.70. That world is the control. If two models trained on equal amounts of old and new data rank apart and thin aggregates are not the cause, the stream has moved in a way that matters to a ranking: either the right order of payments has changed (real drift), or today's payments have moved to where the old model's rows were thin (virtual drift). The chart cannot tell those apart. <Ref lesson="concept-drift" id="per-class-a-delay-later">The per-class procedure</Ref> could, and it was not run.
+
+More rows do not close it. Static on 30, 60, 90 and 120 days climbs 1,387, 1,577, 1,816, 2,191 on AP. Four times the rows gains 804, while retraining at 90 days gains 1,134.
+
+### How much a week of age is worth
+
+The charts give no size, so the size has to come from another run. On ten months of 2014–15 online payments from a European processor, about 54 million in all, compare two random forests retrained daily. One trains on the latest 7 days as though labels were instant. The other trains on 8 days that end 7 days earlier, which is what the labels really allow. They have about the same rows, and one is a week older. The older one scores $CP@100$ of 0.25 against 0.30, and of 0.21 against 0.25 on the same processor's 2013 stream.
+
+So a week of age costs **4 to 5 cards in the hundred** on those streams.
+
+## How fast and how long: age against rows
+
+The Update chart varies two things that are easy to confuse, how often a model is rebuilt and how far back it reaches.
+
+<Figure
+  src="./figures/frequency.svg"
+  alt="Bars of rank sums on AP for 12 Update strategies. K = 90 daily with M of 5, 15, 30 and 1 at 2,651, 2,603, 2,381, 2,021. K = 90 weekly 1,760 and 15-day 1,602, highlighted in amber with the daily M = 1 bar. K = 60 at 1,778, K = 30 at 1,430. Pools of one-day models between 767 and 499. AUC and P@k columns alongside."
+  caption="Amber: only the cadence changes. Below them, only the window changes. Grey: one-day models, in pools of 15 to 90."
+/>
+
+**Cadence is age.** At $K = 90$ and $M = 1$, the rows are the same size and only their age differs: a weekly model is 3 days older on average than a daily one, a 15-day model 7 days. Daily against 15-day clears the 259 needed on all three metrics (419, 323, 317). Daily against weekly clears it only on AP, by 2 (261, 198, 198). So the claim the data carry is daily over fortnightly, with weekly in between.
+
+<Ref lesson="stream-learning-and-adaptation" id="how-often-to-retrain">In the simulator</Ref> a calm stretch gave cadence no value at all, and only a stretch just after a change did. So any gain here, spread over 242 days with no change planted, reads as a stream that keeps moving at a scale of days. That is an inference from the shape of the result, because the chart cannot show the change directly.
+
+**Window is rows.** At daily cadence, $K = 30, 60, 90$ climb 1,430, 1,778, 2,021 on AP. Each newest row is the same age, and the longer window adds older rows, so more rows are beating the dilution by older ones at these lengths. Nothing longer than 90 days was tried under Update, so the peak is not bracketed.
+
+### One day: a handful of frauds
+
+The grey bars at the bottom of the chart are one-day models. They rank 499 to 767 on AP, against 2,021 for a single 90-day model. Each of those models holds about 21 frauds, the mean of one day.
+
+<Figure
+  src="./figures/window-frauds.svg"
+  alt="Four bars drawn to scale for windows of 1, 7, 30 and 90 days, with the frauds each holds on average, at most 21, 146, 630 and 1,880, and the rows of a 50/50 training set, 42, 290, 1,250 and 3,760."
+  caption="At 50/50 the training set is twice the fraud count, so one day trains a forest on about 42 rows."
+/>
+
+Those grey bars are already pools of 15 to 90 models, and a pool looks as though it should make up the shortage. Thirty one-day models have seen 30 days between them, and <Ref lesson="imbalance-techniques-revisited" id="balanced-ensembles-the-gain-is-not-the-balance">module 2's</Ref> ensembles gained from differences between their members. The chart says otherwise. Ninety one-day models, about 3,780 rows between them, rank last at 499, while one model on the same 90 days, 3,760 rows, stands at 2,021. Same rows, same days; only the rows per model differ. Averaging removes a member's noise, but a forest on 42 rows has not seen enough frauds to place a split inside a small region, and no number of such forests can vote for a region none of them has found.
+
+The simulator showed the same thing at a thin 13 frauds a day ($K = 1$ at 0.41, $K = 7$ at 0.68). Here it is measured on real fraud.
+
+### A pool buys variety and pays in age
+
+At $K = 90$ a pool helps: $M = 5$ reaches 2,651 against 2,021 for $M = 1$, a gap of 630. From there more members lose ground (2,603, then 2,381). The same shape is sharper under Forget with $K_{\text{gen}} = 30$:
+
+| $M$, Forget, $K_{\text{gen}} = 30$ (9 strategies, 422 days) | 1 | 5 | 10 | 15 | 30 |
+|---|---|---|---|---|---|
+| Rank sum on AP | 2,202 | **2,941** | 2,621 | 2,375 | 1,737 |
+
+The members of a pool of 5 are at most 4 days apart and differ mainly in which 50/50 draw they got, so their average cuts undersampling's noise at almost no cost in age. By 30 members, about a quarter of the pool is more than three weeks old.
+
+<Ref lesson="stream-learning-and-adaptation" id="three-ways-to-fill-the-training-set">The simulator's pool</Ref> won no column, and that is not a contradiction: its members had different memories on data sampled lightly, and these have one memory on heavily undersampled data. On this evidence, it is the noise of the discard that a pool averages away.
+
+## Keeping old frauds: what $K_{\text{gen}}$ really changes
+
+Does keeping every fraud beat a long window on real fraud? <Ref lesson="stream-learning-and-adaptation" id="the-fraud-models-memory-and-its-cadence">On the simulator</Ref> it showed no gain over 90 days of rows. The closest pair here is `Under.Forget.90Kgen` and `Under.Update.90K`: both daily, one model each, the same reach, and differing only in the frauds older than 90 days. They appear together in the 9-strategy chart of balancers and in the 27-strategy chart. Forget stands above Update on all three metrics in both, by 103, 44, 40 against the 187 needed among 9 strategies, and by 413, 274, 161 against the 560 needed among 27. The direction is steady and the separation is absent, so on a 90-day window this experiment shows no clear gain from the old frauds either.
+
+### Same rows from more days, with one exception
+
+The Forget chart varies $K_{\text{gen}}$, and the natural reading is that more days give the model more genuine rows. They do not, because every set in this chart ends at 50/50: undersampling keeps one genuine payment per fraud, however many days of genuine payments lie behind it. So $K_{\text{gen}}$ changes **how many days the genuine rows are drawn from**, and not how many there are.
+
+The exception sits at the bottom of the range, where the 40% rule binds. Frauds reach 40% of a set when they are two-thirds of its genuine payments. At $K_{\text{gen}} = 0$ that is $\tfrac{2}{3} \times 5{,}197 = 3{,}465$ frauds, which at 21 a day arrive by about day 166. From then on the set stays at about 6,930 rows, holding only the latest frauds. At $K_{\text{gen}} = 15$ the limit is $\tfrac{2}{3} \times 15 \times 5{,}197$, about 52,000 frauds, six times what the whole stream holds, so its frauds accumulate to the end, up to about 8,800 frauds and 17,600 rows. The experiment also sets a maximum training size it does not state; these counts assume it is not reached.
+
+<Figure
+  src="./figures/kgen-metrics.svg"
+  alt="Line chart of rank sum against K_gen of 0, 15, 30, 60, 90 for single Forget models. All three metrics are low at 0, between 619 and 928. AP rises to 2,273 at 15 and then falls to 1,923 at 90. P@k rises to about 2,470 at 60 and stays. AUC keeps rising to 2,867 at 90."
+  caption="Past the first 15 days, the metrics stop agreeing on how far back the genuine payments should reach."
+/>
+
+**$K_{\text{gen}} = 0$ loses on every metric**, by 960 to 1,345 rank points against 15 days: all its genuine rows come from one day, one weekday's merchants and customers. Those 15 days are the largest gain on the chart. What they add is variety, and from about day 166 more rows and older frauds as well. The chart sums all the days into one bar, so it cannot say how much of the gain is which.
+
+### Past 15 days, the metrics part
+
+Among 15, 30, 60 and 90 days the 40% rule never binds, so unless that unstated maximum binds, the frauds and the rows are the same, and only the span of the genuine rows differs. AUC keeps rising to 90 days. $P@k$ flattens from 60. AP is highest at 15 and 30 (2,273 and 2,202) and declines to 1,923. This fits what the metrics read: <Ref lesson="alert-budget-metrics" id="what-each-disagreement-means">AUC grades the whole ranking and AP mostly its top</Ref>, so a wide sample of ordinary genuine payments could serve the first, and only recent ones the second. That is a reading of the shape and not something the chart tests.
+
+The chart's leader on AP and $P@k$ is $K_{\text{gen}} = 30$ with a pool of five models (2,941 and 2,578), which suggests a rule: keep every fraud and 30 days of genuine payments. The chart supports less than that. On AP the lead belongs to the pool: a single model at 30 days stands at 2,202 on AP, level with 15 days. On $P@k$ even the pool is not separated from single models at 60 and 90 days, and on AUC it sits third, significantly behind a single model at 90. The chart also ranks all 422 days, including the first weeks, when a stream younger than $K_{\text{gen}}$ gives 30, 60 and 90 the same pool of rows and their order is noise, so its gaps are somewhat diluted.
+
+## Which balancer with which memory
+
+The expectation from module 2 is that <Ref lesson="imbalance-techniques-revisited" id="why-the-balance-is-not-what-helps">balance itself does not help</Ref>, and that AP does best with the mildest ratio. The chart looks as though it says the opposite, with the balancers far above plain undersampling. But no strategy in this experiment trains unbalanced. Its floor is 50/50 by undersampling, which at 0.4% fraud discards about 99.6% of a chunk's genuine payments, so what the gains measure is the repair of that discard.
+
+The chart crosses the three balancers with the three memory rules and holds the rest fixed: a forest, a new model each day (under Static, one model, never rebuilt), a reach of 90 days ($K$ or $K_{\text{gen}} = 90$), and $M = 1$, so EasyEnsemble's five models all come from the newest chunk. These nine strategies are ranked over 242 days, where two bars need 187 to separate.
+
+<Figure
+  src="./figures/balancer-grid.svg"
+  alt="A three-by-three grid of rank sums with rows EasyEnsemble, SMOTE, Under and columns Static, Update, Forget. On AP: EasyEnsemble 786, 1,607, 1,733; SMOTE 566, 1,813, 1,696; Under 438, 1,076, 1,179. Forget is highlighted for EasyEnsemble and Under, Update for SMOTE."
+  caption="Amber marks the better of the two retraining rules in each row. Static is last in every row on every metric."
+/>
+
+**Both repairs work, unevenly.** EasyEnsemble beats Under in every cell on every metric, by 288 or more: five draws see five times the genuine rows. SMOTE repairs the discard another way: its synthetic frauds raise the fraud count, so a 50/50 set keeps that many more genuine rows. It beats Under on AP by more than 500 under both retraining rules, on $P@k$ by 400 under Update and only 144 under Forget, and on AUC it does not beat Under at all under Forget (1,251 against 1,273) or Static (572 against 615). And no balancer rescues a stale model: the best Static cell, 786, is below the worst retrained one, 1,076.
+
+**The pairing is a direction, not yet a result.** SMOTE prefers Update and the other two prefer Forget, on all three metrics and in both charts. Only SMOTE's preference clears the distance anywhere, in the 9-strategy chart: 262 on AUC and 216 on $P@k$ against 187. EasyEnsemble's preference for Forget is 126, 42 and 39.
+
+The direction has a plausible cause. Keeping every fraud changes the <Ref lesson="imbalance-techniques-revisited">imbalance ratio</Ref> of what the balancer receives, and Forget's frauds span every month so far. SMOTE draws lines between neighbouring frauds, so under Forget it may interpolate between methods that never coexisted, while under Update its frauds are all recent. EasyEnsemble's draws, by contrast, only gain from more frauds, since each then keeps more genuine rows. The charts cannot test this: no run varies the frauds' age while holding their number.
+
+### The winner depends on the chart
+
+The two best strategies appear in both the 9-strategy and the 27-strategy chart, and they swap places.
+
+| Rank sums | 9 strategies, 242 days | 27 strategies, 182 days |
+|---|---|---|
+| AP: `SMOTE.Update` / `EasyEnsemble.Forget` | **1,813** / 1,733 | 4,229 / **4,279** |
+| $P@k$: `SMOTE.Update` / `EasyEnsemble.Forget` | **1,623** / 1,571 | 3,958 / **4,018** |
+| AUC: `SMOTE.Update` / `EasyEnsemble.Forget` | 1,513 / **1,745** | 3,822 / **4,335** |
+
+In the first chart, the paired $t$-test marks EasyEnsemble with Forget as significantly worse than the best on AP. In the second it is the best. The charts differ by 60 days and by 18 other strategies, and either could produce the swap. The AP gaps of 80 and 50 sit well inside the critical differences of 187 and 560. Only on AUC does one lead both charts.
+
+So the experiment does not choose between them on the two metrics that read the top of the list. The pair it names is a shortlist.
+
+### What they cost
+
+<Figure
+  src="./figures/compute.svg"
+  alt="Grouped bars of seconds per daily chunk. EasyEnsemble: Forget 456, Update 233, Static 12. SMOTE: Forget 561, Update 317, Static 4. Under: Forget 38, Update 20, Static 1."
+  caption="Per chunk on a 2013 server. Forget costs about twice Update; either balancer about twelve to sixteen times Under."
+/>
+
+The published chart is labelled prediction time. It must include fitting, or a Static forest of the same size would not be twenty to eighty times cheaper than one retrained. EasyEnsemble fits several models per chunk, and SMOTE makes the training set larger. Forget costs about double because it carries more frauds, and at 50/50 that means more rows. A nightly job has hours, and the most expensive row here takes under ten minutes, so this cost does not decide the choice.
+
+## What the ordering measures
+
+Which property of the stream does each comparison read? It depends on what the comparison holds fixed.
+
+| Contrast | Held fixed | What differs | What it reads |
+|---|---|---|---|
+| Static against daily Update, same $K$ | learner, balancer, rows | age of rows, possibly the fill of their aggregates | change in the right order, or a move away from where the rows are, over months, unless thin aggregates account for it; not the base rate |
+| Daily, weekly, 15-day at $K = 90$ | learner, balancer, rows | 3 to 7 days of age | change at a scale of days |
+| $K = 30, 60, 90$ | cadence, newest row | rows, and older ones | whether rows are still scarcer than freshness |
+| One-day pool against one 90-day model | total rows, days covered | rows per model | the fraud count per chunk |
+| $K_{\text{gen}} = 0$ against 15 | learner, balancer; rows and frauds until about day 166 | days the genuine rows span; from about day 166, rows and old frauds too | variety among genuine payments and, later, rows; not separable here |
+| Under against EasyEnsemble | memory rule | genuine rows seen | the cost of the 99.6% discard |
+| Update against Forget, by balancer | cadence, window | frauds' count and age | frauds' count and age together; not separable here; direction only |
+
+<KeyFact>
+Change one axis at a time in the balancer, Update and Forget charts, and exactly these contrasts clear the critical difference on every metric in one direction:
+
+- **Retraining:** Update or Forget over Static, for each balancer.
+- **Cadence:** daily over 15-day at $K = 90$.
+- **Window:** $K = 60$ and $K = 90$ over $K = 30$, and all three over every one-day pool.
+- **Genuine span:** each $K_{\text{gen}}$ from 15 up over $K_{\text{gen}} = 0$.
+- **Pool:** $M = 5$ over $M = 1$ at $K = 90$ and at $K_{\text{gen}} = 30$. At $K_{\text{gen}} = 30$ also $M = 5$ over 15 and 30, and $M = 10$ or 15 over 30.
+- **Balancer, at the same memory rule with $M = 1$:** EasyEnsemble over Under under all three rules, SMOTE over Under under Update only, EasyEnsemble over SMOTE under Static only.
+
+The balancer's qualifier matters: `Under 5M Forget 30` (4,078 on AP) stands above EasyEnsemble with Update (3,955). No contrast among the leaders is on the list.
+</KeyFact>
+
+## Where the experiment departs from the bank
+
+The experiment scores each chunk before learning from it, which is <Ref lesson="stream-learning-and-adaptation" id="predict-then-score-then-learn">the prequential rule</Ref> at the scale of a day. It runs the module's windows, kept frauds and pools, and <Ref lesson="concept-drift" id="naming-the-three-parts">the kinds of drift</Ref> name what its largest gap can and cannot be. What it leaves out decides how far its ranks carry to a bank.
+
+**Labels are instant.** Every row is usable the next night. This matters most, because the age the experiment has just shown to be costly is exactly what <Ref lesson="delayed-labels-prequential" id="the-label-clock">the label clock</Ref> adds.
+
+<Figure
+  src="./figures/instant-labels.svg"
+  alt="Two rows of eighteen day cells with the last amber as the scored day. Upper row: ten blue training days immediately before it. Lower row: ten blue training days ending seven days earlier, with seven empty cells between."
+  caption="Same window, same day scored. A real model's rows all carry the age of the delay, for every strategy in every chart."
+/>
+
+The labels are also complete, where a bank's come from the cards it chose to check. The bias that adds is <Ref lesson="alert-feedback-selection-bias" />'s subject, and it is drift the model causes for itself.
+
+**The cadence is fixed.** No strategy has <Ref lesson="change-detectors">a detector</Ref>, so the experiment says nothing about cutting memory on an alarm, the one use <Ref lesson="stream-learning-and-adaptation" id="what-the-alarm-is-still-for">the previous lesson</Ref> left for it.
+
+**The scores are payments, not cards or money.** A <Ref lesson="alert-budget-metrics" id="card-precision-at-k-the-team-calls-cards">card</Ref> is called once, but $P@k$ credits each payment, and no row has a cost column. <Ref lesson="worldline-model-comparison" id="average-precision-up-card-precision-flat-two-readings">The model comparison</Ref> showed that a payment-level gain can leave the card count flat.
+
+**One processor, online only, one learner.** Every strategy that retrains is a forest. No sequence model was run, so <Ref lesson="sequence-models-for-transactions" />'s question of how an LSTM holds up across retraining stays open.
+
+**Nothing was measured without labels.** <Ref lesson="concept-drift" id="every-pair-of-days-a-matrix">The day-distinguishability matrix</Ref> on a similar stream shows the cardholders' side of the same drift, and it was not computed here, so the share of the Static gap due to virtual drift cannot be separated out.
+
+**A change retraining cannot follow goes untested.** On <Ref lesson="elliptic-illicit-nodes" id="why-retraining-on-every-label-cannot-catch-up">Elliptic's step 43</Ref>, a fixed forest goes from pooled illicit F1 0.91 on the steps before it to 0.03 from it on. One retrained before every step on instant labels does little better: 0, 0.07, 0, 0.5, 0, 0.11, 0.16 on steps 43 to 49, the 0.5 on a step with two illicit transactions, because each new step adds a couple of dozen illicit transactions to thousands of the old kind. Daily retraining can follow change only when the new rows outvote the old in the region where they fall. Whether the 422 days held a change of that kind these charts cannot show, since a stretch on which every strategy collapses together leaves no mark on a within-day rank. So a high rank here is evidence about the stream it was earned on, and not a guarantee about the next change.
+
+<Conclusion>
+You can now read a rank-sum chart: recover its days from its total, turn a gap into a mean rank, and test it with a critical difference while knowing what it assumes. Given any comparison of retraining strategies, you can list what it holds fixed, strike out what a within-day rank cannot see, and say what the remaining difference reads. The experiment leaves three things unsettled: which leader wins, what labels at a delay would do, and whether a change can come that no cadence follows.
+
+The next lesson, <Ref lesson="drift-detector-lab" />, has you build the scorer and detectors yourself and run them on a drifting stream. Beyond it, <Ref lesson="adversarial-classification" /> takes up the case this experiment could not hold still: a stream that changes because the model did.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+Three strategies have these AP values on six days. Compute the rank sums and check them against the identity. Is any pair separated at the 5% level?
+
+| Day | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|
+| A | .30 | .05 | .08 | .20 | .07 | .12 |
+| B | .25 | .06 | .09 | .22 | .10 | .10 |
+| C | .10 | .04 | .10 | .18 | .06 | .15 |
+
+<Solution>
+Ranks by day, 3 for the best: A 3, 2, 1, 2, 2, 2 = 12. B 2, 3, 2, 3, 3, 1 = 14. C 1, 1, 3, 1, 1, 3 = 10. Check: $12 + 14 + 10 = 36 = 6 \times (1 + 2 + 3)$.
+
+$\text{CD} = 2.34 \sqrt{3 \times 4 / (6 \times 6)} = 2.34 \times 0.577 = 1.35$ in mean rank, $8.1$ on rank sums. The widest gap is 4, so nothing is separated. B leads, and six days cannot say more. The move: check the total first, then the distance, and only then read the order.
+</Solution>
+</Exercise>
+
+<Exercise>
+"Strategy A has the higher mean AP over the stream, so it beats strategy B." Break this with two strategies on six days, then say what a deployment should do when the mean and the rank sum disagree. Decide what your day 1 looks like before writing numbers.
+
+<Solution>
+One rich day and five thin ones:
+
+| Day | 1 | 2 | 3 | 4 | 5 | 6 | Mean | Rank sum |
+|---|---|---|---|---|---|---|---|---|
+| A | .50 | .05 | .05 | .05 | .05 | .05 | .125 | 7 |
+| B | .30 | .06 | .06 | .06 | .06 | .06 | .100 | 11 |
+
+A wins the mean because of one day, and B leads on five days of six. So the claim fails: the mean describes the rich day.
+
+But the rank sum does not settle the choice either. It counts a lead of .01 on a thin day the same as a lead of .20 on a rich one, and the rich day may hold most of the money. Rank tells you which strategy leads reliably, free of day difficulty. To choose, compute what the bank acts on, per day, on the same days: cards found at the budget, or <Ref lesson="example-dependent-cost">money saved</Ref>, and read the paired differences. The move: use a rank to test whether a gap is steady, and a paired measure in the bank's units to say what it is worth.
+</Solution>
+</Exercise>
+
+<Exercise>
+A report says: "Daily Update with $K = 90$, $M = 5$ scored 2,651, while EasyEnsemble with Forget scored 1,733, so plain undersampling with a pool is far better." Find the error. Then repair the comparison as far as the two charts allow, using: the first figure is from the chart of 12 strategies and the second from the chart of 9, both over 242 days. In the chart of 27 strategies over 182 days they score 3,746 and 4,279.
+
+<Solution>
+A rank sum has no meaning outside its chart, since its range depends on $S$ and $D$. Mean ranks are $2{,}651/242 = 10.95$ of 12 and $1{,}733/242 = 7.16$ of 9. On a common scale, $(\text{mean rank} - 1)/(S - 1)$ gives $0.905$ and $0.770$, which still favours the pool.
+
+Even that is wrong, because each number is a position against a different field, and the 12-strategy field holds four weak one-day models that lift everyone above them. The only valid comparison puts them in one chart: there the order is reversed, 4,279 against 3,746. The gap of 533 is just under the critical difference of 560, so even that chart does not separate them. The move: a rank is relative to its field, so two ranks compare only when the field is the same.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the critical difference's square root. (a) With no difference between $S$ strategies, a strategy's daily rank is uniform on $1, \dots, S$. State its variance, and from the fact that the ranks of a day add up to a constant, find the covariance between two strategies' ranks on the same day. (b) Find the variance of the difference of two mean ranks over $D$ independent days. (c) With $q = 2.85$, how far apart must two rank sums be at $S = 6$, $D = 422$? (d) Suppose the daily gap between two strategies has lag-one correlation $\rho$, like an autoregression, so the variance of its mean is multiplied by $(1 + \rho)/(1 - \rho)$. How much does $\rho = 0.18$ widen the distance, and what would $\rho = 0.5$ do?
+
+<Solution>
+(a) A uniform on $1, \dots, S$ has variance $(S^2 - 1)/12$. The ranks of a day sum to a constant, so $0 = \operatorname{Var}(\sum_s r_s) = S \operatorname{Var}(r) + S(S - 1)\operatorname{Cov}$, which gives $\operatorname{Cov} = -\operatorname{Var}(r)/(S - 1) = -(S + 1)/12$.
+
+(b) For one day, $\operatorname{Var}(r_a - r_b) = 2\operatorname{Var}(r) - 2\operatorname{Cov} = \frac{S^2 - 1}{6} + \frac{S + 1}{6} = \frac{S(S + 1)}{6}$. Over $D$ independent days the mean's variance is $S(S + 1)/(6D)$, whose root is the square root in the definition. The negative covariance is why the difference has more variance than two independent ranks would: one strategy's gain on a day is partly the other's loss.
+
+(c) $\sqrt{6 \times 7 / (6 \times 422)} = 0.1288$, so $\text{CD} = 2.85 \times 0.1288 = 0.367$, and $0.367 \times 422 = 155$ on rank sums.
+
+(d) The standard deviation is multiplied by $\sqrt{(1 + \rho)/(1 - \rho)}$: $\sqrt{1.18/0.82} = 1.20$ at $\rho = 0.18$, so 155 becomes 186. At $\rho = 0.5$, $\sqrt{3} = 1.73$, and it becomes 268, as if only 141 of the 422 days were independent. The move: an all-pairs test has a formula because ranks have a known variance under the null, so the assumptions to question are that null and independence between days, not anything about AP.
+</Solution>
+</Exercise>
+
+<Exercise>
+Take Forget at $K_{\text{gen}} = 0$ on this stream after 300 days, with 5,218 payments a day at 0.4% fraud. (a) Compute the <Ref lesson="imbalance-techniques-revisited">imbalance ratio</Ref> of its training set before any balancer, first without the 40% rule and then with it, and compare with $K_{\text{gen}} = 90$ and with Update at $K = 90$. (b) What does each balancer now have to do, and which of them has lost what makes it work? (c) Which clause of "a balancer rebalances the classes" does this case break?
+
+<Solution>
+(a) Frauds so far: $300 \times 5{,}218 \times 0.004 = 6{,}260$. Genuine in one day: $5{,}218 \times 0.996 = 5{,}197$. Without the rule, IR $= 6{,}260/5{,}197 = 1.2$: frauds would outnumber genuine payments, which is what the rule exists to stop. With it, frauds stop at $\tfrac{2}{3} \times 5{,}197 = 3{,}465$, reached by about day 166, so IR $= 0.67$ and the oldest 2,795 frauds are gone. With $K_{\text{gen}} = 90$ the rule does not bind: $6{,}260/467{,}700 = 0.013$. Update at $K = 90$: $1{,}878/467{,}700 = 0.004$.
+
+(b) Under discards 1,732 of the 5,197 genuine payments, a third, where it usually discards 99.6%. SMOTE needs 1,732 synthetic frauds to reach balance, one for every two real ones. EasyEnsemble is the one that has lost its basis: its five draws each take 3,465 of the same 5,197 genuine rows, so any two draws share about two-thirds of them, and little difference is left to average.
+
+(c) The word "rebalances" assumes the genuine class is plentiful enough to sample from. Here the set is already close to balance, and the failure is not in the classes' sizes at all: all the genuine rows come from one day. The chart has $K_{\text{gen}} = 0$ behind $K_{\text{gen}} = 15$ by 960 or more on every metric, though it cannot separate that from the rows the rule holds back after day 166. The move: push a parameter to its edge and ask what the machinery after it still has to work with.
+</Solution>
+</Exercise>
+
+<Exercise>
+Design and run a small version. Use <Ref lesson="stream-learning-and-adaptation" id="three-ways-to-fill-the-training-set">the thinned simulator</Ref> for 240 days (no change, and the replacing world with its change on day 130). Fit a random forest of 100 trees at 50/50 by undersampling, with labels instant. Strategies: Static on days 30–59; nightly Update with $K = 1, 30, 90$; nightly Forget with $K_{\text{gen}} = 30$. Score days 100–239 per day on AP and on $CP@100$ with known cards removed, and rank per day. Before running, write down: is Static last in each world? What is the distance to clear? Repeat on four streams and look at each stream's own rank sums, not only their mean.
+
+<Solution>
+**Reference run** (mean rank sums over four streams, $S = 5$, $D = 140$, so the distance is $2.73 \sqrt{30/840} \times 140 = 72$; neutral is 420):
+
+| | Static | $K = 1$ | $K = 30$ | $K = 90$ | Forget 30 |
+|---|---|---|---|---|---|
+| No change, $CP@100$ | 460 | 247 | 458 | 466 | 468 |
+| No change, AP | 525 | 146 | 382 | 497 | 551 |
+| Replacing, $CP@100$ | 298 | 252 | 494 | 523 | 533 |
+| Replacing, AP | 379 | 152 | 407 | 541 | 620 |
+
+**Without a change Static is not last.** On $CP@100$ it is level with every retrained window except $K = 1$, which repeats the control this lesson leaned on. With a change, Static falls about 160 ranks on $CP@100$ and sits just above $K = 1$, within the 72. $K = 1$ is last in both, with about 13 frauds a day, about 17 once the replacing world's new method runs, and so 26 to 34 rows.
+
+**Forget leads on AP in both worlds.** At 50/50 its rows are twice its frauds, several times what a window holds. This is rows, not memory, and in the no-change world there is nothing to remember.
+
+**One entry does not fit:** AP in the no-change world puts Static 143 above $K = 30$, twice the distance, with equal rows and no drift at all. Look at the four streams. Static scores 571, 574, 542, 413 and $K = 30$ scores 358, 361, 373, 434: the sign flips on the fourth. A frozen forest is one fit, so all its 140 days carry the same luck. Static's rank sum has a spread of 76 across streams, against 4 to 36 for retrained strategies, which redraw every night. On one later month of two such streams, forests fitted to eight different 30-day windows of the same stationary world scored AP from 0.25 to 0.67.
+
+So a daily test treats 140 days as evidence, while Static has one fit in it. Repeating the undersample is not enough either, since it leaves the window fixed. The move: replicate at the level of the thing that varies. For a frozen model that is whole fits, and a claim about it needs several windows or streams, as the four Static windows on the real stream supply.
+
+**Among retrained strategies, dependence between days is small.** In the replacing world the lag-one correlation of the daily rank gap between Update and Forget measures 0.18, and 0.12 or less for the other pairs checked. By the factor you derived earlier, 0.18 widens the distance of 72 to 86, which changes none of the readings above.
+</Solution>
+</Exercise>
+
+<Exercise>
+Rerun the previous exercise's replacing world with <Ref lesson="delayed-labels-prequential" id="the-label-clock">labels arriving $\delta = 7$ days late</Ref>, on AP. Report the whole-stream rank sums, and mean AP for days 138–151 and for days 152–239, against the instant-label run. Which strategy loses most, and when? What does that say about reading a rank sum over a whole stream?
+
+<Solution>
+**Reference run** (four streams):
+
+| | Static | $K = 1$ | $K = 30$ | $K = 90$ | Forget 30 |
+|---|---|---|---|---|---|
+| Rank sum, instant | 379 | 152 | 407 | 541 | 620 |
+| Rank sum, $\delta = 7$ | 392 | 156 | 404 | 544 | 605 |
+| Mean AP, days 138–151, instant | 0.239 | 0.048 | 0.313 | 0.344 | 0.357 |
+| Mean AP, days 138–151, $\delta = 7$ | 0.239 | 0.039 | 0.243 | 0.302 | 0.295 |
+| Mean AP, days 152–239, instant | 0.175 | 0.042 | 0.181 | 0.267 | 0.338 |
+| Mean AP, days 152–239, $\delta = 7$ | 0.175 | 0.045 | 0.188 | 0.273 | 0.332 |
+
+The whole-stream rank sums barely move, each within the 72. All of the measured loss lies in days 138–151. Day 138 is the first on which the delayed model holds a label of the new method, which began on day 130, and by then the instant model holds eight days of them. There $K = 30$ loses 0.07, a fifth of its AP, Forget 0.06, $K = 90$ 0.04, and Static nothing, since it was never going to learn them. Days 130–137, when the delayed model has no such label at all, are not in this table, so their loss is unmeasured. After day 152 the delay costs nothing measurable.
+
+So a stream-long rank sum is close to blind to the delay, in the same way <Ref lesson="stream-learning-and-adaptation" id="the-whole-stream-average-reads-twice-the-current-error">a landmark mean</Ref> was blind to a change. The move: the instant-label assumption looks harmless in a table of rank sums because the table spreads a short loss over many days. Report the weeks after a change separately. The real stream has no planted date to split on, which is one reason its chart cannot price the delay.
+</Solution>
+</Exercise>
+
+<Exercise>
+Plant a fraudster who reads the model. On the same simulator with its scripted compromises off, 12 existing payments a day become fraud with amount $A_w \pm 10\%$, on top of the rule that amounts above 220 are fraud. Each Monday the fraudster probes one model with 400 ordinary payments, trying amounts from 20 to 400 in steps of 20, and takes the largest at which at most 20% of probes would enter yesterday's top 100. Run Static (days 30–59) and nightly Update ($K = 30$) on days 60–209, in three worlds: the fraudster never moves ($A = 200$), probes Static, or probes Update. Track $A_w$ and the frauds each model finds in its top 100 payments, and predict first: does $A_w$ settle?
+
+<Solution>
+**Reference run** (four streams, about 17.5 frauds a day):
+
+| Fraudster | $A_w$ over 22 weeks | Found in the top 100: Static | Update | Mean AP: Static | Update |
+|---|---|---|---|---|---|
+| Never moves | 200 | 17.5 | 17.5 | 0.32 | 0.35 |
+| Probes Static | settles at 140–160 from the first week | 9.2 | 11.5 | 0.11 | 0.20 |
+| Probes Update | moves in 14 to 20 of the 21 weekly steps, between 60 and 400 | 12.25 | 12.48 | 0.22 | 0.29 |
+
+Against a frozen model the fraudster finds a blind spot and stays in it, and retraining gains 2.3 frauds a day, since the Update model sees the new amount. Against the retraining model $A_w$ never settles. In one stream: 160, 160, 160, 180, 400, 400, 200, 160, 160, 140, 400, 400, 200, 120, 100, 80. It goes down until the model has learned the low band, and then it jumps back up, plausibly because the 30-day window has been dropping its high-amount rows. On AP retraining still leads, but the lead in frauds found at the budget has gone, 12.25 against 12.48.
+
+So the stream is now changing because of the model, and this lesson's reading of the Static gap no longer holds: age is no longer the only difference, because the two arms face a fraudster aimed at one of them. The oscillation here is not chance. <Ref lesson="adversarial-classification" /> sets this up as a game with a cost per feature changed, and explains why the back-and-forth need not converge.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Dal Pozzolo, O. Caelen, Y.-A. Le Borgne, S. Waterschoot, G. Bontempi, "Learned Lessons in Credit Card Fraud Detection from a Practitioner Perspective," *Expert Systems with Applications* 41(10), 2014, pp. 4915–4928 — Sec. 4 (aggregates over 90 days), Sec. 5 (AP, rank-form AUC, the precision within the first alerts), Sec. 6 and Table 2 (static, update, forget, the weights), Sec. 7.1 (the dataset), Sec. 7.2 and Figs. 5–10 (rank sums, paired $t$-test on ranks, every chart here), Sec. 7.2.3 (frauds capped at 40% of the set, undersampling at the end of every strategy). The bar lengths were measured from the vector drawings in the published PDF, the chunk counts computed from them, and the critical differences and the day the 40% rule binds computed for this course; they are not stated in the paper. https://doi.org/10.1016/j.eswa.2014.02.026
+2. A. Dal Pozzolo, G. Boracchi, O. Caelen, C. Alippi, G. Bontempi, "Credit Card Fraud Detection: A Realistic Modeling and a Novel Learning Strategy," *IEEE Transactions on Neural Networks and Learning Systems* 29(8), 2018, pp. 3784–3797 — Table III and Sec. VI-D (the comparison of a week's age, daily counts of fraudulent cards), the footnote on dependence between daily ranks.
+3. J. Gama, I. Žliobaitė, A. Bifet, M. Pechenizkiy, A. Bouchachia, "A Survey on Concept Drift Adaptation," *ACM Computing Surveys* 46(4), 2014 — Sec. 4.2.3 (Nemenyi's critical difference, the Friedman step). https://doi.org/10.1145/2523813
+4. J. Demšar, "Statistical Comparisons of Classifiers over Multiple Data Sets," *Journal of Machine Learning Research* 7, 2006, pp. 1–30 — Sec. 3.2 (Friedman and Nemenyi, the values of $q$).
+5. M. Friedman, "The Use of Ranks to Avoid the Assumption of Normality Implicit in the Analysis of Variance," *Journal of the American Statistical Association* 32(200), 1937, pp. 675–701.
+6. J. Jurgovsky, M. Granitzer, K. Ziegler, S. Calabretto, P.-E. Portier, L. He-Guelton, O. Caelen, "Sequence Classification for Credit-Card Fraud Detection," *Expert Systems with Applications* 100, 2018, pp. 234–245 — Sec. 5.1 and 6.1 (daily AUCPR that moves with fraud density across models).
+7. Y. Lucas, J. Jurgovsky, "Credit Card Fraud Detection Using Machine Learning: A Survey," arXiv:2010.06479, 2020 — Sec. 3.2 (the day-shift matrix).
+8. M. Weber, G. Domeniconi, J. Chen, D. K. I. Weidele, C. Bellei, T. Robinson, C. E. Leiserson, "Anti-Money Laundering in Bitcoin: Experimenting with Graph Convolutional Networks for Financial Forensics," KDD Workshop on Anomaly Detection in Finance, 2019 — Sec. 4 (step 43; the per-step scores of the retrained forest are this course's rerun on the public files).
+9. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 3 (the simulator's rules, re-run here thinned, with an adversary added in the last exercise; every reference run was computed for this course). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+</References>

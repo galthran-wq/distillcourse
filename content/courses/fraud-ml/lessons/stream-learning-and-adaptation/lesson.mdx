@@ -1,0 +1,537 @@
+An alarm has just rung on a fraud model. The payments since the change hold about 7 frauds, too few to fit anything on, and the log before them holds thousands from methods that may have stopped. How much should the model remember and forget, when should it be replaced, and how do you score a model that keeps changing while the stream it is scored on changes too?
+
+Both extremes have a price. <Ref lesson="change-detectors" id="exercises">The last exercise of the previous lesson</Ref> rebuilt a model on the items DDM stored between its warning and its alarm: about 845 payments, about 7 frauds, where the baseline training week held 598. That is the price of forgetting everything. Forgetting nothing pays the other way: its statistics average over every concept the stream has been through.
+
+The scoring question comes first, because every comparison between those two extremes needs a score, and the score you have does not apply.
+
+## Scoring a model that never stops changing
+
+A test block answers one question: how good is this fixed model on this fixed stretch? On a stream neither part is fixed.
+
+### Why a held-out block cannot grade it
+
+To grade the model as it stands today, you would hold out items from today's concept. A block drawn from the stream belongs to whichever concept was in force when it was drawn, and which recent items share the current concept is the thing you do not know. <Ref lesson="delayed-labels-prequential" id="prequential-folds-a-spread-across-weeks">Prequential folds</Ref> move the block forward one week per fold, and each fold still grades one frozen model on one week. They are the chunked form, with a delay block, of the scheme below, which takes the block down to one item.
+
+### Predict, then score, then learn
+
+Use every item as a test item once, at the moment before the model may learn from it.
+
+<Definition title="prequential evaluation">
+For each item $x_t$ of the stream, in order: the model predicts $\hat y_t$. When the label $y_t$ is known, compute the loss $L_t$ (1 if wrong, 0 if right, for a classifier), and only then give $(x_t, y_t)$ to the model to learn from.
+</Definition>
+
+The name is the "predictive sequential" of the folds, and the scheme is also called *interleaved test-then-train*. No item is set aside, and the model is always scored in the state it had when it answered.
+
+<FigureSequence
+  name="test-then-train"
+  alt="Four payments at terminals T7, T3, T3, T7 with true labels genuine, fraud, genuine, fraud, and a learner that repeats the last label seen at the terminal. Frame 1 fills the first row, frame 2 the second, frame 3 all four rows with one right, score 1 of 4. Frame 4 repeats the run with learning before prediction: every row right, score 4 of 4."
+  caption="The same learner on the same four payments. Only the order of two lines differs."
+/>
+
+<Task>
+Before frame 3, predict the learner's answer on item 3 from the memory shown in frame 2 plus item 2's label. Then in frame 4, name the first row where learning first changes the prediction.
+</Task>
+
+The last frame is the standard bug in a home-made scorer, and it is one line out of place. The gap is rarely this large, because few learners memorise, but the error always flatters the model, and a learner with more capacity gains more from it, which ranks the wrong model first.
+
+```python
+for x, y in stream:
+    y_hat = model.predict(x)     # the answer goes out before the label is used
+    score.update(y, y_hat)
+    model.learn(x, y)
+```
+
+On payments these lines are days apart. The prediction goes out on day $t$, and score and learning wait for <Ref lesson="delayed-labels-prequential" id="the-label-clock">the label clock</Ref>, $t + \delta$. Meanwhile the model keeps answering without that label, which is the position the bank is in.
+
+### The whole-stream average reads twice the current error
+
+The obvious running score is the mean of all the losses so far. It has two faults, and the first appears with no drift at all. A learner improves, and its early errors stay in the mean forever.
+
+<Example title="an error that falls like one over root t">
+Let the probability of an error at step $t$ be $1/\sqrt{t}$, so at step $T$ the learner's current error is $1/\sqrt{T}$. The expected mean of the losses so far is
+
+$$
+\frac{1}{T} \sum_{t = 1}^{T} \frac{1}{\sqrt{t}} \approx \frac{1}{T} \int_0^T t^{-1/2}\, dt = \frac{2}{\sqrt{T}}.
+$$
+
+At $T = 2{,}500$ the learner errs on 2% of items, and the mean reports about 4%.
+</Example>
+
+<Figure
+  src="./figures/cumulative-error.svg"
+  alt="Two falling curves against items on a log scale from 100 to 10,000. The current error 1/√t runs below the whole-stream average, which stays about twice as high. At t = 2,500 they read 0.02 and 0.04."
+  caption="The average never catches up: the ratio stays near 2 however long the stream runs."
+/>
+
+The second fault is worse. Take the generated stream that runs through this lesson: 100 numeric features, each a normal of variance 1 whose mean is $+0.09$ or $-0.09$ depending on the class, so that the best possible accuracy is 81.6%. A change of concept flips the sign of 50 of those means, which leaves a model of the old concept at about 50%. The learner is a naive Bayes that keeps each class's mean per feature. Let it forget nothing, change the concept at item 30,000, and compare the running mean with what a test on 4,000 fresh items of the current concept would say.
+
+<Figure
+  src="./figures/scorer-tracks.svg"
+  alt="Accuracy against items up to 60,000 with a concept change at 30,000. Accuracy on fresh items and a sliding window of 1,000 both drop from about 0.81 to about 0.51 and climb slowly to about 0.72. The whole-stream average falls smoothly from 0.81 to only 0.73."
+  caption="1,000 items after the change, fresh items say 0.51 and the window says 0.52. The whole-stream average says 0.80."
+/>
+
+The whole-stream mean of 30,000 good items cannot move quickly. For the 5,000 items after the change its root-mean-square gap to the fresh-item accuracy is 0.26. The fix is the one <Ref lesson="concept-drift" id="how-long-a-window-should-an-estimate-use">the drift lesson's window trade-off</Ref> predicts: the estimate has to forget.
+
+<Definition title="sliding and fading prequential scores">
+The *landmark* score is $\frac{1}{t} \sum_{i \leq t} L_i$. The *sliding* score averages the last $W$ losses. The *fading* score keeps two numbers,
+
+$$
+S_t = L_t + \phi\, S_{t-1}, \qquad N_t = 1 + \phi\, N_{t-1},
+$$
+
+and reports $S_t / N_t$, with a fading factor $\phi \in (0, 1)$.
+</Definition>
+
+$S_t / N_t$ is the <Ref lesson="concept-drift" id="forgetting-without-storing-the-moving-average">moving average of the drift lesson</Ref> with $\lambda = 1 - \phi$, started so that its early values are not pulled towards zero. So the matching rule carries over: a window of $W$ corresponds to $\phi = 1 - 2/(W + 1)$, about 0.998 for $W = 1{,}000$. Libraries call the factor `alpha`; here $\alpha$ stays ADWIN's confidence.
+
+The window trade-off returns with its two numbers measured. Against the fresh-item accuracy on this stream:
+
+| Score | Gap on the calm stretch | Gap, 5,000 items after the change |
+|---|---|---|
+| Landmark | 0.008 | 0.26 |
+| Window 100 | 0.041 | 0.045 |
+| Window 1,000 | 0.012 | 0.064 |
+| Window 5,000 | 0.008 | 0.165 |
+
+(Root-mean-square gaps, and the fresh-item test has noise of about 0.006 of its own.) Noise at accuracy $p$ is $\sqrt{p(1-p)/W}$, which is the 0.041 and the 0.012. From a window of 1,000, going down to 100 gains 0.019 after the change and costs 0.029 in the calm, and going up to 5,000 gains 0.004 in the calm and costs 0.10 after the change. So 1,000 balances the two columns here, and a stream that changes faster would move the balance to a shorter window.
+
+<KeyFact>
+A score has to forget for the same reason a model does. A landmark mean describes the stream's history; a sliding or fading one describes the model now.
+</KeyFact>
+
+### Accuracy against what: Kappa
+
+Windows fix when the score looks. They do not fix what it counts. On a stream with 0.2% fraud, a model that never flags anything has 99.8% accuracy.
+
+The repair is to credit a model only for agreement beyond what its own habits would produce by chance. Suppose it flags a share $q$ of items at random on a stream with fraud share $\pi$. It agrees with the label by chance with probability $p_c = q\pi + (1-q)(1-\pi)$.
+
+<Definition title="Kappa">
+With $p_o$ the observed accuracy and $p_c$ as above,
+
+$$
+\kappa = \frac{p_o - p_c}{1 - p_c}.
+$$
+
+$\kappa = 1$ is perfect agreement, $\kappa = 0$ is no better than chance at the model's own flagging rate, and a negative value is worse than chance.
+</Definition>
+
+<Example title="two models on 100,000 payments">
+200 of the payments are fraud, so $\pi = 0.002$.
+
+**Model A never flags.** $p_o = 0.998$ and $q = 0$, so $p_c = 0.998$ and $\kappa = 0$.
+
+**Model B flags 500 payments, 100 of them fraud.** It gets 100 frauds and $99{,}800 - 400 = 99{,}400$ genuine payments right, so $p_o = 0.995$. With $q = 0.005$, $p_c = 0.005 \times 0.002 + 0.995 \times 0.998 = 0.99302$. Then $\kappa = 0.00198 / 0.00698 = 0.28$.
+
+B has the lower accuracy and the higher Kappa, and B found half the fraud.
+</Example>
+
+<Exercise>
+On the same 100,000 payments, Model C flags 2,000 payments, 150 of them fraud. Compute $p_o$, $p_c$ and $\kappa$. Which of A, B, C does accuracy rank first, and which does Kappa? Write the chance term before opening.
+
+<Solution>
+Correct: $150 + (99{,}800 - 1{,}850) = 98{,}100$, so $p_o = 0.981$. $q = 0.02$, so $p_c = 0.02 \times 0.002 + 0.98 \times 0.998 = 0.97808$. $\kappa = (0.981 - 0.97808)/(1 - 0.97808) = 0.00292 / 0.02192 = 0.13$. Accuracy ranks A, B, C. Kappa ranks B (0.28), C (0.13), A (0). C finds the most fraud and pays for it with 1,850 false flags, and Kappa weighs flags and frauds without any idea of a budget.
+</Solution>
+</Exercise>
+
+Chance is not the only baseline a stream needs, because its labels are not independent draws. "Rain tomorrow if it rained today" is a good forecast that knows no meteorology. The stream version is $\hat y_t = y_{t-1}$, and *temporal Kappa* replaces $p_c$ with the accuracy of that repeat-the-last-label rule. A series with long runs, such as a daily flag for a high-fraud day, lets a model score well on plain Kappa by doing what this rule does.
+
+On a payment log in time order, consecutive payments belong to unrelated cards, so the rule is a chance baseline after all. On the simulator it scores 0.9834, which is $\pi^2 + (1 - \pi)^2$ to four places: the chance of two independent payments having the same label. That is $p_c$ for a model flagging at $q = \pi$, so for that model the two baselines coincide. A model that never flags has the higher $p_c = 1 - \pi = 0.9916$. The dependence sits inside the card, where runs of fraud are real: of the simulator's frauds, 11% follow a fraud on the same card. So the repeat rule that could earn credit works per card: flag a card whose last payment was fraud. <Ref lesson="delayed-labels-prequential" id="which-test-payments-would-really-be-scored-removing-known-cards">Removing known cards</Ref> already takes that rule off the score, because a card whose earlier fraud has been labelled never reaches the test.
+
+So Kappa is the right repair for a stream of yes or no decisions, and you will meet it in every stream library. A fraud model's decision is not that kind: <Ref lesson="alert-budget-metrics" id="card-precision-at-k-the-team-calls-cards">$CP@k$</Ref> was built for a ranking cut at a budget, and it is prequential already when each day's model is trained only on labels that had arrived before that day. What the stream adds is that a report has to be a sliding window rather than a mean over the whole test, and its length in whole weeks, because <Ref lesson="change-detectors" id="the-week-has-a-shape">the week has a shape</Ref>. A window of 7 or 28 days holds every weekday equally often, so the rhythm cannot move the score.
+
+## What a learner should remember
+
+With a score that follows the model, the question of memory can be tested. On the generated stream with three switches, 10,000 items apart, the naive Bayes above keeps everything and ends the four stretches at 0.81, 0.72, 0.68 and 0.66, each concept's items being outvoted by the ones before it.
+
+So something must go. Each way of dropping items is a claim about how the relevance of an item falls with its age.
+
+<Figure
+  src="./figures/memory-strips.svg"
+  alt="Five rows of forty cells over one stream, oldest on the left. Fixed window: the last twelve filled. Window set by a detector: filled after a change mark. Landmark: filled from an alarm mark to the end. Reservoir: scattered cells filled across the whole stream. Fading: every cell tinted, darker towards the newest."
+  caption="Five memories over one stream. Each answers: how much is an item of this age still worth?"
+/>
+
+**Fixed window.** The last $W$ items, each counting fully, then nothing. The claim is that the concept has been stable for at least $W$ items, and <Ref lesson="concept-drift" id="how-long-a-window-should-an-estimate-use">the best $W$ depends on a rate of change nobody knows</Ref>.
+
+**Window set by a detector.** <Ref lesson="change-detectors" id="letting-the-stream-set-the-window-adwin">ADWIN</Ref> grows while nothing contradicts "no change inside" and drops the older part when something does. This is the same claim without guessing $W$, at the price of the detector's delay.
+
+**Landmark.** Everything since a chosen moment, usually the last alarm, a stored stretch of variable length. <Ref lesson="change-detectors" id="a-learners-error-is-a-proportion-ddm">DDM's store</Ref> is one, with the warning as its moment. The claim is that the moment dates the change.
+
+**Reservoir.** A uniform sample of the whole stream under a fixed budget of $W$ items. Item $i$ enters with probability $W/i$ and replaces a random resident. The claim is that age says nothing about relevance.
+
+<Aside>
+**Why $W/i$ gives a uniform sample.** After $i$ items, each should be held with probability $W/i$. Item $i$ enters with exactly that. An older item, held with probability $W/(i-1)$ by induction, survives step $i$ unless the new item enters and picks its slot: $\frac{W}{i-1}\left(1 - \frac{W}{i}\cdot\frac{1}{W}\right) = \frac{W}{i-1}\cdot\frac{i-1}{i} = \frac{W}{i}$. Each item costs one random draw, and the sample needs no knowledge of how long the stream will run.
+</Aside>
+
+**Fading.** Every item stays, with weight falling by $\phi$ per step: $S_i = G(x_i, \phi S_{i-1})$ for an update rule $G$. Nothing is stored but $S$. That is its strength and its limit, since it applies only to a learner whose whole state can be written as sums. A naive Bayes can be, and so can counts and means. A boosted forest cannot, so it needs one of the other four.
+
+### Recency is not relevance
+
+Four of the five rules treat the newest item as the most useful. <Ref lesson="concept-drift" id="each-pattern-breaks-a-different-estimate">The Sunday series of the drift lesson</Ref> is where this breaks: on a Sunday, last Sunday beats yesterday. A concept that returns, whether a calendar pattern or a method fraudsters revive, is relearned from nothing by any rule that has forgotten it. So a model of an old concept should be put to sleep rather than deleted, and this is cheap: a stored model costs far less than the items it was fitted on.
+
+Memory also has an entry rule, not only an exit rule. <Ref lesson="behavioural-profiles" id="the-usual-self-has-the-card-just-changed">A card's profile</Ref> is a running statistic, and a stolen card is still paying. Take a card that averages €30 over ten payments and suppose three of those ten are a thief's, at €150: the mean is now €66 and the next €150 reads as 2.3 times usual rather than 5. Very suspicious events should be left out of the update, at the price of a profile that lags when a genuine customer really does change.
+
+<KeyFact>
+A memory rule is a bet about how relevance falls with age, and it can be wrong in both directions: a rule that keeps too much averages over dead concepts, and one that deletes cannot serve a concept that returns.
+</KeyFact>
+
+## When to replace the model: blind or informed
+
+The five memories split in two. *Blind* adaptation forgets at the same rate whatever the stream does: a fixed window, a reservoir, a fading factor, or a retrain every so often. *Informed* adaptation waits for a signal and changes the model when it fires, usually <Ref lesson="change-detectors">a change detector on its error</Ref>, as a detector-set window and an alarm's landmark do. Waiting costs a delay and a detector that can be wrong, so the question is what the constant rate costs. The blind learner has to choose one rate for calm and change alike.
+
+Put the learners on the generated stream, four stretches of 10,000 items with a switch between each, and score them prequentially, averaged over 12 runs. "End of a stretch" is the last 3,000 items of the three stretches after a switch. The informed learner runs Page–Hinkley ($v = 0.05$, $h = 12$) on its own error bits, throws the model away on an alarm and starts again from nothing.
+
+| Learner | Accuracy, end of a stretch | First 2,000 items after a switch | All 40,000 |
+|---|---|---|---|
+| Keep everything | 0.69 | 0.53 | 0.666 |
+| Window 300 | 0.78 | 0.76 | 0.773 |
+| Window 1,000 | 0.81 | 0.74 | 0.793 |
+| Window 5,000 | 0.82 | 0.59 | 0.771 |
+| Fading $\phi = 0.999$ | 0.81 | 0.73 | 0.796 |
+| Reset on alarm | **0.82** | **0.78** | **0.808** |
+
+Read the windows from the top. Window 300 recovers quickly and then stays about 3.5 points short of the best possible, on every item of every calm stretch, because 300 items cannot pin down 100 feature means. Window 5,000 reaches the ceiling and takes thousands of items to get back to it. No window has both, which is what "blind" costs.
+
+The informed learner has both, because its memory is long while the stream is calm and short at the moment that matters. It has a detection delay of about 45 items, then a cold start, and it alarms a little more often than the stream changes (3.25 alarms for 3 switches). Those are small here because the change is large and abrupt and the model takes under a thousand items to fit. Neither holds for fraud: <Ref lesson="change-detectors" id="what-it-costs-in-days">the alarm rings 17 days after the change</Ref>, and a cold start has few frauds to start from.
+
+### Replacing only what changed
+
+A reset discards everything, including what is still right. Suppose the change touches only online payments. A tree-shaped model can see that, since each subtree covers a region of the inputs and the error can be tracked per subtree. Replacement can then be *local*.
+
+<Figure
+  src="./figures/local-replacement.svg"
+  alt="A small decision tree splitting on online payment, then night on one side and amount on the other. The online subtree is tinted as the region where the error rises, with an alternate subtree drawn beside it. The other subtree is marked as untouched."
+  caption="The subtree whose error rose gets a replacement grown beside it, and the rest keeps answering."
+/>
+
+The replacement grows in parallel rather than taking over at once, because a new subtree is worse than a stale one for its first items. It is swapped in when it beats the old one on the same recent items, and thrown away if it never does.
+
+The gain is easy to size. Split the generated stream into two regions by a flag, keep one model per region, and change the concept in one region only. A reset of both models takes the unchanged region from 0.815 to 0.79 over the next 4,000 items. Resetting only the region whose detector fired leaves it at 0.81, and the changed region recovers equally either way (0.78). The saving is proportional to how much of the input space did not change, and a fraud method usually touches little of it.
+
+<KeyFact>
+The detector says when. The memory rule says with what. Local replacement says how much. They are three separate decisions, and a learner that bundles them, such as "on an alarm, retrain on what you stored", has made all three without looking at any of them.
+</KeyFact>
+
+## A committee of models: weighting, adding, pruning
+
+An informed learner bets on one detector and one model at a time. The alternative hedges: keep several models of different ages, and let recent performance decide how much each one counts. Nothing then has to decide a change happened, since the vote moves by itself.
+
+<Definition title="dynamic weighted majority">
+Keep a pool of models (*experts*), each with a weight, starting from one expert of weight 1, and fix a factor $\rho \in [0, 1)$, a floor $w_{\min}$ and a period $u$. On every item, the pool predicts by a weighted vote, and then every expert learns the item. The weights move only on every $u$-th item, between the vote and the learning:
+
+1. multiply the weight of each expert that is wrong by $\rho$;
+2. divide all weights by the largest, and remove experts with weight below $w_{\min}$;
+3. if the pool's vote was wrong, add a new empty expert with weight 1.
+</Definition>
+
+Published statements write the factor as $\beta$ and the floor as $\theta$; in this course $\beta$ stays the keep rate and $\theta$ the size of a change.
+
+<FigureSequence
+  name="dwm"
+  alt="Four experts A, B, C, E with weights 1, 0.5, 0.25, 0.125. A, B and E say genuine, C says fraud, the payment is fraud. Frame 1: the vote says genuine, 1.625 to 0.25. Frame 2: wrong experts drop to 0.5, 0.25 and 0.0625. Frame 3: rescaled to 1, 0.5, 0.5, 0.125, all above the floor 0.1, so none is removed. Frame 4: a new expert F added at weight 1."
+  caption="One update, with ρ = 0.5 and floor 0.1. A, B and E end where they began. C was right and outvoted, and it doubles without any step that rewards it."
+/>
+
+<Task>
+Between frames 1 and 3, C's weight doubled from 0.25 to 0.5 although nothing multiplied it, and A, B and E came back to their old weights. Work out why, by hand, from the rescale. Then say how many of the old experts' votes F can cancel on the next item, with one item learned.
+</Task>
+
+<Exercise>
+Continue from frame 4 with $\rho = 0.5$, and raise the floor to 0.3. The next payment is genuine. A and E say genuine; B, C and F say fraud. Give the vote, all weights after the update, and the pool. Do it on paper before opening.
+
+<Solution>
+Vote: genuine $1 + 0.125 = 1.125$, fraud $0.5 + 0.5 + 1 = 2$, so the pool says fraud, which is wrong. Wrong experts: B 0.25, C 0.25, F 0.5; A stays at 1, so the largest is 1 and nothing rescales. Below 0.3 are B and C, and also E at 0.125: E was right this time, and removal reads the weight, not the answer. The pool was wrong, so G joins at 1. The pool is A 1, F 0.5, G 1. At the figure's floor of 0.1 all of them would have stayed. C was the one expert right on the fraud, F has learned from it, and a single genuine payment has removed C and halved F: genuine payments can erode the experts that know the fraud, which is a real danger at one positive in a thousand.
+</Solution>
+</Exercise>
+
+The period $u$ is there because the rule adds on every pool error, and a learner with 19% error would otherwise add an expert every few items. With $\rho = 0.5$, floor 0.01 and $u = 50$ on the running stream, the pool peaks at about 38 experts. On the same stretches and runs as the learners above:
+
+| Learner | Accuracy, end of a stretch | First 2,000 items after a switch | All 40,000 |
+|---|---|---|---|
+| Weighted pool | 0.81 | 0.75 | 0.798 |
+| Reset on alarm | 0.82 | 0.78 | 0.808 |
+
+On this stream the pool never beats the detector, not on an abrupt switch and not on a ramp over 4,000 items (0.78 against 0.78 in the 6,000 items from the start of the ramp), and it holds 38 models to the detector's one. A pool can earn its cost only where no single detector can be trusted and where its members differ in something one model cannot hold at once: which period they were trained on, how much they remember. A thin fraud stream looks like that case, and the experiment in the next section tests it.
+
+### Bagging on a stream, and what it does not do
+
+The pool's members differ by when they joined. The other common way to make members differ is the sample each one sees, and on a stream that needs a new definition. <Ref lesson="imbalance-techniques-revisited" id="balanced-ensembles-the-gain-is-not-the-balance">Bagging</Ref> fits each member on a bootstrap, $n$ draws with replacement from $n$ rows. A stream has no $n$ to draw from. But in a bootstrap one given row is drawn $r$ times with binomial probability, $r \sim \text{Binomial}(n, 1/n)$, and as $n$ grows that distribution tends to Poisson with mean 1. So each member can see each arriving item $r$ times with $r \sim \text{Poisson}(1)$: no copy at probability 0.37, one copy at 0.37, two at 0.18. No stored data and no knowledge of the stream's length are needed.
+
+From an ensemble one would expect recovery after a switch: ten models with different samples should hold up better than one. On the same stretches and runs, with each bagged row beside the single learner it resembles:
+
+| Learner | Accuracy, end of a stretch | First 2,000 items after a switch | All 40,000 |
+|---|---|---|---|
+| Keep everything | 0.69 | 0.53 | 0.666 |
+| Bagging, 10 members | 0.69 | 0.53 | 0.666 |
+| Reset on alarm | 0.82 | 0.78 | 0.808 |
+| Bagging, a detector per member | 0.82 | 0.78 | 0.807 |
+
+Ten-member bagging shows no recovery at all, and every figure in its row matches the learner that keeps everything. Each member is still a model that never forgets, so the vote of ten of them is a less noisy version of the same stale answer. Give each member a detector that resets it, and the row jumps to the informed learner's. Bagging contributes the diversity and the detector contributes the forgetting.
+
+What the diversity contributes has been measured, not proved. In an experiment with online bagging on generated drifting streams, using the Poisson mean to set how much the members differed (a smaller mean leaves more items out of each member, so the members differ more), ensembles with low diversity had the lower error before a drift, highly diverse ones had the lower error shortly after, whatever the kind of drift, and the difference faded later. Nobody knows in advance when a change will come, so holding both kinds is a hedge.
+
+## The fraud model's memory and its cadence
+
+Everything so far learned one item at a time on a stream that gave its labels at once. A fraud model cannot, for three reasons. Labels <Ref lesson="fraud-detection-system" id="how-often-the-model-changes-a-nightly-retrain-beside-hand-edited-rules">arrive by the day</Ref>, in a batch, $\delta$ days late, so there is nothing to feed one at a time. The inputs that matter are <Ref lesson="transaction-aggregates">windows over the card and the terminal</Ref>, rebuilt as of each moment. And the default model on those inputs is a tree ensemble, whose state cannot be faded.
+
+So the unit is a *chunk*, one day of payments, and the learning mode is *retraining*: a new model built from stored rows each night. *Incremental* updating, in which a model's own state moves item by item, is the right tool on the streams above and the wrong one here. Nothing about the item-level results is overturned. The score stays prequential at the chunk level, and the rules for memory and replacement all still apply, on a coarser clock.
+
+### Three ways to fill the training set
+
+The rule that can be written down immediately is one the item streams never suggested, since a balanced stream has no reason for it: **memory can differ by class**. Genuine payments are plentiful and go stale, and frauds are scarce.
+
+<Figure
+  src="./figures/strategy-chunks.svg"
+  alt="Three rows of day cells. Static: three early days tinted blue, stuck in place, with a later day grey as the day to be scored. Update: the three days just before the grey day tinted blue, labelled K = 3. Forget: the two days before the grey day tinted, labelled K_gen = 2, and a small amber mark under every earlier day for the frauds kept."
+  caption="Three training sets for the same scored day, drawn without the label delay, which moves every block δ days further back."
+/>
+
+*Static* trains once and keeps scoring. *Update* retrains each night on the last $K$ days. *Forget* retrains each night on the last $K_{\text{gen}}$ days of genuine payments and on every fraud so far. A pool can sit on top of them. The one measured below holds four nightly models that remember differently, $K = 7$, $30$, $90$ and $K_{\text{gen}} = 30$, with each member's weight set from its precision over the last labelled week,
+
+$$
+w_m = \frac{\text{Prec}_m - \text{Prec}_{\min}}{\text{Prec}_{\max} - \text{Prec}_{\min}},
+$$
+
+which sends the worst model's weight to 0 and the best one's to 1, so the spread stays useful when all the numbers are small. (Equal precisions make the formula undefined, and then all weights are set to 1.)
+
+What can each of these do with few frauds? <Ref lesson="canonical-datasets" id="three-scripted-frauds">The simulator's</Ref> 85 frauds a day flatter a one-day window, so the experiment needs a thinner stream. Real ones can be thin: one subset of Belgian e-commerce payments that the next lesson studies holds about 5,200 payments a day, under 0.4% fraud, so at most about 20 frauds a day.
+
+<Example title="the experiment">
+**Data.** The simulator's card and terminal rules, run for 240 days, with compromises drawn less often (a new terminal every 5 days, a new card every 3 or so), which gives about 13 frauds a day among about 9,800 payments, with the 15 inputs of <Ref lesson="alert-budget-metrics" id="five-models-scored-on-a-test-week">the baseline models</Ref>.
+
+**Worlds.** Amounts above 220 stay fraud throughout. *No change.* *Replacing:* on day 130 terminal and card compromises stop being drawn and a new method starts, three cards a day each with two to five small payments between 1 a.m. and 5 a.m. (running compromises end within 28 days). *Returning:* the same, and on day 175 the old methods come back and the new one stops.
+
+**Models.** A boosted tree, depth 3, 60 rounds, with genuine rows sampled down to 1 in 10 for speed; only the order of scores is used. Labels arrive with $\delta = 7$. Training rows start on day 30, so that every card has a history behind its aggregates. Static is trained once, on days 72 to 101, so it is about four weeks old when the change comes on day 130. The pool ranks payments by a weighted mean of its members' ranks, with $w_m$ from the cards each member found in the last labelled week.
+
+**Score.** Each day's model picks 100 cards. Cards with a labelled earlier fraud, and cards it already found, are removed first. The score is the share of that day's compromised cards found, $\text{TP}/\gamma$, which is <Ref lesson="change-detectors" id="the-raw-error-rate-reads-the-fraud-share">the input that keeps its meaning at any scale</Ref>; $CP@100$ here is a low number with a ceiling set by the thin stream. Means over 4 runs.
+
+**Columns.** Day 138 is $c + \delta + 1$, the first day whose model can hold a label of the new method. Days 138–151 are the first two weeks of such models, when the new method's labels are still few, and 152 starts the stretch after them. Day 175 is when the old methods return in the returning world, so the last two columns start together, and the last one reads the three weeks after the return.
+</Example>
+
+| Strategy (nightly unless stated) | No change, day 130 on | Replacing, days 138–151 | Replacing, days 152–174 | Replacing, day 175 on | Returning, days 175–196 |
+|---|---|---|---|---|---|
+| Static, 30 days | 0.70 | 0.55 | 0.46 | 0.38 | **0.70** |
+| Update, $K = 1$ | 0.41 | 0.35 | 0.44 | 0.45 | 0.47 |
+| Update, $K = 7$ | 0.68 | 0.78 | 0.81 | 0.74 | 0.56 |
+| Update, $K = 30$ | 0.70 | **0.79** | **0.87** | 0.84 | 0.56 |
+| Update, $K = 90$ | 0.72 | 0.70 | 0.83 | **0.86** | 0.67 |
+| Forget, $K_{\text{gen}} = 7$ | 0.72 | 0.62 | 0.73 | 0.79 | 0.69 |
+| Forget, $K_{\text{gen}} = 30$ | **0.73** | 0.64 | 0.77 | 0.80 | 0.68 |
+| Forget, $K_{\text{gen}} = 90$ (separate pass) | 0.72 | 0.67 | 0.79 | 0.82 | **0.70** |
+| Pool of the $K = 7, 30, 90$ and $K_{\text{gen}} = 30$ models | 0.71 | 0.77 | 0.85 | 0.84 | 0.63 |
+
+A single difference under about 0.04 is not separated: rerunning a strategy on the same rows with another random sample of genuine payments moves it that much. The $K_{\text{gen}} = 90$ row is such a rerun, a separate pass over the same streams with its own sample, so its gaps to the other rows can only be read against that 0.04. The gaps stated below between the other rows have the same sign in all four runs, except that $K = 90$ leads Forget on days 152–174 in three runs of four. Levels do not compare across columns: $K = 30$ reads 0.70 in the calm and 0.87 after the change, because the new method's small night payments are easier to separate than the old frauds. So read each column down.
+
+**One day is too few.** $K = 1$ scores about 0.4 in every world, against about 0.7 for $K \geq 7$ in the calm column, with the same model and the same inputs. Its training set holds about 13 frauds.
+
+**A short memory wins after a new method and loses when an old one returns.** Through days 138–151, $K = 30$ finds 0.79 of the cards and every row holding months of old frauds finds 0.62 to 0.70, because those frauds outnumber the week of the new method. The last column reverses the ranking. When the old methods return on day 175, the models that have spent 45 days on the new one, $K = 7$ and $K = 30$, find 0.56. The ones still holding the old frauds find 0.67 to 0.70, and Static, which has never heard of the new method, is as good as any.
+
+<Figure
+  src="./figures/after-change.svg"
+  alt="Share of compromised cards found against day, 14-day windows, in the replacing world. All curves stand near 0.75 before day 130 except K = 1 near 0.4. All fall to about 0.6. Update K = 30 recovers first, near 0.87 by day 160. Update K = 90 follows, and Forget stays a little lower, near 0.8. Static keeps falling to below 0.4, and K = 1 stays near 0.4 to 0.5."
+  caption="The replacing world, day by day. Update, K = 30 recovers first, and Static never does."
+/>
+
+All the retrained models fall together, however they remember, because the 7 days of label delay hide the new method from every model until day 138. The trough looks longer than that because each point averages the 14 days ending there. No memory rule can touch those days.
+
+**Choose by what each bet can lose.** Nobody knows which world is coming. $K = 30$ is at most 0.03 short of the best row until a method returns, and then 0.14 short. $K = 90$ is level with the best in the calm and at most 0.04 short in every column except days 138–151, where it is 0.09 short, and a late start on a new method is the one loss a cut in memory could shorten.
+
+**Keeping frauds saves rows, and on a long window it shows no gain.** $K_{\text{gen}} = 90$ is $K = 90$ plus the frauds older than its window. Every gap between the two rows is within noise: level in the calm, 0.03 ahead when a method returns, 0.03 to 0.04 behind while a new method takes over. Whatever the older frauds add to 90 days of rows is too small for this experiment to see. What keeping frauds buys is a shorter genuine window. At about 9,800 payments a day, on day 130 $K = 90$ has about 880,000 genuine rows and 1,300 frauds (before the sampling for speed). $K_{\text{gen}} = 30$ has at least those frauds with 294,000 genuine rows, a third, and $K_{\text{gen}} = 7$ with about 69,000, a thirteenth. In the calm they score 0.73 and 0.72 against 0.72, and when a method returns 0.68 and 0.69 against 0.67, because frauds are the scarce rows and the genuine ones past some number add little. Short windows gain the most: $K = 7$ falls to 0.56 when a method returns, where $K_{\text{gen}} = 7$ holds 0.69. The price is a lag behind $K = 90$ of 0.06 to 0.10 in the replacing columns.
+
+**The pool does not win a column and is never far from the best.** It stands within noise of the best in four columns of five, and its largest shortfall is 0.07. That is about as safe as $K = 90$, at four models a night instead of one.
+
+### How often to retrain
+
+The cadence can be read the same way. Take $K = 30$ and vary only how often the model is rebuilt.
+
+| Retrained | No change | Replacing, days 138–151 | Replacing, days 152–174 | Replacing, day 175 on |
+|---|---|---|---|---|
+| Nightly | 0.70 | 0.79 | 0.87 | 0.84 |
+| Weekly | 0.70 | 0.69 | 0.86 | 0.84 |
+| Every 28 days | 0.69 | 0.55 | 0.63 | 0.84 |
+
+On a calm stream the schedule buys nothing, and after the change it buys time and only time: every row reaches the same level, and the slower schedule reaches it later by about the wait for its next retrain. So the cadence is the fastest loop the labels can feed. Since labels arrive daily, that is nightly, and <Ref lesson="change-detectors" id="what-the-alarm-is-for">the previous lesson's rule</Ref> gives the other side: a schedule that lags by less than the detector's delay leaves the alarm with little to do about learning.
+
+### What the alarm is still for
+
+The alarm can decide what the model learns from, which the nightly schedule does not. The long memory's one large loss is the late start on a new method: nightly $K = 90$ still holds 90 days of mostly old rows, and Forget with $K_{\text{gen}} = 30$ holds every old fraud. Give both a detector: CUSUM with $v = 0.5$, $h = 5$ on the daily missed share, level and spread taken from three calm weeks. On an alarm, training starts from the detector's estimate of the change, with at least two weeks of rows. That estimate is the last day CUSUM's sum stood at its floor of 0, because the <Ref lesson="change-detectors" id="where-the-floor-the-allowance-and-the-threshold-come-from">best-start sum</Ref> it carries begins there.
+
+On this thin stream the signal is weak, since each day's share rests on about four cards, and a model that relearns by itself shrinks the very rise the detector is looking for. In the four replacing runs, it fired 3 times on the $K = 90$ model (0, 1, 0 and 2) and 3 times on Forget (1, 1, 0 and 1), against 3 false alarms in the four calm runs on $K = 90$. With the detector, $K = 90$ and Forget average 0.73 and 0.68 in days 138–151, against 0.70 and 0.64 without, a gain within the noise. A false alarm costs something: in one run of the calm world, a cut with no reason behind it took Forget from 0.73 to 0.66 over days 138–174. A true cut costs too when the method returns: in the returning world the same detector takes $K = 90$ from 0.67 to 0.59 over days 175–196, most of it in one run.
+
+The gain is clearer with the detector taken out of the question. Cut both models back to day 130 on day 147, which is $c + \delta + 10$, the alarm the previous lesson computed, and rerun the four replacing streams with another random sample of genuine payments. Over days 152–174 Forget with $K_{\text{gen}} = 30$ rises from 0.75 (the table's 0.77, within the noise) to 0.86, and $K = 90$ from 0.83 to 0.87. So the gain from knowing the date of the change is largest for the model holding the most old frauds, and whether a detector can deliver it depends on how many cards a day it can read.
+
+<Figure
+  src="./figures/three-clocks.svg"
+  alt="A timeline of about thirty day cells with a change at c. A blue bar marks the seven-day label delay. A row of dots marks nightly retrains and a row of green marks the daily budget of 100 cards. A guide marks the alarm at c + 17, and a block below shows the training data then starting from about c."
+  caption="The clocks of the loop on one line. Only the alarm is not on a schedule, and it changes what the next night's model trains on."
+/>
+
+<KeyFact>
+The schedule keeps the model learning, what each bet can lose sets the length of its memory, and the detector decides only when to cut that memory back.
+</KeyFact>
+
+## ★ Can a tree learn one item at a time?
+
+Everything in the fraud section rebuilt trees from stored rows. The local replacement above assumed a tree could be kept up to date without that. It can, and the idea is a bound rather than a data structure.
+
+A tree-growing algorithm needs to know which attribute is the best split at a leaf. On a stream the leaf can keep just the counts of (attribute value, class), and the question is how many items it needs before its estimate of the best attribute can be trusted. Let $G$ be the gain of a split, in bits, with two classes, so $G \in [0, 1]$. <Ref lesson="change-detectors" id="letting-the-stream-set-the-window-adwin">Hoeffding's inequality</Ref> says a mean of $n$ independent values in a range of width 1 falls short of its expectation by more than
+
+$$
+\varepsilon(n, \alpha) = \sqrt{\frac{\ln(1/\alpha)}{2n}}
+$$
+
+with probability at most $\alpha$. So split a leaf when the best attribute's observed gain beats the second's by more than $\varepsilon$. With $\alpha = 10^{-7}$ and a gap of 0.05 bits, $n = 16.1 / (2 \times 0.0025) \approx 3{,}200$ items; a gap of 0.01 needs about 80,000. Nothing is stored but the counts, and the bound turns "enough items to decide" into a number. This is a *Hoeffding tree*. Gain is not literally a mean of independent values, so the statement is a heuristic reading of the bound rather than a theorem about gain, though a useful one. When two attributes are nearly tied, $n$ would run on without limit, so implementations also split once $\varepsilon$ is below a small tie threshold.
+
+This tree does not forget. The next step keeps statistics over a window: a first design stores a window of examples and has a parameter for each decision involved (window size 100,000, checks every 20,000 items, 2,000 items to decide a split has gone stale, 10,000 to build an alternate subtree, 1,000 to judge it). The *adaptive Hoeffding tree* replaces those with <Ref lesson="change-detectors" id="letting-the-stream-set-the-window-adwin">ADWIN</Ref>: one per subtree on its error. A rising error starts an alternate subtree, and the same estimates decide when the alternate has won. No example window is stored, and none of the five numbers remains, although the confidence $\alpha$, the tie threshold and how often a leaf is checked do remain.
+
+The table scores each learner prequentially by accuracy, one run each, on a generated loan-approval stream of 100,000 items, where a labelling rule of thresholds on attributes such as age and salary sets each label and changes at each switch, over four stretches of 25,000 (rules 1, 3, 1 again and 5). The bagged row draws its copies from a Poisson with mean 6, not the mean 1 defined above, so a member leaves out almost no item (probability 0.002 rather than 0.37):
+
+| Learner | All items | First 5,000 after each switch | End of last stretch |
+|---|---|---|---|
+| Naive Bayes | 0.67 | 0.52, 0.73, 0.30 | 0.63 |
+| Bagging of 5 naive Bayes with ADWIN resets | 0.76 | 0.54, 0.77, 0.76 | 0.78 |
+| Hoeffding tree | 0.89 | 0.88, 0.69, 0.70 | 0.80 |
+| Adaptive Hoeffding tree | 0.95 | 0.91, 0.95, 0.79 | 0.91 |
+
+The tree beats naive Bayes here because these rules are thresholds on attributes. The adaptive version gains most at the second switch, where a rule returns.
+
+<Conclusion>
+You can now score a changing model with predict, then score, then learn, say why a whole-stream mean reads twice a $1/\sqrt{t}$ error and misses a drift by 0.3, and pick a sliding or fading score whose length matches the noise you can accept. You can compute Kappa at a model's own flagging rate, and say why a budgeted fraud model uses a whole-week window of $CP@k$ instead. You can place any memory rule by what it claims about relevance, tell blind from informed adaptation by what each costs, show that bagging does not forget unless a detector makes it, and choose a fraud model's memory by what each bet can lose: retrained as often as labels arrive, on about 90 days of payments, or on every fraud with a shorter genuine window at a third to a thirteenth of the rows, cut back on an alarm you trust.
+
+That design rests on one simulator with planted changes. <Ref lesson="drift-strategies-on-worldline" /> ranks the strategies day by day on 422 days of real card payments, and asks what the ordering says about the stream. The toolkit itself, a scorer and a naive Bayes that resets on alarm, is built in <Ref lesson="drift-detector-lab" />.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+(a) A model never flags on a stream with 0.2% fraud. Compute its Kappa. (b) A second formula in circulation sets the chance term to $\sum_c \Pr[c]^2$, the sum of squared class shares. Compute Kappa that way for the same model, and say which guesser that chance term describes. (c) A daily series of "high-fraud day" flags is 1 on half the days, and a day agrees with the day before on 70% of days. A model is right on 80% of days, flagging half of them. Compute its Kappa and its temporal Kappa, and say what the gap means.
+
+<Solution>
+(a) $q = 0$, $p_c = 0.998$, $p_o = 0.998$, so $\kappa = 0$.
+
+(b) $\sum_c \Pr[c]^2 = 0.998^2 + 0.002^2 = 0.996008$. $\kappa = (0.998 - 0.996008)/(1 - 0.996008) = 0.499$. That chance term describes a guesser who says "fraud" 0.2% of the time, and it is also the score of repeat-the-last-label on independent labels. A model that does nothing beats that guesser because the majority answer is better than copying the shares. So the same word gives 0 or 0.5 on one model. Check which chance term a library computes before you read its Kappa; the one in this lesson uses the model's own flagging rate.
+
+(c) $p_c = 0.5 \times 0.5 + 0.5 \times 0.5 = 0.5$, so $\kappa = 0.6$. Temporal: $(0.8 - 0.7)/(1 - 0.7) = 0.33$. Most of the apparent skill is what a rule with no inputs gets by repeating yesterday. The move: report a score against the cheapest baseline that could explain it.
+</Solution>
+</Exercise>
+
+<Exercise>
+(a) Generalise the example: if the current error is $t^{-a}$ with $0 < a < 1$, by what factor does the whole-stream mean overstate it at large $T$? What happens at $a \to 0$ and $a \to 1$? (b) A learner's error rises linearly by $r$ per item, around a level with per-item standard deviation $\sigma$. Find the window length at which a sliding score's bias equals its standard error. Evaluate it for $\sigma = 0.4$, $r = 10^{-5}$. (c) Compare with <Ref lesson="concept-drift" id="how-long-a-window-should-an-estimate-use">the window that minimises variance plus squared staleness</Ref>.
+
+<Solution>
+(a) $\frac{1}{T} \sum_{t \leq T} t^{-a} \approx \frac{1}{T} \cdot \frac{T^{1-a}}{1-a} = \frac{T^{-a}}{1-a}$, a factor of $1/(1-a)$, which is 2 at $a = \frac{1}{2}$. As $a \to 0$ the error does not fall and the factor is 1: without learning the mean is honest. As $a \to 1$ the factor grows without bound; at $a = 1$ the mean is $\ln(T)/T$ against $1/T$, so the overstatement itself grows with the stream.
+
+(b) The mean age in a window of $w$ is about $w/2$, so the bias is $rw/2$. The standard error is $\sigma/\sqrt{w}$. Setting them equal gives $w^{3/2} = 2\sigma/r$, so $w = (2\sigma/r)^{2/3}$. Numbers: $(8 \times 10^4)^{2/3} \approx 1{,}860$ items.
+
+(c) That window was $(2\sigma^2/r^2)^{1/3} = (\sqrt{2}\,\sigma/r)^{2/3}$, here about 1,470. The ratio is $2^{1/3} \approx 1.26$, and both scale as $r^{-2/3}$. Stopping where bias equals noise gives slightly more weight to the noise than the best total does. The move: two ways of posing a trade-off give the same scaling, so the exact rule matters less than knowing the rate of change.
+</Solution>
+</Exercise>
+
+<Exercise>
+"A sliding-window prequential score of 0.92 beats the hold-out score of 0.90, so the streaming learner is better than the batch model." Refute this. Name what differs between the two numbers, and describe a comparison that would be valid.
+
+<Solution>
+**Which items.** The window covers the latest 1,000 items, and the hold-out is a block from some earlier time, under whatever concept then held. A change in how hard the stream is moves one number and not the other.
+
+**Which model.** The hold-out grades one frozen model. The window averages over 1,000 states of a model that has been learning, and it has been learning from labels the batch model never saw.
+
+**How precise.** At $p = 0.92$ and $W = 1{,}000$ the noise is $\sqrt{0.92 \times 0.08 / 1000} = 0.0086$, and neighbouring labels are not independent, so a gap of 0.02 is not safely more than noise.
+
+**A valid comparison.** Score both on the same items in the same order: the batch model predicts each one and never learns, the streaming model predicts and then learns, each with the same delay on its labels. Then read the difference of their sliding scores over time, which removes the shared difficulty of the stream. The move: a difference between two scores means something only if they share items and clock.
+</Solution>
+</Exercise>
+
+<Exercise>
+Take the weighted pool at its two boundaries, $\rho = 1$ and $\rho = 0$, and answer before opening. (a) What does the pool become in each case, and which is the plain unweighted majority vote? (b) What happens at $\rho = 0$ when every expert is wrong, and which step of the definition breaks? (c) Predict which one has the better accuracy on the calm stretches of the running stream, which has the better first 2,000 items after a switch, and how many experts each ends with. A reference run has the answers.
+
+<Solution>
+(a) At $\rho = 1$ no weight ever moves, so no expert falls below the floor. The pool only grows, and it votes an unweighted majority of everything ever added. At $\rho = 0$ one wrong answer at a check sets an expert's weight to 0, and it is removed at once. So the pool can hold only experts with no wrong answer at any check.
+
+(b) If all are wrong the largest weight is 0, and "divide by the largest" divides by zero. The fix is to treat that case as an empty pool and add a new expert. The definition's range includes 0, but the rescale step quietly needs a positive weight.
+
+(c) **Reference run** (three runs, $u = 50$, floor 0.01; the stretches of the lesson's table):
+
+| $\rho$ | End of a stretch | First 2,000 after a switch | All items | Experts |
+|---|---|---|---|---|
+| 0.5 | 0.81 | 0.75 | 0.798 | about 38 at most |
+| 1 | 0.79 | 0.57 | 0.733 | about 230 |
+| 0 | 0.71 | 0.70 | 0.708 | 1 |
+
+$\rho = 1$ is slow after a switch, because the old experts keep their votes and new ones must outnumber them. $\rho = 0$ recovers at once and never gets good: at 19% irreducible error an expert is wrong at about one check in five, so each model lives about 250 items. The move: a model that errs because the task is noisy is not a model that has gone stale, and a shrink factor has to tell the two apart by acting slowly.
+</Solution>
+</Exercise>
+
+<Exercise>
+Design and run an experiment. Generate a stream with three features uniform on $[0, 10]$ and the label "$x_1 + x_2 \leq \vartheta$", with 10% of labels flipped, for four stretches of 25,000 items at $\vartheta = 8, 9, 7, 9.5$. Score a naive Bayes (keep each class's mean), a Poisson(1)-bagged pool of ten, the pool with a Page–Hinkley detector per member ($v = 0.05$, $h = 12$), and the single model reset on alarm. Before running, predict from the lesson which ranks first and by how much. Report accuracy per stretch, and state what would count as evidence that adaptation helps here.
+
+<Solution>
+**Reference run** (four runs):
+
+| Learner | All items | End of each stretch |
+|---|---|---|
+| Naive Bayes | 0.831 | 0.815, 0.873, 0.747, 0.893 |
+| Bagged pool | 0.832 | 0.815, 0.873, 0.747, 0.893 |
+| Bagged, detector per member | 0.836 | 0.816, 0.871, 0.772, 0.892 |
+| Reset on alarm | 0.834 | 0.815, 0.867, 0.771, 0.893 |
+
+If you predicted a gap like the lesson's table, 0.67 against 0.81, the run says otherwise. A threshold moving from 8 to 9 changes the label only on a thin band of inputs, about a tenth of them, so the old model stays nearly right and its error barely rises. Detectors have little to fire on, and only the hardest stretch ($\vartheta = 7$) shows a gain, of about 2.5 points.
+
+Adaptation is shown to help when, on the same items, the difference between the adaptive and the plain score is positive after each switch, and larger than the difference between two repeats of the plain learner with different seeds. On this stream that holds at $\vartheta = 7$ alone. The move: measure the size of a change before paying for machinery to follow it. A concept change is not the same thing as a large change in error.
+</Solution>
+</Exercise>
+
+<Exercise>
+Return to the full simulator, whose 15 inputs and scenarios you know from <Ref lesson="alert-budget-metrics" id="five-models-scored-on-a-test-week">the baseline</Ref>. For training blocks ending on day 121: a window of 1 day holds 9,875 payments and 87 frauds, 7 days 68,526 and 626, 30 days 293,926 and 2,512, 90 days 882,035 and 7,758. Keeping every fraud since day 30 with 30 days of genuine gives 7,941 frauds and 291,414 genuine. (a) Compute the <Ref lesson="imbalance-techniques-revisited">imbalance ratio</Ref> of each. What does the window length do to it? What does keeping the frauds do? (b) A model is fitted on the Forget set and outputs 0.5. What is the probability on the stream, using <Ref lesson="undersampling-calibration" id="correcting-to-a-different-base-rate">the correction</Ref>? Find the keep rate from the two ratios, and compare it with $K_{\text{gen}}/T$ where $T$ is the number of days of fraud kept. (c) What assumption does the correction now make that a coin flip on the rows would not?
+
+<Solution>
+(a) IR $= 87/9{,}788 = 0.0089$; $626/67{,}900 = 0.0092$; $2{,}512/291{,}414 = 0.0086$; $7{,}758/874{,}277 = 0.0089$. Window length has no systematic effect on the ratio: it changes how many frauds there are, 87 against 7,758, and leaves the proportion. The Forget set has $7{,}941/291{,}414 = 0.0272$, about three times as much. Keeping frauds is the only move here that changes the balance.
+
+(b) $\beta$ is the stream odds over the training odds: $0.0089 / 0.0272 = 0.33$. Here $K_{\text{gen}}/T = 30/92 = 0.326$, the same number, because at a steady fraud rate the frauds of $T$ days face the genuine payments of $K_{\text{gen}}$ days. A stated 0.5 has odds 1, so the stream's odds are $0.33$ and $p' = 0.33/1.33 = 0.25$. Uncorrected, the Forget model is three times overconfident in odds.
+
+(c) That the frauds of day 30 are drawn from the same $p(x \mid \text{fraud})$ as today's. A coin flip on the rows looks only at the label. The Forget rule looks at the label and the date, so if fraud has drifted, the 92-day fraud mix is not today's, and the correction is right about the base rate and wrong about the distribution. The move: a keep rate exists only for a selection that looks at nothing but the label, the point <Ref lesson="undersampling-calibration" id="when-the-coin-looks-at-the-payment">the coin</Ref> already made.
+</Solution>
+</Exercise>
+
+<Exercise>
+Three strategies on 20 days of the replacing world, days 138 to 157: cards found out of the 100 called. Rank them each day (3 for most found, ties share their average), then sum the ranks over days.
+
+| Day | 138 | 139 | 140 | 141 | 142 | 143 | 144 | 145 | 146 | 147 | 148 | 149 | 150 | 151 | 152 | 153 | 154 | 155 | 156 | 157 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Static | 1 | 4 | 9 | 7 | 3 | 2 | 2 | 0 | 3 | 1 | 0 | 0 | 3 | 3 | 1 | 6 | 2 | 2 | 0 | 2 |
+| Update, $K = 30$ | 2 | 4 | 9 | 8 | 5 | 4 | 5 | 2 | 5 | 1 | 1 | 3 | 4 | 6 | 3 | 9 | 5 | 5 | 1 | 3 |
+| Forget, $K_{\text{gen}} = 30$ | 1 | 4 | 9 | 7 | 4 | 3 | 3 | 0 | 4 | 1 | 0 | 2 | 4 | 5 | 2 | 9 | 3 | 4 | 0 | 3 |
+
+(a) Give the rank sums. (b) Why rank per day rather than add up the cards? Point to two days that show the reason. (c) What is the largest and smallest rank sum possible with 3 strategies over $D$ days, and what sum would two strategies with no difference have?
+
+<Solution>
+(a) Static 25.5, Update 55.5, Forget 39. They add up to 120, the check: each day distributes $1 + 2 + 3 = 6$, and $6 \times 20 = 120$.
+
+(b) Totals are 51, 85 and 68, and most of the difference between strategies on a total can come from a few busy days. Day 153 has 6, 9, 9 and day 148 has 0, 1, 0. Between Static and Update, day 153 adds 3 cards to the difference on totals and day 148 adds 1, while on ranks each adds 1.5. A day with few compromised cards counts the same as a busy one, and the score does not move with how many frauds happened to arrive. A rank also needs no assumption that a card found on one day is worth a card found on another.
+
+(c) Largest $3D$, smallest $D$, and with no difference $2D$, which is 40 here. Forget's 39 is on that line, Update's 55.5 far above. Whether 15.5 above is more than chance needs a test on the daily ranks. That table is what <Ref lesson="drift-strategies-on-worldline" /> reads, with 422 days and many more strategies, and with real fraud.
+</Solution>
+</Exercise>
+
+<References>
+1. J. Gama, I. Žliobaitė, A. Bifet, M. Pechenizkiy, A. Bouchachia, "A Survey on Concept Drift Adaptation," *ACM Computing Surveys* 46(4), 2014 — Sec. 3.1 (windows, reservoir sampling, fading factor, recency and relevance), Sec. 3.3 (retraining and incremental modes, blind and informed adaptation, global and local replacement, ensembles), Sec. 4.2 (hold-out, prequential landmark, sliding and fading), Appendix A (Algorithm 5, the weighted pool), Appendix C (a sliding window of 1,000 against hold-out). https://doi.org/10.1145/2523813
+2. A. Bifet, R. Gavaldà, G. Holmes, B. Pfahringer, *Machine Learning for Data Streams with Practical Examples in MOA*, MIT Press, 2018 — Ch. 5, Sec. 5.2 (sliding window and exponential estimators), Exercise 5.2. https://book.moa.cms.waikato.ac.nz/chapter_5.html
+3. R. Gavaldà, *MIRI Seminar on Data Streams*, UPC, 2015 — Lecture 8, slides 4–11 (prequential, the $2/\sqrt{T}$ example, Kappa, temporal dependence), 13–18 (Poisson bagging, dynamic ensembles); Lecture 7, slides 13–23 (Hoeffding trees, the parameters of the concept-adapting version, adaptive trees). http://www.cs.upc.edu/~gavalda/DataStreamSeminar/
+4. J. Gama, R. Sebastião, P. P. Rodrigues, "On Evaluating Stream Learning Algorithms," *Machine Learning* 90(3), 2013, pp. 317–346 — fading factors for prequential error.
+5. A. P. Dawid, "Statistical Theory: The Prequential Approach," *Journal of the Royal Statistical Society A* 147(2), 1984, pp. 278–292 — the term.
+6. J. Cohen, "A Coefficient of Agreement for Nominal Scales," *Educational and Psychological Measurement* 20(1), 1960, pp. 37–46 — chance agreement at each rater's own marginals, the form used here.
+7. I. Žliobaitė, A. Bifet, J. Read, B. Pfahringer, G. Holmes, "Evaluation Methods and Decision Theory for Classification of Streaming Data with Temporal Dependence," *Machine Learning* 98(3), 2015, pp. 455–482 — the no-change baseline and temporal Kappa.
+8. J. S. Vitter, "Random Sampling with a Reservoir," *ACM Transactions on Mathematical Software* 11(1), 1985, pp. 37–57.
+9. J. Z. Kolter, M. A. Maloof, "Dynamic Weighted Majority: An Ensemble Method for Drifting Concepts," *Journal of Machine Learning Research* 8, 2007, pp. 2755–2790.
+10. N. C. Oza, S. Russell, "Online Bagging and Boosting," *AISTATS*, 2001 — Poisson(1) copies.
+11. L. L. Minku, A. P. White, X. Yao, "The Impact of Diversity on Online Ensemble Learning in the Presence of Concept Drift," *IEEE Transactions on Knowledge and Data Engineering* 22(5), 2010, pp. 730–742 — low diversity before a drift, high diversity after it.
+12. A. Bifet, G. Holmes, B. Pfahringer, "Leveraging Bagging for Evolving Data Streams," *ECML PKDD*, 2010; *Tutorial 5: Simulating Concept Drift in MOA*, Example 3 — the Agrawal stream with three abrupt switches, re-run here with `river` 0.26. https://moa.cms.waikato.ac.nz/tutorial-5-simulating-concept-drift-in-moa/
+13. A. Dal Pozzolo, O. Caelen, Y.-A. Le Borgne, S. Waterschoot, G. Bontempi, "Learned Lessons in Credit Card Fraud Detection from a Practitioner Perspective," *Expert Systems with Applications* 41(10), 2014, pp. 4915–4928 — Sec. 3.3 and Sec. 6 (static, update and forget, the ensemble weights), Sec. 7.1 (the dataset's scale). The strategy names are theirs; every number in the experiment here was computed for this course on the simulator.
+14. J. Gao, W. Fan, J. Han, P. S. Yu, "A General Framework for Mining Concept-Drifting Data Streams with Skewed Distributions," *SIAM International Conference on Data Mining*, 2007 — accumulating the minority class.
+15. R. J. Bolton, D. J. Hand, "Statistical Fraud Detection: A Review," *Statistical Science* 17(3), 2002, pp. 235–255 — Sec. 2 (leaving very suspicious events out of a profile's update).
+16. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 3 (the simulator, re-run here with thinner compromise rates and a planted change), Ch. 7 (an ensemble with members specialised on recent and older data). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+17. P. Domingos, G. Hulten, "Mining High-Speed Data Streams," *KDD*, 2000; G. Hulten, L. Spencer, P. Domingos, "Mining Time-Changing Data Streams," *KDD*, 2001; A. Bifet, R. Gavaldà, "Adaptive Learning from Evolving Data Streams," *Intelligent Data Analysis*, 2009 — the three trees of the starred section.
+18. L. Rutkowski, L. Pietruczuk, P. Duda, M. Jaworski, "Decision Trees for Mining Data Streams Based on the McDiarmid's Bound," *IEEE Transactions on Knowledge and Data Engineering* 25(6), 2013, pp. 1272–1279 — why gain is not covered by Hoeffding's inequality as stated.
+19. A. Carta, *Continual Learning* course, University of Pisa, notebook OML1 "From batch to stream learning" — the predict-then-learn loop. https://github.com/AntonioCarta/continual-learning-course
+20. J. Montiel et al., "River: Machine Learning for Streaming Data in Python," *Journal of Machine Learning Research* 22(110), 2021. https://riverml.xyz
+</References>

@@ -1,0 +1,68 @@
+The last three lessons quoted a detector's delay, the 3.25 times one rang for three switches, and a model's Kappa at its own flagging rate. Each number rests on a line that can be wrong without raising an error: whether the running mean takes the current item before the deviation does, what a count starts from after a reset, whether a model reads the label before it predicts. A wrong line still prints a plausible number, so the output alone cannot say which of them to trust before a detector goes on a live model.
+
+So you write the tools and check them: a bit-stream generator with planted abrupt
+and gradual changes, four change detectors compared by false alarms and detection
+delay over random runs, a prequential scorer with a sliding window, and a streaming
+naive Bayes that resets on alarm, run on a drifting synthetic stream and then on the
+simulator.
+
+Every definition comes from an earlier lesson. The run-length measures, the
+cumulative sums, Page–Hinkley, DDM, the two-window test and ADWIN's cut come from
+<Ref lesson="change-detectors" />. Prequential evaluation, the sliding and fading
+scores, Kappa and reset on alarm come from
+<Ref lesson="stream-learning-and-adaptation" />. The sigmoid transition is
+from <Ref lesson="concept-drift" />, the strategies that retrain on a schedule
+from <Ref lesson="drift-strategies-on-worldline" />, the simulator from
+<Ref lesson="canonical-datasets" />. Naive Bayes is taken as known.
+
+You write the tools in numpy, one checkpoint each, and each is first checked
+locally against a value you can follow by hand or against a published stream:
+the seeded generator; Page–Hinkley, one- and two-sided, by analogy with a CUSUM
+class that ships complete; DDM with its warning and drift bands; the reference
+window against the sliding window; ADWIN's cut, and ADWIN as a detector; the
+scorecard, which runs a detector over many seeded streams and reports its MTFA,
+MTD and missed detections; the landmark, sliding and fading scores with sliding
+Kappa; a Gaussian naive Bayes learned one item at a time, and the loop that
+predicts, feeds the detector, resets and only then learns. Then your detectors
+are compared on one plot of delay against false alarms, and the learner runs on
+a SEA stream and on 60 days of payments in which the fraud changes at day 25
+and again at day 45.
+
+The lab runs as a Jupyter notebook — open it in Colab with the button above, or
+in any Jupyter. It needs no GPU and downloads a data file of about 4.5 MB. The
+comparisons run for a minute or two, in plain Python on purpose: every detector
+has to be fed one item at a time. Pair the notebook with the code from this
+page; each checkpoint submits your function's outputs for verification, and the
+checklist above tracks what stands. The nine exact checkpoints are the required
+set. The written answer (which detector to put on a deployed fraud model whose
+labels come a week late) and the open task are optional. The open task scores
+the unlabelled half of days 40–59 with a learner of your design that may read a
+label only seven days after its payment, to a ROC-AUC above 0.83. Trees trained
+once on days 0–24 reach 0.66, and the same trees retrained daily on all the labels
+old enough reach 0.815. The grade is a ROC-AUC because a ranking asks for no
+flagging rate. On the labelled half of the same days the notebook draws two curves
+from your scores: ROC-AUC in bins of about three days, which shows where a lagging
+model loses its grade, and the sliding Kappa you built, which is the operating view. Expect about five hours. When a check goes red, the verdict often
+names the bug — the mean updated after the deviation, $t$ counted from the stream's
+start, a reference window that slides, the arithmetic mean in the cut, a late alarm
+counted as false, the landmark returned for the window, the model learning before it
+predicts — so read it before rereading your code.
+
+The first alarms on the payment stream ring when no fraud has changed: DDM's on days 2 and 6, because its
+warm-up ended on the stream's calmest items and a reset model then met its first
+weekend, and the others' on day 7, when columns computed from labels seven days old
+stop being zero. A detector on an error stream reports that something moved, and
+only that.
+
+The hand-built aggregates this lab's stream carries took a person to design, for one
+task on one issuer's data. <Ref lesson="limits-of-hand-built-features" /> starts on
+whether a model can learn that summary from the events themselves.
+
+<References>
+1. A. Bifet, R. Gavaldà, G. Holmes, B. Pfahringer, *Machine Learning for Data Streams*, MIT Press, 2018 — Ch. 5: the measures MTFA, MTD and MDR, Page–Hinkley, the window tests, DDM and ADWIN; Exercise 5.7, the generator and the comparison over random runs this lab is modelled on. It implements the normal test and the Hoeffding cut of the three tests there, and has the server verify outputs instead of asking for a report.
+2. J. Gama, I. Žliobaitė, A. Bifet, M. Pechenizkiy, A. Bouchachia, "A Survey on Concept Drift Adaptation," *ACM Computing Surveys* 46(4), 2014 — Sec. 3.2 (the detectors' formulas), Sec. 4.1 (Kappa), App. B.1 (the SEA generator).
+3. R. Gavaldà, *MIRI Seminar on Data Streams*, UPC, 2015 — Lecture 7, its closing exercise (a streaming naive Bayes made adaptive with a detector, the assignment the adaptive half follows, here Gaussian and with a reset on alarm); Lecture 8, slides 6–11 (prequential evaluation, its pessimism, Kappa).
+4. MOA, *Tutorial 5: Introduction to Concept Drift* — Sec. 3 (the sigmoid window), Sec. 7 (the SEA drift exercises, here re-implemented at a smaller size and with a naive Bayes in place of the Hoeffding tree).
+5. A. Carta, *Continual Learning* course, University of Pisa, notebooks OML1 "From batch to stream learning" and OML2 "Concept Drift" — the three-segment stream, the hand-written cumulative sum, the exercises on windowed prequential accuracy.
+6. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 3 (the rules of the transaction simulator, implemented here from their published description, with the handbook's scenarios switched on and off by day).
+</References>

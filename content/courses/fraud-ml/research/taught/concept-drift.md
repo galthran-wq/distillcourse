@@ -1,0 +1,58 @@
+# concept-drift — ledger
+
+NOTE (data): every simulator number here was computed by the writer on a re-generation of the simulator from its stated rules (numpy seed 0, 90 days, 882,164 payments, ~9,800/day, ~86 frauds/day), classifier HistGradientBoosting depth 3, 60 trees, rate 0.1, 3 GroupKFold by card; not the same run as other lessons' re-runs. Tracking table: Gaussian noise simulation, 400 seeds. Each disturbance alters only the amount or time column; window columns stay as computed.
+
+**Problem.** A June detector scores badly on October, with three stories on the table (new method, new product, holiday): which is the model's problem, how does each show up, and what can be measured before labels arrive? Answer: name the factor that moved (p(x), base rate with p(x|y) fixed, p(y|x)) and how it arrived; only a change in the right order of payments forces relearning; it reaches labels at c + δ at the earliest; label-free distances (day distinguishability, Hellinger) read p(x) and cannot see a fraud-only change (AUC ≤ ½ + π − π²/2); on labels, the base rate and ROC-AUC, then fraud rates within kinds and Hellinger on fraud rows against genuine rows, separate the rest (H on fraud rows alone does not: a new product moves it too); every tracked estimate trades variance against staleness at a window set by an unknown rate.
+
+## Explained
+- Why retraining on any fall is no answer: score late, holiday model relearned, score can fall with nothing wrong — intro
+- Four-worlds table (model = three kinds ranked by June rate); new product lowers ROC-AUC with order intact: shares within each class moved (online 82% of frauds, 40% of genuine, against 65%, 20%), same-kind pairs tie, ties count half, tied pairs 30% → 38%; wave leaves the shares, so AUC holds — §What exactly changed / ### One model, four worlds
+- Joint factors two ways; Definition: drift = p_t0(x,y) ≠ p_t1(x,y); "concept drift" = any change in this course; virtual (p(x) moves, p(y|x) not), prior shift (π_t moves, p(x|y) not), real (p(y|x) changes so as to reorder payments); fraud share = Σ p(y=1|x)p(x), so virtual usually moves it; figure three-changes (key image) — ### Naming the three parts
+- What each does to a cut: virtual leaves the best rule, but the fitted model is thin where training rows are few; prior shift multiplies all odds by one factor (posterior odds = prior odds × likelihood ratio), order kept, only a fixed-probability cut moves (Ref base-rate correction); real changes the likelihood ratio unevenly. KeyFact: test is whether the right order changed; prior shift can move precision and fraud share, virtual drift fraud share and even ROC-AUC, order right in both — ### Which change moves the boundary
+- In-body exercise: fifth world (frauds halve) — same §
+- News filter triad; the kind depends on x (terminal id vs delayed terminal risk: the feature turns real drift in the terminal-identity input into a change in p(x) with p(y|x) stable); near-miss: skew — ### The same three kinds elsewhere
+- Patterns: sudden, incremental, gradual, reoccurring, outlier-not-drift (figure patterns); sigmoid f(t) = 1/(1+e^{−4(t−p)/w}), centre p, width w, the 4 makes the slope at the centre 1/w (about 12% to 88% across w days), w → 1 is a step; w = 10 → 12%, 50%, 88% at p−5, p, p+5 — §How the change arrives in time
+- Term *concept*: the distribution p(x, y) in force over a stretch of the stream; drift = one concept giving way to another — §How the change arrives in time
+- Pattern × window table; last-four-Sundays 0.055 — ### Each pattern breaks a different estimate
+- Error on labels describes the stream δ days ago; first slow label at c + δ, first model using it scores c + δ + 1; seven days fully labelled at c + 6 + δ; fast labels come only from alerted cards, so a method the model scores low produces few (figure label-delay-1..3) — §Why the latest labels cannot answer in time
+- Means miss shape and correlation; three disturbances (correlation made by dealing the day's times out again by amount, each payment keeping card and amount) — §Measuring two days without labels / ### The obvious comparison misses shape and correlation
+- Definition day distinguishability D(a,b); three conditions: out of fold, no column names the day, folds split by card (shuffled 0.516 vs 0.499); code `day_distance` (figure distinguish-1..3) — ### A classifier as a distance
+- Matrix; planted calendar; reoccurring = D returns to 0.50 for like days, lasting sudden = new block, incremental = D grows with gap; real matrix (day-shift-matrix, first 34 of 92 days of face-to-face payments, spring 2015): random forest per pair of days, held-out, cell = correlation of predicted and true day, 0 at chance (scale not D's, measure not named); days merged by closeness into four calendar groups: working weekdays, Sundays with public holidays (shops closed), Saturdays with most Fridays, weekdays of Easter school holidays; a reoccurring change in p(x); read against own ordinary cells (Elliptic exercise); label-derived columns are not label-free — ### Every pair of days: a matrix
+- Total variation; Proposition: same genuine g, arbitrary fraud: TV ≤ π = max(π_a, π_b), AUC ≤ ½ + π − π²/2, with proof; KeyFact: D measures cardholders, not fraudsters; narrower comparison (card testing in a merchant group) escapes it — ### What the matrix cannot see
+- Hellinger Definition H = (1/√2)||√P − √Q||₂, symmetric, 0 to 1, empty bins fine; Example; in-body exercise with an empty bin, KL infinite (KL defined only there); H misses correlation, names the column — §A cheaper distance, one column at a time
+- H on fraud rows only, from δ late, drops the genuine majority and reads 0 under a fraud wave, but is not a method test: p(x|y=1) = p(y=1|x)p(x)/π, so a move in p(x) carries it; p(x|y) is fixed only under prior shift. Compare both classes: both still = prior shift or nothing; both move = the mix; fraud rows alone = p(y|x) moved; each read against its own week-to-week level. Method plus product moves both, so fraud rates within kinds decide (unchanged under virtual, reordering = real) — ### Per class, a delay later
+- Variance σ²/W, staleness (r(W−1)/2)²; best W depends on unknown r (figure window-tradeoff) — §How long a window should an estimate use / ### Two errors with opposite slopes
+- EWMA y_t = λx_t + (1−λ)y_{t−1}, weight λ(1−λ)^i; mean age (1−λ)/λ, variance σ²λ/(2−λ); λ = 2/(W+1) matches window's lag and variance; KeyFact — ### Forgetting without storing
+- Four-story table and three-step procedure, the order the evidence arrives (on the day; from c + δ, base rate and ROC-AUC on the first whole labelled week; then rates within kinds and H on fraud against genuine rows, read off the per-class table); stories combine, so one score cannot separate them; sequence lesson's hard days 9–10 and 25–26 May 2015: the experiment's authors inspected them and reported no calendar or public event; the real matrix gives reason to doubt that for three of the four (Saturday, Sunday, and 25 May = Pentecost Monday, grouped with the Sundays), so calendar may have a part but not the whole account (other weekends not low points, 26 May an ordinary Tuesday); ROC-AUC per day not reported (figure october-stories, schematic) — §Which of the October stories is the model's problem
+
+## Notation
+- x inputs, y label, p_t distribution on day t; π_t base rate (from economics-of-detection); τ probability cut
+- c day of a change; δ label delay (course symbol)
+- p, w centre and width of the sigmoid (f(t))
+- D(a,b) day distinguishability; H(P,Q) Hellinger; P_i, Q_i bin shares; g, f_a, f_b genuine and fraud distributions in the Proposition; u false-positive rate there; S a set of payments
+- W window length, σ per-step sd, r rate of change per step, λ EWMA rate. CAUTION for change-detectors: its brief uses λ as an alarm threshold and δ in CUSUM; both clash with this lesson (λ) and the course (δ)
+
+## Running cases
+- Four worlds, online / petrol / grocery payments, frauds: June 20,000/200, 10,000/40, 70,000/70; new product 40,000/400, 10,000/40, 50,000/50; wave 20,200/400, 10,040/80, 70,070/140; new method 19,840/40, 10,160/200, 70,000/70. Fraud share 0.31, 0.49, 0.62, 0.31%; frauds in top kind 65, 82, 65, 13%; precision in top kind 1, 1, 1.98, 0.20%; AUC 0.757, 0.725, 0.757, 0.680; TV 0, 20, 0.15, 0.16 points; tied fraud–genuine pairs June 30%, new product 38%. Ebb (exercise): 100, 20, 35 frauds, 0.16%, top precision 0.50%, AUC 0.757
+- D on simulator days 60–73, eleven label-free columns (amount, time of day, card count and mean amount 1/7/30, terminal count 1/7/30): 91 pairs mean 0.499, sd 0.006, range 0.482–0.512. Against day 60, second day disturbed (mean amount; D; H amount): ×1.2 (64; 0.58; 0.085); half ×0.5 half ×1.5 (54; 0.65; 0.122); times dealt out by amount so large amounts fall late, correlation 0 → 0.72 (54; 0.73 on the eleven columns, mean of 5 draws, 0.74 on amount and time alone; 0.023; time 0.010, both day 61's own values since each column's histogram is unchanged). Ordinary H ≈ 0.016 (ten bins)
+- H per class against June (fraud rows, genuine rows; three kinds as bins): wave 0, 0; new product 0.141, 0.160; new method 0.444, 0.000
+- Fraud-only: π 0.87%, ceiling 0.509; all frauds rewritten (×3 + 300, midnight to 2 a.m.) D 0.506; fraud rows doubled 0.502
+- Planted calendar (Sat ×1.25, +90 min; Sun ×0.8, +3 h): weekday pairs 0.50; Sat–weekday 0.65; Sun–weekday 0.69; Sat–Sun 0.74; Sat–Sat 0.50; Sun–Sun 0.51
+- Tracking table, noise 0.11, level 1 → 1.5 (RMSE W = 3, 7, 28): none .063 .041 .020; sudden .074 .082 .155; incremental .063 .046 .088; gradual .064 .047 .100; Sundays .167 .179 .175; outlier .136 .088 .044; halfway crossing after a step 1, 3, 14 days
+- Daily fraud share 0.88%, σ ≈ 0.095 points; r 0.01 → W ≈ 6; 0.03 → 3; 0.001 → 26
+- Exercises: EWMA λ 0.1 (0.035, 0.0042, 2.7e-6; mean age 9; W = 19); H/L precision 0.50 → 0.26; refutation of 0.55 → 0.80; W* = (2σ²/r²)^{1/3}; simulator matrix flat, scenario 2 invisible; Elliptic step 43 = sudden, prior + real; geometry: change day 125 → first model day 133, first whole fold in the new concept day 153 (28 days); forward Bernoulli 0.05 → 0.08: W 100 23% above 0.065 before the change, delay ~50; W 1,000 1.3%, ~480; W 10,000 crosses ~9,300–9,700
+
+## Assumed
+- delayed-labels-prequential: label clock, shuffled split, prequential folds; gbm-model-selection: best-estimated settings (exercise)
+- sequence-models-for-transactions: May hard days, models co-moving
+- undersampling-calibration: base-rate correction, current base rate a delay late
+- alert-budget-metrics: ROC axes are within-class rates, AUC by pairs; fraud-detection-system: fast labels; alert-feedback-selection-bias named only
+- canonical-datasets: scenarios; point-in-time-features: delayed terminal risk, skew; transaction-aggregates: short vs long windows; fraud-as-a-graph: decay by age
+- elliptic-illicit-nodes: step 43, the time-step column, shift-classifier exercise; anomaly-detection-framing: card testing
+
+## Left open
+- Rule on the running error, delay and false alarms → change-detectors (forward exercise, conclusion)
+- Which models to keep, how fast to forget → stream-learning-and-adaptation, drift-strategies-on-worldline
+- Drift the model causes through its own alerts → alert-feedback-selection-bias
+- Stability index on inputs, monitoring in production → model-risk-monitoring, fraudfinder-monitoring-read
+- Not taught: importance-weighted cross-validation, Kalman filters, severity and predictability as named axes, the Matthews correlation by name (the real matrix's cell measure, described only as a correlation, 0 at chance)

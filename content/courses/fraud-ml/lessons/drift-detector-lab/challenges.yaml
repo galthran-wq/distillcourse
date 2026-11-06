@@ -1,0 +1,953 @@
+checkpoints:
+  drift-bit-stream:
+    kind: exact
+    seed: 1
+    atol: 1.0e-6
+    inputs_code: |
+      inputs = (1500, 0.1, 0.6, 700, 300, 7)
+    wrong:
+      - hint: "A hard switch at `position`. The width is ignored; the mixing probability must follow the sigmoid."
+        code: |
+          def f(n, p_a, p_b, position, width, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              mix = (np.arange(n) >= position).astype(float)
+              from_b = rng.random(n) < mix
+              return (rng.random(n) < np.where(from_b, p_b, p_a)).astype(np.int64), mix
+      - hint: "The sigmoid is centred at position + width/2. `position` is its centre: mix is 0.5 there."
+        code: |
+          def f(n, p_a, p_b, position, width, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              mix = 1.0 / (1.0 + np.exp(-4.0 * (np.arange(n) - position - width / 2) / width))
+              from_b = rng.random(n) < mix
+              return (rng.random(n) < np.where(from_b, p_b, p_a)).astype(np.int64), mix
+      - hint: "The exponent is missing its factor of 4: the transition takes about four times as long as the width."
+        code: |
+          def f(n, p_a, p_b, position, width, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              mix = 1.0 / (1.0 + np.exp(-(np.arange(n) - position) / width))
+              from_b = rng.random(n) < mix
+              return (rng.random(n) < np.where(from_b, p_b, p_a)).astype(np.int64), mix
+      - hint: "One draw per item against the mixed probability. The distribution is right, but the checker needs the two draws of the contract: n uniforms for the concept, then n for the bit."
+        code: |
+          def f(n, p_a, p_b, position, width, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              mix = 1.0 / (1.0 + np.exp(-4.0 * (np.arange(n) - position) / width))
+              return (rng.random(n) < (1 - mix) * p_a + mix * p_b).astype(np.int64), mix
+  page-hinkley:
+    kind: exact
+    seed: 2
+    atol: 1.0e-6
+    inputs_code: |
+      x = np.r_[rng.normal(0.2, 0.1, 600), rng.normal(0.6, 0.1, 20), rng.normal(1.4, 0.1, 380), rng.normal(0.2, 0.1, 600), rng.normal(0.5, 0.1, 400)]
+      inputs = (x, 0.02, 3.0, 30)
+    wrong:
+      - hint: "No restart after an alarm: the mean and the statistic carry on, so one change alarms on every following item."
+        code: |
+          def f(x, v, h, warm_up):
+              import numpy as np
+              def run(two):
+                  n, mean, up, down = 0, 0.0, 0.0, 0.0
+                  a, us, ds = [], [], []
+                  for i, xi in enumerate(x):
+                      xi = float(xi)
+                      n += 1; mean += (xi - mean) / n
+                      up = max(0.0, up + xi - mean - v); down = max(0.0, down + mean - xi - v)
+                      if n >= warm_up and (up > h or (two and down > h)):
+                          a.append(i)
+                      us.append(up); ds.append(down)
+                  return np.array(a, dtype=np.int64), np.array(us), np.array(ds)
+              a1, u1, _ = run(False); a2, u2, d2 = run(True)
+              return a1, u1, a2, u2, d2
+      - hint: "The running mean is updated after the deviation is taken. The mean inside the sum includes the current item."
+        code: |
+          def f(x, v, h, warm_up):
+              import numpy as np
+              def run(two):
+                  n, mean, up, down = 0, 0.0, 0.0, 0.0
+                  a, us, ds = [], [], []
+                  for i, xi in enumerate(x):
+                      xi = float(xi)
+                      up = max(0.0, up + xi - mean - v); down = max(0.0, down + mean - xi - v)
+                      n += 1; mean += (xi - mean) / n
+                      if n >= warm_up and (up > h or (two and down > h)):
+                          a.append(i); n, mean, up, down = 0, 0.0, 0.0, 0.0
+                      us.append(up); ds.append(down)
+                  return np.array(a, dtype=np.int64), np.array(us), np.array(ds)
+              a1, u1, _ = run(False); a2, u2, d2 = run(True)
+              return a1, u1, a2, u2, d2
+      - hint: "The statistic restarted after an alarm but the running mean did not, so the old level stays in the deviation."
+        code: |
+          def f(x, v, h, warm_up):
+              import numpy as np
+              def run(two):
+                  n, c, mean, up, down = 0, 0, 0.0, 0.0, 0.0
+                  a, us, ds = [], [], []
+                  for i, xi in enumerate(x):
+                      xi = float(xi)
+                      n += 1; c += 1; mean += (xi - mean) / n
+                      up = max(0.0, up + xi - mean - v); down = max(0.0, down + mean - xi - v)
+                      if c >= warm_up and (up > h or (two and down > h)):
+                          a.append(i); c, up, down = 0, 0.0, 0.0
+                      us.append(up); ds.append(down)
+                  return np.array(a, dtype=np.int64), np.array(us), np.array(ds)
+              a1, u1, _ = run(False); a2, u2, d2 = run(True)
+              return a1, u1, a2, u2, d2
+      - hint: "The sums were held during the warm-up. Only the alarm waits: up and down run from the first item."
+        code: |
+          def f(x, v, h, warm_up):
+              import numpy as np
+              def run(two):
+                  n, mean, up, down = 0, 0.0, 0.0, 0.0
+                  a, us, ds = [], [], []
+                  for i, xi in enumerate(x):
+                      xi = float(xi)
+                      n += 1; mean += (xi - mean) / n
+                      if n >= warm_up:
+                          up = max(0.0, up + xi - mean - v); down = max(0.0, down + mean - xi - v)
+                          if up > h or (two and down > h):
+                              a.append(i); n, mean, up, down = 0, 0.0, 0.0, 0.0
+                      us.append(up); ds.append(down)
+                  return np.array(a, dtype=np.int64), np.array(us), np.array(ds)
+              a1, u1, _ = run(False); a2, u2, d2 = run(True)
+              return a1, u1, a2, u2, d2
+      - hint: "The warm-up counted from the stream's start. It restarts with everything else: after an alarm no new alarm until warm_up items have been read since it."
+        code: |
+          def f(x, v, h, warm_up):
+              import numpy as np
+              def run(two):
+                  n, seen, mean, up, down = 0, 0, 0.0, 0.0, 0.0
+                  a, us, ds = [], [], []
+                  for i, xi in enumerate(x):
+                      xi = float(xi)
+                      n += 1; seen += 1; mean += (xi - mean) / n
+                      up = max(0.0, up + xi - mean - v); down = max(0.0, down + mean - xi - v)
+                      if seen >= warm_up and (up > h or (two and down > h)):
+                          a.append(i); n, mean, up, down = 0, 0.0, 0.0, 0.0
+                      us.append(up); ds.append(down)
+                  return np.array(a, dtype=np.int64), np.array(us), np.array(ds)
+              a1, u1, _ = run(False); a2, u2, d2 = run(True)
+              return a1, u1, a2, u2, d2
+      - hint: "down has the same sign as up. The fall statistic adds mean - x, so it grows while items sit below the mean."
+        code: |
+          def f(x, v, h, warm_up):
+              import numpy as np
+              def run(two):
+                  n, seen, mean, up, down = 0, 0, 0.0, 0.0, 0.0
+                  a, us, ds = [], [], []
+                  for i, xi in enumerate(x):
+                      xi = float(xi)
+                      n += 1; seen += 1; mean += (xi - mean) / n
+                      up = max(0.0, up + xi - mean - v); down = max(0.0, down + xi - mean - v)
+                      if n >= warm_up and (up > h or (two and down > h)):
+                          a.append(i); n, mean, up, down = 0, 0.0, 0.0, 0.0
+                      us.append(up); ds.append(down)
+                  return np.array(a, dtype=np.int64), np.array(us), np.array(ds)
+              a1, u1, _ = run(False); a2, u2, d2 = run(True)
+              return a1, u1, a2, u2, d2
+      - hint: "With two_sided=True only the fall statistic was tested. Two-sided means either one crossing h alarms, and a rise still rings."
+        code: |
+          def f(x, v, h, warm_up):
+              import numpy as np
+              def run(two):
+                  n, seen, mean, up, down = 0, 0, 0.0, 0.0, 0.0
+                  a, us, ds = [], [], []
+                  for i, xi in enumerate(x):
+                      xi = float(xi)
+                      n += 1; seen += 1; mean += (xi - mean) / n
+                      up = max(0.0, up + xi - mean - v); down = max(0.0, down + mean - xi - v)
+                      if n >= warm_up and (down > h if two else up > h):
+                          a.append(i); n, mean, up, down = 0, 0.0, 0.0, 0.0
+                      us.append(up); ds.append(down)
+                  return np.array(a, dtype=np.int64), np.array(us), np.array(ds)
+              a1, u1, _ = run(False); a2, u2, d2 = run(True)
+              return a1, u1, a2, u2, d2
+  ddm-bands:
+    kind: exact
+    seed: 3
+    atol: 1.7e-6
+    inputs_code: |
+      p = np.r_[np.zeros(100), np.full(2900, 0.05), np.full(1500, 0.25), np.full(1500, 0.55)]
+      inputs = ((rng.random(6000) < p).astype(float), 100)
+    wrong:
+      - hint: "t counts from the stream's start: after a reset the rate and its deviation must start from a fresh count."
+        code: |
+          def f(x, warm_up):
+              import numpy as np
+              t, p, s, pm, sm, w = 0, 0.0, 0.0, np.inf, np.inf, False
+              a, ps, ss, ws = [], [], [], []
+              for i, xi in enumerate(x):
+                  xi = float(xi)
+                  t += 1; p += (xi - p) / t; s = np.sqrt(p * (1 - p) / t)
+                  if t >= warm_up:
+                      l = p + s
+                      if l < pm + sm: pm, sm = p, s
+                      w = l >= pm + 2 * sm
+                      if l >= pm + 3 * sm:
+                          a.append(i); p, s, pm, sm, w = 0.0, 0.0, np.inf, np.inf, False
+                  ps.append(p); ss.append(s); ws.append(float(w))
+              return np.array(a, dtype=np.int64), np.array(ps), np.array(ss), np.array(ws)
+      - hint: "The bands use the current s_t: 2 s_t and 3 s_t above p_min. They are measured in s_min, the deviation stored with the best rate."
+        code: |
+          def f(x, warm_up):
+              import numpy as np
+              t, p, s, pm, sm, w = 0, 0.0, 0.0, np.inf, np.inf, False
+              a, ps, ss, ws = [], [], [], []
+              for i, xi in enumerate(x):
+                  xi = float(xi)
+                  t += 1; p += (xi - p) / t; s = np.sqrt(p * (1 - p) / t)
+                  if t >= warm_up:
+                      l = p + s
+                      if l < pm + sm: pm, sm = p, s
+                      w = l >= pm + 2 * s
+                      if l >= pm + 3 * s:
+                          a.append(i); t, p, s, pm, sm, w = 0, 0.0, 0.0, np.inf, np.inf, False
+                  ps.append(p); ss.append(s); ws.append(float(w))
+              return np.array(a, dtype=np.int64), np.array(ps), np.array(ss), np.array(ws)
+      - hint: "The registers are updated during the warm-up, so a lucky early stretch sets the bar. They start at t = warm_up."
+        code: |
+          def f(x, warm_up):
+              import numpy as np
+              t, p, s, pm, sm, w = 0, 0.0, 0.0, np.inf, np.inf, False
+              a, ps, ss, ws = [], [], [], []
+              for i, xi in enumerate(x):
+                  xi = float(xi)
+                  t += 1; p += (xi - p) / t; s = np.sqrt(p * (1 - p) / t)
+                  l = p + s
+                  if t > 1 and l < pm + sm: pm, sm = p, s
+                  if t >= warm_up:
+                      w = l >= pm + 2 * sm
+                      if l >= pm + 3 * sm:
+                          a.append(i); t, p, s, pm, sm, w = 0, 0.0, 0.0, np.inf, np.inf, False
+                  ps.append(p); ss.append(s); ws.append(float(w))
+              return np.array(a, dtype=np.int64), np.array(ps), np.array(ss), np.array(ws)
+      - hint: "The registers keep the smallest p_t. They are overwritten when the level p_t + s_t falls below p_min + s_min, so a small rate with a wide deviation does not set the bar."
+        code: |
+          def f(x, warm_up):
+              import numpy as np
+              t, p, s, pm, sm, w = 0, 0.0, 0.0, np.inf, np.inf, False
+              a, ps, ss, ws = [], [], [], []
+              for i, xi in enumerate(x):
+                  xi = float(xi)
+                  t += 1; p += (xi - p) / t; s = np.sqrt(p * (1 - p) / t)
+                  if t >= warm_up:
+                      l = p + s
+                      if p < pm: pm, sm = p, s
+                      w = l >= pm + 2 * sm
+                      if l >= pm + 3 * sm:
+                          a.append(i); t, p, s, pm, sm, w = 0, 0.0, 0.0, np.inf, np.inf, False
+                  ps.append(p); ss.append(s); ws.append(float(w))
+              return np.array(a, dtype=np.int64), np.array(ps), np.array(ss), np.array(ws)
+      - hint: "The bands are tested with a strict >. They are >=: a stream with no error in its warm-up has p = s = 0, the level equals the band, and the test as written declares drift at once."
+        code: |
+          def f(x, warm_up):
+              import numpy as np
+              t, p, s, pm, sm, w = 0, 0.0, 0.0, np.inf, np.inf, False
+              a, ps, ss, ws = [], [], [], []
+              for i, xi in enumerate(x):
+                  xi = float(xi)
+                  t += 1; p += (xi - p) / t; s = np.sqrt(p * (1 - p) / t)
+                  if t >= warm_up:
+                      l = p + s
+                      if l < pm + sm: pm, sm = p, s
+                      w = l > pm + 2 * sm
+                      if l > pm + 3 * sm:
+                          a.append(i); t, p, s, pm, sm, w = 0, 0.0, 0.0, np.inf, np.inf, False
+                  ps.append(p); ss.append(s); ws.append(float(w))
+              return np.array(a, dtype=np.int64), np.array(ps), np.array(ss), np.array(ws)
+      - hint: "The tests start one item late. They start on the update where t reaches warm_up, not on the one after it."
+        code: |
+          def f(x, warm_up):
+              import numpy as np
+              t, p, s, pm, sm, w = 0, 0.0, 0.0, np.inf, np.inf, False
+              a, ps, ss, ws = [], [], [], []
+              for i, xi in enumerate(x):
+                  xi = float(xi)
+                  t += 1; p += (xi - p) / t; s = np.sqrt(p * (1 - p) / t)
+                  if t > warm_up:
+                      l = p + s
+                      if l < pm + sm: pm, sm = p, s
+                      w = l >= pm + 2 * sm
+                      if l >= pm + 3 * sm:
+                          a.append(i); t, p, s, pm, sm, w = 0, 0.0, 0.0, np.inf, np.inf, False
+                  ps.append(p); ss.append(s); ws.append(float(w))
+              return np.array(a, dtype=np.int64), np.array(ps), np.array(ss), np.array(ws)
+  two-window-test:
+    kind: exact
+    seed: 4
+    atol: 1.0e-6
+    inputs_code: |
+      p = np.r_[np.full(800, 0.1), np.full(600, 0.4), np.full(600, 0.15), np.full(800, 0.5), np.full(400, 0.3)]
+      inputs = ((rng.random(len(p)) < p).astype(float), 40, 20, 1.96)
+    wrong:
+      - hint: "The root is missing its sizes: the standard error of a difference of means divides each variance by that window's size."
+        code: |
+          def f(x, n0, n1, z):
+              import numpy as np
+              ref, win, a = [], [], []
+              for i, xi in enumerate(x):
+                  if len(ref) < n0: ref.append(float(xi)); continue
+                  win.append(float(xi))
+                  if len(win) > n1: win.pop(0)
+                  if len(win) == n1 and abs(np.mean(ref) - np.mean(win)) > z * np.sqrt(np.var(ref) + np.var(win)):
+                      a.append(i); ref, win, n0 = win, [], n1
+              return np.array(a, dtype=np.int64)
+      - hint: "The reference window slides too. It must stay fixed until an alarm, or a slow change never opens a gap between the two."
+        code: |
+          def f(x, n0, n1, z):
+              import numpy as np
+              ref, win, a = [], [], []
+              for i, xi in enumerate(x):
+                  if len(ref) < n0: ref.append(float(xi)); continue
+                  win.append(float(xi))
+                  if len(win) > n1: ref.append(win.pop(0)); ref.pop(0)
+                  if len(win) == n1 and abs(np.mean(ref) - np.mean(win)) > z * np.sqrt(np.var(ref) / len(ref) + np.var(win) / n1):
+                      a.append(i); ref, win, n0 = win, [], n1
+              return np.array(a, dtype=np.int64)
+      - hint: "After an alarm the old reference stays, so the same change alarms again and again. The sliding window's items become the new reference."
+        code: |
+          def f(x, n0, n1, z):
+              import numpy as np
+              ref, win, a = [], [], []
+              for i, xi in enumerate(x):
+                  if len(ref) < n0: ref.append(float(xi)); continue
+                  win.append(float(xi))
+                  if len(win) > n1: win.pop(0)
+                  if len(win) == n1 and abs(np.mean(ref) - np.mean(win)) > z * np.sqrt(np.var(ref) / len(ref) + np.var(win) / n1):
+                      a.append(i); win = []
+              return np.array(a, dtype=np.int64)
+      - hint: "The root still divides the reference's variance by the first n0. After an alarm the reference holds n1 items, so n1 is its size."
+        code: |
+          def f(x, n0, n1, z):
+              import numpy as np
+              ref, win, a = [], [], []
+              first, size = n0, n0
+              for i, xi in enumerate(x):
+                  if len(ref) < size: ref.append(float(xi)); continue
+                  win.append(float(xi))
+                  if len(win) > n1: win.pop(0)
+                  if len(win) == n1 and abs(np.mean(ref) - np.mean(win)) > z * np.sqrt(np.var(ref) / first + np.var(win) / n1):
+                      a.append(i); ref, win, size = win, [], n1
+              return np.array(a, dtype=np.int64)
+  adwin-cut:
+    kind: exact
+    seed: 5
+    atol: 1.0e-6
+    inputs_code: |
+      p = np.r_[np.full(500, 0.1), np.full(250, 0.5), np.full(150, 0.15), np.full(100, 0.8)]
+      inputs = ((rng.random(len(p)) < p).astype(float), 0.01)
+    wrong:
+      - hint: "m is the arithmetic mean of the sizes. It is 1/(1/n0 + 1/n1), which stays near the smaller part; the arithmetic mean lets a tiny part pass on the strength of the large one."
+        code: |
+          def f(window, alpha):
+              import numpy as np
+              def splits(w):
+                  k = len(w); n0 = np.arange(1, k, dtype=float); n1 = k - n0; h = np.cumsum(w)[:-1]
+                  return np.abs(h / n0 - (w.sum() - h) / n1), np.sqrt(np.log(4 * k / alpha) / (2 * ((n0 + n1) / 2)))
+              g, e = splits(window); w = window
+              while len(w) >= 2:
+                  a, b = splits(w); cut = np.flatnonzero(a >= b)
+                  if not len(cut): break
+                  w = w[cut[0] + 1:]
+              return g, e, w
+      - hint: "The logarithm is ln(|W|/alpha), without the 4. The cut is then too low, by a constant inside the log."
+        code: |
+          def f(window, alpha):
+              import numpy as np
+              def splits(w):
+                  k = len(w); n0 = np.arange(1, k, dtype=float); n1 = k - n0; h = np.cumsum(w)[:-1]
+                  return np.abs(h / n0 - (w.sum() - h) / n1), np.sqrt(np.log(k / alpha) * (1 / n0 + 1 / n1) / 2)
+              g, e = splits(window); w = window
+              while len(w) >= 2:
+                  a, b = splits(w); cut = np.flatnonzero(a >= b)
+                  if not len(cut): break
+                  w = w[cut[0] + 1:]
+              return g, e, w
+      - hint: "Dropped W0 of the most recent cut split. The contract drops up to the oldest cut split and retests, so the window gives up as little as each test demands."
+        code: |
+          def f(window, alpha):
+              import numpy as np
+              def splits(w):
+                  k = len(w); n0 = np.arange(1, k, dtype=float); n1 = k - n0; h = np.cumsum(w)[:-1]
+                  return np.abs(h / n0 - (w.sum() - h) / n1), np.sqrt(np.log(4 * k / alpha) * (1 / n0 + 1 / n1) / 2)
+              g, e = splits(window); w = window
+              while len(w) >= 2:
+                  a, b = splits(w); cut = np.flatnonzero(a >= b)
+                  if not len(cut): break
+                  w = w[cut[-1] + 1:]
+              return g, e, w
+      - hint: "Cut once and stopped. After a drop the shorter window has its own |W| and must be tested again."
+        code: |
+          def f(window, alpha):
+              import numpy as np
+              k = len(window); n0 = np.arange(1, k, dtype=float); n1 = k - n0; h = np.cumsum(window)[:-1]
+              g = np.abs(h / n0 - (window.sum() - h) / n1); e = np.sqrt(np.log(4 * k / alpha) * (1 / n0 + 1 / n1) / 2)
+              cut = np.flatnonzero(g >= e)
+              return g, e, window[cut[0] + 1:] if len(cut) else window
+      - hint: "The retest kept the original |W| in the logarithm. After a drop the shorter window is tested with its own |W|, so its cut is lower."
+        code: |
+          def f(window, alpha):
+              import numpy as np
+              K = len(window)
+              def splits(w):
+                  k = len(w); n0 = np.arange(1, k, dtype=float); n1 = k - n0; h = np.cumsum(w)[:-1]
+                  return np.abs(h / n0 - (w.sum() - h) / n1), np.sqrt(np.log(4 * K / alpha) * (1 / n0 + 1 / n1) / 2)
+              g, e = splits(window); w = window
+              while len(w) >= 2:
+                  a, b = splits(w); cut = np.flatnonzero(a >= b)
+                  if not len(cut): break
+                  w = w[cut[0] + 1:]
+              return g, e, w
+      - hint: "Kept the item at the cut with `window[cut[0]:]`. Index j is the split whose W0 holds the first j + 1 items, so what remains starts at j + 1. At j = 0 this slice drops nothing and the loop never ends."
+        code: |
+          def f(window, alpha):
+              import numpy as np
+              def splits(w):
+                  k = len(w); n0 = np.arange(1, k, dtype=float); n1 = k - n0; h = np.cumsum(w)[:-1]
+                  return np.abs(h / n0 - (w.sum() - h) / n1), np.sqrt(np.log(4 * k / alpha) * (1 / n0 + 1 / n1) / 2)
+              g, e = splits(window); w = window
+              while len(w) >= 2:
+                  a, b = splits(w); cut = np.flatnonzero(a >= b)
+                  if not len(cut): break
+                  w = w[cut[0]:]
+              return g, e, w
+  adwin-stream:
+    kind: exact
+    seed: 6
+    atol: 1.0e-6
+    inputs_code: |
+      p = np.r_[np.full(1500, 0.1), np.full(800, 0.6), np.full(700, 0.2)]
+      inputs = ((rng.random(len(p)) < p).astype(float), 0.01, 16)
+    wrong:
+      - hint: "Cleared the whole window on an alarm. ADWIN keeps the part it still trusts: that part's mean is the estimate of the current level."
+        code: |
+          def f(x, alpha, check_every):
+              import numpy as np
+              def cut(w):
+                  w = np.array(w)
+                  while len(w) >= 2:
+                      k = len(w); n0 = np.arange(1, k, dtype=float); n1 = k - n0; h = np.cumsum(w)[:-1]
+                      g = np.abs(h / n0 - (w.sum() - h) / n1); e = np.sqrt(np.log(4 * k / alpha) * (1 / n0 + 1 / n1) / 2)
+                      c = np.flatnonzero(g >= e)
+                      if not len(c): break
+                      w = w[c[0] + 1:]
+                  return w
+              items, a, ws = [], [], []
+              for i, xi in enumerate(x):
+                  items.append(float(xi))
+                  if (i + 1) % check_every == 0 and len(cut(items)) < len(items):
+                      a.append(i); items = []
+                  ws.append(len(items))
+              return np.array(a, dtype=np.int64), np.array(ws, dtype=float)
+      - hint: "The cut runs on every item. check_every is part of the detector: it runs on every check_every-th item read."
+        code: |
+          def f(x, alpha, check_every):
+              import numpy as np
+              def cut(w):
+                  w = np.array(w)
+                  while len(w) >= 2:
+                      k = len(w); n0 = np.arange(1, k, dtype=float); n1 = k - n0; h = np.cumsum(w)[:-1]
+                      g = np.abs(h / n0 - (w.sum() - h) / n1); e = np.sqrt(np.log(4 * k / alpha) * (1 / n0 + 1 / n1) / 2)
+                      c = np.flatnonzero(g >= e)
+                      if not len(c): break
+                      w = w[c[0] + 1:]
+                  return w
+              items, a, ws = [], [], []
+              for i, xi in enumerate(x):
+                  items.append(float(xi))
+                  kept = cut(items)
+                  if len(kept) < len(items):
+                      a.append(i); items = kept.tolist()
+                  ws.append(len(items))
+              return np.array(a, dtype=np.int64), np.array(ws, dtype=float)
+      - hint: "The interval was counted on the window's length, which an alarm shortens. It counts the items read since the detector was created."
+        code: |
+          def f(x, alpha, check_every):
+              import numpy as np
+              def cut(w):
+                  w = np.array(w)
+                  while len(w) >= 2:
+                      k = len(w); n0 = np.arange(1, k, dtype=float); n1 = k - n0; h = np.cumsum(w)[:-1]
+                      g = np.abs(h / n0 - (w.sum() - h) / n1); e = np.sqrt(np.log(4 * k / alpha) * (1 / n0 + 1 / n1) / 2)
+                      c = np.flatnonzero(g >= e)
+                      if not len(c): break
+                      w = w[c[0] + 1:]
+                  return w
+              items, a, ws = [], [], []
+              for i, xi in enumerate(x):
+                  items.append(float(xi))
+                  if len(items) % check_every == 0:
+                      kept = cut(items)
+                      if len(kept) < len(items):
+                          a.append(i); items = kept.tolist()
+                  ws.append(len(items))
+              return np.array(a, dtype=np.int64), np.array(ws, dtype=float)
+  detector-scorecard:
+    kind: exact
+    seed: 7
+    atol: 1.0e-6
+    inputs_code: |
+      # A window rule stands in for the detector, so that this checkpoint grades
+      # the accounting and nothing in your earlier classes.
+      class WindowRule:
+          def __init__(self):
+              self.items = []
+          def update(self, x):
+              self.items = (self.items + [x])[-40:]
+              if len(self.items) == 40 and sum(self.items) / 40 > 0.3:
+                  self.items = []
+                  return True
+              return False
+      inputs = (WindowRule, 12, 3000, 0.15, 0.4, 2000, 300, 130, 21)
+    wrong:
+      - hint: "Alarms after the change were counted as false. Only an alarm before c, on the stretch where nothing has changed, is false."
+        code: |
+          def f(make_detector, n_runs, n, p_a, p_b, position, width, horizon, seed):
+              import numpy as np
+              def stream(r):
+                  rng = np.random.default_rng(seed + r)
+                  mix = 1.0 / (1.0 + np.exp(np.clip(-4.0 * (np.arange(n) - position) / width, -500, 500)))
+                  from_b = rng.random(n) < mix
+                  return (rng.random(n) < np.where(from_b, p_b, p_a)).astype(np.int64)
+              def alarms_of(r):
+                  d = make_detector()
+                  return np.array([i for i, v in enumerate(stream(r)) if d.update(float(v))], dtype=np.int64)
+              c = position - width // 2
+              fa, ds, m = 0, [], 0
+              for r in range(n_runs):
+                  a = alarms_of(r); fa += len(a)
+                  h = a[(a >= c) & (a < c + horizon)]
+                  if len(h): ds.append(h[0] - c)
+                  else: m += 1
+              return np.array([n_runs * c / max(fa, 1), np.mean(ds) if ds else horizon, m / n_runs, fa], dtype=float)
+      - hint: "The delay and the stable stretch run from the sigmoid's centre. A gradual change starts at c = position - width // 2, the window's start."
+        code: |
+          def f(make_detector, n_runs, n, p_a, p_b, position, width, horizon, seed):
+              import numpy as np
+              def stream(r):
+                  rng = np.random.default_rng(seed + r)
+                  mix = 1.0 / (1.0 + np.exp(np.clip(-4.0 * (np.arange(n) - position) / width, -500, 500)))
+                  from_b = rng.random(n) < mix
+                  return (rng.random(n) < np.where(from_b, p_b, p_a)).astype(np.int64)
+              def alarms_of(r):
+                  d = make_detector()
+                  return np.array([i for i, v in enumerate(stream(r)) if d.update(float(v))], dtype=np.int64)
+              c = position
+              fa, ds, m = 0, [], 0
+              for r in range(n_runs):
+                  a = alarms_of(r); fa += int((a < c).sum())
+                  h = a[(a >= c) & (a < c + horizon)]
+                  if len(h): ds.append(h[0] - c)
+                  else: m += 1
+              return np.array([n_runs * c / max(fa, 1), np.mean(ds) if ds else horizon, m / n_runs, fa], dtype=float)
+      - hint: "Missed runs entered the mean delay at the horizon. MTD is the mean over the runs that detected; MDR is the separate column for the others."
+        code: |
+          def f(make_detector, n_runs, n, p_a, p_b, position, width, horizon, seed):
+              import numpy as np
+              def stream(r):
+                  rng = np.random.default_rng(seed + r)
+                  mix = 1.0 / (1.0 + np.exp(np.clip(-4.0 * (np.arange(n) - position) / width, -500, 500)))
+                  from_b = rng.random(n) < mix
+                  return (rng.random(n) < np.where(from_b, p_b, p_a)).astype(np.int64)
+              def alarms_of(r):
+                  d = make_detector()
+                  return np.array([i for i, v in enumerate(stream(r)) if d.update(float(v))], dtype=np.int64)
+              c = position - width // 2
+              fa, ds, m = 0, [], 0
+              for r in range(n_runs):
+                  a = alarms_of(r); fa += int((a < c).sum())
+                  h = a[(a >= c) & (a < c + horizon)]
+                  if len(h): ds.append(h[0] - c)
+                  else: m += 1; ds.append(horizon)
+              return np.array([n_runs * c / max(fa, 1), np.mean(ds), m / n_runs, fa], dtype=float)
+      - hint: "MTFA was computed from one run's stable stretch. The false alarms are pooled over all runs, so the items are R times c."
+        code: |
+          def f(make_detector, n_runs, n, p_a, p_b, position, width, horizon, seed):
+              import numpy as np
+              def stream(r):
+                  rng = np.random.default_rng(seed + r)
+                  mix = 1.0 / (1.0 + np.exp(np.clip(-4.0 * (np.arange(n) - position) / width, -500, 500)))
+                  from_b = rng.random(n) < mix
+                  return (rng.random(n) < np.where(from_b, p_b, p_a)).astype(np.int64)
+              def alarms_of(r):
+                  d = make_detector()
+                  return np.array([i for i, v in enumerate(stream(r)) if d.update(float(v))], dtype=np.int64)
+              c = position - width // 2
+              fa, ds, m = 0, [], 0
+              for r in range(n_runs):
+                  a = alarms_of(r); fa += int((a < c).sum())
+                  h = a[(a >= c) & (a < c + horizon)]
+                  if len(h): ds.append(h[0] - c)
+                  else: m += 1
+              return np.array([c / max(fa, 1), np.mean(ds) if ds else horizon, m / n_runs, fa], dtype=float)
+      - hint: "One detector was shared across the runs, so each run starts from the state the last one left. Call make_detector() once per run."
+        code: |
+          def f(make_detector, n_runs, n, p_a, p_b, position, width, horizon, seed):
+              import numpy as np
+              def stream(r):
+                  rng = np.random.default_rng(seed + r)
+                  mix = 1.0 / (1.0 + np.exp(np.clip(-4.0 * (np.arange(n) - position) / width, -500, 500)))
+                  from_b = rng.random(n) < mix
+                  return (rng.random(n) < np.where(from_b, p_b, p_a)).astype(np.int64)
+              d = make_detector()
+              c = position - width // 2
+              fa, ds, m = 0, [], 0
+              for r in range(n_runs):
+                  a = np.array([i for i, v in enumerate(stream(r)) if d.update(float(v))], dtype=np.int64)
+                  fa += int((a < c).sum())
+                  h = a[(a >= c) & (a < c + horizon)]
+                  if len(h): ds.append(h[0] - c)
+                  else: m += 1
+              return np.array([n_runs * c / max(fa, 1), np.mean(ds) if ds else horizon, m / n_runs, fa], dtype=float)
+  prequential-scorer:
+    kind: exact
+    seed: 8
+    atol: 1.7e-6
+    inputs_code: |
+      y = (rng.random(4000) < np.r_[np.full(2000, 0.02), np.full(2000, 0.08)]).astype(np.int64)
+      flip = rng.random(4000) < np.r_[np.full(2500, 0.03), np.full(1500, 0.15)]
+      inputs = (np.where(flip, 1 - y, y), y, 500, 0.99)
+    wrong:
+      - hint: "The sliding column is the landmark: a running mean of everything so far. It must average only the last W items."
+        code: |
+          def f(pred, y, W, phi):
+              import numpy as np
+              pred, y = np.asarray(pred, dtype=float), np.asarray(y, dtype=float)
+              n = len(y); right = (pred == y).astype(float); t = np.arange(1, n + 1)
+              start = np.maximum(t - W, 0); size = t - start
+              def win(v):
+                  c = np.r_[0.0, np.cumsum(v)]
+                  return (c[t] - c[start]) / size
+              land = np.cumsum(right) / t; slid = land
+              fade = np.empty(n); s, m = 0.0, 0.0
+              for i in range(n):
+                  s = right[i] + phi * s; m = 1.0 + phi * m
+                  fade[i] = s / m
+              q, pi = win(pred), win(y); pc = q * pi + (1 - q) * (1 - pi)
+              return land, slid, fade, np.divide(win(right) - pc, 1 - pc, out=np.zeros(n), where=pc < 1)
+      - hint: "The window holds W + 1 items. At step t it covers the last W, that step included."
+        code: |
+          def f(pred, y, W, phi):
+              import numpy as np
+              pred, y = np.asarray(pred, dtype=float), np.asarray(y, dtype=float)
+              n = len(y); right = (pred == y).astype(float); t = np.arange(1, n + 1)
+              start = np.maximum(t - (W + 1), 0); size = t - start
+              def win(v):
+                  c = np.r_[0.0, np.cumsum(v)]
+                  return (c[t] - c[start]) / size
+              land = np.cumsum(right) / t; slid = win(right)
+              fade = np.empty(n); s, m = 0.0, 0.0
+              for i in range(n):
+                  s = right[i] + phi * s; m = 1.0 + phi * m
+                  fade[i] = s / m
+              q, pi = win(pred), win(y); pc = q * pi + (1 - q) * (1 - pi)
+              return land, slid, fade, np.divide(win(right) - pc, 1 - pc, out=np.zeros(n), where=pc < 1)
+      - hint: "The fading score is normalised by 1/(1 - phi) rather than by N_t, so its early values are pulled towards zero."
+        code: |
+          def f(pred, y, W, phi):
+              import numpy as np
+              pred, y = np.asarray(pred, dtype=float), np.asarray(y, dtype=float)
+              n = len(y); right = (pred == y).astype(float); t = np.arange(1, n + 1)
+              start = np.maximum(t - W, 0); size = t - start
+              def win(v):
+                  c = np.r_[0.0, np.cumsum(v)]
+                  return (c[t] - c[start]) / size
+              land = np.cumsum(right) / t; slid = win(right)
+              fade = np.empty(n); s, m = 0.0, 0.0
+              for i in range(n):
+                  s = right[i] + phi * s; m = 1.0 + phi * m
+                  fade[i] = s * (1 - phi)
+              q, pi = win(pred), win(y); pc = q * pi + (1 - q) * (1 - pi)
+              return land, slid, fade, np.divide(win(right) - pc, 1 - pc, out=np.zeros(n), where=pc < 1)
+      - hint: "The Kappa chance term is the sum of squared class shares. Here chance is agreement at the model's own flagging rate: q*pi + (1-q)*(1-pi)."
+        code: |
+          def f(pred, y, W, phi):
+              import numpy as np
+              pred, y = np.asarray(pred, dtype=float), np.asarray(y, dtype=float)
+              n = len(y); right = (pred == y).astype(float); t = np.arange(1, n + 1)
+              start = np.maximum(t - W, 0); size = t - start
+              def win(v):
+                  c = np.r_[0.0, np.cumsum(v)]
+                  return (c[t] - c[start]) / size
+              land = np.cumsum(right) / t; slid = win(right)
+              fade = np.empty(n); s, m = 0.0, 0.0
+              for i in range(n):
+                  s = right[i] + phi * s; m = 1.0 + phi * m
+                  fade[i] = s / m
+              q, pi = win(pred), win(y); pc = pi * pi + (1 - pi) * (1 - pi)
+              return land, slid, fade, np.divide(win(right) - pc, 1 - pc, out=np.zeros(n), where=pc < 1)
+      - hint: "Kappa's q and pi are landmark shares, taken over everything so far. The observed accuracy, q and pi all come from the same sliding window."
+        code: |
+          def f(pred, y, W, phi):
+              import numpy as np
+              pred, y = np.asarray(pred, dtype=float), np.asarray(y, dtype=float)
+              n = len(y); right = (pred == y).astype(float); t = np.arange(1, n + 1)
+              start = np.maximum(t - W, 0); size = t - start
+              def win(v):
+                  c = np.r_[0.0, np.cumsum(v)]
+                  return (c[t] - c[start]) / size
+              land = np.cumsum(right) / t; slid = win(right)
+              fade = np.empty(n); s, m = 0.0, 0.0
+              for i in range(n):
+                  s = right[i] + phi * s; m = 1.0 + phi * m
+                  fade[i] = s / m
+              q, pi = np.cumsum(pred) / t, np.cumsum(y) / t; pc = q * pi + (1 - q) * (1 - pi)
+              return land, slid, fade, np.divide(slid - pc, 1 - pc, out=np.zeros(n), where=pc < 1)
+  streaming-naive-bayes:
+    kind: exact
+    seed: 9
+    atol: 1.0e-6
+    inputs_code: |
+      n = 3000
+      X = rng.uniform(0, 10, (n, 3))
+      theta = np.r_[np.full(1500, 13.0), np.full(1500, 6.0)]
+      y = (X[:, 0] + X[:, 1] <= theta).astype(np.int64)
+      flip = rng.random(n) < 0.1
+      y[flip] = 1 - y[flip]
+      inputs = (X, y, 0.02, 15.0, 30)
+    wrong:
+      - hint: "The model learned the item before predicting on it, so it reads its own answer. Predict, score, then learn."
+        code: |
+          def f(X, y, v, h, warm_up):
+              import numpy as np
+              def run(detect):
+                  d = X.shape[1]; n = np.zeros(2, dtype=np.int64); mean = np.zeros((2, d)); m2 = np.zeros((2, d))
+                  pn, pm, pu, pc = 0, 0.0, 0.0, []
+                  def score(x):
+                      tot = np.log((n[1] + 1) / (n[0] + 1))
+                      for c, sign in ((1, 1.0), (0, -1.0)):
+                          var = m2[c] / (n[c] - 1) + 1e-6 if n[c] >= 2 else np.ones(d)
+                          tot += sign * np.sum(-0.5 * np.log(2 * np.pi * var) - (x - mean[c]) ** 2 / (2 * var))
+                      return float(tot)
+                  def learn(x, c):
+                      n[c] += 1; e = x - mean[c]; mean[c] += e / n[c]; m2[c] += e * (x - mean[c])
+                  S, P, A = np.empty(len(y)), np.empty(len(y), dtype=np.int64), []
+                  for i in range(len(y)):
+                      if True: learn(X[i], int(y[i]))
+                      S[i] = score(X[i]); P[i] = int(S[i] > 0)
+                      if detect:
+                          e = float(P[i] != y[i]); pn += 1; pm += (e - pm) / pn; pu = max(0.0, pu + e - pm - v)
+                          if pn >= warm_up and pu > h:
+                              pn, pm, pu = 0, 0.0, 0.0; A.append(i)
+                              if True and not False: n[:] = 0; mean[:] = 0; m2[:] = 0
+                              if False:
+                                  if not True: learn(X[i], int(y[i]))
+                                  n[:] = 0; mean[:] = 0; m2[:] = 0
+                                  continue
+                      if not True: learn(X[i], int(y[i]))
+                  return S, P, np.array(A, dtype=np.int64)
+              s0, p0, _ = run(False); s1, p1, a = run(True)
+              return s0, p0, s1, p1, a
+      - hint: "The variance divides by n. The contract is the unbiased M2 / (n - 1)."
+        code: |
+          def f(X, y, v, h, warm_up):
+              import numpy as np
+              def run(detect):
+                  d = X.shape[1]; n = np.zeros(2, dtype=np.int64); mean = np.zeros((2, d)); m2 = np.zeros((2, d))
+                  pn, pm, pu, pc = 0, 0.0, 0.0, []
+                  def score(x):
+                      tot = np.log((n[1] + 1) / (n[0] + 1))
+                      for c, sign in ((1, 1.0), (0, -1.0)):
+                          var = m2[c] / (n[c] - 0) + 1e-6 if n[c] >= 2 else np.ones(d)
+                          tot += sign * np.sum(-0.5 * np.log(2 * np.pi * var) - (x - mean[c]) ** 2 / (2 * var))
+                      return float(tot)
+                  def learn(x, c):
+                      n[c] += 1; e = x - mean[c]; mean[c] += e / n[c]; m2[c] += e * (x - mean[c])
+                  S, P, A = np.empty(len(y)), np.empty(len(y), dtype=np.int64), []
+                  for i in range(len(y)):
+                      if False: learn(X[i], int(y[i]))
+                      S[i] = score(X[i]); P[i] = int(S[i] > 0)
+                      if detect:
+                          e = float(P[i] != y[i]); pn += 1; pm += (e - pm) / pn; pu = max(0.0, pu + e - pm - v)
+                          if pn >= warm_up and pu > h:
+                              pn, pm, pu = 0, 0.0, 0.0; A.append(i)
+                              if True and not False: n[:] = 0; mean[:] = 0; m2[:] = 0
+                              if False:
+                                  if not False: learn(X[i], int(y[i]))
+                                  n[:] = 0; mean[:] = 0; m2[:] = 0
+                                  continue
+                      if not False: learn(X[i], int(y[i]))
+                  return S, P, np.array(A, dtype=np.int64)
+              s0, p0, _ = run(False); s1, p1, a = run(True)
+              return s0, p0, s1, p1, a
+      - hint: "The detector alarms and nothing happens to the model. The alarm's job is to reset the statistics."
+        code: |
+          def f(X, y, v, h, warm_up):
+              import numpy as np
+              def run(detect):
+                  d = X.shape[1]; n = np.zeros(2, dtype=np.int64); mean = np.zeros((2, d)); m2 = np.zeros((2, d))
+                  pn, pm, pu, pc = 0, 0.0, 0.0, []
+                  def score(x):
+                      tot = np.log((n[1] + 1) / (n[0] + 1))
+                      for c, sign in ((1, 1.0), (0, -1.0)):
+                          var = m2[c] / (n[c] - 1) + 1e-6 if n[c] >= 2 else np.ones(d)
+                          tot += sign * np.sum(-0.5 * np.log(2 * np.pi * var) - (x - mean[c]) ** 2 / (2 * var))
+                      return float(tot)
+                  def learn(x, c):
+                      n[c] += 1; e = x - mean[c]; mean[c] += e / n[c]; m2[c] += e * (x - mean[c])
+                  S, P, A = np.empty(len(y)), np.empty(len(y), dtype=np.int64), []
+                  for i in range(len(y)):
+                      if False: learn(X[i], int(y[i]))
+                      S[i] = score(X[i]); P[i] = int(S[i] > 0)
+                      if detect:
+                          e = float(P[i] != y[i]); pn += 1; pm += (e - pm) / pn; pu = max(0.0, pu + e - pm - v)
+                          if pn >= warm_up and pu > h:
+                              pn, pm, pu = 0, 0.0, 0.0; A.append(i)
+                              if False and not False: n[:] = 0; mean[:] = 0; m2[:] = 0
+                              if False:
+                                  if not False: learn(X[i], int(y[i]))
+                                  n[:] = 0; mean[:] = 0; m2[:] = 0
+                                  continue
+                      if not False: learn(X[i], int(y[i]))
+                  return S, P, np.array(A, dtype=np.int64)
+              s0, p0, _ = run(False); s1, p1, a = run(True)
+              return s0, p0, s1, p1, a
+      - hint: "The model reset after learning the item that rang the alarm, losing it. Reset first, then learn it."
+        code: |
+          def f(X, y, v, h, warm_up):
+              import numpy as np
+              def run(detect):
+                  d = X.shape[1]; n = np.zeros(2, dtype=np.int64); mean = np.zeros((2, d)); m2 = np.zeros((2, d))
+                  pn, pm, pu, pc = 0, 0.0, 0.0, []
+                  def score(x):
+                      tot = np.log((n[1] + 1) / (n[0] + 1))
+                      for c, sign in ((1, 1.0), (0, -1.0)):
+                          var = m2[c] / (n[c] - 1) + 1e-6 if n[c] >= 2 else np.ones(d)
+                          tot += sign * np.sum(-0.5 * np.log(2 * np.pi * var) - (x - mean[c]) ** 2 / (2 * var))
+                      return float(tot)
+                  def learn(x, c):
+                      n[c] += 1; e = x - mean[c]; mean[c] += e / n[c]; m2[c] += e * (x - mean[c])
+                  S, P, A = np.empty(len(y)), np.empty(len(y), dtype=np.int64), []
+                  for i in range(len(y)):
+                      if False: learn(X[i], int(y[i]))
+                      S[i] = score(X[i]); P[i] = int(S[i] > 0)
+                      if detect:
+                          e = float(P[i] != y[i]); pn += 1; pm += (e - pm) / pn; pu = max(0.0, pu + e - pm - v)
+                          if pn >= warm_up and pu > h:
+                              pn, pm, pu = 0, 0.0, 0.0; A.append(i)
+                              if True and not True: n[:] = 0; mean[:] = 0; m2[:] = 0
+                              if True:
+                                  if not False: learn(X[i], int(y[i]))
+                                  n[:] = 0; mean[:] = 0; m2[:] = 0
+                                  continue
+                      if not False: learn(X[i], int(y[i]))
+                  return S, P, np.array(A, dtype=np.int64)
+              s0, p0, _ = run(False); s1, p1, a = run(True)
+              return s0, p0, s1, p1, a
+      - hint: "The detector reads the correctness indicator. It watches for a rise, so it must be fed the error: 1.0 when the prediction was wrong."
+        code: |
+          def f(X, y, v, h, warm_up):
+              import numpy as np
+              def run(detect):
+                  d = X.shape[1]; n = np.zeros(2, dtype=np.int64); mean = np.zeros((2, d)); m2 = np.zeros((2, d))
+                  pn, pm, pu, pc = 0, 0.0, 0.0, []
+                  def score(x):
+                      tot = np.log((n[1] + 1) / (n[0] + 1))
+                      for c, sign in ((1, 1.0), (0, -1.0)):
+                          var = m2[c] / (n[c] - 1) + 1e-6 if n[c] >= 2 else np.ones(d)
+                          tot += sign * np.sum(-0.5 * np.log(2 * np.pi * var) - (x - mean[c]) ** 2 / (2 * var))
+                      return float(tot)
+                  def learn(x, c):
+                      n[c] += 1; e = x - mean[c]; mean[c] += e / n[c]; m2[c] += e * (x - mean[c])
+                  S, P, A = np.empty(len(y)), np.empty(len(y), dtype=np.int64), []
+                  for i in range(len(y)):
+                      if False: learn(X[i], int(y[i]))
+                      S[i] = score(X[i]); P[i] = int(S[i] > 0)
+                      if detect:
+                          e = float(P[i] == y[i]); pn += 1; pm += (e - pm) / pn; pu = max(0.0, pu + e - pm - v)
+                          if pn >= warm_up and pu > h:
+                              pn, pm, pu = 0, 0.0, 0.0; A.append(i)
+                              if True and not False: n[:] = 0; mean[:] = 0; m2[:] = 0
+                              if False:
+                                  if not False: learn(X[i], int(y[i]))
+                                  n[:] = 0; mean[:] = 0; m2[:] = 0
+                                  continue
+                      if not False: learn(X[i], int(y[i]))
+                  return S, P, np.array(A, dtype=np.int64)
+              s0, p0, _ = run(False); s1, p1, a = run(True)
+              return s0, p0, s1, p1, a
+      - hint: "The prior term ln((n1 + 1) / (n0 + 1)) is missing from the score, so a class seen a hundred times less often is treated as just as likely."
+        code: |
+          def f(X, y, v, h, warm_up):
+              import numpy as np
+              def run(detect):
+                  d = X.shape[1]; n = np.zeros(2, dtype=np.int64); mean = np.zeros((2, d)); m2 = np.zeros((2, d))
+                  pn, pm, pu = 0, 0.0, 0.0
+                  def score(x):
+                      tot = 0.0
+                      for c, sign in ((1, 1.0), (0, -1.0)):
+                          var = m2[c] / (n[c] - 1) + 1e-6 if n[c] >= 2 else np.ones(d)
+                          tot += sign * np.sum(-0.5 * np.log(2 * np.pi * var) - (x - mean[c]) ** 2 / (2 * var))
+                      return float(tot)
+                  def learn(x, c):
+                      n[c] += 1; e = x - mean[c]; mean[c] += e / n[c]; m2[c] += e * (x - mean[c])
+                  S, P, A = np.empty(len(y)), np.empty(len(y), dtype=np.int64), []
+                  for i in range(len(y)):
+                      S[i] = score(X[i]); P[i] = int(S[i] > 0)
+                      if detect:
+                          e = float(P[i] != y[i]); pn += 1; pm += (e - pm) / pn; pu = max(0.0, pu + e - pm - v)
+                          if pn >= warm_up and pu > h:
+                              pn, pm, pu = 0, 0.0, 0.0; A.append(i)
+                              n[:] = 0; mean[:] = 0; m2[:] = 0
+                      learn(X[i], int(y[i]))
+                  return S, P, np.array(A, dtype=np.int64)
+              s0, p0, _ = run(False); s1, p1, a = run(True)
+              return s0, p0, s1, p1, a
+      - hint: "var_floor is missing from the variance. The output here moves only in the third decimal, but a column constant within a class then has variance 0, and on the payment stream the score goes NaN."
+        code: |
+          def f(X, y, v, h, warm_up):
+              import numpy as np
+              def run(detect):
+                  d = X.shape[1]; n = np.zeros(2, dtype=np.int64); mean = np.zeros((2, d)); m2 = np.zeros((2, d))
+                  pn, pm, pu = 0, 0.0, 0.0
+                  def score(x):
+                      tot = np.log((n[1] + 1) / (n[0] + 1))
+                      for c, sign in ((1, 1.0), (0, -1.0)):
+                          var = m2[c] / (n[c] - 1) if n[c] >= 2 else np.ones(d)
+                          tot += sign * np.sum(-0.5 * np.log(2 * np.pi * var) - (x - mean[c]) ** 2 / (2 * var))
+                      return float(tot)
+                  def learn(x, c):
+                      n[c] += 1; e = x - mean[c]; mean[c] += e / n[c]; m2[c] += e * (x - mean[c])
+                  S, P, A = np.empty(len(y)), np.empty(len(y), dtype=np.int64), []
+                  for i in range(len(y)):
+                      S[i] = score(X[i]); P[i] = int(S[i] > 0)
+                      if detect:
+                          e = float(P[i] != y[i]); pn += 1; pm += (e - pm) / pn; pu = max(0.0, pu + e - pm - v)
+                          if pn >= warm_up and pu > h:
+                              pn, pm, pu = 0, 0.0, 0.0; A.append(i)
+                              n[:] = 0; mean[:] = 0; m2[:] = 0
+                      learn(X[i], int(y[i]))
+                  return S, P, np.array(A, dtype=np.int64)
+              s0, p0, _ = run(False); s1, p1, a = run(True)
+              return s0, p0, s1, p1, a
+  which-detector-for-fraud:
+    kind: review
+    rubric: |
+      The question: which detector on a deployed fraud model, with labels a
+      week late, and what its alarm can and cannot mean.
+      Pass if the answer does all three:
+      (1) it states the delay of the stream it chose: c + δ + MTD for slow
+      labels, about a day plus MTD for fast-label CP@k or a label-free stream,
+      and what that stream cannot see;
+      (2) it deals with the daily swing of the number of compromised cards or
+      the fraud share, by feeding a quantity normalised to the budget or the
+      day (CP@k or a share of compromised cards missed, not the raw error
+      rate), or by comparing the same weekdays;
+      (3) it names a detector and gives a reason tied to this stream, and
+      states a false-alarm rate or MTFA chosen and checked by simulation or
+      replay on a stable stretch.
+      "ADWIN because it has no parameters" alone fails: it has them (alpha,
+      the check interval, the choice of cut), and on a short series the
+      Hoeffding cut is nearly blind. Do not fail an answer for choosing a
+      different detector than the model answer when its reason holds, or for
+      wording or length.
+  beat-drifting-stream:
+    kind: metric
+    metric: roc_auc
+    threshold: 0.83
+    holdout: data/tx_stream.csv.gz
+    labels_code: |
+      labels = np.loadtxt("private/tx_stream_labels.csv")

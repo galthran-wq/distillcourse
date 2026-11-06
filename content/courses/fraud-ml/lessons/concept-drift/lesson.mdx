@@ -1,0 +1,524 @@
+A detector trained in June scores well on July and badly on October. Fraudsters have changed their methods, the bank launched a new product, and a holiday season began — but which of these is the model's problem? What kinds of change can a transaction stream undergo, how does each show up, and how can you measure that two days differ before any of their labels have arrived?
+
+The score cannot say. <Ref lesson="sequence-models-for-transactions" id="how-much-of-a-gap-is-noise">The sequence lesson</Ref> ended on the same difficulty: a forest and an LSTM fell on the same days in May, so the days were hard and the models were not to blame, and nothing in the score told what had happened on those days.
+
+The obvious response is to retrain whenever the score falls. Three things stand in its way. October's score does not exist in October, because its labels arrive days to weeks later. A holiday model thrown away in January has to be relearned next December. And a score can fall when nothing about the model is wrong, as the first table below shows. Choosing a response needs a name for what changed.
+
+## What exactly changed: three parts of one distribution
+
+"The data changed" is too coarse, because a detector is hurt by some changes and not by others. To see which, take the simplest possible model and change the stream under it in three ways.
+
+### One model, four worlds
+
+A model sorts payments into three kinds and scores each kind by its fraud rate in June: online first, then petrol, then grocery. The team works the top of that list. Keep the model fixed and vary the stream:
+
+- **June.** The stream the model was fitted on.
+- **New product.** A wallet moves payments online. Online doubles, and each kind keeps its fraud rate.
+- **Fraud wave.** Twice as many frauds, spread over the three kinds as before. Genuine payments are unchanged.
+- **New method.** The same number of frauds, but they leave online for petrol stations.
+
+| Counts over one stretch of the stream | June | New product | Fraud wave | New method |
+|---|---|---|---|---|
+| Online: payments, frauds | 20,000, 200 | 40,000, 400 | 20,200, 400 | 19,840, 40 |
+| Petrol: payments, frauds | 10,000, 40 | 10,000, 40 | 10,040, 80 | 10,160, 200 |
+| Grocery: payments, frauds | 70,000, 70 | 50,000, 50 | 70,070, 140 | 70,000, 70 |
+| Fraud rate: online, petrol, grocery | 1%, 0.4%, 0.1% | 1%, 0.4%, 0.1% | 1.98%, 0.80%, 0.20% | 0.20%, 1.97%, 0.10% |
+| Fraud share of the stream | 0.31% | 0.49% | 0.62% | 0.31% |
+| Share of frauds in the model's top kind | 65% | 82% | 65% | 13% |
+| Precision in the model's top kind | 1% | 1% | 1.98% | 0.20% |
+| Model's ROC-AUC (ties count half) | 0.757 | 0.725 | 0.757 | 0.680 |
+| Largest move in the mix of payments | | 20 points | 0.15 points | 0.16 points |
+
+Read the columns against June.
+
+**New product.** The mix of payments moved by 20 points, and the fraud share moved with it, because more payments sit where fraud is common. The fraud rate of each kind did not move, so the model's order is still the right order. The ROC-AUC fell all the same, because it is read off the shares within each class, and those moved: online now holds 82% of the frauds and 40% of the genuine payments, against 65% and 20%. A fraud and a genuine payment in the same kind tie, and ties count half. Online now holds far more such pairs, so tied pairs rose from 30% to 38% of all fraud–genuine pairs and the score fell, with every fraud rate and the order intact.
+
+**Fraud wave.** Precision doubled and the ROC-AUC did not move. <Ref lesson="alert-budget-metrics" id="precision-sees-the-base-rate-the-roc-axes-do-not">The ROC axes are rates within one class</Ref>, so they cannot see how many frauds there are, and the wave left each class's shares where they were. The order is still right.
+
+**New method.** The mix hardly moved, the fraud share is exactly June's, and the model's top kind went from 65% of the frauds to 13%. The right order is now petrol first. This is the only column in which the model is wrong.
+
+### Naming the three parts
+
+Write $x$ for a payment's inputs, $y$ for its label, and $p_t$ for the distribution on day $t$. The joint distribution factors in two ways:
+
+$$
+p_t(x, y) = p_t(y \mid x)\, p_t(x) = p_t(x \mid y)\, p_t(y).
+$$
+
+Each column of the table moved a different factor while another stayed fixed.
+
+<Definition title="concept drift and its three kinds">
+A stream *drifts* between days $t_0$ and $t_1$ if $p_{t_0}(x, y) \neq p_{t_1}(x, y)$ for some $x$. This course uses *concept drift* for any such change, and names the kind:
+
+- **Virtual drift:** $p(x)$ changes and $p(y \mid x)$ does not.
+- **Prior shift:** the base rate $\pi_t = p_t(y = 1)$ changes and $p(x \mid y)$ does not.
+- **Real drift:** $p(y \mid x)$ changes in a way that reorders payments.
+</Definition>
+
+Some writers keep "concept drift" for real drift alone, so check which sense a text uses. The three kinds can also arrive together, and the factors constrain one another. The fraud share is $\sum_x p(y = 1 \mid x)\, p(x)$, so a virtual drift usually moves it, as the new product did.
+
+<Figure
+  src="./figures/three-changes.svg"
+  alt="Four square panels of blue genuine points and amber fraud points with a line between them. June shows the fitted line. The p(x) panel moves the clouds along the same line. The base-rate panel keeps the clouds and adds fraud points, with the line moved slightly parallel to a dashed old line. The p(y given x) panel moves the fraud points to another region, and an amber line crosses the dashed old line at a new angle."
+  caption="Only in the last panel does the boundary turn, so only there is the old order of payments wrong."
+/>
+
+### Which change moves the boundary
+
+A decision is a cut on the posterior: alert when $p(y = 1 \mid x) > \tau$. So the question for each kind is what happens to the set of payments above a cut, and to their order.
+
+**Virtual drift** leaves $p(y \mid x)$ alone, so the best possible rule is unchanged. The fitted model may still suffer, for a reason the toy hides: it estimated $p(y \mid x)$ from training rows, and a new product puts payments where it had few. What it needs there is more data on the same relation.
+
+**Prior shift** does change $p(y \mid x)$, though in one specific way. By Bayes' rule the posterior odds are the prior odds times a ratio that does not depend on $\pi_t$:
+
+$$
+\frac{p_t(y = 1 \mid x)}{p_t(y = 0 \mid x)} = \frac{\pi_t}{1 - \pi_t} \cdot \frac{p(x \mid y = 1)}{p(x \mid y = 0)}.
+$$
+
+Every payment's odds are multiplied by the same factor. In the table, the wave's online odds are $400 / 19{,}800$ against June's $200 / 19{,}800$: exactly double, and the same for petrol and grocery. So the order of payments survives, and a team cutting at $k$ alerts picks the same payments. Only a cut at a fixed probability moves, which is what <Ref lesson="undersampling-calibration" id="correcting-to-a-different-base-rate">the base-rate correction</Ref> repairs with one factor.
+
+**Real drift** changes the likelihood ratio itself, by a different amount for different $x$. No single factor can restore the order. That is the case <Ref lesson="undersampling-calibration" id="where-the-current-base-rate-comes-from">the calibration lesson</Ref> left open, and the only one that forces the model to learn something new.
+
+<KeyFact>
+The test for "is this the model's problem" is whether the right order of payments changed. A prior shift can move precision and the fraud share, and a virtual drift the fraud share and even the ROC-AUC, while the order stays right; real drift can reorder payments while the mix and the base rate stand still.
+</KeyFact>
+
+<Exercise>
+A fifth world: frauds halve in every kind, genuine payments as in June, so 100, 20 and 35 frauds. Compute each kind's fraud rate, the fraud share of the stream, and the precision in the top kind. Say which kind of change this is and what the ROC-AUC does, then say what a team reading only precision would conclude.
+
+<Solution>
+Genuine counts stay 19,800, 9,960 and 69,930. Rates: $100 / 19{,}900 = 0.50\%$, $20 / 9{,}980 = 0.20\%$, $35 / 69{,}965 = 0.05\%$. Fraud share: $155 / 99{,}845 = 0.16\%$. Precision in the top kind falls from 1% to 0.50%. Each kind's odds are half of June's, so this is a prior shift: the order is intact and the ROC-AUC stays 0.757, since it depends only on the shares of frauds and of genuine payments in each kind, and neither moved. A team reading only precision would see it halve and might call the model stale, when there is simply less fraud to find.
+</Solution>
+</Exercise>
+
+### The same three kinds elsewhere, and where the definition stops
+
+**A different surface.** A filter marks news articles on property as relevant to a reader looking for an apartment. The site changes editor and the writing style changes: virtual drift. A crisis brings more articles on apartments and fewer on holiday homes: a change in the class shares. The reader buys an apartment and starts wanting holiday homes: the same article now gets the opposite label, real drift.
+
+**The kind depends on what $x$ is.** On <Ref lesson="canonical-datasets" id="three-scripted-frauds">the simulator</Ref>, each day two terminals are compromised for 28 days, and every payment there is fraud. With $x$ holding the terminal's identity, $p(y \mid x)$ switches on and off at that terminal: real drift. With $x$ holding <Ref lesson="point-in-time-features" id="the-definition">the delayed terminal risk</Ref>, the relation between "this terminal's recent fraud rate" and fraud hardly moves, because the feature carries the change. A good feature turns real drift in the terminal-identity input into a change in $p(x)$ with $p(y \mid x)$ stable, and the model need not be retrained for it.
+
+**A near-miss.** <Ref lesson="point-in-time-features" id="two-implementations-of-the-same-feature">Training–serving skew</Ref> also makes the model see inputs it was not trained on. It is not drift, because nothing in the stream moved over time: the same payment gets two values from two computations.
+
+## How the change arrives in time
+
+Naming the part that moved does not say how quickly it moved, and the speed decides how any estimate built on recent data behaves. Call the distribution $p(x, y)$ in force over a stretch of the stream a *concept*, so that drift is one concept giving way to another. Four patterns recur, and one look-alike has to be kept apart from them.
+
+<Figure
+  src="./figures/patterns.svg"
+  alt="Five small plots of a level over time. Sudden: a step up. Incremental: a straight ramp between two levels. Gradual: dots at two levels, mostly the lower at first and mostly the upper later, with an S-shaped curve below labelled share of the new concept, width w, centre p. Reoccurring: the upper level returning in regular short stretches. Outlier: a flat line with one dot far above it."
+  caption="Sudden, incremental, gradual and reoccurring are drift. The outlier is one day that does not continue, and adapting to it is a mistake."
+/>
+
+- **Sudden.** One concept replaces another on one day. A dark market closes, as <Ref lesson="elliptic-illicit-nodes" id="the-data-fewer-illicit-transactions-and-the-rest-look-licit">at step 43 of Elliptic</Ref>.
+- **Incremental.** The stream passes through intermediate states. Contactless payments take a little more of the mix each month.
+- **Gradual.** Two concepts coexist, and the share of the new one grows. A scheme spreads through a fraud community while the old one continues, so any one day holds both.
+- **Reoccurring.** A concept seen before comes back: weekends, Christmas.
+- **Outlier.** One terminal has a bad day. It is a one-off deviation, not drift.
+
+A gradual change has a convenient description for simulating one. On day $t$ a payment comes from the new concept with probability
+
+$$
+f(t) = \frac{1}{1 + e^{-4(t - p)/w}},
+$$
+
+where $p$ is the centre of the change and $w$ its width: the 4 makes the slope at the centre $1/w$, so the share goes from about 12% to about 88% across $w$ days. For a scheme centred on 10 October with $w = 10$ days, the share is $1 / (1 + e^{2}) = 12\%$ on 5 October, 50% on the 10th and 88% on the 15th. As $w$ shrinks to one day, the curve becomes a step, so sudden change is the narrow end of the same family.
+
+### Each pattern breaks a different estimate
+
+The patterns matter because a statistic tracked on a stream has to choose how far back to average, and no choice suits all five. Take a daily rate of about 1 with noise of standard deviation 0.11, which is the relative day-to-day noise of the simulator's fraud share, and plant each pattern in it: a rise to 1.5, a Sunday level of 1.5, or one day at 3. Average the last $W$ days, and measure the error against the true level (the outlier's true level stays 1). Each cell is a root-mean-square error over days 28 to 119 of a 120-day stream, averaged over 400 runs.
+
+| Pattern planted | $W = 3$ | $W = 7$ | $W = 28$ |
+|---|---|---|---|
+| None | 0.063 | 0.041 | **0.020** |
+| Sudden, day 60 | **0.074** | 0.082 | 0.155 |
+| Incremental, days 30 to 90 | 0.063 | **0.046** | 0.088 |
+| Gradual, centre day 60, $w = 30$ | 0.064 | **0.047** | 0.100 |
+| Reoccurring, every Sunday | **0.167** | 0.179 | 0.175 |
+| Outlier, one day at 3 | 0.136 | 0.088 | **0.044** |
+
+The best column moves with the pattern. After the sudden step a 28-day window takes about 14 days to cross the halfway mark, against one day for $W = 3$. On the reoccurring row no length helps, since each one is wrong about Sundays by about the same amount. What works there is to condition on the calendar: the mean of the last four Sundays has error $0.11 / 2 = 0.055$.
+
+## Why the latest labels cannot answer in time
+
+If the kinds differ in whether the order of payments changed, the direct check is to score the model on the latest labelled payments. The trouble is what "latest" means. <Ref lesson="delayed-labels-prequential" id="the-label-clock">The label clock</Ref> says that on day $t$ the bank receives the labels of day $t - \delta$, so the model's error on labels describes the stream $\delta$ days ago.
+
+<FigureSequence
+  name="label-delay"
+  alt="Two rows of day cells, payments scored above and labels received below, with an arrow marking a delay of seven days. Frame 1 shows both rows blue. Frame 2 marks a change at day 8 and turns the payments from that day amber. Frame 3 shows the first amber cell in the labels row at day 15, and a bar under days 8 to 15 reads seven days scored with no label from the new concept."
+  caption="Scoring is immediate; the diagnosis runs δ days behind it."
+/>
+
+<Task>
+Step to frame 3 and read off the first day a label from the new concept arrives. Then work out the first day the model trained that night could score with it: it should be day 16.
+</Task>
+
+A scheme that starts on day $c$ cannot appear in a slow label before day $c + \delta$. The same holds for a full picture: seven days of the new concept are fully labelled only on day $c + 6 + \delta$, 13 days after the change when $\delta = 7$.
+
+What about <Ref lesson="fraud-detection-system" id="investigators-fast-labels-on-the-alerted-cards">the investigators' same-day labels</Ref>? They come only from cards the model alerted. A new method that the model scores low raises few alerts, so it produces few fast labels, and the error measured on those labels looks fine. This is the case the delay hurts most: the fraud the model has stopped seeing is the fraud that its fast feedback cannot report. <Ref lesson="alert-feedback-selection-bias">The feedback-loop lesson</Ref> measures that bias.
+
+So for at least $\delta$ days, real drift has to be caught, if it can be caught at all, from what exists without labels: the payments themselves.
+
+## Measuring two days without labels
+
+Today's payments are all in the log, so the question is whether they differ from yesterday's as distributions. That measures $p(x)$ only, but it is available today.
+
+### The obvious comparison misses shape and correlation
+
+Compare each column's mean between the two days. To see what that misses, re-generate the simulator from its rules and take two ordinary days, days 60 and 61 of a 90-day run with about 9,800 payments a day, after the 30-day windows have filled. Then disturb the second day's genuine and fraudulent payments alike:
+
+- **Scale:** every amount $\times 1.2$. The mean amount goes from 54 to 64, and a mean comparison catches it.
+- **Shape:** half the amounts $\times 0.5$, the other half $\times 1.5$. The mean stays at 54.
+- **Correlation:** deal the day's times out again so that large amounts fall late in the day. Each payment keeps its card and its amount. The mean amount and mean time are unchanged, and the histogram of each column is unchanged too, while the correlation of amount with time goes from 0 to 0.72.
+
+The last two are real changes in behaviour with no change in any mean. What is needed is a distance that uses every column at once and has no fixed idea of what to look for.
+
+### A classifier as a distance
+
+A classifier has both properties. If two days come from the same distribution, no classifier can tell a row of one from a row of the other. The more they differ, in any way a classifier can express, the better it does. So make telling them apart the task.
+
+<FigureSequence
+  name="distinguish"
+  alt="Frame 1: two small tables of amount and hour, day A a Tuesday and day B a Saturday, with the fraud column struck through. Frame 2: the rows pooled with a day column of 0 and 1 feeding a box labelled classifier, target which day. Frame 3: an arrow from the classifier to one amber cell of a seven by seven matrix of weekdays, labelled Tue against Sat, 0.65, marked illustrative."
+  caption="No fraud label enters at any step, so the measure is available on the day the payments happen."
+/>
+
+<Task>
+Before stepping to frame 3, say what AUC you would expect if day B were another ordinary Tuesday. It should be 0.5: a random day-B row outranks a random day-A row half the time.
+</Task>
+
+<Definition title="day distinguishability">
+For days $a$ and $b$: pool their payments, label each by its day, train a classifier on inputs that do not name the day, and score it out of fold. The *day distinguishability* $D(a, b)$ is its ROC-AUC: the probability that a random row of day $b$ outranks a random row of day $a$. It runs from 0.5, indistinguishable, towards 1, fully separated.
+</Definition>
+
+```python
+def day_distance(day_a, day_b, columns):
+    pooled = pd.concat([day_a, day_b])
+    which_day = np.r_[np.zeros(len(day_a)), np.ones(len(day_b))]
+    model = HistGradientBoostingClassifier(max_depth=3, max_iter=60, learning_rate=0.1)
+    scores = cross_val_predict(model, pooled[columns], which_day, groups=pooled["card"],
+                               cv=GroupKFold(3), method="predict_proba")[:, 1]
+    return roc_auc_score(which_day, scores)
+```
+
+**Out of fold.** A flexible model scored on its own training rows separates any two days by memorising them.
+
+**No column may name the day.** A timestamp or a weekend flag gives AUC 1 at once, and so does a column that grows with time, like <Ref lesson="elliptic-illicit-nodes" id="the-time-step-is-a-column">Elliptic's time step</Ref>. The time of day stays, because it is behaviour.
+
+**Folds split by card.** This is <Ref lesson="delayed-labels-prequential" id="a-shuffled-split-tests-a-model-that-cannot-exist">the shuffled split's flaw</Ref> in a new place. A card's window values barely change within a day, so a row in the training fold identifies its sibling in the test fold, and through it the day.
+
+On the simulator's ordinary days, take eleven label-free columns (amount, time of day, the card's count and mean amount over 1, 7 and 30 days, the terminal's count over 1, 7 and 30 days), the classifier in the code, and all 91 pairs among days 60 to 73. Folds split by card read a mean of 0.499, standard deviation 0.006, where shuffled folds read 0.516. That 0.499 is the yardstick for what follows. And the three disturbances, on the same eleven columns, each altering only the amount or the time column and leaving the window columns as they were:
+
+| Second day, against day 60 | Mean amount | $D$ |
+|---|---|---|
+| Scale | 64 | 0.58 |
+| Shape | 54 | 0.65 |
+| Correlation | 54 | 0.73 |
+
+The two changes that a mean comparison cannot see score highest.
+
+### Every pair of days: a matrix
+
+One number needs a comparison, so compute $D$ for every pair of days and look at the matrix. The simulator has no calendar: times centre on noon every day, and so all its cells read about 0.50. To see what a calendar would do, plant one: on Saturdays amounts rise by a quarter and payments come 90 minutes later, on Sundays amounts fall by a fifth and payments come three hours later. Only the amount and time columns are altered.
+
+<Figure
+  src="./figures/planted-matrix.svg"
+  alt="A 14 by 14 matrix of numbers for two weeks of days labelled M T W T F S S, shaded amber by size. Pairs of weekdays read about 0.50, a Saturday against a weekday about 0.65, a Sunday against a weekday about 0.69, a Saturday against a Sunday 0.74, the two Saturdays 0.50 and the two Sundays 0.51."
+  caption="A planted calendar on the simulator: bands at the weekend rows and columns, and a return to 0.50 between like days a week apart."
+/>
+
+Weekdays form one block. A Saturday is far from a Tuesday and close to the Saturday a week later. That return to 0.50 is the signature of reoccurring drift: distance that does not grow with the gap in time. A sudden lasting change looks different, as a new block that never returns to the old one, and incremental change makes $D$ grow steadily with the gap.
+
+<Figure
+  src="./figures/day-shift-matrix.png"
+  alt="A published heat map of about 34 by 34 cells, both axes time in days from 01.03.2015 to 03.04.2015, each cell holding a two-decimal number and coloured green through yellow to red. Most of it is a green field of values from 0.00 to about 0.10. Red and orange bands, about 0.20 to 0.29, cross it as rows and columns every seven days, with a narrower yellow band beside each, and where two red bands cross the cell turns green again, about 0.04."
+  caption="Day-pair shift on real face-to-face card payments, 1 March to 3 April 2015, coloured by centile: green for similar days, red for shifted ones. Bands repeat every seven days. The numbers are not ROC-AUCs: on their scale a day against itself reads 0.00, so 0.50 means nothing here."
+  float="right"
+  width="m"
+/>
+
+Real card-present payments show the same banding with no planting. The stream is 92 days of face-to-face payments on one European country's cards in spring 2015, and the figure shows its first 34. For each pair of days, a random forest was trained on a sample of both to say which day a payment came from, and tested on held-out payments. Each cell records how well it did, as a correlation between predicted and true day, which reads 0 at chance where $D$ reads 0.5. The days were then merged into groups by how close the matrix put them, and four groups came out that follow the calendar: working weekdays; Sundays with public holidays, when shops are closed; Saturdays with most Fridays; and the weekdays of the Easter school holidays. The classifier's target was the day and never the fraud label, so this is a reoccurring change in $p(x)$, readable on the day it happens.
+
+Two cautions come with a real matrix. Its level has to be read against its own ordinary cells, since columns that move with time for everyone can make every pair separable. <Ref lesson="elliptic-illicit-nodes" id="exercises">Elliptic's exercise</Ref> found exactly this: an AUC of 0.986 across step 43 meant little beside 0.979 across two earlier periods with no event between them. And a matrix built on columns derived from labels, such as the delayed terminal risk, is no longer label-free in the sense used here.
+
+### What the matrix cannot see
+
+From the opening one would hope that the matrix warns of the fraudsters' new method a week before the labels do. On a card stream it cannot, and the reason is arithmetic. Fraud is a small share of the rows, so the total distribution of inputs can barely respond to what fraud does.
+
+Measure the gap between two distributions by the largest difference in probability they can give to one set of payments, the *total variation* distance. The table's new method moved the mix by 0.16 points, against a fraud share of 0.31%.
+
+<Proposition title="a fraud-only change is nearly invisible to the matrix">
+Let $p_a(x) = (1 - \pi_a) g(x) + \pi_a f_a(x)$ and $p_b(x) = (1 - \pi_b) g(x) + \pi_b f_b(x)$, so the genuine payments have the same distribution $g$ on both days, while fraud's share and its distribution may differ arbitrarily. With $\pi = \max(\pi_a, \pi_b)$, the total variation distance between $p_a$ and $p_b$ is at most $\pi$, and any classifier's AUC at telling the days apart is at most $\tfrac12 + \pi - \tfrac12\pi^2$.
+
+<Proof>
+Take $\pi_b \geq \pi_a$ and any set $S$ of payments. Then $P_a(S) - P_b(S) = (\pi_b - \pi_a)\, g(S) + \pi_a f_a(S) - \pi_b f_b(S)$. Each of $g(S), f_a(S), f_b(S)$ lies between 0 and 1, so the expression is at most $(\pi_b - \pi_a) + \pi_a = \pi_b$ and at least $-\pi_b$. That is the total variation bound.
+
+Now take a classifier's score and a cut, and let $S$ be the rows above the cut. With day $b$ as the positive class, the true-positive rate is $P_b(S)$ and the false-positive rate is $P_a(S)$, so at every point of the ROC curve the true-positive rate is at most $\min(1, u + \pi)$, where $u$ is the false-positive rate. The AUC is the area under the curve, so it is at most
+
+$$
+\int_0^{1 - \pi} (u + \pi)\, du + \int_{1 - \pi}^{1} 1\, du = \tfrac12 + \pi - \tfrac12\pi^2.
+$$
+</Proof>
+</Proposition>
+
+At a fraud share of 0.25%, replacing every fraud with a kind never seen before can raise $D$ by at most 0.0025. On the simulator, with a share of 0.87%, the ceiling is 0.509. Rewriting all of a day's frauds into nothing like the others (amounts tripled plus €300, all between midnight and 2 a.m.) gives a mean $D$ of 0.506 against day 60 over 13 days, about one standard deviation above the 0.499 yardstick. Doubling the fraud rows gives 0.502.
+
+<KeyFact>
+Day distinguishability measures the cardholders, not the fraudsters. Genuine payments are 99% of the rows and more, so a flat matrix says nothing about whether real drift has begun, and a moving one says that customers changed.
+</KeyFact>
+
+The bound depends on the share fraud holds in what is compared, so a narrower comparison can escape it. A <Ref lesson="anomaly-detection-framing">card-testing attack</Ref> that makes up a third of one merchant group's payments stands out in that group's matrix. And a moving matrix is still worth having on its own terms: it says the model is being asked about payments unlike its training rows.
+
+## A cheaper distance, one column at a time
+
+A matrix of $n$ days costs $n(n-1)/2$ pairs, each fitted once per fold, and its number does not say which column moved. Monitoring needs something cheap to compute per column every night. So compare histograms.
+
+Take a column's histogram on two days, with shares $P_i$ and $Q_i$ in bin $i$. The difference of shares is the first thought, but a move from 40% to 41% should not count like a move from 0.1% to 1.1%, since the second is a kind of payment becoming eleven times as common. Taking square roots first gives small shares more weight.
+
+<Example title="the Hellinger distance between two amount histograms">
+Four amount bands. Monday's shares are $P = (0.50, 0.30, 0.15, 0.05)$ and Saturday's are $Q = (0.30, 0.30, 0.25, 0.15)$.
+
+Square roots: $\sqrt P = (0.707, 0.548, 0.387, 0.224)$, $\sqrt Q = (0.548, 0.548, 0.500, 0.387)$.
+
+Differences: $(0.159, 0, -0.113, -0.164)$. Their squares sum to $0.0254 + 0 + 0.0127 + 0.0268 = 0.0649$.
+
+Divide by 2 and take the root: $\sqrt{0.0325} = 0.180$.
+
+The smallest band moved 10 points and the largest 20, and they contribute about the same: 0.0268 and 0.0254.
+</Example>
+
+<Definition title="Hellinger distance">
+For two histograms with shares $P_i$ and $Q_i$ over the same bins,
+
+$$
+H(P, Q) = \frac{1}{\sqrt 2}\, \bigl\lVert \sqrt P - \sqrt Q \bigr\rVert_2 = \sqrt{\tfrac12 \sum_i \bigl(\sqrt{P_i} - \sqrt{Q_i}\bigr)^2}.
+$$
+
+It is symmetric, it is 0 for identical histograms and 1 for histograms with no bin in common, and an empty bin causes no trouble.
+</Definition>
+
+The $1/\sqrt2$ is what fixes the maximum at 1: with no bin in common, the sum is $\sum P_i + \sum Q_i = 2$.
+
+<Exercise>
+Sunday has $Q' = (0.70, 0, 0.15, 0.15)$ against the same Monday. Compute $H$. The Kullback–Leibler divergence $\sum_i P_i \ln(P_i / Q'_i)$ would divide by $Q'_2 = 0$: what is its value, and why does that make it awkward for a nightly monitor?
+
+<Solution>
+$\sqrt{Q'} = (0.837, 0, 0.387, 0.387)$. Differences from $\sqrt P$: $(-0.130, 0.548, 0, -0.164)$. Squares: $0.0168 + 0.300 + 0 + 0.0268 = 0.3436$. $H = \sqrt{0.1718} = 0.414$. The divergence is infinite, because $P_2 > 0$ where $Q'_2 = 0$. A single empty bin on a small day would set off a monitor whatever the rest of the histogram does, which is why it needs smoothing and $H$ does not.
+</Solution>
+</Exercise>
+
+On the simulator, with ten amount bins, the ordinary pairs against day 60 read $H \approx 0.016$. The three disturbances:
+
+| Second day, against day 60 | $H$ on amount | $D$ |
+|---|---|---|
+| Scale | 0.085 | 0.58 |
+| Shape | 0.122 | 0.65 |
+| Correlation | 0.023, day 61's own ordinary value (time: 0.010) | 0.73 |
+
+The cheap distance sees scale and shape, and it says which column moved. It misses the correlation, since each column's histogram is unchanged. That is the trade: histograms for the nightly watch and for finding the column, the classifier for changes that live between columns.
+
+### Per class, a delay later
+
+The Proposition's limit comes from the genuine rows, which are 99% of what the matrix compares. Once labels have arrived they can be set aside: compute $H$ on the **fraud rows alone**, comparing $p(x \mid y = 1)$ between two labelled weeks. Each histogram is normalised within its class, so the fraud share does not enter, and a fraud wave reads 0. The price is the delay, and only the frauds that were labelled count.
+
+The tempting reading is that a rise on fraud rows means a new method. The four worlds refute it. Take the three kinds as three bins and compare each world with June. The new method moves the fraud shares from $(0.65, 0.13, 0.23)$ to $(0.13, 0.65, 0.23)$, so $H = 0.444$. But the new product moves them to $(0.82, 0.08, 0.10)$, so $H = 0.141$, with no fraud rate changed. By Bayes' rule $p(x \mid y = 1) = p(y = 1 \mid x)\, p(x) / \pi$, so a move in $p(x)$ carries the fraud rows with it. Only a prior shift holds $p(x \mid y)$ still. Reading one class is therefore not enough, and the genuine rows supply the comparison:
+
+| Against June | $H$ on fraud rows | $H$ on genuine rows | Fraud rates within kinds |
+|---|---|---|---|
+| Fraud wave | 0 | 0 | All about double, order kept |
+| New product | 0.141 | 0.160 | Unchanged |
+| New method | 0.444 | 0.000 | Reordered, petrol first |
+
+Neither class moving means a prior shift or nothing. Both classes moving means the mix of payments moved. Fraud rows moving while genuine rows do not means $p(y \mid x)$ moved, since the likelihood ratio changed where the genuine side stood still. On real weeks neither reads exactly 0, so each is compared with its own usual week-to-week level, and the fraud rows, being few, have the noisier level.
+
+The pair has a blind case. A new method arriving with a new product moves both classes, as the product alone does. The fraud rates within kinds still decide, because virtual drift leaves them unchanged by definition, and a reordering among them is real drift whatever else moved. They also settle what fraud rows moving alone leaves open, whether the move was large enough to change the order.
+
+## How long a window should an estimate use
+
+Every number in this lesson that is tracked over time has to average over some stretch of the stream: the fraud share a correction needs, a Hellinger reference histogram, the block a model trains on. Averaging all of history is the natural first thought, since more data means less noise. On a drifting stream the old items come from another distribution. <Ref lesson="transaction-aggregates" id="a-burst-and-a-drift">The aggregates lesson</Ref> found that short windows are fast and noisy and long ones stable and slow. That can now be measured.
+
+### Two errors with opposite slopes
+
+Track the simulator's daily fraud share, about 0.88% on 9,800 payments. Treating payments as independent, one day's share has standard deviation $\sigma = \sqrt{0.0088 \times 0.9912 / 9{,}800} \approx 0.095$ percentage points. Frauds come in runs on a card, so the real figure is higher. Now suppose the true share rises by $r = 0.01$ points a day.
+
+The mean of the last $W$ days has two errors:
+
+- **Variance.** $\sigma^2 / W$, falling with $W$: for $W = 7$ it is $0.0090 / 7 = 0.0013$.
+- **Staleness.** The window's items are on average $(W - 1)/2$ days old, so the mean trails the truth by $r(W - 1)/2$: for $W = 7$ that is 0.03 points, which squared is $0.0009$.
+
+Their sum is $0.0022$. At $W = 3$ it is $0.0030 + 0.0001 = 0.0031$, and at $W = 14$ it is $0.0006 + 0.0042 = 0.0048$. The minimum is near $W = 6$.
+
+<Figure
+  src="./figures/window-tradeoff.svg"
+  alt="Squared error against window length from 1 to 30 days. A blue dashed variance curve falls. Two dotted staleness curves rise, one for a rate of 0.01 points a day and a steeper one for 0.03. The solid amber and green sums have minima marked at about W = 6 and W = 3."
+  caption="Triple the rate of change and the best window halves, from about 6 days to about 3."
+/>
+
+The difficulty is in the two inputs. The noise $\sigma$ can be estimated, but the best $W$ also depends on $r$, the rate of change, which is what you do not know and which itself moves. A slower drift of $r = 0.001$ puts the minimum near 26 days. So a fixed window is right only for the stretch of the stream whose rate happens to match it.
+
+### Forgetting without storing: the moving average
+
+A window of $W$ days has to keep $W$ days of data. The alternative keeps one number and decays it, in the same way that <Ref lesson="fraud-as-a-graph" id="choosing-the-decay-from-a-horizon">edge weights fade by age</Ref> in the fraud graph.
+
+<Definition title="exponentially weighted moving average">
+With $0 < \lambda < 1$, the EWMA of a stream $x_t$ is $y_t = \lambda x_t + (1 - \lambda) y_{t-1}$. Unrolled, $y_t = \sum_{i \geq 0} \lambda (1 - \lambda)^i x_{t-i}$, so the item $i$ steps back has weight $\lambda(1 - \lambda)^i$, where a sliding window gives $1/W$ up to $i = W - 1$ and 0 after.
+</Definition>
+
+Giving up the sharp edge buys no escape from the trade-off. The EWMA's items have mean age $(1 - \lambda)/\lambda$, and its variance is $\sigma^2 \lambda / (2 - \lambda)$. Set $\lambda = 2 / (W + 1)$: the mean age becomes $(W - 1)/2$ and the variance $\sigma^2 / W$, both exactly those of a window of $W$. At $W = 6$ that is $\lambda = 0.29$.
+
+<KeyFact>
+An EWMA with $\lambda = 2/(W + 1)$ has the same variance and the same lag as a window of length $W$ at the memory of one number. It makes tracking cheap and leaves the choice of speed exactly where it was, so something has to set that speed from the stream.
+</KeyFact>
+
+## Which of the October stories is the model's problem
+
+Return to June's detector in October. Each story has a different signature in the label-free distances and in the error on labels, a different date on which it can be read, and a different remedy.
+
+<Figure
+  src="./figures/october-stories.svg"
+  alt="Three small schematic timelines with a dashed line marking the change. New method: a blue label-free distance stays flat and an amber error line jumps some time after the change. New product: the distance steps up at the change and stays up; the error stays nearly flat. Holiday season: the distance rises and falls and rises again; the error stays nearly flat."
+  caption="Schematic. Blue is available the same day; amber starts at c + δ, with a whole week to read at c + 6 + δ. The story that hurts the model is the one blue cannot see."
+/>
+
+| Story | Kind and pattern | Today, label-free | On labels, from $c + \delta$ | Remedy |
+|---|---|---|---|---|
+| Holiday season | Virtual, reoccurring | $D$ and $H$ jump, as last year | Rates per kind of payment hold; $H$ moves in both classes | Keep a model or a block that has seen the season |
+| New product | Virtual, sudden or incremental | $D$ and $H$ move and stay | Rates hold; $H$ on fraud rows moves too, as on genuine rows; error may be high where training rows are few | More data on the new region |
+| Fraud wave or ebb | Prior shift, any pattern | Flat | Base rate moves; ROC-AUC holds; AP moves with it; $H$ flat in both classes | Re-threshold with one factor; the ranking is fine |
+| New method | Real, any pattern | Flat | ROC-AUC falls; $H$ moves on fraud rows and not on genuine rows; the order of kinds changes | Relearn |
+
+The procedure follows the order in which the evidence arrives:
+
+1. **On the day.** Read the column histograms and the new day's row of the matrix against its like days.
+2. **From $c + \delta$.** Compute the base rate and the ROC-AUC on the first whole labelled week; a falling ROC-AUC beside a moved mix also needs the next step, since the new product moved it from 0.757 to 0.725 with no change in any fraud rate.
+3. **Then.** Compare fraud rates within kinds of payment, and $H$ on fraud rows against $H$ on genuine rows, and read them off <Ref lesson="concept-drift" id="per-class-a-delay-later">the per-class table</Ref>.
+
+These stories also happen at once, and they combine in October's score, so one score cannot separate them. This also says what <Ref lesson="sequence-models-for-transactions" id="how-much-of-a-gap-is-noise">the sequence lesson's hard days</Ref> could and could not be. Those days were 9–10 and 25–26 May 2015. The experiment's authors inspected them and reported no calendar or public event that explained them. The real matrix, on face-to-face payments of the same spring, gives a reason to doubt that report for three of the four days: 9 and 10 May are a Saturday and a Sunday, which it sets apart from working weekdays, and it groups 25 May, Pentecost Monday, with the Sundays. So the calendar may have a part in them. It cannot be the whole account, since the other weekends of those test weeks were not the low points and 26 May was an ordinary Tuesday. Whether the rest was a base rate or a change of method would need the ROC-AUC per day, which that experiment did not report. What to do once the story is known, which models to keep and how fast to forget, is the business of <Ref lesson="stream-learning-and-adaptation" /> and <Ref lesson="drift-strategies-on-worldline" />.
+
+<Conclusion>
+You can now name a change in a stream by the factor that moved, $p(x)$, the base rate or $p(y \mid x)$, and by how it arrived, sudden, incremental, gradual or reoccurring, and keep a one-off outlier out of the list. You can say why only a change in the order of payments forces relearning, why it reaches the labels no sooner than $\delta$ days later, and why label-free distances cannot see it first: any change confined to fraud moves $D$ by at most about the fraud share. You can measure day distinguishability with folds split by card, read a day-by-day matrix, compute a Hellinger distance and read it per class once labels arrive, and size a window from its variance and staleness.
+
+What stays open is the last step of the procedure. Labels arrive every day, the running error on them moves by chance every day, and the right window depends on a rate nobody knows. <Ref lesson="change-detectors" /> takes up the rule that watches that error and decides when a rise is real.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+For an EWMA with $\lambda = 0.1$: (a) compute the weight on the item 10, 30 and 100 steps back; (b) compute the mean age $\sum_i i \lambda (1 - \lambda)^i$; (c) give the window length with the same mean age, and check that its variance matches too.
+
+<Solution>
+(a) $0.1 \times 0.9^{10} = 0.035$; $0.1 \times 0.9^{30} = 0.0042$; $0.1 \times 0.9^{100} = 2.7 \times 10^{-6}$.
+
+(b) With $q = 1 - \lambda$, $\sum_i i q^i = q / (1 - q)^2$, so the mean age is $\lambda q / \lambda^2 = q / \lambda = 9$ steps.
+
+(c) $(W - 1)/2 = 9$ gives $W = 19$, and $\lambda = 2/(19 + 1) = 0.1$ as the formula says. The EWMA's variance is $\sigma^2 \sum_i \lambda^2 q^{2i} = \sigma^2 \lambda^2 / (1 - q^2) = \sigma^2 \lambda / (2 - \lambda) = \sigma^2 \times 0.1 / 1.9 = \sigma^2 / 19$. The move to keep: weights far back are tiny but never zero, and the matched pair agrees on lag and on variance for every $\lambda$, so the choice between them is memory, not accuracy.
+</Solution>
+</Exercise>
+
+<Exercise>
+A stream has $p(x)$ changing and $p(y \mid x)$ fixed. (a) Show that the rule "alert when $p(y = 1 \mid x) > \tau$" that minimises expected cost stays the same. (b) A perfectly calibrated model scores two kinds of payment: kind H with fraud probability 0.5 and kind L with 0.1. In June there are 1,000 H payments a day; in October 40. Compute the team's precision at 100 alerts in each month. (c) Which kind of drift did the metric see, and is the model at fault?
+
+<Solution>
+(a) The rule depends on $x$ only through $p(y = 1 \mid x)$ and on the costs. Neither depends on $p(x)$, so the rule is the same set of inputs. What $p(x)$ changes is how many payments fall into that set.
+
+(b) June: all 100 alerts are H, precision 0.50. October: 40 H and 60 L, so $(40 \times 0.5 + 60 \times 0.1)/100 = 0.26$.
+
+(c) Virtual drift. Every score is still exactly right and the order is still right; precision halved because there are fewer high-probability payments to alert on. The boundary case exposes what precision at $k$ reads: the model and the mix of the day together. Retraining would change nothing here, and comparing to the fraud share and to rates within H and L would show it.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague writes: "Day distinguishability rose from 0.55 to 0.80 between Monday-against-Tuesday and Monday-against-Sunday, so the fraud concept drifted on Sunday and the model must be retrained." Name each step that fails, and say what would show real drift.
+
+<Solution>
+**What was measured.** $D$ reads $p(x)$, and no label enters it. It says that Sunday's payments differ from Monday's, which on real card data is the ordinary weekly band: reoccurring virtual drift, the same next Sunday.
+
+**The step to "fraud concept".** By the Proposition, a change confined to fraud can move $D$ by at most about the fraud share, far below 0.25. A rise that size must come from the genuine payments, so it is close to evidence about customers and no evidence about fraud.
+
+**The step to "must be retrained".** A reoccurring change asks for a model or training block that has seen Sundays, not a new model each Sunday. A week-long training block already holds one.
+
+**What would show real drift.** On labels, from $\delta$ days later: the ROC-AUC falling on like days while the mix of payments holds, fraud rates within kinds of payment reordering, or $H$ on fraud rows rising above its usual week-to-week level while $H$ on genuine rows stays at its own.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the window. The stream is $x_t = \mu_t + \varepsilon_t$ with independent noise of variance $\sigma^2$ and $\mu_t$ rising by $r$ per step. For the mean of the last $W$ items: (a) derive the variance; (b) derive the bias against $\mu_t$; (c) minimise their sum, approximating $W - 1 \approx W$, and show how $W^*$ scales with $r$; (d) check against the lesson's three rates, and state what doubling $\sigma$ does.
+
+<Solution>
+(a) $\operatorname{Var} = W \sigma^2 / W^2 = \sigma^2 / W$.
+
+(b) $\mathbb{E}[\bar x] = \frac{1}{W} \sum_{i = 0}^{W - 1} (\mu_t - ir) = \mu_t - r(W - 1)/2$, so the bias is $-r(W - 1)/2$.
+
+(c) The sum is $\sigma^2 / W + r^2 W^2 / 4$. Its derivative is $-\sigma^2 / W^2 + r^2 W / 2$, which is zero at $W^3 = 2\sigma^2 / r^2$. So $W^* = (2\sigma^2 / r^2)^{1/3}$, which scales as $r^{-2/3}$.
+
+(d) With $\sigma^2 = 0.009$: $r = 0.03$ gives $20^{1/3} = 2.7$; $r = 0.01$ gives $180^{1/3} = 5.6$; $r = 0.001$ gives $18{,}000^{1/3} = 26$. The lesson's 3, 6 and 26 keep $W - 1$. Doubling $\sigma$ multiplies $W^*$ by $4^{1/3} = 1.6$. The exponent is the useful part: a thirtyfold error in the guessed rate moves the best window about tenfold.
+</Solution>
+</Exercise>
+
+<Exercise>
+Run the matrix on the simulator. Generate the simulator from its rules for 90 days, compute the eleven label-free columns of this lesson and $D$ for all pairs among 14 days, with folds split by card. Before running, state: (a) whether scenario 2's compromised terminals should show as structure in the matrix; (b) what result would contradict you. Then run it, also with shuffled folds, and report.
+
+<Solution>
+Possible answer. **(a)** They should not. Scenario 2 marks a terminal's payments as fraud and changes nothing about them: amounts, times and counts are as before, so it does not move $p(x)$. Scenario 3 multiplies amounts of about 25 payments a day out of 9,800, which is limited by the Proposition; and the steady state holds 56 terminals and 42 cards compromised every day, so nothing differs between days.
+
+**(b)** Pairs close in time reading systematically below far pairs, or any block.
+
+**Reference run** (one seed, 882,164 payments, days 60 to 73, 60 trees of depth 3, three folds): 91 pairs, mean 0.499, standard deviation 0.006, range 0.482 to 0.512; pairs one day apart 0.499, pairs a week or more apart 0.499. No structure. With shuffled folds the mean is 0.516, an artefact of recognising cards.
+
+So a stream with real change at the level of each terminal, on and off every 28 days, has a flat matrix. Scenario 2 is a change in $p(y \mid x)$ for $x$ holding the terminal, and only labels can reveal it. The way to test the reading is to add a column that does respond, the delayed terminal risk, and see which terminals move, noting that the measure is then no longer label-free.
+</Solution>
+</Exercise>
+
+<Exercise>
+Place <Ref lesson="elliptic-illicit-nodes" id="the-data-fewer-illicit-transactions-and-the-rest-look-licit">Elliptic's step 43</Ref> in the taxonomy. The illicit count falls from 239 to 24, a share of 11% to under 2%; among the five nearest training transactions an illicit test transaction had 78% illicit neighbours before and 8% after; at step 43 the AP is 0.029 against a no-information 0.018, and the top 50 hold no illicit transaction. (a) Which pattern? (b) Which kinds of drift do these numbers show? Use the prior correction to test whether a base-rate change alone could explain them. (c) How much could the prior correction repair? (d) Would the lesson's Proposition have let a matrix see it?
+
+<Solution>
+(a) Sudden: one step, tied to a dark market closing.
+
+(b) The share falling is a prior shift. A prior shift alone keeps $p(x \mid y)$, so it multiplies all odds by one factor and keeps the order: the illicit transactions would still sit at the top of the list, in smaller number. They do not. The top 50 hold none and the neighbour count fell from 78% to 8%, so the illicit transactions now sit among the licit. So $p(x \mid y = \text{illicit})$ changed, and with it the order: real drift on top of the prior shift.
+
+(c) Nothing about the order. The factor changes the level of each probability; the ranking and so the AP on a ranking stay as they are. Only the fixed cut could move.
+
+(d) Hardly. At an illicit share of up to 11% the ceiling is about 0.60, a weak bound, but its assumption of an unchanged licit part fails anyway: <Ref lesson="elliptic-illicit-nodes" id="exercises">the earlier exercise</Ref> found 0.967 between licit transactions on either side of the break and 0.979 across earlier periods with no event. A high cell is the ledger's ordinary state, so a matrix would not single out step 43. What did single it out, the neighbour count, reads labels.
+</Solution>
+</Exercise>
+
+<Exercise>
+Use the simulator's geometry of <Ref lesson="delayed-labels-prequential" id="prequential-folds-a-spread-across-weeks">prequential folds</Ref>: $\delta = 7$, seven-day training and validation blocks. A real drift begins on day 125, sudden and lasting. (a) What is the first model that trains on a label from the new concept, and which day does it first score? (b) Deploying on day 129, as in that lesson, which blocks hold old and new? What does a test number on 129 to 135 measure? (c) What is the first day on which one whole fold, training and validation, lies inside the new concept? (d) Before that day, what do the <Ref lesson="gbm-model-selection" id="three-test-numbers-for-one-model-class">best-estimated settings</Ref> measure, and what can the one-standard-deviation rule say about them?
+
+<Solution>
+(a) Labels of day 125 arrive on day 132. The model trained that night scores day 133, matching the rule $d - \delta - 1 = 125$.
+
+(b) Training block 115 to 121: all old. Delay block 122 to 128: three days old, four new, but unlabelled. Test block 129 to 135: all new. The number measures an old-concept model on the new concept, a true picture of what happens, and it is a sample of one such change.
+
+(c) Training must start on day 125 or later: training 125 to 131, delay 132 to 138, validation 139 to 145. Day 145's labels arrive on day 152, so it is usable by the model scoring day 153. That is **28 days** after the change, the sum of four weeks.
+
+(d) They pick the best settings for the old concept, or for a model trained on old rows and validated on new ones. Folds straddling the break also differ from one another because of the break, and the rule reads that spread as noise, so candidates may be called tied when they are not. The folds assume that adjacent weeks resemble each other, and a break is where that fails.
+</Solution>
+</Exercise>
+
+<Exercise>
+Simulate 20,000 errors, each 1 with probability 0.05 up to step 5,000 and 0.08 after it. Keep the running mean over the last 100, 1,000 and 10,000 items. Mark 0.065 as an alarm level. For each window, report (a) the share of steps before the change at which it is already above the level, and (b) how many steps after the change it first crosses. Predict (a) from the binomial standard deviation before running. What does the result ask of a better rule?
+
+<Solution>
+**Prediction.** The window mean's standard deviation is $\sqrt{0.05 \times 0.95 / W}$: 0.0218 at 100, so 0.065 is 0.69 standard deviations up and about 25% of the steps should be above it; 0.0069 at 1,000, so 2.2 standard deviations and about 1.5%.
+
+**A run** (200 seeds): at $W = 100$, 23% of the pre-change steps are above the level and the first crossing comes about 50 steps after the change; at $W = 1{,}000$, 1.3% and about 480 steps. At $W = 10{,}000$ the window has not filled by the change. Its mean over $t$ items reaches 0.065 in expectation exactly at $t = 10{,}000$, and in three runs it first crossed at 9,300 to 9,700, some 4,500 steps late.
+
+So a short window raises an alarm long before anything happens and a long one raises it thousands of steps late, with the level fixed by hand. A better rule needs to weigh how much evidence has built up and to scale the level to the noise it expects on a stable stream. That rule, and the measures for its false alarms and its delay, are the subject of <Ref lesson="change-detectors" />.
+</Solution>
+</Exercise>
+
+<References>
+1. J. Gama, I. Žliobaitė, A. Bifet, M. Pechenizkiy, A. Bouchachia, "A Survey on Concept Drift Adaptation," *ACM Computing Surveys* 46(4), 2014 — Sec. 2.1 (the definition, real and virtual drift, the news-stream triad, Fig. 1), Sec. 2.2 (patterns of change, Fig. 2), Sec. 2.4 (predict, diagnose, update with delayed feedback, Fig. 3), Sec. 3.1 (memory). https://doi.org/10.1145/2523813
+2. Y. Lucas, J. Jurgovsky, "Credit Card Fraud Detection Using Machine Learning: A Survey," arXiv:2010.06479, 2020 — Sec. 3.1 (covariate shift, prior shift, concept drift), Sec. 3.2 and Fig. 4 (day distinguishability and the weekly matrix). https://arxiv.org/abs/2010.06479
+3. Y. Lucas, P.-E. Portier, L. Laporte, S. Calabretto, L. He-Guelton, F. Oblé, M. Granitzer, "Dataset Shift Quantification for Credit Card Fraud Detection," *IEEE AIKE*, 2019, pp. 97–100 — Sec. II–III (a random forest per pair of days, a correlation score in each cell, four calendar clusters). https://arxiv.org/abs/1906.06977
+4. R. Gavaldà, *MIRI Seminar on Data Streams*, UPC, 2015, Lecture 6 — slides 26–30 (decay functions, sliding window and EWMA, the variance and reaction-time trade-off). http://www.cs.upc.edu/~gavalda/DataStreamSeminar/
+5. A. Bifet, R. Gavaldà, G. Holmes, B. Pfahringer, *Machine Learning for Data Streams with Practical Examples in MOA*, MIT Press, 2018 — Ch. 5, Sec. 5.1–5.2 (notions of change, estimators, distribution change against outliers). https://book.moa.cms.waikato.ac.nz/chapter_5.html
+6. H. M. Gomes, A. Bifet, *Tutorial 5: Simulating Concept Drift in MOA*, 2017 — Sec. 3 (the drift window, position and width, width 1 as abrupt). https://moa.cms.waikato.ac.nz/tutorial-5-simulating-concept-drift-in-moa/
+7. A. Bifet, G. Holmes, B. Pfahringer, R. Kirkby, R. Gavaldà, "New Ensemble Methods for Evolving Data Streams," *KDD*, 2009, pp. 139–148 — the sigmoid transition with rate $4/w$ in its exponent.
+8. A. Dal Pozzolo, O. Caelen, Y.-A. Le Borgne, S. Waterschoot, G. Bontempi, "Learned Lessons in Credit Card Fraud Detection from a Practitioner Perspective," *Expert Systems with Applications* 41(10), 2014, pp. 4915–4928 — Sec. 4 (new products move $P(X)$, new fraud types move $P(Y \mid X)$).
+9. D. A. Cieslak, T. R. Hoens, N. V. Chawla, W. P. Kegelmeyer, "Hellinger Distance Decision Trees Are Robust and Skew-Insensitive," *Data Mining and Knowledge Discovery* 24, 2012, pp. 136–158 — Hellinger distance applied per class. https://doi.org/10.1007/s10618-011-0222-1
+10. M. Weber, G. Domeniconi, J. Chen, D. K. I. Weidele, C. Bellei, T. Robinson, C. E. Leiserson, "Anti-Money Laundering in Bitcoin: Experimenting with Graph Convolutional Networks for Financial Forensics," *KDD Workshop on Anomaly Detection in Finance*, 2019 — Sec. 4 and Fig. 2 (the dark-market shutdown at step 43). https://arxiv.org/abs/1908.02591
+11. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 3, section "Transaction data simulator" (the generating rules the day-distance runs regenerate, scenarios 2 and 3). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+12. J. Jurgovsky, M. Granitzer, K. Ziegler, S. Calabretto, P.-E. Portier, L. He-Guelton, O. Caelen, "Sequence Classification for Credit-Card Fraud Detection," *Expert Systems with Applications* 100, 2018, pp. 234–245 — Sec. 5.1 (daily AUCPR moving on a common trend). https://doi.org/10.1016/j.eswa.2018.01.037
+</References>

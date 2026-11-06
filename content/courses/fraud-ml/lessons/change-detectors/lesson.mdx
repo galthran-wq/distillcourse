@@ -8,7 +8,7 @@ Both numbers came from a level picked by hand and a window picked by hand, and n
 
 "It found the change" cannot be the score, because a rule that alarms on every step finds every change. The false alarms have to be counted too, and they can only be counted where the truth is known. So detectors are scored on streams with a planted change: a long stable stretch, then a change of known size $\theta$ in the mean.
 
-Run the window rule that way, restarting it after each alarm. With the window of 100 at level 0.065, a stable stream sets off an alarm every 230 steps or so, and a change to 0.08 is caught about 70 steps later. With the window of 1,000 at the same level, the alarms come every 13,000 steps or so and the change takes about 510 steps (the 480 above did not restart the rule after false alarms). The short window is faster and cries wolf more than fifty times as often.
+Run the window rule that way, restarting it after each alarm. With the window of 100 at level 0.065, a stable stream sets off an alarm every 230 steps or so, and a change to 0.08 is caught about 70 steps later. With the window of 1,000 at the same level, the alarms come every 13,000 steps or so and the change takes about 510 steps (the 480 above did not restart the rule after false alarms). The short window is faster and raises more than fifty times as many false alarms.
 
 <Definition title="run-length measures of a detector">
 Let a detector restart after every alarm.
@@ -16,8 +16,6 @@ Let a detector restart after every alarm.
 - **Mean time between false alarms (MTFA):** the mean number of steps between alarms on a stream with no change. The *false alarm rate* is $1/\text{MTFA}$.
 - **Mean time to detection, $\text{MTD}(\theta)$:** the mean number of steps from a change of size $\theta$ to the first alarm after it.
 - **Missed detection rate, $\text{MDR}(\theta)$:** the probability of no alarm within a stated horizon after a change of size $\theta$.
-
-The *average run length* $\text{ARL}(\theta)$ is the mean wait for an alarm when the mean has shifted by $\theta$, so $\text{MTFA} = \text{ARL}(0)$ and $\text{MTD}(\theta) = \text{ARL}(\theta)$ for $\theta > 0$.
 </Definition>
 
 The boundary cases show why it takes more than one number. A rule that always alarms has MTD of one step and MTFA of one step. A rule that never alarms has infinite MTFA and MDR of 1.
@@ -31,12 +29,6 @@ Moving the level traces out a curve for each rule, so comparing two rules at one
   alt="Mean time to detection against mean time between false alarms on a log scale, for a change from 0.05 to 0.08. Three rising curves: a window of 100 steepest and highest, a window of 1,000 in the middle, a cumulative sum lowest. A vertical guide at about 13,000 steps meets them at 625, 510 and 404 steps."
   caption="Each point is one threshold, measured by simulation. Every rule buys fewer false alarms with delay; the better rule is the lower curve."
 />
-
-<KeyFact>
-A detector is a curve, not a point. Quote its delay at a stated MTFA, on a stated change, or the number compares nothing.
-</KeyFact>
-
-The lowest curve in the figure belongs to a rule that uses no window at all.
 
 ## Evidence has to accumulate: CUSUM
 
@@ -133,7 +125,7 @@ $$
 \text{MTD}(\theta) \approx \frac{2 \ln \text{MTFA}}{\theta^2}.
 $$
 
-With $\theta = 1$ the threshold is $h = \ln \text{MTFA}$, the usual guideline with values of 3 to 5. A simulation checks this, on four million stable normal values and 4,000 runs per change:
+With $\theta = 1$, so $v = 0.5$, the threshold is $h = \ln \text{MTFA}$. Practice usually starts from this case, setting $v = 0.5$ and $h$ from 3 to 5. A simulation checks the formulas there and one step beyond, on four million stable normal values and 4,000 runs per change:
 
 | Threshold $h$, with $v = 0.5$ | Bound $e^{h}$ | MTFA | MTD, $\theta = 2$ | MTD, $\theta = 1$ | MTD, $\theta = 0.5$ |
 |---|---|---|---|---|---|
@@ -148,7 +140,9 @@ Three things can be read off. The bound holds and is loose by a factor of about 
 False alarms are cheap to buy off and small changes are not: delay grows with the logarithm of the MTFA and with the inverse square of the change.
 </KeyFact>
 
-On the running stream of errors, $\sigma = \sqrt{0.05 \times 0.95} = 0.218$ and the change is $\theta = 0.03/0.218 = 0.138$ standard deviations, so $v = 0.069$. With $h = 38$ the measured MTFA is about 12,700 and the MTD 404, the point on the lowest curve of the first figure. The bound promises only $e^{2vh} = 190$, since at small $v$ an attempt lasts many steps. The slope formula gives 550, and the measured delay is shorter because a single error adds 4.4 to the sum, far above its mean step. So the formulas tell you how the settings scale. The final $h$ comes from simulating the stable stream.
+On the running stream of errors, $\sigma = \sqrt{0.05 \times 0.95} = 0.218$ and the change is $\theta = 0.03/0.218 = 0.138$ standard deviations, so $v = 0.069$. With $h = 38$ the measured MTFA is about 12,700 and the MTD 404, the point on the lowest curve of the first figure. The bound promises only $e^{2vh} = 190$, since at small $v$ an attempt lasts many steps.
+
+The slope formula gives $38 / 0.069 = 550$, and the measured delay is shorter for two reasons the formula leaves out. After the change, 92% of the steps lower the sum by 0.30 and 8% raise it by 4.29, which nets to the slope of 0.069. The sum therefore falls often, and the floor clips the falls that would take it below 0, so $g_t$ climbs faster than its slope. And at the change $g_t$ does not stand at 0: the calm has left it at about 6 on average. Simulation separates the two. Started from 0, the sum without a floor takes about 580 steps (the last error overshoots $h$), with the floor about 435, and with the floor after a calm the 404 above. So the formulas tell you how the settings scale. The final $h$ comes from simulating the stable stream.
 
 ## When the usual level is unknown: Page–Hinkley
 
@@ -251,25 +245,25 @@ $$
 The rate should hold still or fall while the concept holds and the model keeps learning. So remember the best it has been and measure rises against that.
 
 <Definition title="drift detection method (DDM)">
-Let $t$ count items since the last reset. Keep registers $p_{\min}$ and $s_{\min}$, overwritten by $p_t, s_t$ whenever $p_t + s_t$ falls below $p_{\min} + s_{\min}$. After a warm-up of a few items, because reading $s_t$ as the standard deviation of a roughly normal rate needs enough of them:
+Let $t$ count items since the last reset. After a warm-up of a few items, because reading $s_t$ as the standard deviation of a roughly normal rate needs enough of them, start registers $p_{\min}$ and $s_{\min}$, overwriting them by $p_t, s_t$ whenever $p_t + s_t$ falls below $p_{\min} + s_{\min}$. Then:
 
 - **Warning** while $p_t + s_t \geq p_{\min} + 2 s_{\min}$.
 - **Drift** when $p_t + s_t \geq p_{\min} + 3 s_{\min}$: discard the model, build a new one from the items stored since the warning began, reset.
 </Definition>
 
-There are two levels because a new model has to be trained on something. When drift is declared, it is too late to begin collecting the new concept's items, and storing everything is what the method wants to avoid. So the warning starts the collection, and a warning that fades clears it. Two and three standard deviations are the usual warning and action limits of a control chart, the tracking plot of factory quality control. They do not fix a false alarm rate, since $p_{\min}$ is the lowest of many noisy values. The rate has to be measured here too.
+There are two levels because a new model has to be trained on something. When drift is declared, it is too late to begin collecting the new concept's items, and storing everything is what the method wants to avoid. So the warning starts the collection, and a warning that fades clears it. Two and three standard deviations are the usual warning and action limits of a control chart, the tracking plot of factory quality control. They do not fix a false alarm rate, since $p_{\min}$ is the lowest of many noisy values. Their false alarms have to be measured too, and a subsection below shows they do not form a steady rate.
 
 The appeal is that nothing about the change has to be stated in advance. The price comes from what $p_t$ averages.
 
 ### Its price: the longer the calm, the slower the reaction
 
-$p_t$ runs over every item since the last reset. Let the rate be $p$ with $\sigma = \sqrt{p(1-p)}$ for $T$ calm items, then rise by $\theta$. After $n$ further items, with $n$ much smaller than $T$, the rate has risen by about $\theta n / T$. Near the end of the calm $s_t \approx s_{\min} \approx \sigma / \sqrt{T}$, so drift needs a rise of about $2 s_{\min}$:
+$p_t$ runs over every item since the last reset. Let the rate be $p$ with $\sigma = \sqrt{p(1-p)}$ for $T$ calm items, then rise by $\Delta$, measured in the rate itself rather than in standard deviations as $\theta$ is. After $n$ further items, with $n$ much smaller than $T$, the rate has risen by about $\Delta n / T$. Near the end of the calm $s_t \approx s_{\min} \approx \sigma / \sqrt{T}$, so drift needs a rise of about $2 s_{\min}$:
 
 $$
-\frac{\theta n}{T} \approx \frac{2\sigma}{\sqrt{T}} \quad \Longrightarrow \quad n \approx \frac{2 \sigma \sqrt{T}}{\theta}.
+\frac{\Delta n}{T} \approx \frac{2\sigma}{\sqrt{T}} \quad \Longrightarrow \quad n \approx \frac{2 \sigma \sqrt{T}}{\Delta}.
 $$
 
-The band narrows as $1/\sqrt{T}$, which helps, and the averaging dilutes the change as $1/T$, which hurts more. Measured at 0.05 → 0.08, with a warm-up of 1,000 items and medians because a few runs take far longer:
+The band narrows as $1/\sqrt{T}$, which helps, and the averaging dilutes the change as $1/T$, which hurts more. At 0.05 → 0.08, $\Delta = 0.03$ and $\sigma = 0.218$, so a calm of $T = 2{,}000$ predicts $2 \times 0.218 \times \sqrt{2000} / 0.03 = 650$ items. Measured with a warm-up of 1,000 items and medians because a few runs take far longer:
 
 | Calm items $T$ | 2,000 | 5,000 | 20,000 | 80,000 |
 |---|---|---|---|---|
@@ -288,7 +282,7 @@ DDM is slowest when the stream has been stable longest, and a slow warning stret
 
 ### A boundary: rare errors at the start
 
-The small warm-up usually quoted is about 30 items, resting on the normal approximation. At a low error rate that breaks. At $p = 0.05$, 21% of streams show no error in the first 30 items, so $p_t = s_t = 0$, the registers are set to 0, and the test as written, $0 \geq 0$, declares drift at once. Other streams lock the registers onto a lucky early stretch, such as one error in 42 items, where $s_{\min}$ is 0.024. Then the drift line sits near 0.09 and a change to 0.08 never reaches it. In simulation with a warm-up of 30, 7% of changes are missed within 60,000 items after a calm of 5,000, and 16% after a calm of 50,000. A warm-up of 1,000 takes these to under 1%. So the method has a parameter after all, and it matters more the rarer the errors are.
+The small warm-up usually quoted is about 30 items, resting on the normal approximation. At a low error rate that breaks. At $p = 0.05$, 21% of streams show no error in the first 30 items, so $p_t = s_t = 0$, the registers are set to 0, and the test as written, $0 \geq 0$, declares drift at once. That can happen only in the first items after a restart, and most other false alarms come early too: about 90% of them within 1,000 items of a restart. Later $p_t + s_t$ settles on the true rate while the drift line stays where the registers froze it, so about a third of starts never alarm. A stable stream gets about two false alarms in total, whatever its length, and items divided by alarms grows with the stream: about half a million on a million items, about 50 million on 100 million. DDM has no MTFA to report. Other streams lock the registers onto a lucky early stretch, such as one error in 42 items, where $s_{\min}$ is 0.024. Then the drift line sits near 0.09 and a change to 0.08 never reaches it. In simulation with a warm-up of 30, 7% of changes are missed within 60,000 items after a calm of 5,000, and 16% after a calm of 50,000. A warm-up of 1,000 takes these to under 1%. So the method has a parameter after all, and it matters more the rarer the errors are.
 
 ## Comparing two windows directly
 
@@ -300,11 +294,21 @@ $$
 |\hat\mu_0 - \hat\mu_1| > 1.96 \sqrt{\frac{\sigma_0^2}{n_0} + \frac{\sigma_1^2}{n_1}}.
 $$
 
-On an alarm the sliding window becomes the new reference. At 1,000 items each, with means 0.05 and 0.08, the root is $\sqrt{0.0475/1000 + 0.0736/1000} = 0.011$, and the difference of 0.03 is 2.7 standard errors, past 1.96. (A $\chi^2$ test on the variances catches a change in spread, but on bits the variance is a function of the mean and adds nothing.)
+At 1,000 items each, with means 0.05 and 0.08, the root is $\sqrt{0.0475/1000 + 0.0736/1000} = 0.011$, and the difference of 0.03 is 2.7 standard errors, past 1.96. (A $\chi^2$ test on the variances catches a change in spread, but on bits the variance is a function of the mean and adds nothing.)
 
-The 5% is not a false alarm rate, since the test runs afresh on every step and neighbouring tests share almost all their items. The measured MTFA, with alarms in either direction counted, is about 13,000 steps. The test has a real merit: since the variance comes from the windows, it stays near 13,000 with the stable error at 0.01 or at 0.20, where Page–Hinkley's fell to 900 at 0.20.
+The 5% is not a false alarm rate, since the test runs afresh on every step and neighbouring tests share almost all their items. The rate has to be measured, and it depends on something the test leaves open: what happens to the two windows after an alarm.
 
-Its weakness is the reference. A reference window that came out high by chance stays in place until an alarm replaces it, so some runs wait a long time: the mean delay on 0.05 → 0.08 is about 1,120 steps with a median of 706. And its window sizes are a guess again, the same guess as in <Ref lesson="concept-drift" id="how-long-a-window-should-an-estimate-use">the previous lesson's variance and staleness</Ref>: the best length depends on a rate of change nobody knows.
+### After an alarm: which window stays
+
+After a real change the reference describes a concept that has gone, and the sliding window already holds the new one. So the natural rule is a handover: the sliding window becomes the new reference, a new sliding window starts empty, and testing resumes 1,000 items later. On the stable stream, with alarms in either direction counted, the handover gives an MTFA of about 4,500 steps and, on 0.05 → 0.08, a mean delay of about 790.
+
+The handover is itself a cause of that low MTFA. A false alarm fires when the sliding window has strayed unusually far from the reference, so the new reference is an unusual window, and the ordinary windows that follow stand far from it. Four alarms in ten come within 2,000 steps of the one before.
+
+The other rule is the full restart the run-length definition describes: drop both windows and fill them again, 2,000 items with no test. A false alarm then leaves nothing behind. At the same 1.96 the MTFA is about 13,000 and the mean delay about 1,220, which looks like the usual trade, so the two rules have to be compared at one false alarm rate. The handover reaches 13,000 only with 1.96 raised to 2.9, where its mean delay is about 2,340. So the restart is the better rule at equal MTFA, and it costs 1,000 more blind items after each alarm.
+
+Under either rule the variance comes from the windows, so the MTFA hardly moves with the level. With the stable error at 0.01 and 0.20 it is 4,600 and 4,400 under the handover, 16,100 and 12,400 under the restart, where Page–Hinkley's fell to 900 at 0.20.
+
+The test's weakness is the reference. One that came out high by chance stays in place until an alarm replaces it, so some runs wait a long time: under the restart the median delay is 704 against the mean of 1,220. And its window sizes are a guess again, the same guess as in <Ref lesson="concept-drift" id="how-long-a-window-should-an-estimate-use">the previous lesson's variance and staleness</Ref>: the best length depends on a rate of change nobody knows.
 
 ## Letting the stream set the window: ADWIN
 
@@ -379,7 +383,7 @@ $$
 \varepsilon_{\text{cut}} = \sqrt{\frac{2}{m}\, \sigma_W^2\, \ln \frac{2}{\alpha'}} + \frac{2}{3m} \ln \frac{2}{\alpha'}, \qquad \alpha' = \frac{\alpha}{\ln |W|}.
 $$
 
-The first term is a normal test with a multiple-testing charge, and the second protects small windows. The charge is $\ln |W|$ rather than the $|W|$ above because the histogram tests only at bucket edges, about $\log |W|$ split points rather than every split. It rests on a normal approximation, so the proof above no longer covers it. At $\alpha = 0.2$ the MTFA is about 19,000 steps and the MTD about 950. At $\alpha = 0.002$ false alarms all but vanish (two in four million items) and the MTD is about 2,200. So $\alpha$ is a dial on the same trade, though one that keeps its meaning across levels: at a stable error of 0.20 the MTFA for $\alpha = 0.2$ stays near 9,500.
+The first term is a normal test with a multiple-testing charge, and the second protects small windows. The charge is $\ln |W|$ rather than the $|W|$ above because the histogram tests only at bucket edges, about $\log |W|$ split points rather than every split. It rests on a normal approximation, so the proof above no longer covers it. At $\alpha = 0.2$ the MTFA is about 42,000 steps and the MTD about 950. At $\alpha = 0.002$ false alarms all but vanish (two in four million items) and the MTD is about 2,200. So $\alpha$ is a dial on the same trade, though one that keeps its meaning across levels: at a stable error of 0.20 the MTFA for $\alpha = 0.2$ is still about 24,000.
 
 <Exercise>
 A window holds 15,000 items at 0.05 and 5,000 at 0.08, with $\alpha = 0.002$, under the Hoeffding cut. (a) Compute $\varepsilon_{\text{cut}}$ for the split at the change. Does it cut? (b) With $n_0$ fixed at 15,000, roughly how large must $n_1$ be for a difference of 0.03 to be cut?
@@ -393,30 +397,35 @@ A window holds 15,000 items at 0.05 and 5,000 at 0.08, with $\alpha = 0.002$, un
 
 ## Four detectors on one stream, and why the first comparison misleads
 
-Put the detectors on a single stream first, the way a quick notebook would. Take 3,000 values: uniform on $[0, 0.3]$ for 750 steps, then on $[0, 0.4]$ for 250, then on $[0.4, 0.5]$ for 1,000, then on $[0.7, 1]$ for 1,000. The large changes come at steps 1,000 and 2,000. Run the defaults of the [`river`](https://riverml.xyz) library for ADWIN ($\alpha = 0.002$), Page–Hinkley ($v = 0.005$, $h = 50$) and DDM (fed these values as if they were error rates), and a hand-written cumulative sum with the same $v$ and $h$ over the running mean.
+Put the detectors on a single stream first, the way a quick notebook would. Take 3,000 values: uniform on $[0, 0.3]$ for 750 steps and on $[0, 0.4]$ for 250, a small rise, then on $[0.4, 0.5]$ for 1,000, then on $[0.7, 1]$ for 1,000. The changes to catch come at steps 1,000 and 2,000. Run the defaults of the [`river`](https://riverml.xyz) library for ADWIN ($\alpha = 0.002$), Page–Hinkley ($v = 0.005$, $h = 50$) and DDM (fed these values as if they were error rates), then the `PageHinkley` class above with the same $v$ and $h$. The library's version differs from the class in one way: it multiplies its sum by 0.9999 at each step, so that old evidence fades, and that moves its alarms by a step or two.
 
 <Figure
   src="./figures/three-segments.svg"
-  alt="A scatter of 3,000 values in three bands, with changes at steps 1,000 and 2,000. Below it, rows of alarm ticks: ADWIN at 1,023 and 2,047; DDM at 1,059 and 2,085; CUSUM with h 50 at 1,154 and 2,135; Page-Hinkley with h 50 at 1,156 and 2,136; and in amber Page-Hinkley with h 10 at 1,005 and 2,026."
-  caption="One run. No detector raises a false alarm at these settings, so the delays are all that shows, and the last row changes only the threshold."
+  alt="A scatter of 3,000 values in three bands, with changes at steps 1,000 and 2,000. Below it, rows of alarm ticks: ADWIN at 1,023 and 2,047; DDM at 1,059 and 2,085; river's version of Page-Hinkley with h 50 at 1,156 and 2,136; this lesson's Page-Hinkley class with h 50 at 1,154 and 2,135; and in amber the same class with h 10 at 1,005 and 2,026."
+  caption="One run. No detector raises a false alarm in it, so the delays are all that shows, and the last row changes only the threshold of the row above it."
 />
 
-From the first four rows one would conclude that ADWIN and DDM react within some 20 to 90 steps and that cumulative sums need about 150. The last row removes that conclusion: with $h = 10$ instead of 50, Page–Hinkley alarms first at both changes. The default of 50 is a high threshold: at the first change the sum climbs by roughly a third per step, so it needs about 150 steps. A stream with large jumps and one run per detector measures settings, and it says nothing about false alarms. Lower still, at $h = 5$, Page–Hinkley also alarms at step 825, on the small real rise at step 750.
+From the first four rows one would conclude that ADWIN and DDM react within some 20 to 90 steps and that Page–Hinkley needs about 150. The last row changes only the threshold, and with $h = 10$ the class alarms at 1,005 and 2,026, ahead of ADWIN at both changes. The reason lies in the statistic, and it is different at each change.
 
-The comparison that means something sets each detector to about the same MTFA and uses the small change on bits. The table below does that where it can. The DDM rows and the Hoeffding ADWIN row cannot be brought to that MTFA, so their delays are not at an equal false alarm rate. DDM's only setting is its warm-up, and any warm-up above one item leaves it far quieter. The Hoeffding cut raised no alarm in 4 million stable items even at $\alpha = 0.999$. The conditions: stable error 0.05, at least two million stable items per MTFA, up to 1,000 runs per delay with a calm of 5,000 unless stated, and a miss meaning no alarm within 60,000 items. Each MTD is a mean over the runs that alarmed.
+At the first change the statistic does not start from zero. The small rise has left it at 8.3 by step 1,000, and from there it climbs about 0.27 per step, the distance of the new values above the running mean. So $h = 50$ takes $(50 - 8.3)/0.27 \approx 154$ steps, and $h = 10$ has only 1.7 left to find. The alarm at 1,005 is mostly that head start.
+
+The second change is the fair reading. The statistic stands at 0 at step 2,000 and climbs 0.37 per step, so $h = 10$ needs about 27 steps, against ADWIN's 47. That is a real lead on a change this large, but the head start shows what it costs. Over 300 seeds of this stream, $h = 10$ alarms before step 1,000, on the small rise, in 60% of runs, and $h = 50$ in none. A stream with large jumps and one run per detector measures settings, and it says nothing about false alarms.
+
+The comparison that means something sets each detector to about the same MTFA and uses the small change on bits. The table below does that where it can. The DDM rows have no MTFA to bring there, the Hoeffding ADWIN row cannot reach it, and neither of those delays is at an equal false alarm rate. Two rows sit elsewhere by choice. The handover row has its own lower MTFA, since that rule reaches the others' only with 1.96 raised to 2.9. The variance-cut ADWIN row has a higher one at its usual $\alpha = 0.2$; at $\alpha = 0.5$ it reaches 13,000 with an MTD of about 940, close to the row's 952. DDM's only setting is its warm-up, and at any warm-up its false alarms are a finite count near the start rather than a rate: about 20 per stream at a warm-up of 2, 2 at 30, 0.25 at 1,000. The Hoeffding cut raised no alarm in 4 million stable items even at $\alpha = 0.999$. The conditions: stable error 0.05, at least two million stable items per MTFA, about 1,000 runs per delay, up to 20,000 where the mean is slow to settle, with a calm of 5,000 unless stated, and a miss meaning no alarm within 60,000 items. Each MTD is a mean over the runs that alarmed.
 
 | Detector, settings | MTFA at 0.05 | MTFA at 0.20, same settings | MTD to 0.065 | MTD to 0.08 | MTD to 0.20 | MTD to 0.08, calm 50,000 | MTD, ramp to 0.08 over 4,000 steps |
 |---|---|---|---|---|---|---|---|
-| Window 1,000, level 0.065 | 13,200 | 1,000 | 1,045 | 508 | 139 | 515 | 1,865 |
-| CUSUM, known $\mu, \sigma$, $v = 0.069$, $h = 38$ | 12,700 | 62 | 1,252 | **404** | **52** | **381** | 2,040 |
+| Window 1,000, level 0.065 | 13,200 | 1,000 | 1,052 | 508 | 139 | 515 | 1,883 |
+| CUSUM, known $\mu, \sigma$, $v = 0.069$, $h = 38$ | 12,700 | 62 | 1,167 | **404** | **52** | **381** | 1,950 |
 | Page–Hinkley, $v = 0.015$, $h = 8.5$ | 14,000 | 900 | 2,089 | 506 | 55 | 533 | 2,189 |
-| DDM, warm-up 30 | 500,000 | 400,000 | 5,698 (29% missed) | 3,066 (7%) | 344 | 8,863 (16%) | 5,830 (10%) |
-| DDM, warm-up 1,000 | none in 4 million | none in 2 million | 4,400 (5%) | 1,360 | 201 | 7,294 | 3,599 |
-| Reference and sliding, 1,000 each, 1.96 | 13,200 | 12,300 | 3,143 | 1,123 | 448 | 1,183 | 2,333 |
+| DDM, warm-up 30 | no steady rate: about 2 alarms per stream, then silence | about 0.5 per stream | 5,780 (26% missed) | 3,120 (7%) | 347 | 11,200 (16%) | 5,870 (7%) |
+| DDM, warm-up 1,000 | about 0.25 per stream | about 0.2 per stream | 4,400 (5%) | 1,360 | 201 | 7,294 | 3,599 |
+| Reference and sliding, 1,000 each, 1.96, restart | 13,000 | 12,400 | 3,392 | 1,221 | 426 | 1,032 | 2,453 |
+| Reference and sliding, 1,000 each, 1.96, handover | 4,500 | 4,400 | 3,475 | 793 | 204 | 805 | 2,324 |
 | ADWIN, Hoeffding cut, $\alpha = 0.002$ | none in 4 million | none in 2 million | never | never | 416 | 13,659 | never |
-| ADWIN, variance cut, $\alpha = 0.2$ | 19,000 | 9,500 | 3,696 | 952 | 93 | 1,052 | 2,931 |
+| ADWIN, variance cut, $\alpha = 0.2$ | 42,000 | 24,000 | 3,696 | 952 | 93 | 1,052 | 2,931 |
 
-The reversal is in the column for 0.08: the cumulative tests beat the two-window test and ADWIN by about a factor of two, and they are also cheaper. CUSUM holds up at sizes it was not tuned for: it is the quickest at 0.20, and only the plain window beats it at 0.065 and on the ramp, by about 15% and 10%. What it cannot survive is a change of level: at 0.20 its $\mu$ and $\sigma$ are wrong and alarms come every 62 steps. The second column is where the other designs earn their place, since the reference-window test and ADWIN carry their noise estimate with them and hold their false alarm rate wherever the error sits. DDM has the fewest false alarms and pays for it in the calm-50,000 column. And no detector does much on the ramp: even the quickest alarm comes about halfway up, since the evidence has to exist first.
+The reversal is in the column for 0.08: the cumulative tests beat the two-window test at equal MTFA and ADWIN by a factor of about two to three, and they are also cheaper. CUSUM holds up at sizes it was not tuned for: it is the quickest at 0.20, and only the plain window beats it at 0.065 and on the ramp, by about 10% and 3%. What it cannot survive is a change of level: at 0.20 its $\mu$ and $\sigma$ are wrong and alarms come every 62 steps. The second column is where the other designs earn their place, since the reference-window test and ADWIN carry their noise estimate with them and hold their false alarm rate wherever the error sits. DDM has the fewest false alarms and pays for it in the calm-50,000 column. And no detector does much on the ramp: even the quickest alarm comes about halfway up, since the evidence has to exist first.
 
 <KeyFact>
 Choose by what you know. A known level and a known size of change: CUSUM. A level that moves between retrainings: Page–Hinkley, with $h$ re-simulated at each level. Nothing known about either, and a logarithmic cost acceptable: ADWIN with the variance cut, which also returns the window of items to trust.
@@ -428,7 +437,20 @@ All of this took the error stream at face value. A fraud model's error stream ha
 
 ### The raw error rate reads the fraud share
 
-Take <Ref lesson="concept-drift" id="one-model-four-worlds">the previous lesson's worlds</Ref>, where a model ranks online above petrol above grocery. Let the team open 1,000 alerts, drawn from online, over each stretch of about 100,000 payments, and add the ebb, with frauds halved, and a method that arrives alongside the old one, with 160 extra frauds at petrol and the online frauds staying. With $\text{TP}$ alerts that are fraud and $\gamma$ frauds in the stream, the number of wrong decisions is $1{,}000 + \gamma - 2\,\text{TP}$.
+The obvious input is the model's raw error rate, so compute it where the truth is known. Take <Ref lesson="concept-drift" id="one-model-four-worlds">the previous lesson's worlds</Ref>, where a model ranks online above petrol above grocery over a stretch of about 100,000 payments. Let the team open 1,000 alerts per stretch, drawn at random from online, the top of its list.
+
+Each payment then ends in a decision: an alert says fraud, and no alert says genuine. The raw error rate is the number of wrong decisions divided by the number of payments. Let $\text{TP}$ be the alerts that are fraud and $\gamma$ the frauds in the stream. A decision is wrong in one of two ways, and each can be counted:
+
+- an alert on a genuine payment, a false positive: $1{,}000 - \text{TP}$ of them;
+- a fraud with no alert, a missed fraud: $\gamma - \text{TP}$ of them.
+
+Their sum gives the number of wrong decisions, $1{,}000 + \gamma - 2\,\text{TP}$. And since the alerts are drawn at random from online, $\text{TP}$ is 1,000 times the online fraud rate.
+
+<Example title="the June row">
+June has 200 frauds in 20,000 online payments, a rate of 1%, so 1,000 alerts give $\text{TP} = 10$. Its frauds number $\gamma = 200 + 40 + 70 = 310$. The wrong decisions are $1{,}000 + 310 - 20 = 1{,}290$, and 1,290 of 100,000 is a raw error rate of 1.29%. The alerts' precision is $10 / 1{,}000 = 1.00\%$, and the share of the frauds they find is $10 / 310 = 3.2\%$.
+</Example>
+
+Two worlds join the previous lesson's four, with its new method now called "replacing". In the **fraud ebb** the frauds halve over the same genuine payments: 100 at online, 20 at petrol and 35 at grocery. In the **added** method the new frauds arrive alongside the old: online and grocery stay as in June, and petrol holds 200 frauds in 10,160 payments, 160 more than June's.
 
 | World | Is the order wrong? | Raw error rate | Precision of the alerts | Frauds found, $\text{TP}/\gamma$ |
 |---|---|---|---|---|
@@ -440,6 +462,8 @@ Take <Ref lesson="concept-drift" id="one-model-four-worlds">the previous lesson'
 | New method, added | **yes** | **1.45%** | 1.00% | 2.1% |
 
 Read the raw error first. The wave, which needs no relearning, moves it by 0.29 points. The replacing method, the world where the model has lost the fraud, moves it by 0.02. $\text{TP}$ is a handful against 1,000 alerts and hundreds of frauds, so the count $1{,}000 + \gamma - 2\,\text{TP}$ follows $\gamma$: a raw error rate counts how many frauds there are. A detector on it would fire on the wave and stay quiet through the method.
+
+The table counts payments and, for simplicity, lets each fraud stand for one compromised card with one alert per card. Counted that way per day, with $k$ alerts and $\gamma_t$ compromised cards, the precision column is <Ref lesson="alert-budget-metrics" id="card-precision-at-k-the-team-calls-cards">card precision at $k$</Ref> and the last column is $\text{TP}/\gamma_t$.
 
 The precision of the alerts falls five times over under the replacing method, and it can be read at once, because <Ref lesson="fraud-detection-system" id="investigators-fast-labels-on-the-alerted-cards">investigators label alerted cards the same day</Ref>. This is the daily $CP@k$ stream, the one input with no delay. Two rows limit it. The ebb halves it with the model doing nothing wrong. And it does not move at all under the added method, since the alerts still find what they found, so the new fraud goes past unseen.
 
@@ -472,14 +496,14 @@ Payments <Ref lesson="concept-drift" id="every-pair-of-days-a-matrix">follow the
 | Weekdays' level 0.47, weekdays' $\sigma$ 0.08 | 21 | false alarm comes first |
 | Whole-week level 0.516, weekdays' $\sigma$ 0.08 | about 200 | 8 |
 | Whole-week level 0.516, whole-week $\sigma$ 0.108 | about 7,000 | 16 |
-| Residual against the last four same weekdays | about 1,000 | median 11, about a quarter never |
+| Residual against the last four same weekdays | about 1,000 | median 11, about a quarter not caught by the evidence |
 | Residual against weekday means fixed from twelve stable weeks | about 500 | 10 |
 
 Against the weekdays' level, a weekend day stands two standard deviations up and adds 1.5 to the sum, so one weekend supplies 3 of the 5 the threshold needs. The whole-week level gives the weekdays a downward pull, which helps, and leaves enough weekend bumps to alarm every seven months. Widening $\sigma$ to take in the weekends buys quiet with sensitivity: the 0.08 rise is now only 0.74 of a standard deviation, and the delay of 10 days on an independent stream becomes 16.
 
-The repair the previous lesson used for Sundays is to compare like with like. Feed the detector $x_t$ minus the mean of the last four values of the same weekday. This residual has standard deviation $0.08 \sqrt{1.25} = 0.089$, and the MTFA returns to about 1,000 days. The MTFA hides what this does to a change that lasts: after four weeks the baseline holds the new level, the residual is back at zero, and the evidence stops. About a quarter of the rises are then never caught.
+<Ref lesson="concept-drift" id="each-pattern-breaks-a-different-estimate">The repair the previous lesson used for Sundays</Ref>, where the mean of the last four Sundays beat every window length, is to compare like with like. Feed the detector $x_t$ minus the mean of the last four values of the same weekday. This residual has standard deviation $0.08 \sqrt{1.25} = 0.089$, and the MTFA returns to about 1,000 days. The MTFA hides what this does to a change that lasts: after four weeks the baseline holds the new level, the residual is back at zero, and the evidence stops. About a quarter of the rises are then not caught by the evidence.
 
-A detector looking for a lasting change needs a baseline the change cannot enter. Fix the weekday means and $\sigma$ on twelve stable weeks and hold them until the next alarm or retrain. The rises are caught in about 10 days, 98% of them within four weeks. The MTFA falls to about 500 days, because a weekday mean that came out low by chance stays low for as long as it is held, and 26 weeks bring it back to about 700.
+A detector looking for a lasting change needs a baseline the change cannot enter. Fix the weekday means and $\sigma$ on twelve stable weeks and hold them until the next retrain, through any false alarm. The rises are caught in about 10 days, 98% of them within four weeks. The MTFA falls to about 500 days, because a weekday mean that came out low by chance stays low for as long as it is held, and 26 weeks bring it back to about 700.
 
 CUSUM and Page–Hinkley can take such a residual as it stands. DDM needs bits and the Hoeffding cut needs bounded values, so those two would run per kind of day. Either way, an MTFA measured on independent noise says little about a stream with a calendar, so measure it on the stream's own stable stretches.
 
@@ -523,11 +547,11 @@ The tests above alarm only on a rise. (a) Write two-sided versions of CUSUM and 
 
 (c) Possible answers.
 
-**A window on the rate.** Compute $p_t$ over the last $W$ items only. New parameter: $W$. The rise needed is at most about $2\sigma\sqrt{W}/\theta$, so delay stops growing once $T > W$, at the cost of a wider band and more false alarms.
+**A window on the rate.** Compute $p_t$ over the last $W$ items only. New parameter: $W$. The delay is then at most about $2\sigma\sqrt{W}/\Delta$, so it stops growing once $T > W$, at the cost of a wider band and more false alarms.
 
 **A moving average on the error.** Track $Z_t = \lambda x_t + (1 - \lambda) Z_{t-1}$ and alarm when $Z_t > p_t + L \sqrt{p_t (1 - p_t)\, \lambda / (2 - \lambda)}$, using <Ref lesson="concept-drift" id="forgetting-without-storing-the-moving-average">the moving average's variance</Ref>. New parameters: $\lambda$ and $L$. Its memory of the change does not depend on $T$.
 
-**A reference run** of the second fix at $\lambda = 0.01$, $L = 4$, warm-up 1,000: MTFA about 35,000, mean delay about 1,350 after a calm of 5,000 and about 990 after 50,000, against DDM's 1,360 and 7,294. The growth has gone, and $L$ now has to be chosen. A fix for reaction time reintroduces the setting the method began by doing without.
+**A reference run** of the second fix at $\lambda = 0.01$, $L = 4$, warm-up 1,000: MTFA about 36,000, mean delay about 2,050 after a calm of 5,000 and about 1,600 after 50,000 (medians 670 and 560, since the tail is long), against DDM's 1,360 and 7,294. So the chart is now slower than DDM at a calm of 5,000 and far quicker at 50,000. The growth has gone, and $L$ now has to be chosen. A fix for reaction time reintroduces the setting the method began by doing without.
 </Solution>
 </Exercise>
 
@@ -551,7 +575,7 @@ Take ADWIN with the Hoeffding cut. (a) A long calm of length $T$ at $\mu_0$ is f
 
 **The factors.** A split's bound is $2 e^{-2 m \varepsilon^2}$, with the 2 from the two tails. The union over fewer than $|W|$ splits contributes $|W|$. So $\ln(2|W|/\alpha)$ would already give $\alpha$ overall, and the form with 4 gives $\alpha/2$: the last factor of 2 is slack.
 
-**It is a tunable.** Under the variance cut, $\alpha = 0.2$ gives an MTFA of about 19,000 and an MTD of about 950, and $\alpha = 0.002$ gives about 2 million and about 2,200. That is the same trade as $h$. What $\alpha$ does give is a meaning that holds across levels, where $h$ has to be re-simulated.
+**It is a tunable.** Under the variance cut, $\alpha = 0.2$ gives an MTFA of about 42,000 and an MTD of about 950, and $\alpha = 0.002$ gives about 2 million and about 2,200. That is the same trade as $h$. What $\alpha$ does give is a meaning that holds across levels, where $h$ has to be re-simulated.
 
 **What else is set.** The check interval (every 32 items, which is a delay of its own), the smallest sub-window tested, the buckets per size in the histogram, and the choice of test. Each is a parameter of the detector, so it is more accurate to say that no size of window or change is asked for.
 </Solution>
@@ -606,7 +630,7 @@ A model cannot be fitted on seven positives. The stored stretch gives the new co
 7. W. Hoeffding, "Probability Inequalities for Sums of Bounded Random Variables," *Journal of the American Statistical Association* 58(301), 1963, pp. 13–30 — the inequality for independent bounded terms.
 8. D. Kifer, S. Ben-David, J. Gehrke, "Detecting Change in Data Streams," *VLDB*, 2004 — reference and sliding windows.
 9. R. Gavaldà, *MIRI Seminar on Data Streams*, UPC, 2015, Lecture 6 — slides 31–39 (CUSUM, window detectors, ADWIN's guarantees, its cost against CUSUM). http://www.cs.upc.edu/~gavalda/DataStreamSeminar/
-10. A. Carta, *Continual Learning* course, University of Pisa, notebook OML2 "Concept Drift" — the three-segment stream and the hand-written cumulative sum, re-run here with `river` 0.26. https://github.com/AntonioCarta/continual-learning-course
+10. A. Carta, *Continual Learning* course, University of Pisa, notebook OML2 "Concept Drift" — the three-segment stream, re-run here with `river` 0.26. https://github.com/AntonioCarta/continual-learning-course
 11. J. Montiel et al., "River: Machine Learning for Streaming Data in Python," *Journal of Machine Learning Research* 22(110), 2021 — the library's detectors. https://riverml.xyz
 12. A. Dal Pozzolo, G. Boracchi, O. Caelen, C. Alippi, G. Bontempi, "Credit Card Fraud Detection: A Realistic Modeling and a Novel Learning Strategy," *IEEE Transactions on Neural Networks and Learning Systems* 29(8), 2018, pp. 3784–3797 — Sec. VI (daily fluctuation of $CP_k$, the normalised metric as less affected by it).
 </References>
