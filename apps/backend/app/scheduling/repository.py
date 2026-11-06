@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import Any, Literal
 
 import logfire
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -233,7 +233,7 @@ async def initiations_today(
     session: AsyncSession, user_id: uuid.UUID, since: datetime
 ) -> int:
     """Messages the platform started today, not items it delivered — one
-    message may carry three. A batch is claimed in a single statement, so its
+    message may carry several items. A batch is claimed in a single statement, so its
     rows share the moment that identifies it.
     """
     total = await session.scalar(
@@ -244,6 +244,45 @@ async def initiations_today(
         )
     )
     return int(total or 0)
+
+
+async def silence(session: AsyncSession, user_id: uuid.UUID) -> int:
+    """How many review messages in a row the learner has let time out: those
+    sent since the last thing they wrote in the thread. Read back from the
+    thread and the queue rather than stored, so it cannot drift from either.
+    """
+    last_reply = (
+        select(func.max(Message.created_at))
+        .join(Chat, Chat.id == Message.chat_id)
+        .where(
+            Chat.user_id == user_id,
+            Chat.kind == "telegram",
+            Message.role == "user",
+        )
+        .scalar_subquery()
+    )
+    total = await session.scalar(
+        select(func.count(func.distinct(Schedule.claimed_at))).where(
+            Schedule.user_id == user_id,
+            Schedule.kind == "review",
+            Schedule.outcome == "ignored",
+            or_(last_reply.is_(None), Schedule.claimed_at > last_reply),
+        )
+    )
+    return int(total or 0)
+
+
+async def last_initiation(session: AsyncSession, user_id: uuid.UUID) -> datetime | None:
+    """When the platform last opened the conversation of its own accord — a
+    reminder is the learner's appointment, not ours, so it does not count."""
+    moment: datetime | None = await session.scalar(
+        select(func.max(Schedule.claimed_at)).where(
+            Schedule.user_id == user_id,
+            Schedule.kind != "reminder",
+            Schedule.status.in_(("awaiting_reply", "done")),
+        )
+    )
+    return moment
 
 
 async def ignored_topic(session: AsyncSession, user_id: uuid.UUID) -> str | None:

@@ -55,9 +55,9 @@ async def _initiations_allowed(
 ) -> list[Schedule]:
     """What the platform may say on its own account, of what is due.
 
-    The slot and the daily budget govern messages the platform starts — a
-    review, a nudge. A reminder is the learner's own appointment, set for a time
-    they named, so neither holds it back (#15's gate is that "remind me on
+    The slot, the daily budget and the silence backoff govern messages the
+    platform starts — a review, a nudge. A reminder is the learner's own appointment, set for a time
+    they named, so none of them holds it back (#15's gate is that "remind me on
     Friday" arrives on Friday). It is still a message: delivering one spends the
     day's budget for the reviews that come after it.
     """
@@ -73,6 +73,13 @@ async def _initiations_allowed(
     )
     if spent >= policy.DAILY_INITIATIONS:
         await repository.defer(session, rows, due_at=policy.tomorrow_open(now, hours))
+        return []
+    wait = policy.silence_wait(await repository.silence(session, user.id))
+    last = await repository.last_initiation(session, user.id)
+    if last is not None and now < last + wait:
+        await repository.defer(
+            session, rows, due_at=policy.next_open(last + wait, hours)
+        )
         return []
     return rows
 

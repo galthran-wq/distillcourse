@@ -10,8 +10,17 @@ from app.models import Schedule, User
 SLOT_TIMEOUT = timedelta(hours=4)
 # Per user per day: how many times the platform may open the conversation, and
 # how many items one of those messages may carry.
-DAILY_INITIATIONS = 3
-SESSION_ITEMS = 3
+DAILY_INITIATIONS = 1
+SESSION_ITEMS = 1
+# How long the platform waits after its last message, by how many in a row went
+# unanswered. The last entry repeats for ever rather than ending in silence:
+# stopping is useless at exactly the moment a learner has drifted away.
+SILENCE_WAITS = (
+    timedelta(days=1),
+    timedelta(days=2),
+    timedelta(days=4),
+    timedelta(days=7),
+)
 MAX_ATTEMPTS = 3
 RETRY_DELAY = timedelta(minutes=5)
 # A mute with no end date. Keeping it a distant moment rather than a second
@@ -79,6 +88,12 @@ def slot_deadline(sent_at: datetime, hours: Hours) -> datetime:
             return cursor + remaining
         remaining -= closes - cursor
         cursor = next_open(closes, hours)
+
+
+def silence_wait(silence: int) -> timedelta:
+    if silence == 0:
+        return timedelta(0)
+    return SILENCE_WAITS[min(silence, len(SILENCE_WAITS)) - 1]
 
 
 def retry_at(moment: datetime, attempts: int) -> datetime:
