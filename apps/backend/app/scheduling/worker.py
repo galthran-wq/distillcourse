@@ -55,11 +55,11 @@ async def _initiations_allowed(
 ) -> list[Schedule]:
     """What the platform may say on its own account, of what is due.
 
-    The slot and the daily budget govern messages the platform starts — a
-    review, a nudge. A reminder is the learner's own appointment, set for a time
-    they named, so neither holds it back (#15's gate is that "remind me on
-    Friday" arrives on Friday). It is still a message: delivering one spends the
-    day's budget for the reviews that come after it.
+    The slot, the daily budget and the silence backoff govern messages the
+    platform starts. A reminder is the learner's own appointment, set for a
+    time they named, so none of them holds it back ("remind me on Friday"
+    arrives on Friday). It is still a message: delivering one spends the day's
+    budget for the reviews that come after it.
     """
     hours = policy.Hours.of(user)
     deadline = await repository.open_slot_deadline(session, user.id)
@@ -74,7 +74,45 @@ async def _initiations_allowed(
     if spent >= policy.DAILY_INITIATIONS:
         await repository.defer(session, rows, due_at=policy.tomorrow_open(now, hours))
         return []
+    wait = policy.silence_wait(await repository.silence(session, user.id))
+    if (
+        wait
+        and (last := await repository.last_initiation(session, user.id)) is not None
+        and now < last + wait
+    ):
+        # Held a day at a time rather than to the end of the wait, so a reply
+        # that ends the silence is seen by the next morning at the latest.
+        await repository.defer(
+            session,
+            rows,
+            due_at=min(
+                policy.next_open(last + wait, hours), policy.tomorrow_open(now, hours)
+            ),
+        )
+        return []
     return rows
+
+
+async def _release_on_reply(session: AsyncSession, now: datetime) -> None:
+    """Bring what a silence held back to the next moment the gates allow it.
+
+    A day the budget is already spent leaves it where it is: the clamp above
+    already has it due tomorrow morning, and releasing it now would only see
+    it deferred again every cycle.
+    """
+    rows = await repository.held_past_a_reply(session, now)
+    if not rows:
+        return
+    users = await repository.users_by_id(session, {row.user_id for row in rows})
+    for row in rows:
+        user = users[row.user_id]
+        hours = policy.Hours.of(user)
+        spent = await repository.initiations_today(
+            session, user.id, policy.day_start(now, hours)
+        )
+        if spent < policy.DAILY_INITIATIONS:
+            row.due_at = min(row.due_at, policy.next_open(now, hours))
+    await session.commit()
 
 
 async def _fire(
@@ -152,6 +190,7 @@ async def _fire(
 async def cycle(session: AsyncSession, now: datetime) -> None:
     await repository.sweep_leases(session, now)
     await repository.close_answered(session)
+    await _release_on_reply(session, now)
     await repository.expire_slots(session, now)
     # The ladders read the sessions that just closed and then put what they owe
     # into the queue, in that order: a review settled as ignored is due again

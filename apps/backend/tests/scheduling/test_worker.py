@@ -5,7 +5,12 @@ from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
-from pydantic_ai.messages import ModelMessage, ModelResponse
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    UserPromptPart,
+)
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -19,6 +24,7 @@ from app.models import (
     Chat,
     LabPairingCode,
     Message,
+    ReviewState,
     Schedule,
     TgLink,
     TgPairingCode,
@@ -32,6 +38,7 @@ from app.telegram import repository as telegram
 from tests.conftest import Bot, replying
 from tests.scheduling.conftest import NOON
 
+LESSON = "lesson:information-theory/entropy-as-average-surprise"
 WAKING = policy.Hours(ZoneInfo("UTC"), time(9), time(22))
 
 
@@ -177,7 +184,7 @@ async def test_quiet_hours_hold_the_message_until_morning(
 
 
 @pytest.mark.usefixtures("thread")
-async def test_the_daily_budget_holds_the_fourth_message(
+async def test_the_daily_budget_holds_the_second_message(
     session: AsyncSession, user: User
 ) -> None:
     for hour in range(policy.DAILY_INITIATIONS):
@@ -196,7 +203,7 @@ async def test_the_daily_budget_holds_the_fourth_message(
     assert row.due_at == policy.tomorrow_open(NOON, WAKING)
 
 
-async def test_three_items_travel_together_and_the_rest_wait(
+async def test_one_item_goes_out_a_day_and_the_rest_wait(
     session: AsyncSession, user: User, thread: Chat
 ) -> None:
     rows = [await due_review(session, user, note=f"item {index}") for index in range(4)]
@@ -208,12 +215,21 @@ async def test_three_items_travel_together_and_the_rest_wait(
         await session.refresh(row)
     delivered = [row for row in rows if row.status == "awaiting_reply"]
     postponed = [row for row in rows if row.status == "deferred"]
-    prompt = await thread_messages(session, user, thread)
-    assert len(delivered) == policy.SESSION_ITEMS
-    assert [row.due_at for row in postponed] == [policy.tomorrow_open(NOON, WAKING)]
-    # One message carrying all three, not three messages.
-    assert prompt.count("What is due now") == 1
+    assert len(delivered) == 1
+    assert [row.due_at for row in postponed] == [policy.tomorrow_open(NOON, WAKING)] * 3
+    assert (await thread_messages(session, user, thread)).count("What is due") == 1
     assert repository.CLAIM_BATCH > len(rows)
+
+    # Deferred, not lost: the next day carries the next one.
+    tomorrow = NOON + timedelta(days=1)
+    with replying():
+        await worker.cycle(session, tomorrow)
+
+    for row in rows:
+        await session.refresh(row)
+    assert [row.status for row in rows].count("awaiting_reply") == 1
+    assert [row.status for row in rows].count("deferred") == 2
+    assert (await thread_messages(session, user, thread)).count("What is due") == 2
 
 
 async def test_one_message_waits_for_a_reply_at_a_time(
@@ -304,6 +320,111 @@ async def test_a_reminder_waits_for_a_transport_instead_of_being_cancelled(
     )
 
 
+async def went_unanswered(
+    session: AsyncSession, user: User, count: int, *, last: datetime
+) -> None:
+    for days in range(count):
+        row = await due_review(session, user, note=f"ignored {days}")
+        row.status = "done"
+        row.outcome = "ignored"
+        row.claimed_at = last - timedelta(days=days)
+    await session.commit()
+
+
+@pytest.mark.usefixtures("thread")
+async def test_a_silent_learner_is_held_until_the_wait_is_over(
+    session: AsyncSession, user: User
+) -> None:
+    last = NOON - timedelta(days=3)
+    await went_unanswered(session, user, 4, last=last)
+    rows = [await due_review(session, user, note=f"item {index}") for index in range(2)]
+
+    with replying():
+        await worker.cycle(session, NOON)
+
+    assert await repository.silence(session, user.id) == 4
+    for row in rows:
+        await session.refresh(row)
+    assert [(row.status, row.due_at) for row in rows] == [
+        ("deferred", policy.tomorrow_open(NOON, WAKING))
+    ] * 2
+
+
+async def test_any_message_from_the_learner_ends_the_wait(
+    session: AsyncSession, user: User, thread: Chat
+) -> None:
+    await went_unanswered(session, user, 4, last=NOON - timedelta(days=3))
+    row = await due_review(session, user)
+    with replying():
+        await worker.cycle(session, NOON)
+    await session.refresh(row)
+    assert row.status == "deferred"
+
+    await HarnessRepository(session, user.id).add_messages(
+        thread, [ModelRequest(parts=[UserPromptPart(content="hi")])], role="user"
+    )
+    await session.execute(
+        update(Message)
+        .where(Message.chat_id == thread.id)
+        .values(created_at=NOON + timedelta(hours=1))
+    )
+    await session.commit()
+    with replying():
+        await worker.cycle(session, NOON + timedelta(hours=2))
+
+    await session.refresh(row)
+    assert await repository.silence(session, user.id) == 0
+    assert row.status == "awaiting_reply"
+
+
+async def test_a_reminder_is_delivered_during_a_backoff_wait(
+    session: AsyncSession, user: User, thread: Chat
+) -> None:
+    await went_unanswered(session, user, 4, last=NOON - timedelta(days=3))
+    reminder = await due_reminder(session, user)
+    held = await due_review(session, user)
+
+    with replying():
+        await worker.cycle(session, NOON)
+
+    await session.refresh(reminder)
+    await session.refresh(held)
+    assert reminder.status == "done"
+    assert "redo exercise 3" in await thread_messages(session, user, thread)
+    assert held.status == "deferred"
+
+
+@pytest.mark.usefixtures("thread")
+async def test_a_ladder_makes_no_second_row_while_its_delivery_waits(
+    session: AsyncSession, user: User
+) -> None:
+    await went_unanswered(session, user, 4, last=NOON - timedelta(days=3))
+    session.add(
+        ReviewState(
+            user_id=user.id,
+            lesson=LESSON,
+            step=0,
+            next_due_at=NOON - timedelta(minutes=1),
+        )
+    )
+    await session.commit()
+
+    with replying():
+        await worker.cycle(session, NOON)
+        await worker.cycle(session, NOON + timedelta(minutes=1))
+
+    waiting = (
+        await session.scalars(
+            select(Schedule).where(
+                Schedule.user_id == user.id, Schedule.outcome.is_(None)
+            )
+        )
+    ).all()
+    assert [(row.payload["lesson"], row.status) for row in waiting] == [
+        (LESSON, "deferred")
+    ]
+
+
 async def test_a_reply_closes_the_slot(
     session: AsyncSession, user: User, thread: Chat
 ) -> None:
@@ -353,7 +474,8 @@ async def test_the_message_after_an_ignored_one_leads_with_another_topic(
     ignored = await due_review(session, user, topic="information-theory")
     ignored.status = "done"
     ignored.outcome = "ignored"
-    ignored.claimed_at = NOON - timedelta(hours=6)
+    # Far enough back for the one-day wait that one silence earns to be over.
+    ignored.claimed_at = NOON - timedelta(days=1, hours=1)
     same = [
         await due_review(
             session, user, topic="information-theory", note=f"same {index}"
@@ -370,8 +492,9 @@ async def test_the_message_after_an_ignored_one_leads_with_another_topic(
     for row in same:
         await session.refresh(row)
     prompt = await thread_messages(session, user, thread)
-    assert [row.status for row in same].count("deferred") == 1
-    assert prompt.index("other 0") < prompt.index("same 0")
+    assert [row.status for row in same] == ["deferred", "deferred"]
+    assert "other 0" in prompt
+    assert "same 0" not in prompt
 
 
 async def test_a_message_runs_the_whole_loop_from_delivery_to_rotation(
@@ -379,7 +502,8 @@ async def test_a_message_runs_the_whole_loop_from_delivery_to_rotation(
 ) -> None:
     """The sequence in one pass: a due review is delivered, the slot waits, the
     learner never answers, it times out as ignored, and the message that goes
-    out next leads with a different topic."""
+    out next — a day later, after the one silence — leads with a different
+    topic."""
     first = await due_review(
         session, user, topic="information-theory", note="entropy is due"
     )
@@ -392,6 +516,7 @@ async def test_a_message_runs_the_whole_loop_from_delivery_to_rotation(
     assert "entropy is what you owe me" in await thread_messages(session, user, thread)
 
     timeout = policy.slot_deadline(NOON, WAKING)
+    tomorrow = NOON + timedelta(days=1)
     same = await due_review(
         session,
         user,
@@ -412,10 +537,18 @@ async def test_a_message_runs_the_whole_loop_from_delivery_to_rotation(
 
     for row in (first, same, other):
         await session.refresh(row)
-    prompt = await thread_messages(session, user, thread)
     assert (first.status, first.outcome) == ("done", "ignored")
-    assert same.status == other.status == "awaiting_reply"
-    assert prompt.index("bias and variance") < prompt.index("mutual information")
+    assert same.status == other.status == "deferred"
+
+    with replying():
+        await worker.cycle(session, tomorrow)
+
+    for row in (same, other):
+        await session.refresh(row)
+    prompt = await thread_messages(session, user, thread)
+    assert (other.status, same.status) == ("awaiting_reply", "deferred")
+    assert "bias and variance" in prompt
+    assert "mutual information" not in prompt
 
 
 @pytest.mark.usefixtures("thread")
@@ -437,7 +570,7 @@ async def test_a_failed_run_does_not_spend_the_overflows_day(
     overflow = [row for row in rows if row.status == "deferred"]
     assert [(row.due_at, row.attempts, row.lease_until) for row in overflow] == [
         (NOON, 0, None)
-    ]
+    ] * 3
 
 
 async def test_a_muted_learner_is_left_alone(

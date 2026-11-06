@@ -2,6 +2,8 @@ import uuid
 from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+import pytest
+
 from app.models import Schedule
 from app.scheduling import policy
 
@@ -83,14 +85,21 @@ def test_retries_back_off() -> None:
     assert policy.retry_at(start, 2) == start + timedelta(minutes=10)
 
 
-def test_one_message_carries_three_items_and_the_rest_wait() -> None:
+def test_one_message_carries_one_item_and_the_rest_wait() -> None:
     due = [schedule(topic=f"course-{index}") for index in range(5)]
 
     now, later = policy.session_items(due, avoid=None)
 
-    assert len(now) == policy.SESSION_ITEMS
-    assert len(later) == 2
+    assert len(now) == 1
+    assert len(later) == 4
     assert not set(now) & set(later)
+
+
+@pytest.mark.parametrize(
+    ("silence", "days"), [(0, 0), (1, 1), (2, 2), (3, 4), (4, 7), (50, 7)]
+)
+def test_silence_backs_off_but_never_stops(silence: int, days: int) -> None:
+    assert policy.silence_wait(silence) == timedelta(days=days)
 
 
 def test_a_reminder_is_delivered_before_a_review() -> None:
@@ -107,4 +116,4 @@ def test_after_an_ignored_message_another_topic_leads() -> None:
 
     now, _ = policy.session_items([ignored, other], avoid="information-theory")
 
-    assert [policy.topic(row) for row in now] == ["classical-ml", "information-theory"]
+    assert [policy.topic(row) for row in now] == ["classical-ml"]
