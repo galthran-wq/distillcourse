@@ -4,8 +4,9 @@ from datetime import datetime, timedelta
 from typing import Any, Literal
 
 import logfire
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.core.config import settings
 from app.models import Chat, Message, Schedule, TgLink, User
@@ -233,8 +234,9 @@ async def initiations_today(
     session: AsyncSession, user_id: uuid.UUID, since: datetime
 ) -> int:
     """Messages the platform started today, not items it delivered — one
-    message may carry three. A batch is claimed in a single statement, so its
-    rows share the moment that identifies it.
+    message may carry more than one item (`policy.SESSION_ITEMS`). A batch is
+    claimed in a single statement, so its rows share the moment that
+    identifies it.
     """
     total = await session.scalar(
         select(func.count(func.distinct(Schedule.claimed_at))).where(
@@ -244,6 +246,99 @@ async def initiations_today(
         )
     )
     return int(total or 0)
+
+
+async def silence(session: AsyncSession, user_id: uuid.UUID) -> int:
+    """How many review messages in a row the learner has let time out: those
+    sent since the last thing they wrote in the thread. Read back from the
+    thread and the queue rather than stored, so it cannot drift from either.
+    """
+    last_reply = (
+        select(func.max(Message.created_at))
+        .join(Chat, Chat.id == Message.chat_id)
+        .where(
+            Chat.user_id == user_id,
+            Chat.kind == "telegram",
+            Message.role == "user",
+        )
+        .scalar_subquery()
+    )
+    total = await session.scalar(
+        select(func.count(func.distinct(Schedule.claimed_at))).where(
+            Schedule.user_id == user_id,
+            Schedule.kind == "review",
+            Schedule.outcome == "ignored",
+            or_(last_reply.is_(None), Schedule.claimed_at > last_reply),
+        )
+    )
+    return int(total or 0)
+
+
+async def last_initiation(session: AsyncSession, user_id: uuid.UUID) -> datetime | None:
+    """When the platform last opened the conversation of its own accord — a
+    reminder is the learner's appointment, not ours, so it does not count. The
+    same messages `silence` counts, so the wait runs from the last of them."""
+    moment: datetime | None = await session.scalar(
+        select(func.max(Schedule.claimed_at)).where(
+            Schedule.user_id == user_id,
+            Schedule.kind == "review",
+            Schedule.status.in_(("awaiting_reply", "done")),
+        )
+    )
+    return moment
+
+
+async def held_past_a_reply(session: AsyncSession, now: datetime) -> Sequence[Schedule]:
+    """Reviews still held for a learner who has written since the platform's
+    last message went unanswered.
+
+    The silence that held them is over the moment the learner writes, but a
+    deferred row is not looked at again until its `due_at`, which a wait put
+    days out.
+    """
+    opened = aliased(Schedule)
+    last_opened = (
+        select(func.max(opened.claimed_at))
+        .where(
+            opened.user_id == Schedule.user_id,
+            opened.kind == "review",
+            opened.status.in_(("awaiting_reply", "done")),
+        )
+        .correlate(Schedule)
+        .scalar_subquery()
+    )
+    last_ignored = (
+        select(func.max(opened.claimed_at))
+        .where(
+            opened.user_id == Schedule.user_id,
+            opened.kind == "review",
+            opened.outcome == "ignored",
+        )
+        .correlate(Schedule)
+        .scalar_subquery()
+    )
+    replied = (
+        select(Message.id)
+        .join(Chat, Chat.id == Message.chat_id)
+        .where(
+            Chat.user_id == Schedule.user_id,
+            Chat.kind == "telegram",
+            Message.role == "user",
+            Message.created_at > last_ignored,
+        )
+        .correlate(Schedule)
+        .exists()
+    )
+    rows = await session.scalars(
+        select(Schedule).where(
+            Schedule.status == "deferred",
+            Schedule.kind == "review",
+            Schedule.due_at > now,
+            last_ignored == last_opened,
+            replied,
+        )
+    )
+    return rows.all()
 
 
 async def ignored_topic(session: AsyncSession, user_id: uuid.UUID) -> str | None:

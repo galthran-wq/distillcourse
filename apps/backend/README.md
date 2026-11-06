@@ -381,13 +381,19 @@ What reaches the learner is decided per user, in `policy.py`:
   then means the moment it counts as ignored — four *waking* hours later, so a
   message at 21:30 is not written off overnight. Everything else due waits for
   that slot to close.
-- **Three initiations a day**, counted as messages rather than items: what is
-  due for one learner is coalesced into a single message of at most three
-  items, and the rest wait for tomorrow.
+- **One initiation a day**, counted as messages rather than items, carrying
+  one item; the rest wait for tomorrow.
+- **Silence backoff.** Silence is the number of distinct `claimed_at` moments
+  among the learner's `review` rows that ended `ignored` after their latest
+  message in the Telegram thread — derived, never stored. After the last
+  initiation the platform waits 1, 2, 4, then 7 days for silence 1, 2, 3, 4+,
+  and keeps writing weekly from there until `/mute`. Anything the learner
+  writes resets it to zero. Held rows are deferred to the end of the wait,
+  not dropped.
 - **Reminders are not initiations.** The slot and the budget govern what the
   platform says on its own account; a reminder is the learner's appointment,
   set for a time they named, so it goes out at that time regardless of an open
-  slot or a spent budget (quiet hours and mute still hold). Nothing is waiting
+  slot, a spent budget or a backoff wait (quiet hours and mute still hold). Nothing is waiting
   for an answer to it, so it is `done` on delivery rather than holding the slot
   — though it does count as a message sent, against the day's budget for the
   reviews behind it.
@@ -444,7 +450,7 @@ resurrect it.
 Deliveries are materialised from the ladder each poller cycle: a due row with
 no live delivery and a working Telegram link becomes a `schedules` row, which
 from there is ordinary proactive work (#15) — quiet hours, one open slot,
-three initiations a day, coalescing, topic rotation. Nothing is materialised
+one initiation a day, the silence backoff, topic rotation. Nothing is materialised
 for a learner who has not paired: a row with nowhere to go would be cancelled
 on sight and made again every cycle, and pairing later needs no repair because
 the ladder stood the whole time.
