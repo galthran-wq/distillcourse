@@ -40,6 +40,10 @@ async def webhook(
     update = updates.parse(payload)
     if update is None:
         return {"ok": True}
-    if await repository.first_sighting(session, update.update_id):
+    if not await repository.first_sighting(session, update.update_id):
+        return {"ok": True}
+    if isinstance(update, updates.Tap):
+        background.add_task(updates.handle_tap, session_factory, update)
+    else:
         background.add_task(updates.handle, session_factory, update)
     return {"ok": True}

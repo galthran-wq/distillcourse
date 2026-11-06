@@ -58,27 +58,66 @@ class Update:
     text: str
 
 
-def parse(payload: dict[str, Any]) -> Update | None:
-    """The three fields this bot acts on, or nothing.
+@dataclass(frozen=True)
+class Tap:
+    """A pressed inline button. `data` is `<prefix>:<payload>`."""
+
+    update_id: int
+    tg_chat_id: int
+    callback_id: str
+    message_id: int
+    data: str
+
+
+def _private_chat(holder: dict[str, Any]) -> int | None:
+    chat = holder.get("chat") or {}
+    tg_chat_id = chat.get("id")
+    if chat.get("type") != "private" or not isinstance(tg_chat_id, int):
+        return None
+    return tg_chat_id
+
+
+def _tap(update_id: int, query: dict[str, Any]) -> Tap | None:
+    message = query.get("message") or {}
+    tg_chat_id = _private_chat(message)
+    callback_id = query.get("id")
+    message_id = message.get("message_id")
+    data = query.get("data")
+    if (
+        tg_chat_id is None
+        or not isinstance(callback_id, str)
+        or not isinstance(message_id, int)
+        or not isinstance(data, str)
+    ):
+        return None
+    return Tap(
+        update_id=update_id,
+        tg_chat_id=tg_chat_id,
+        callback_id=callback_id,
+        message_id=message_id,
+        data=data,
+    )
+
+
+def parse(payload: dict[str, Any]) -> Update | Tap | None:
+    """The fields this bot acts on, or nothing.
 
     A sticker, a photo, an edit: shapes that carry no text for the tutor to
     read, all answered with the same silence. So is anything outside a private
     chat — a pairing code redeemed in a group would hand that group the
-    learner's own thread.
+    learner's own thread, and a button pressed there would act on it.
     """
     update_id = payload.get("update_id")
-    message = payload.get("message") or {}
-    chat = message.get("chat") or {}
-    text = message.get("text")
-    if (
-        not isinstance(update_id, int)
-        or chat.get("type") != "private"
-        or not isinstance(chat.get("id"), int)
-        or not isinstance(text, str)
-        or not text.strip()
-    ):
+    if not isinstance(update_id, int):
         return None
-    return Update(update_id=update_id, tg_chat_id=chat["id"], text=text.strip())
+    if "callback_query" in payload:
+        return _tap(update_id, payload["callback_query"] or {})
+    message = payload.get("message") or {}
+    tg_chat_id = _private_chat(message)
+    text = message.get("text")
+    if tg_chat_id is None or not isinstance(text, str) or not text.strip():
+        return None
+    return Update(update_id=update_id, tg_chat_id=tg_chat_id, text=text.strip())
 
 
 async def _clear(repo: HarnessRepository, chat: Chat) -> str:
@@ -121,6 +160,11 @@ _COMMANDS: dict[str, Callable[[HarnessRepository, Chat], Awaitable[str]]] = {
     "/mute": _mute,
     "/unmute": _unmute,
 }
+
+
+# Keyed by the `callback_data` prefix before the first ":". A handler is
+# called with the learner's outbox and the tap; the button is already answered.
+TAP_HANDLERS: dict[str, Callable[[Outbox, Tap], Awaitable[None]]] = {}
 
 
 async def _pair(session: AsyncSession, update: Update, code: str) -> None:
@@ -236,3 +280,32 @@ async def handle(
                 await outbox.send(FAILED)
         finally:
             typing.cancel()
+
+
+async def handle_tap(
+    session_factory: async_sessionmaker[AsyncSession], tap: Tap
+) -> None:
+    # Telegram spins the pressed button until this is answered, whatever comes
+    # of the tap — an unknown button and an unpaired chat included.
+    with suppress(api.TelegramError):
+        await api.answer_callback(tap.callback_id)
+    handler = TAP_HANDLERS.get(tap.data.partition(":")[0])
+    if handler is None:
+        return
+    async with session_factory() as session:
+        link = await repository.link_for_chat(session, tap.tg_chat_id)
+        if link is None:
+            return
+        if link.status != "active":
+            await repository.set_status(session, link, "active")
+        outbox = Outbox(session=session, link=link)
+        try:
+            await handler(outbox, tap)
+        except api.BotBlocked:
+            return
+        except Exception:
+            # The top of a background task, as in `handle`: what escapes here
+            # is lost, and a button that does nothing reads as a dead bot.
+            logfire.exception("telegram tap failed")
+            with suppress(Exception):
+                await outbox.send(FAILED)
