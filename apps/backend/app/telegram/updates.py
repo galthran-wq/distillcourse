@@ -209,6 +209,7 @@ TAP_HANDLERS: dict[str, Callable[[Outbox, Tap], Awaitable[None]]] = {
     cards.HARDER: controls.harder,
     cards.EXPLAIN: controls.explain,
     cards.OWN_WORDS: controls.own_words,
+    cards.SEND_IT: controls.send_it,
     nudges.QUICK_CHECK: nudges.quick_check,
 }
 

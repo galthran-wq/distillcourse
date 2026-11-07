@@ -18,16 +18,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.coach import floor, wake
-from app.coach.agent import coach, decide
+from app.coach.agent import coach
 from app.harness import runner
 from app.harness.agent import tutor
 from app.harness.prompts import module
 from app.harness.repository import HarnessRepository
 from app.models import BackgroundRun, CardDelivery, Chat, Schedule, TgLink, User
 from app.scheduling import policy, worker
-from app.scheduling import repository as scheduling
-from app.telegram.outbox import Outbox
-from tests.coach.conftest import deciding
+from tests.coach.conftest import FAR, deciding, run, wake_up
 from tests.conftest import Bot, replying
 from tests.harness.conftest import calling, returns
 from tests.review.conftest import (  # noqa: F401  (a shared fixture)
@@ -53,38 +51,8 @@ from tests.telemetry.conftest import (  # noqa: F401  (a shared fixture)
 from tests.telemetry.conftest import LESSON as READ_LESSON
 
 UTC_WAKING = policy.Hours(ZoneInfo("UTC"), time(9), time(22))
-FAR = NOON + timedelta(days=5)
 
 pytestmark = pytest.mark.usefixtures("thread", "indexed_section", "configured_bot")
-
-
-async def wake_up(
-    session: AsyncSession, user: User, *, at: datetime = FAR, reason: str = ""
-) -> Schedule:
-    return await scheduling.create(
-        session,
-        user_id=user.id,
-        kind="coach",
-        due_at=at,
-        payload={"reason": reason, "note": wake.OWN},
-        created_by="system",
-    )
-
-
-async def run(
-    session: AsyncSession,
-    user: User,
-    link: TgLink,
-    *sends: dict[str, object],
-    asked: list[list[ModelMessage]] | None = None,
-    at: datetime = NOON,
-) -> list[ModelMessage]:
-    """One coach run on a fresh wake-up; what its last request was handed."""
-    seen = [] if asked is None else asked
-    row = await wake_up(session, user, at=at)
-    with coach.override(model=deciding(*sends, asked=seen)):
-        await decide(session, user, Outbox(session=session, link=link), row, at)
-    return seen[-1]
 
 
 def sent_back(messages: list[ModelMessage]) -> list[str]:

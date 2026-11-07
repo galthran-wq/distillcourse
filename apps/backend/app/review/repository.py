@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
-from sqlalchemy import Exists, and_, func, select
+from sqlalchemy import ColumnElement, Exists, and_, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,6 +34,7 @@ OWN_WORDS = "m"
 ASKED = "asked"
 
 Tapped = Literal["correct", "wrong"]
+ANSWERED: tuple[Tapped, ...] = ("correct", "wrong")
 
 
 def _resting(now: datetime) -> Exists:
@@ -295,3 +296,26 @@ async def cards_today(
         )
     )
     return int(total or 0)
+
+
+def _answered(user_id: uuid.UUID) -> ColumnElement[bool]:
+    """A tap answering a card, right or wrong. A skip is not an answer."""
+    return and_(CardDelivery.user_id == user_id, CardDelivery.outcome.in_(ANSWERED))
+
+
+async def answer_times(
+    session: AsyncSession, user_id: uuid.UUID, since: datetime | None = None
+) -> Sequence[datetime]:
+    """When the learner answered a card with a tap: what the streak is counted
+    from."""
+    query = select(CardDelivery.answered_at).where(_answered(user_id))
+    if since is not None:
+        query = query.where(CardDelivery.answered_at >= since)
+    return [moment for moment in await session.scalars(query) if moment is not None]
+
+
+async def last_answer(session: AsyncSession, user_id: uuid.UUID) -> datetime | None:
+    moment: datetime | None = await session.scalar(
+        select(func.max(CardDelivery.answered_at)).where(_answered(user_id))
+    )
+    return moment

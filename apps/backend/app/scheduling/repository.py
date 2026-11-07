@@ -8,7 +8,15 @@ from sqlalchemy import ColumnElement, ScalarSelect, and_, func, or_, select, upd
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models import CardDelivery, Chat, Message, Schedule, TgLink, User
+from app.models import (
+    CardDelivery,
+    Chat,
+    CoachNote,
+    Message,
+    Schedule,
+    TgLink,
+    User,
+)
 from app.scheduling import policy
 
 ScheduleKind = Literal["coach", "reminder", "nudge"]
@@ -185,8 +193,9 @@ async def initiations_today(
     session: AsyncSession, user_id: uuid.UUID, since: datetime
 ) -> int:
     """Messages the platform started today: the cards it sent on its own
-    account, its reading nudges, and the reminders — the learner's
-    appointment, but still a message, which the day's one card waits behind."""
+    account, its reading nudges, the weekly note, and the reminders — the
+    learner's appointment, but still a message, which the day's one card
+    waits behind."""
     cards = await session.scalar(
         select(func.count()).where(
             CardDelivery.user_id == user_id,
@@ -204,7 +213,12 @@ async def initiations_today(
             ),
         )
     )
-    return int(cards or 0) + int(others or 0)
+    notes = await session.scalar(
+        select(func.count()).where(
+            CoachNote.user_id == user_id, CoachNote.sent_at >= since
+        )
+    )
+    return int(cards or 0) + int(others or 0) + int(notes or 0)
 
 
 def _last_message(user_id: uuid.UUID) -> ScalarSelect[datetime]:

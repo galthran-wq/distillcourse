@@ -473,6 +473,31 @@ class CardDelivery(Base):
     initiated: Mapped[bool] = mapped_column(default=False, server_default="false")
 
 
+class CoachNote(Base):
+    """A weekly note the coach sent: how each course is holding, what is
+    slipping, and one thing to do next. It spends the day's initiation.
+
+    `lesson` is what its Send it button puts a card on, NULL for a note with
+    no button; `pressed_at` spends the button. `tg_message_id` is NULL until
+    Telegram has the message: the row is written first, so a note that went
+    out is never missing from the day's count.
+    """
+
+    __tablename__ = "coach_notes"
+    __table_args__ = (Index("ix_coach_notes_user_sent", "user_id", "sent_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid7)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE")
+    )
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    tg_message_id: Mapped[int | None] = mapped_column(BigInteger, default=None)
+    lesson: Mapped[str | None] = mapped_column(String(LESSON_LENGTH), default=None)
+    pressed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
+
 class BackgroundRun(Base):
     """Model spend with no message to hang it on: a card written or checked
     in the poller, a voice note transcribed. The monthly ceiling sums `usage`
