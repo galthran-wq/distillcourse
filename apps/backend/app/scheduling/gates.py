@@ -32,12 +32,12 @@ async def refusal(session: AsyncSession, user: User, now: datetime) -> str | Non
     )
     if spent >= policy.DAILY_INITIATIONS:
         return "Not sent: today's message has already gone out."
-    silence = await repository.silence(session, user.id)
+    silence = await repository.silence(session, user.id, now)
     wait = policy.silence_wait(silence)
     last = await repository.last_initiation(session, user.id)
     if wait and last is not None and now < last + wait:
         return (
-            f"Not sent: {silence} cards in a row went unanswered, so nothing "
+            f"Not sent: {silence} messages in a row went unanswered, so nothing "
             f"goes out before {(last + wait).astimezone(hours.tz):%Y-%m-%d %H:%M}."
         )
     return None

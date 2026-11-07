@@ -10,9 +10,10 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import CardDelivery, ReviewCard, ReviewState, User
+from app.models import CardDelivery, ReviewCard, ReviewState, TgLink, User
 from app.review import cards, ladder, subject, writer
 from app.scheduling import policy
+from app.telegram.outbox import Outbox
 from tests.conftest import Bot
 from tests.review.conftest import (
     LESSON,
@@ -334,21 +335,94 @@ async def test_a_half_answered_card_is_still_an_unanswered_one(
     assert (sent.outcome, sent.chosen, sent.answered_at) == ("ignored", [1, 3], None)
 
 
-async def test_a_lapsed_half_answered_card_cannot_be_finished(
-    client: AsyncClient, session: AsyncSession, user: User, bot: Bot
+async def test_a_lapsed_half_answered_card_can_still_be_finished(
+    client: AsyncClient, session: AsyncSession, user: User
 ) -> None:
-    """Closed as silence is closed: the last step placed a day late must not
-    grade it and move the ladder."""
+    """A card that expired unanswered keeps its buttons, and a late answer is
+    still an answer — as it is in writing."""
     _, sent = await delivered(session, user)
     taps = Taps(client, sent)
     with no_model():
         await taps.press(1, 3)
     await cards.expire(session, datetime.now(UTC) + policy.IGNORED_AFTER)
-    edits = len(bot.edited)
 
     with no_model():
         await taps.press(0, 2)
 
     await session.refresh(sent)
-    assert (sent.outcome, sent.chosen, sent.answered_at) == ("ignored", [1, 3], None)
-    assert len(bot.edited) == edits
+    assert (sent.outcome, sent.chosen) == ("correct", RIGHT)
+    assert sent.answered_at is not None
+
+
+# The card controls on a half-answered card
+
+
+async def press(client: AsyncClient, sent: CardDelivery, data: str) -> None:
+    await deliver(
+        client, tap(f"{data}:{sent.id}", update_id=900, message_id=sent.tg_message_id)
+    )
+
+
+async def test_another_question_puts_a_half_answered_card_aside(
+    client: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    _, sent = await delivered(session, user)
+    with no_model():
+        await Taps(client, sent).press(1, 3)
+        await press(client, sent, cards.ANOTHER)
+
+    await session.refresh(sent)
+    assert sent.outcome == "skipped"
+    assert sent.answered_at is not None
+
+
+async def test_not_today_puts_a_half_answered_card_aside(
+    client: AsyncClient, session: AsyncSession, user: User, bot: Bot
+) -> None:
+    _, sent = await delivered(session, user)
+    with no_model():
+        await Taps(client, sent).press(1, 3)
+        await press(client, sent, cards.NOT_TODAY)
+
+    await session.refresh(sent)
+    await session.refresh(user)
+    assert sent.outcome == "skipped"
+    assert user.cards_paused_until is not None
+    assert bot.rekeyed[-1] == (sent.tg_message_id, None)
+
+
+async def test_a_new_card_folds_a_half_answered_one(
+    client: AsyncClient, session: AsyncSession, user: User, link: TgLink
+) -> None:
+    _, sent = await delivered(session, user)
+    with no_model():
+        await Taps(client, sent).press(1, 3)
+    card = await session.get(ReviewCard, sent.card_id)
+    assert card is not None
+
+    await cards.deliver(
+        session, Outbox(session=session, link=link), user.id, card, datetime.now(UTC)
+    )
+
+    await session.refresh(sent)
+    assert (sent.outcome, sent.chosen, sent.answered_at) == ("folded", [1, 3], None)
+
+
+@pytest.mark.parametrize(
+    "button", [cards.NEXT, cards.HARDER, cards.EXPLAIN, cards.OWN_WORDS]
+)
+async def test_a_card_put_aside_half_way_has_no_feedback_buttons(
+    client: AsyncClient, session: AsyncSession, user: User, bot: Bot, button: str
+) -> None:
+    """It was never graded: a stale feedback button for it does nothing,
+    though it holds a `chosen` as a graded card does."""
+    _, sent = await delivered(session, user)
+    with no_model():
+        await Taps(client, sent).press(1, 3)
+        await press(client, sent, cards.ANOTHER)
+        before = (len(bot.sent), len(bot.edited), len(bot.photos))
+        await press(client, sent, button)
+
+    await session.refresh(sent)
+    assert sent.follow_ups == {}
+    assert (len(bot.sent), len(bot.edited), len(bot.photos)) == before

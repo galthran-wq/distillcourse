@@ -210,6 +210,54 @@ async def test_with_nothing_slipping_the_next_step_links_the_lesson_left_unfinis
     )
 
 
+async def test_with_nothing_to_put_under_it_a_note_is_refused(
+    session: AsyncSession, user: User, link: TgLink, bot: Bot
+) -> None:
+    """Every message the coach starts carries a card or a link: a report with
+    neither asks nothing of the learner."""
+    await standing(session, user)
+    entropy = await review.state_of(session, user.id, LESSON)
+    assert entropy is not None
+    entropy.last_outcome = "correct"
+    await session.execute(update(CardDelivery).values(outcome="correct"))
+    await session.commit()
+
+    messages = await note(session, user, link)
+
+    assert sent_back(messages) == [
+        "Not sent: nothing is slipping and no lesson is unfinished, so nothing "
+        "would go under it; send a card or nothing."
+    ]
+    assert bot.sent == []
+
+
+async def test_a_note_restarts_the_backoff_and_pays_the_floor(
+    session: AsyncSession, user: User, link: TgLink
+) -> None:
+    """One definition of what the platform started, read by the day's count
+    and by the clock the backoff and the floor wait from alike."""
+    await standing(session, user)
+
+    await note(session, user, link)
+
+    assert await scheduling.last_initiation(session, user.id) == NOON
+
+
+async def test_a_note_left_alone_a_day_adds_to_the_silence(
+    session: AsyncSession, user: User, link: TgLink
+) -> None:
+    await standing(session, user)
+    await note(session, user, link)
+    stored = await session.scalar(select(CoachNote))
+    assert stored is not None
+
+    assert await scheduling.silence(session, user.id, NOON + timedelta(hours=23)) == 0
+    assert await scheduling.silence(session, user.id, NOON + timedelta(days=1)) == 1
+    stored.pressed_at = NOON + timedelta(hours=1)
+    await session.commit()
+    assert await scheduling.silence(session, user.id, NOON + timedelta(days=1)) == 0
+
+
 async def test_send_it_puts_one_card_on_the_slipping_lesson(
     client: AsyncClient, session: AsyncSession, user: User, link: TgLink, bot: Bot
 ) -> None:

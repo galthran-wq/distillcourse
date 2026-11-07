@@ -193,7 +193,7 @@ async def test_a_backoff_wait_is_refused(
 
     messages = await run(session, user, link, {"lesson": LESSON})
 
-    assert sent_back(messages)[0].startswith("Not sent: 4 cards in a row")
+    assert sent_back(messages)[0].startswith("Not sent: 4 messages in a row")
     assert bot.sent == []
 
 

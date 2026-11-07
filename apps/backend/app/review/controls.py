@@ -19,6 +19,7 @@ from sqlalchemy import Update, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
+from app.content.locators import section_key
 from app.core.config import settings
 from app.harness.repository import HarnessRepository
 from app.models import CardDelivery, CoachNote, ReviewCard, Schedule, User
@@ -38,7 +39,9 @@ EXPLAIN_PROMPT = "Explain this card."
 OWN_WORDS_PROMPT = "I'll put the answer to this card in my own words."
 PRESSED = "pressed"
 
-Finder = Callable[[AsyncSession, uuid.UUID, str, int], Awaitable[ReviewCard | None]]
+Finder = Callable[
+    [AsyncSession, uuid.UUID, str, int, datetime], Awaitable[ReviewCard | None]
+]
 
 
 async def _card(outbox: Outbox, tap: Tap) -> tuple[CardDelivery, ReviewCard] | None:
@@ -50,9 +53,10 @@ async def _card(outbox: Outbox, tap: Tap) -> tuple[CardDelivery, ReviewCard] | N
 
 
 async def _open(outbox: Outbox, tap: Tap) -> tuple[CardDelivery, ReviewCard] | None:
-    """The card under the button, locked, while it is still unanswered."""
+    """The card under the button, locked, while it is still open
+    (`repository.is_open`, the rule its answer buttons go by too)."""
     found = await _card(outbox, tap)
-    return None if found is None or found[0].answered_at is not None else found
+    return None if found is None or not repository.is_open(found[0]) else found
 
 
 async def _tapped(outbox: Outbox, tap: Tap) -> tuple[CardDelivery, ReviewCard] | None:
@@ -60,10 +64,11 @@ async def _tapped(outbox: Outbox, tap: Tap) -> tuple[CardDelivery, ReviewCard] |
     unpressed."""
     found = await _card(outbox, tap)
     prefix = tap.data.partition(":")[0]
-    # An `order` card part-way through holds a `chosen` but is not tapped yet.
+    # Graded by a tap, and by nothing else: an `order` card part-way through
+    # holds a `chosen` too, and so does one put aside half-way.
     if (
         found is None
-        or found[0].answered_at is None
+        or found[0].outcome not in repository.ANSWERED
         or found[0].chosen is None
         or prefix in found[0].follow_ups
     ):
@@ -156,7 +161,9 @@ async def _due_card(
     """A card of the lesson whose review is owed longest. `easy` is
     `level_one_only`, asked once by the caller."""
     for state in await repository.due(session, user_id, now, recent_first=False):
-        card = await find(session, user_id, state.lesson, 1 if easy else state.level)
+        card = await find(
+            session, user_id, state.lesson, 1 if easy else state.level, now
+        )
         if card is not None:
             return card
     return None
@@ -173,7 +180,7 @@ async def _swap(outbox: Outbox, sent: CardDelivery, card: ReviewCard) -> None:
     now = datetime.now(UTC)
     easy = await repository.level_one_only(session, user_id, now)
     level = 1 if easy else max(card.level - 1, 1)
-    replacement = await cards.existing(session, user_id, card.lesson, level)
+    replacement = await cards.existing(session, user_id, card.lesson, level, now)
     if replacement is None:
         replacement = await _due_card(session, user_id, now, cards.existing, easy=easy)
     if replacement is None:
@@ -220,8 +227,10 @@ async def not_today(outbox: Outbox, tap: Tap) -> None:
 
 async def wrong_card(outbox: Outbox, tap: Tap) -> None:
     """Retired on the first report — with one learner, waiting for a second
-    means never — put aside as Another question would, then filed for a human
-    once the swap has committed the retirement."""
+    means never — put aside and filed for a human before anything is sent:
+    the report must hold whatever Telegram does with the edit. Then swapped
+    as Another question would; a swap Telegram refuses leaves the card put
+    aside with nothing in its place, as when there is no other card."""
     found = await _open(outbox, tap)
     if found is None:
         return
@@ -229,16 +238,24 @@ async def wrong_card(outbox: Outbox, tap: Tap) -> None:
     session, user_id = outbox.session, outbox.link.user_id
     card.status = "retired"
     repository.skip(sent, datetime.now(UTC))
-    await _swap(outbox, sent, card)
+    # Commits the retirement and the skip with the incident.
     await HarnessRepository(session, user_id).file_incident(
         await thread.of(session, user_id),
-        locator=cards.locator(card),
+        locator=section_key(card.lesson, card.anchor),
         kind="error",
         summary=(
             f"The learner reported review card {card.id} as wrong; it is "
             f"retired. Its prompt: {card.prompt}"
         ),
     )
+    try:
+        # A refused edit fails before the swap writes anything.
+        await _swap(outbox, sent, card)
+    except api.BotBlocked:
+        raise
+    except api.TelegramError:
+        with suppress(api.TelegramError):
+            await outbox.edit_keyboard(sent.tg_message_id, None)
 
 
 async def _capped(session: AsyncSession, user_id: uuid.UUID, now: datetime) -> bool:
@@ -342,21 +359,24 @@ async def send_it(outbox: Outbox, tap: Tap) -> None:
 
 async def harder(outbox: Outbox, tap: Tap) -> None:
     """A card of this lesson a level up, written if there is none: the learner
-    asked, and can wait."""
+    asked, and can wait. Held to the day's cap as Next is, before anything is
+    written."""
     found = await _tapped(outbox, tap)
     if found is None or found[1].level >= ladder.TOP_LEVEL:
         return
     sent, card = found
-    session, user_id = outbox.session, outbox.link.user_id
-    async with _following_up(outbox, sent, card, cards.HARDER):
-        async with thread.typing(outbox.link.tg_chat_id):
-            up = await cards.pick(session, user_id, card.lesson, card.level + 1)
-        if up is None:
-            await outbox.send(NOTHING_ELSE)
-            return
-        await cards.deliver(
-            session, outbox, user_id, up, datetime.now(UTC), harder=True
+    session, user_id, now = outbox.session, outbox.link.user_id, datetime.now(UTC)
+
+    async def up() -> bool:
+        picked = await cards.pick(session, user_id, card.lesson, card.level + 1, now)
+        return (
+            picked is not None
+            and await cards.deliver(session, outbox, user_id, picked, now, harder=True)
+            is not None
         )
+
+    async with _following_up(outbox, sent, card, cards.HARDER):
+        await _asked(outbox, now, up)
 
 
 async def _converse(

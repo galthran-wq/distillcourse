@@ -8,6 +8,8 @@ it was aimed at one of them, and served until the section it tests changes.
 """
 
 import asyncio
+import hashlib
+import json
 import re
 import uuid
 from collections.abc import Sequence
@@ -20,11 +22,11 @@ import logfire
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.content.locators import lesson_url
+from app.content.locators import lesson_url, section_key
 from app.content.search import figure_url, figures, section_of, sections
 from app.core.clock import zone
 from app.harness.repository import HarnessRepository
-from app.models import CardDelivery, ReviewCard, ReviewState, User
+from app.models import CardDelivery, Document, ReviewCard, ReviewState, User
 from app.review import ladder, repository, streak, subject, writer
 from app.scheduling import policy
 from app.telegram import api, formula, thread
@@ -59,13 +61,22 @@ WRONG = "✗"
 CAPTION_CHARS = 1024
 
 
+def fingerprint(chunk: Document) -> str:
+    """What a card stands on: its section's words and figures. Not the index
+    document's own hash, which covers the rest of its metadata as well — a
+    change there must not retire every card of the lesson."""
+    srcs = sorted(figure.src for figure in figures([chunk]))
+    payload = json.dumps([chunk.title, chunk.text, srcs], ensure_ascii=False)
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
 async def _sections(session: AsyncSession, lesson: str) -> list[writer.Section]:
     return [
         writer.Section(
             anchor=chunk.locator.partition("#")[2] or None,
             title=chunk.title,
             text=chunk.text,
-            content_hash=chunk.content_hash,
+            content_hash=fingerprint(chunk),
             figures=figures([chunk]),
         )
         for chunk in await sections(session, lesson)
@@ -141,7 +152,7 @@ async def write(
 
 
 async def existing(
-    session: AsyncSession, user_id: uuid.UUID, lesson: str, level: int
+    session: AsyncSession, user_id: uuid.UUID, lesson: str, level: int, now: datetime
 ) -> ReviewCard | None:
     """A card of this lesson and level the learner has not seen lately, from a
     section that still reads as it did when the card was written."""
@@ -164,7 +175,7 @@ async def existing(
             or_(ReviewCard.owner_id.is_(None), ReviewCard.owner_id == user_id),
             or_(
                 last_seen.is_(None),
-                last_seen < datetime.now(UTC) - UNSEEN_FOR,
+                last_seen < now - UNSEEN_FOR,
             ),
         )
         # Never seen first, then the one seen longest ago.
@@ -177,11 +188,11 @@ async def existing(
 
 
 async def pick(
-    session: AsyncSession, user_id: uuid.UUID, lesson: str, level: int
+    session: AsyncSession, user_id: uuid.UUID, lesson: str, level: int, now: datetime
 ) -> ReviewCard | None:
     """An existing card, or one of a batch written when there is none; None
     when no card of that batch survived."""
-    card = await existing(session, user_id, lesson, level)
+    card = await existing(session, user_id, lesson, level, now)
     if card is not None:
         return card
     written = await write(session, user_id, lesson, level)
@@ -319,6 +330,7 @@ async def _record(
     user_id: uuid.UUID,
     card: ReviewCard,
     message_id: int,
+    now: datetime,
     *,
     harder: bool = False,
     initiated: bool = False,
@@ -328,7 +340,7 @@ async def _record(
         user_id=user_id,
         card_id=card.id,
         tg_message_id=message_id,
-        sent_at=datetime.now(UTC),
+        sent_at=now,
         harder=harder,
         initiated=initiated,
     )
@@ -340,8 +352,9 @@ async def _record(
 async def _tidy(session: AsyncSession, outbox: Outbox, sent: CardDelivery) -> None:
     """Fold the cards still open from before this one into a line each: the
     thread must not become a wall of unanswered questions. A folded card is
-    skipped, whether or not its message could still be edited — the learner
-    can no longer be held to it either way."""
+    closed, whether or not its message could still be edited — the learner
+    can no longer be held to it either way — and, since they did nothing to
+    it, counts toward the silence as an expired one would."""
     folded = (
         (
             await session.execute(
@@ -364,7 +377,7 @@ async def _tidy(session: AsyncSession, outbox: Outbox, sent: CardDelivery) -> No
     if not folded:
         return
     for delivery, _ in folded:
-        repository.skip(delivery, sent.sent_at)
+        repository.fold(delivery)
     await session.commit()
     titles = await subject.materials(session, {card.lesson for _, card in folded})
     for delivery, card in folded:
@@ -434,6 +447,7 @@ async def deliver(
         user_id,
         card,
         message_id,
+        now,
         harder=harder,
         initiated=initiated,
     )
@@ -477,7 +491,7 @@ async def offer(
                 return sent
         return None
     for _ in range(2):
-        picked = await pick(session, user_id, lesson, level)
+        picked = await pick(session, user_id, lesson, level, now)
         if picked is None:
             return None
         sent = await deliver(session, outbox, user_id, picked, now, initiated=not asked)
@@ -510,11 +524,7 @@ async def replace(
         _question(head, card),
         keyboard=_buttons(delivery_id, card, []),
     )
-    return await _record(session, delivery_id, user_id, card, sent.tg_message_id)
-
-
-def locator(card: ReviewCard) -> str:
-    return card.lesson if card.anchor is None else f"{card.lesson}#{card.anchor}"
+    return await _record(session, delivery_id, user_id, card, sent.tg_message_id, now)
 
 
 def _shown(html: str) -> int:
@@ -531,7 +541,7 @@ def _right(card: ReviewCard) -> str:
 
 
 def _feedback(head: str, section: str, sent: CardDelivery, card: ReviewCard) -> str:
-    link = lesson_url(locator(card))
+    link = lesson_url(section_key(card.lesson, card.anchor))
     mark = RIGHT if sent.outcome == "correct" else WRONG
     chosen = None
     if card.kind == "order":
@@ -568,9 +578,10 @@ def _tapped(data: str) -> tuple[uuid.UUID, str] | None:
 async def _open(
     outbox: Outbox, tap: Tap
 ) -> tuple[CardDelivery, ReviewCard, str] | None:
-    """The tapped card, if it is this learner's and still open. A card closed
-    any way — tapped, graded in conversation, expired as ignored — is closed:
-    a late tap must not move the ladder for it."""
+    """The tapped card, if it is this learner's and still open
+    (`repository.is_open`): a card tapped, graded in conversation, put aside
+    or folded is closed, and a late tap must not move the ladder for it. One
+    that expired unanswered is not — a late answer is still an answer."""
     tapped = _tapped(tap.data)
     if tapped is None:
         return None
@@ -579,7 +590,7 @@ async def _open(
     if found is None:
         return None
     sent, card = found
-    if sent.answered_at is not None or sent.outcome is not None:
+    if not repository.is_open(sent):
         return None
     return sent, card, value
 
@@ -592,12 +603,15 @@ async def _grade(
     chosen: int | list[int],
 ) -> None:
     session = outbox.session
-    await repository.grade(session, sent, card, outcome, chosen=chosen)
+    now = datetime.now(UTC)
+    await repository.grade(session, sent, card, outcome, now, chosen=chosen)
     await session.commit()
     title = await title_of(session, card)
-    chunk = section_of(await sections(session, card.lesson), locator(card))
+    chunk = section_of(
+        await sections(session, card.lesson), section_key(card.lesson, card.anchor)
+    )
     section = title if chunk is None else chunk.title
-    head = await heading(session, sent.user_id, title, datetime.now(UTC))
+    head = await heading(session, sent.user_id, title, now)
     await edit(
         outbox,
         sent.tg_message_id,
@@ -678,14 +692,14 @@ async def arrange(outbox: Outbox, tap: Tap) -> None:
 async def expire(session: AsyncSession, now: datetime) -> None:
     """A card nobody answered in a day is ignored. The ladder does not move:
     silence is not evidence about what they know, and the backoff is what
-    answers it."""
+    answers it. Its buttons stay: a late tap still grades it."""
     await session.execute(
         update(CardDelivery)
         .where(
             CardDelivery.outcome.is_(None),
             CardDelivery.sent_at <= now - policy.IGNORED_AFTER,
         )
-        .values(outcome="ignored")
+        .values(outcome=repository.IGNORED)
     )
     await session.commit()
 

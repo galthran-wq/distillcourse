@@ -433,9 +433,12 @@ async def test_a_reminder_is_delivered_after_the_days_message_is_spent(
 
 
 @pytest.mark.usefixtures("thread")
-async def test_a_reminder_spends_the_days_message(
+async def test_a_reminder_neither_spends_the_days_message_nor_pays_the_floor(
     session: AsyncSession, user: User
 ) -> None:
+    """The learner's appointment, not the platform's move: a learner with a
+    daily reminder still gets their card, and the floor still sees a week
+    without one."""
     await due_reminder(session, user)
 
     with replying(), coach.override(model=deciding()):
@@ -444,7 +447,8 @@ async def test_a_reminder_spends_the_days_message(
     spent = await repository.initiations_today(
         session, user.id, policy.day_start(NOON, WAKING)
     )
-    assert spent == 1
+    assert spent == 0
+    assert await repository.last_initiation(session, user.id) is None
 
 
 async def test_a_reminder_waits_for_a_transport_instead_of_being_cancelled(
@@ -529,7 +533,7 @@ async def test_any_message_from_the_learner_ends_the_silence(
     session: AsyncSession, user: User, thread: Chat
 ) -> None:
     await went_unanswered(session, user, 4)
-    assert await repository.silence(session, user.id) == 4
+    assert await repository.silence(session, user.id, datetime.now(UTC)) == 4
 
     await HarnessRepository(session, user.id).add_messages(
         thread, [ModelRequest(parts=[UserPromptPart(content="hi")])], role="user"
@@ -541,20 +545,20 @@ async def test_any_message_from_the_learner_ends_the_silence(
     )
     await session.commit()
 
-    assert await repository.silence(session, user.id) == 0
+    assert await repository.silence(session, user.id, datetime.now(UTC)) == 0
 
 
 async def test_a_tap_ends_the_silence_as_a_message_does(
     session: AsyncSession, user: User
 ) -> None:
     await went_unanswered(session, user, 2)
-    assert await repository.silence(session, user.id) == 2
+    assert await repository.silence(session, user.id, datetime.now(UTC)) == 2
 
     answered = await card_sent(session, user, ago=timedelta(days=1), outcome="correct")
     answered.answered_at = datetime.now(UTC) - timedelta(hours=20)
     await session.commit()
 
-    assert await repository.silence(session, user.id) == 0
+    assert await repository.silence(session, user.id, datetime.now(UTC)) == 0
 
 
 async def test_a_card_answered_late_still_ends_the_silence(
@@ -568,7 +572,7 @@ async def test_a_card_answered_late_still_ends_the_silence(
     old.answered_at = datetime.now(UTC) - timedelta(days=1)
     await session.commit()
 
-    assert await repository.silence(session, user.id) == 0
+    assert await repository.silence(session, user.id, datetime.now(UTC)) == 0
 
 
 # Housekeeping

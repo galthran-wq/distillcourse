@@ -109,12 +109,21 @@ async def returned(session: AsyncSession, user_id: uuid.UUID, now: datetime) -> 
     """Called on a tap, a message or a lesson opened, before it is recorded:
     the first of them after a week away pulls the next look forward. The
     caller commits."""
-    waiting = await session.scalar(
-        select(Schedule.id).where(Schedule.user_id == user_id, _live()).limit(1)
-    )
+    waiting = (
+        await session.execute(
+            select(Schedule.due_at, Schedule.lease_until)
+            .where(Schedule.user_id == user_id, _live())
+            .limit(1)
+        )
+    ).first()
     if waiting is None:
         return
-    answered = await scheduling.last_answer(session, user_id)
+    # A look already due soon has nothing to be pulled to — unless a run holds
+    # it, whose own next look is not decided yet. Called on every telemetry
+    # flush, so the aggregates below are not paid for nothing.
+    if waiting.lease_until is None and waiting.due_at <= now + SOON:
+        return
+    answered = await scheduling.last_contact(session, user_id)
     read: datetime | None = await session.scalar(
         select(func.max(Event.server_ts)).where(Event.user_id == user_id)
     )

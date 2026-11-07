@@ -1,15 +1,15 @@
 """The weekly floor: the bot does not get to give up on a learner.
 
-When a week has passed with no card or reading nudge sent on the platform's
-own account and a run ends silent, code sends a card anyway, chosen with no model: the lesson
-finished most recently whose ladder is due and had no card in the last three
-days, at its level, with a card this learner has not seen in two weeks. The
-limits the coach is held to hold here too.
+When a week has passed with nothing sent on the platform's own account — no
+card, reading nudge or weekly note — and a run ends silent, code sends a card
+anyway, chosen with no model: the lesson finished most recently whose ladder
+is due and had no card in the last three days, at its level, with a card this
+learner has not seen in two weeks. The limits the coach is held to hold here
+too.
 
-Only such a card, or a nudge, pays the floor: a reminder is the learner's appointment and
-a card they asked for is their move (`scheduling.repository.last_initiation`).
-A reminder still spends the day's message, so on a day one went out the floor
-waits for the next run.
+A reminder is the learner's appointment and a card they asked for is their
+move, so neither pays the floor nor spends the day's message
+(`scheduling.repository.last_initiation`).
 """
 
 from datetime import datetime, timedelta
@@ -28,8 +28,8 @@ FLOOR = timedelta(days=7)
 
 
 async def owed(session: AsyncSession, link: TgLink, now: datetime) -> bool:
-    """A week without a card or a nudge the platform sent, counted from
-    pairing for a learner who has had none."""
+    """A week without anything the platform sent on its own account,
+    counted from pairing for a learner who has had none."""
     last = await scheduling.last_initiation(session, link.user_id)
     return now - (last or link.created_at) >= FLOOR
 

@@ -153,6 +153,7 @@ class Bot:
         keyboard: api.Keyboard | None = None,
     ) -> None:
         self.captioned.append((message_id, caption))
+        self.rekeyed.append((message_id, keyboard))
 
     @property
     def texts(self) -> list[str]:

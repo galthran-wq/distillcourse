@@ -11,6 +11,7 @@ from pydantic_ai.messages import ModelRequest, UserPromptPart
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.coach import nudges, wake
+from app.core.config import settings
 from app.harness import runner
 from app.harness.limits import LimitExceeded, check_run_allowed
 from app.harness.prompts import ContextBlock
@@ -52,6 +53,7 @@ TAP_FAILED = "Something went wrong on my side. Press that again in a minute."
 TAP_BUSY = "Still finishing the previous message. Press that again in a minute."
 TOO_LONG = "Too long. Keep it under two minutes."
 UNHEARD = "Couldn't make that out. Send it as text?"
+VOICE_OFF = "I can't take voice notes yet. Send it as text?"
 # Checked on what Telegram reports, before anything is downloaded.
 VOICE_SECONDS = 120
 # The learner sees what was heard, because that is what gets graded; a long
@@ -263,6 +265,9 @@ async def _answer(
 async def _hear(repo: HarnessRepository, outbox: Outbox, voice: Voice) -> str | None:
     """The voice message as text, or None once the learner has been told why
     there is none. A guess is never passed on as what they said."""
+    if settings.TRANSCRIPTION_MODEL is None:
+        await outbox.send(VOICE_OFF)
+        return None
     if voice.duration > VOICE_SECONDS:
         await outbox.send(TOO_LONG)
         return None

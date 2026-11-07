@@ -51,6 +51,12 @@ def lesson_key(course: str, lesson: str) -> str:
     return f"lesson:{course}/{lesson}"
 
 
+def section_key(lesson: str, anchor: str | None) -> str:
+    """A section of a lesson, as `lesson_url` and `search.section_of` read it;
+    the lesson itself where there is no anchor."""
+    return lesson if anchor is None else f"{lesson}#{anchor}"
+
+
 def course_of(locator: str) -> str:
     """The course a locator belongs to. `<corpus>:<course>[/<rest>]`.
 

@@ -9,10 +9,10 @@ which records a graded card in the same transaction as the ladder it moves.
 
 import uuid
 from collections.abc import Sequence
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Literal
 
-from sqlalchemy import ColumnElement, Exists, and_, func, select
+from sqlalchemy import ColumnElement, Exists, ScalarSelect, and_, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,6 +35,12 @@ ASKED = "asked"
 
 Tapped = Literal["correct", "wrong"]
 ANSWERED: tuple[Tapped, ...] = ("correct", "wrong")
+# Closed by the platform rather than the learner: a newer card went out while
+# this one was still open, and its message was folded into a line.
+FOLDED = "folded"
+# Closed by a day with no answer. Its buttons still work: a late tap grades it,
+# as a late written answer does.
+IGNORED = "ignored"
 
 
 def _resting(now: datetime) -> Exists:
@@ -149,11 +155,18 @@ async def delivery(
     return None if found is None else (found[0], found[1])
 
 
+def is_open(sent: CardDelivery) -> bool:
+    """Whether the learner can still answer or put aside this card — the one
+    rule every button under it and a written answer to it go by."""
+    return sent.answered_at is None and sent.outcome in (None, IGNORED)
+
+
 async def grade(
     session: AsyncSession,
     sent: CardDelivery,
     card: ReviewCard,
     outcome: Tapped | ladder.Outcome,
+    now: datetime,
     *,
     chosen: int | list[int] | None = None,
 ) -> ReviewState | None:
@@ -164,7 +177,6 @@ async def grade(
     than recognition, so it moves the ladder as a review always did and leaves
     the level alone. A harder card the learner asked for moves only the level.
     """
-    now = datetime.now(UTC)
     sent.answered_at = now
     sent.chosen = chosen
     sent.outcome = outcome
@@ -199,14 +211,25 @@ def _volunteered(
 
 
 def skip(sent: CardDelivery, now: datetime) -> None:
-    """A card put aside unanswered. Nothing is learned from it, so nothing
-    else moves; answering it now is no longer possible."""
+    """A card the learner put aside unanswered. Nothing is learned from it, so
+    nothing else moves; answering it now is no longer possible. It is still
+    their move, so it ends a silence (`responded`)."""
     sent.answered_at = now
     sent.outcome = "skipped"
 
 
+def fold(sent: CardDelivery) -> None:
+    """A card the platform closed: the learner did nothing, so it has no
+    `answered_at` and counts toward the silence as an ignored one does."""
+    sent.outcome = FOLDED
+
+
 async def recall(
-    session: AsyncSession, sent: CardDelivery, card: ReviewCard, outcome: ladder.Outcome
+    session: AsyncSession,
+    sent: CardDelivery,
+    card: ReviewCard,
+    outcome: ladder.Outcome,
+    now: datetime,
 ) -> ReviewState | None:
     """Grade the learner's own words on a card they already tapped; the caller
     commits. `passed` is real recall: it counts as a right answer at the level
@@ -220,7 +243,6 @@ async def recall(
     if state is None or sent.harder or outcome != "passed":
         await session.flush()
         return state
-    now = datetime.now(UTC)
     state.level, state.level_run = ladder.next_level(
         state.level, state.level_run, "correct"
     )
@@ -298,6 +320,18 @@ async def cards_today(
     return int(total or 0)
 
 
+def responded(user_id: uuid.UUID) -> ScalarSelect[datetime | None]:
+    """When the learner last did anything to a card: tapped it, answered it in
+    writing, or put it aside. `answered_at` is set only by their own move — a
+    card the platform folded or let expire has none — so this is the card half
+    of `scheduling.repository.last_contact`."""
+    return (
+        select(func.max(CardDelivery.answered_at))
+        .where(CardDelivery.user_id == user_id)
+        .scalar_subquery()
+    )
+
+
 def _answered(user_id: uuid.UUID) -> ColumnElement[bool]:
     """A tap answering a card, right or wrong. A skip is not an answer."""
     return and_(CardDelivery.user_id == user_id, CardDelivery.outcome.in_(ANSWERED))
@@ -314,7 +348,9 @@ async def answer_times(
     return [moment for moment in await session.scalars(query) if moment is not None]
 
 
-async def last_answer(session: AsyncSession, user_id: uuid.UUID) -> datetime | None:
+async def last_tap(session: AsyncSession, user_id: uuid.UUID) -> datetime | None:
+    """When the learner last answered a card right or wrong: a skip is not
+    one."""
     moment: datetime | None = await session.scalar(
         select(func.max(CardDelivery.answered_at)).where(_answered(user_id))
     )

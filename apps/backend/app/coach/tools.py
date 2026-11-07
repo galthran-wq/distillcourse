@@ -14,7 +14,7 @@ from pydantic import Field
 from pydantic_ai import RunContext
 
 from app.coach import note, nudges
-from app.content.locators import LESSON
+from app.content.locators import LESSON, section_key
 from app.content.search import section_of, sections
 from app.harness import runner
 from app.harness.deps import HarnessDeps
@@ -22,6 +22,7 @@ from app.models import LessonProgress, ReviewCard
 from app.review import cards, ladder
 from app.review import repository as review
 from app.scheduling import gates
+from app.scheduling import repository as scheduling
 
 Level = Annotated[int, Field(ge=1, le=ladder.TOP_LEVEL)]
 Focus = Annotated[str, Field(min_length=1, max_length=300)]
@@ -136,17 +137,24 @@ async def send_nudge(
         # Where they stopped may be a heading since renamed: then the top.
         if not anchor:
             stopped = progress.last_anchor
-            found = stopped and section_of(chunks, nudges.locator(lesson, stopped))
+            found = stopped and section_of(chunks, section_key(lesson, stopped))
             anchor = stopped if found else None
     elif progress is not None:
         return f"Not sent: the learner has opened {lesson} already."
-    where = nudges.locator(lesson, anchor)
+    where = section_key(lesson, anchor)
     section = chunks[0] if anchor is None else section_of(chunks, where)
     if section is None:
         return f"Not sent: {lesson} has no section `{anchor}`."
     refused = await gates.refusal(session, await repo.user(), now)
     if refused is not None:
         return refused
+    # Neither kind is spent by being ignored: without this, the same lesson
+    # could be put to a learner who never opens it every day.
+    if await scheduling.nudged(session, repo.user_id, lesson, now - review.REST):
+        return (
+            f"Not sent: a nudge on {lesson} went out in the last "
+            f"{review.REST.days} days; another lesson, or nothing, goes first."
+        )
     if where not in ctx.deps.nudge_read:
         ctx.deps.nudge_read.add(where)
         return (

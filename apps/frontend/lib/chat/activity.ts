@@ -32,6 +32,9 @@ const TOOLS: Record<string, { done: string; doing: string; noun?: [string, strin
   create_reminder: { done: "set a reminder", doing: "setting a reminder" },
   list_reminders: { done: "checked your reminders", doing: "checking your reminders" },
   cancel_reminder: { done: "cancelled a reminder", doing: "cancelling a reminder" },
+  mute_bot: { done: "paused messages", doing: "pausing messages" },
+  unmute_bot: { done: "resumed messages", doing: "resuming messages" },
+  // The same tools under the names older chats stored them by.
   mute_proactive: { done: "paused messages", doing: "pausing messages" },
   unmute_proactive: { done: "resumed messages", doing: "resuming messages" },
   report_review_outcome: { done: "graded the review", doing: "grading the review" },

@@ -11,9 +11,11 @@ from app.harness import runner
 from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
 from app.memory import repository as memory
-from app.models import CardDelivery, Chat, User
+from app.models import CardDelivery, Chat, TgLink, User
 from app.review import ladder
 from app.review import repository as review
+from app.telegram.outbox import Outbox
+from tests.conftest import Bot
 from tests.harness.conftest import calling
 from tests.review.conftest import LESSON, stored_card
 from tests.review.conftest import ladder as ladder_row
@@ -73,7 +75,7 @@ async def test_one_card_moves_the_ladder_once(
 
     await session.refresh(state)
     assert state.step == 2
-    assert "already graded as passed" in again
+    assert "already closed as passed" in again
 
 
 async def test_a_card_ignored_for_a_day_can_still_be_answered(
@@ -90,6 +92,24 @@ async def test_a_card_ignored_for_a_day_can_still_be_answered(
 
     await session.refresh(state)
     assert (state.step, state.last_outcome) == (0, "failed")
+
+
+async def test_a_card_answered_in_words_loses_its_buttons(
+    session: AsyncSession, user: User, thread: Chat, link: TgLink, bot: Bot
+) -> None:
+    """Graded, it is closed: buttons left on it would do nothing when
+    pressed."""
+    await ladder_row(session, user, step=1)
+    sent = await sent_to(session, user)
+    repo = HarnessRepository(session, user.id)
+    model = calling("report_review_outcome", delivery_id=str(sent.id), outcome="passed")
+
+    with tutor.override(model=model):
+        await runner.run(
+            repo, thread, "the average", outbox=Outbox(session=session, link=link)
+        )
+
+    assert bot.rekeyed == [(sent.tg_message_id, None)]
 
 
 async def test_a_card_of_someone_elses_cannot_be_graded(

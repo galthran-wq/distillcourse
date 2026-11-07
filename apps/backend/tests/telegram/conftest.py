@@ -83,6 +83,9 @@ class Ears:
 @pytest.fixture
 def ears(monkeypatch: pytest.MonkeyPatch) -> Ears:
     stub = Ears()
+    monkeypatch.setattr(
+        settings, "TRANSCRIPTION_MODEL", "mistralai/voxtral-mini-transcribe"
+    )
     monkeypatch.setattr(api, "download_file", stub.download_file)
     monkeypatch.setattr(speech, "transcribe", stub.transcribe)
     return stub

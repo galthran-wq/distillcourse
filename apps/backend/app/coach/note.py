@@ -52,9 +52,17 @@ async def unavailable(
     )
     if last is not None and now - last < EVERY:
         return f"a weekly note went out {(now - last).days} days ago, one a week"
-    answered = await review.last_answer(session, user_id)
+    answered = await review.last_tap(session, user_id)
     if answered is None or now - answered > ANSWERED_WITHIN:
         return "no card answered in two weeks; a quiet learner gets a card"
+    found = await report(session, user_id)
+    if found.card is None and found.link is None:
+        # Every message the coach starts carries a card or a link into a
+        # lesson; a report with neither under it asks nothing of the learner.
+        return (
+            "nothing is slipping and no lesson is unfinished, so nothing would "
+            "go under it; send a card or nothing"
+        )
     return None
 
 
@@ -146,10 +154,9 @@ async def block(
     found = await report(session, user_id)
     if found.card is not None:
         under = f"a Send it button for a card on `{found.card}`"
-    elif found.link is not None:
-        under = f"a link to `{found.link[0]}`"
     else:
-        under = "no button and no link"
+        assert found.link is not None
+        under = f"a link to `{found.link[0]}`"
     body = "\n".join(
         [
             "Available. Code writes:",

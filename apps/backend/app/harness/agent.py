@@ -18,8 +18,8 @@ from app.scheduling.tools import (
     cancel_reminder,
     create_reminder,
     list_reminders,
-    mute_proactive,
-    unmute_proactive,
+    mute_bot,
+    unmute_bot,
 )
 from app.telegram.tools import send_message
 
@@ -34,8 +34,8 @@ _BARRIERS = (
     create_reminder,
     list_reminders,
     cancel_reminder,
-    mute_proactive,
-    unmute_proactive,
+    mute_bot,
+    unmute_bot,
     send_message,
     read_memory,
     save_memory,

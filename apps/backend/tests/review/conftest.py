@@ -21,7 +21,7 @@ from app.content.ingest import ingest
 from app.content.schemas import ContentIndex
 from app.harness.agent import tutor
 from app.models import CardDelivery, Document, ReviewCard, ReviewState, User
-from app.review import writer
+from app.review import cards, writer
 from app.telegram import repository as telegram
 from app.telegram.outbox import Outbox
 from tests.conftest import Bot
@@ -143,10 +143,10 @@ async def indexed_section(session: AsyncSession) -> None:
 
 async def section_hash(session: AsyncSession, anchor: str = SECTION) -> str:
     found = await session.scalar(
-        select(Document.content_hash).where(Document.locator == f"{LESSON}#{anchor}")
+        select(Document).where(Document.locator == f"{LESSON}#{anchor}")
     )
     assert found is not None
-    return found
+    return cards.fingerprint(found)
 
 
 async def stored_card(

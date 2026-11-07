@@ -45,14 +45,16 @@ def ago(*days: int) -> list[date]:
         (ago(0, 0, 1, 1), 2),
         # Today not yet answered: the run up to yesterday stands.
         (ago(1, 2, 3), 3),
-        # A gap of one missed day is forgiven, and is not itself counted.
-        (ago(0, 2, 3), 3),
+        # A gap of one missed day is forgiven, and counted as a day of the run.
+        (ago(0, 2, 3), 4),
         (ago(2, 3), 2),
         # A gap of two ends it.
         (ago(0, 3, 4), 1),
         (ago(3, 4, 5), 0),
-        # Two forgiven gaps are two single missed days, not two in a row.
-        (ago(0, 2, 4), 3),
+        # Two forgiven gaps are two single missed days, not two in a row:
+        # every other day for five days is five days.
+        (ago(0, 2, 4), 5),
+        (ago(0, 2, 4, 6, 8), 9),
         # A day after today is not an answer yet.
         ([TODAY + timedelta(days=1)], 0),
     ],
@@ -146,7 +148,8 @@ async def test_a_streak_is_carried_over_a_missed_day(
     card, feedback = await card_and_tap(client, session, user, bot)
 
     assert card == f"<b>Day 2 · {TITLE}</b>"
-    assert feedback == f"<b>Day 3 · {TITLE}</b>"
+    # Yesterday, missed and forgiven, is a day of it.
+    assert feedback == f"<b>Day 4 · {TITLE}</b>"
 
 
 async def test_a_broken_streak_starts_over_and_sends_nothing(

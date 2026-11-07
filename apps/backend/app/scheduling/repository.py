@@ -6,17 +6,20 @@ from typing import Any, Literal
 import logfire
 from sqlalchemy import ColumnElement, ScalarSelect, and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import InstrumentedAttribute
 
 from app.core.config import settings
 from app.models import (
     CardDelivery,
     Chat,
     CoachNote,
+    LessonProgress,
     Message,
     Schedule,
     TgLink,
     User,
 )
+from app.review import repository as review
 from app.scheduling import policy
 
 ScheduleKind = Literal["coach", "reminder", "nudge"]
@@ -30,6 +33,9 @@ CreatedBy = Literal["system", "user"]
 LEASE = timedelta(seconds=settings.RUN_CLAIM_TTL_SECONDS) + timedelta(minutes=5)
 CLAIM_BATCH = 100
 WAITING = ("pending", "deferred")
+# The key a nudge's Quick check button is spent under in its payload
+# (`coach.nudges`), which is also the learner answering it.
+QUICK = "quick"
 
 
 def new(
@@ -189,36 +195,47 @@ async def sweep_leases(session: AsyncSession, now: datetime) -> None:
         )
 
 
+# What the platform starts on its own account, each counted by when it went
+# out. A reminder is not here: it is the learner's appointment, so it neither
+# spends the day's message nor pays the weekly floor, and a learner with a daily
+# reminder still gets their card.
+def _initiations(
+    user_id: uuid.UUID,
+) -> list[tuple[InstrumentedAttribute[datetime], ColumnElement[bool]]]:
+    return [
+        (
+            CardDelivery.sent_at,
+            and_(CardDelivery.user_id == user_id, CardDelivery.initiated),
+        ),
+        (Schedule.due_at, and_(Schedule.user_id == user_id, Schedule.kind == "nudge")),
+        (CoachNote.sent_at, CoachNote.user_id == user_id),
+    ]
+
+
 async def initiations_today(
     session: AsyncSession, user_id: uuid.UUID, since: datetime
 ) -> int:
-    """Messages the platform started today: the cards it sent on its own
-    account, its reading nudges, the weekly note, and the reminders — the
-    learner's appointment, but still a message, which the day's one card
-    waits behind."""
-    cards = await session.scalar(
-        select(func.count()).where(
-            CardDelivery.user_id == user_id,
-            CardDelivery.initiated,
-            CardDelivery.sent_at >= since,
+    """Messages the platform started today: its cards, reading nudges and
+    weekly notes."""
+    total = 0
+    for sent_at, mine in _initiations(user_id):
+        total += int(
+            await session.scalar(select(func.count()).where(mine, sent_at >= since))
+            or 0
         )
-    )
-    others = await session.scalar(
-        select(func.count()).where(
-            Schedule.user_id == user_id,
-            Schedule.status == "done",
-            or_(
-                and_(Schedule.kind == "reminder", Schedule.claimed_at >= since),
-                and_(Schedule.kind == "nudge", Schedule.due_at >= since),
-            ),
-        )
-    )
-    notes = await session.scalar(
-        select(func.count()).where(
-            CoachNote.user_id == user_id, CoachNote.sent_at >= since
-        )
-    )
-    return int(cards or 0) + int(others or 0) + int(notes or 0)
+    return total
+
+
+async def last_initiation(session: AsyncSession, user_id: uuid.UUID) -> datetime | None:
+    """When the platform last opened the conversation of its own accord: what
+    the backoff waits from and what pays the weekly floor. A card the learner
+    asked for (Next, Harder, Quick check) was their move."""
+    latest = [
+        select(func.max(sent_at)).where(mine).scalar_subquery()
+        for sent_at, mine in _initiations(user_id)
+    ]
+    moment: datetime | None = await session.scalar(select(func.greatest(*latest)))
+    return moment
 
 
 def _last_message(user_id: uuid.UUID) -> ScalarSelect[datetime]:
@@ -231,56 +248,82 @@ def _last_message(user_id: uuid.UUID) -> ScalarSelect[datetime]:
     )
 
 
-def _answered(user_id: uuid.UUID) -> ColumnElement[datetime]:
-    """When the learner last wrote in the thread or tapped a card."""
-    last_tap = (
-        select(func.max(CardDelivery.answered_at))
-        .where(CardDelivery.user_id == user_id)
-        .scalar_subquery()
-    )
+def _contact(user_id: uuid.UUID) -> ColumnElement[datetime]:
+    """When the learner last wrote in the thread or did anything to a card —
+    a skip included: it is their move, so it ends a silence."""
     # greatest() skips NULLs, so either one alone is enough.
-    return func.greatest(_last_message(user_id), last_tap)
+    return func.greatest(_last_message(user_id), review.responded(user_id))
 
 
-async def last_answer(session: AsyncSession, user_id: uuid.UUID) -> datetime | None:
-    moment: datetime | None = await session.scalar(select(_answered(user_id)))
+async def last_contact(session: AsyncSession, user_id: uuid.UUID) -> datetime | None:
+    moment: datetime | None = await session.scalar(select(_contact(user_id)))
     return moment
 
 
-async def silence(session: AsyncSession, user_id: uuid.UUID) -> int:
-    """How many cards in a row the learner has let go unanswered: those sent
-    since the last thing they wrote in the thread or tapped. Read back from the
-    thread and the deliveries rather than stored, so it cannot drift from
-    either.
+async def silence(session: AsyncSession, user_id: uuid.UUID, now: datetime) -> int:
+    """How many messages in a row the platform sent that the learner let go
+    unanswered, counted since their last contact. A card is unanswered once it
+    expired or a newer card folded it; a nudge or a weekly note, once a day has
+    passed without its button pressed — or, for a nudge, its lesson opened.
+    Read back rather than stored, so it cannot drift from what it counts.
     """
-    since = _answered(user_id)
-    total = await session.scalar(
+    since = _contact(user_id)
+    expired = now - policy.IGNORED_AFTER
+    cards = await session.scalar(
         select(func.count()).where(
             CardDelivery.user_id == user_id,
-            CardDelivery.outcome == "ignored",
+            CardDelivery.outcome.in_((review.IGNORED, review.FOLDED)),
             or_(since.is_(None), CardDelivery.sent_at > since),
         )
     )
-    return int(total or 0)
+    read = (
+        select(LessonProgress.lesson)
+        .where(
+            LessonProgress.user_id == Schedule.user_id,
+            LessonProgress.lesson == Schedule.payload["lesson"].astext,
+            LessonProgress.last_seen > Schedule.due_at,
+        )
+        .correlate(Schedule)
+        .exists()
+    )
+    nudges = await session.scalar(
+        select(func.count()).where(
+            Schedule.user_id == user_id,
+            Schedule.kind == "nudge",
+            Schedule.due_at <= expired,
+            or_(since.is_(None), Schedule.due_at > since),
+            ~Schedule.payload.has_key(QUICK),
+            ~read,
+        )
+    )
+    notes = await session.scalar(
+        select(func.count()).where(
+            CoachNote.user_id == user_id,
+            CoachNote.sent_at <= expired,
+            or_(since.is_(None), CoachNote.sent_at > since),
+            CoachNote.pressed_at.is_(None),
+        )
+    )
+    return int(cards or 0) + int(nudges or 0) + int(notes or 0)
 
 
-async def last_initiation(session: AsyncSession, user_id: uuid.UUID) -> datetime | None:
-    """When the platform last opened the conversation of its own accord: the
-    last card it sent on its own account, or reading nudge. A card the learner
-    asked for (Next, Harder, Quick check) was their move, and a reminder is
-    their appointment, not ours, so neither counts."""
-    card = (
-        select(func.max(CardDelivery.sent_at))
-        .where(CardDelivery.user_id == user_id, CardDelivery.initiated)
-        .scalar_subquery()
+async def nudged(
+    session: AsyncSession, user_id: uuid.UUID, lesson: str, since: datetime
+) -> bool:
+    """Whether a reading nudge on this lesson went out since a moment."""
+    found = await session.scalar(
+        select(
+            select(Schedule.id)
+            .where(
+                Schedule.user_id == user_id,
+                Schedule.kind == "nudge",
+                Schedule.payload["lesson"].astext == lesson,
+                Schedule.due_at >= since,
+            )
+            .exists()
+        )
     )
-    nudge = (
-        select(func.max(Schedule.due_at))
-        .where(Schedule.user_id == user_id, Schedule.kind == "nudge")
-        .scalar_subquery()
-    )
-    moment: datetime | None = await session.scalar(select(func.greatest(card, nudge)))
-    return moment
+    return bool(found)
 
 
 async def users_by_id(

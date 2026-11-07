@@ -86,8 +86,11 @@ class Settings(BaseSettings):
     # What turns a Telegram voice message into text. Not a chat model: it is
     # called on OpenRouter's transcription endpoint, so it has no place in
     # CHAT_MODELS. It must take Telegram's Opus-in-Ogg as sent — nothing
-    # converts the audio first.
-    TRANSCRIPTION_MODEL: str = "mistralai/voxtral-mini-transcribe"
+    # converts the audio first. Unset, voice answers are off: a model is set
+    # here only once a real Russian and a real English voice note have come
+    # back right through it, since what it hears is what gets graded.
+    # Candidates: mistralai/voxtral-mini-transcribe, openai/whisper-large-v3.
+    TRANSCRIPTION_MODEL: str | None = None
 
     # The tutor's only route out to the open web. Unset, web_search reports
     # itself unavailable and the agent answers from the corpus.

@@ -1,4 +1,6 @@
 import uuid
+from contextlib import suppress
+from datetime import UTC, datetime
 
 from pydantic_ai import RunContext
 
@@ -8,6 +10,7 @@ from app.memory import repository as memory
 from app.models import MEMORY_SLUG_LENGTH
 from app.review import repository
 from app.review.ladder import Outcome
+from app.telegram import api
 
 # The sore spot of one lesson, kept under a handle derived from that lesson, so
 # the next review of it replaces what the last one found rather than adding a
@@ -73,15 +76,21 @@ async def report_review_outcome(
     own = sent.follow_ups.get(repository.OWN_WORDS)
     if own is not None and own != repository.ASKED:
         return f"their own words on that card are already graded as {own}"
-    if own is None and sent.answered_at is not None:
+    if own is None and not repository.is_open(sent):
         # One card moves the ladder once: a tap and a written answer, or an
         # answer split across two messages, can both reach here.
-        return f"that card is already graded as {sent.outcome}"
+        return f"that card is already closed as {sent.outcome}"
+    now = ctx.deps.now or datetime.now(UTC)
     if own == repository.ASKED:
-        state = await repository.recall(repo.session, sent, card, outcome)
+        state = await repository.recall(repo.session, sent, card, outcome, now)
     else:
-        state = await repository.grade(repo.session, sent, card, outcome)
+        state = await repository.grade(repo.session, sent, card, outcome, now)
     await repo.session.commit()
+    if own is None and ctx.deps.outbox is not None:
+        # Answered in words, the card is closed: its buttons would only do
+        # nothing when pressed.
+        with suppress(api.TelegramError):
+            await ctx.deps.outbox.edit_keyboard(sent.tg_message_id, None)
     kept = "" if notes is None else await _remember(ctx, card.lesson, notes)
     if state is None:
         return f"recorded as {outcome}; there is no review ladder for {card.lesson}"

@@ -232,6 +232,8 @@ async def _ask[T: BaseModel](
                 retries=2,
             )
     finally:
+        # Only spend is charged here: no cap counts writer calls, unlike the
+        # coach's runs (`coach.agent.decide`), whose row is the cap's unit.
         if usage.requests:
             await charge_background(session, user_id, kind, usage)
             await session.commit()

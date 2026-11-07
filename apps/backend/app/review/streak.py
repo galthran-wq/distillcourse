@@ -1,4 +1,4 @@
-"""The streak: consecutive days on the learner's calendar with a card answered.
+"""The streak: days on the learner's calendar with a card answered, in a run.
 
 Derived from `card_deliveries` every time it is shown, never stored, so it
 cannot drift from them. A skip is not an answer. One missed day is forgiven;
@@ -22,12 +22,18 @@ def local_days(moments: Iterable[datetime], tz: tzinfo) -> list[date]:
 
 
 def streak(answer_days: Sequence[date], today: date) -> int:
-    count, after = 0, today
-    for day in sorted({day for day in answer_days if day <= today}, reverse=True):
-        if after - day > GAP:
+    """Calendar days from the run's first answered day to its last: a forgiven
+    day is still a day of the streak, so answering every other day counts
+    every day."""
+    days = sorted({day for day in answer_days if day <= today}, reverse=True)
+    if not days or today - days[0] > GAP:
+        return 0
+    first = days[0]
+    for day in days[1:]:
+        if first - day > GAP:
             break
-        count, after = count + 1, day
-    return count
+        first = day
+    return (days[0] - first).days + 1
 
 
 def line(count: int, title: str) -> str:

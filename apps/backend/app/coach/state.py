@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.coach import note, nudges
+from app.content.locators import section_key
 from app.harness.prompts import ContextBlock, render
 from app.harness.title import transcript
 from app.memory import repository as memory
@@ -67,8 +68,8 @@ async def _waking(
 
 
 async def _silence(session: AsyncSession, user: User, now: datetime) -> ContextBlock:
-    last = await scheduling.last_answer(session, user.id)
-    count = await scheduling.silence(session, user.id)
+    last = await scheduling.last_contact(session, user.id)
+    count = await scheduling.silence(session, user.id, now)
     answered = (
         "They have never answered a card or written in the thread."
         if last is None
@@ -76,7 +77,7 @@ async def _silence(session: AsyncSession, user: User, now: datetime) -> ContextB
     )
     return ContextBlock(
         title="Silence",
-        body=f"{answered}\nCards in a row that went unanswered: {count}.",
+        body=f"{answered}\nMessages in a row that went unanswered: {count}.",
     )
 
 
@@ -102,7 +103,7 @@ async def _deliveries(
     sent_nudges = [
         (
             row.due_at,
-            f"`{nudges.locator(row.payload['lesson'], row.payload['anchor'])}`, "
+            f"`{section_key(row.payload['lesson'], row.payload['anchor'])}`, "
             f"{row.payload['nudge']} nudge",
         )
         for row in await session.scalars(

@@ -415,14 +415,22 @@ to the model as a sentence:
   the constraint alone.
 - **One initiation a day** (`policy.DAILY_INITIATIONS`): the cards sent on the
   platform's own account (`card_deliveries.initiated`), the reading nudges
-  (`schedules` of kind `nudge`) and the reminders delivered, counted on the
-  learner's calendar.
-- **Silence backoff.** Silence is the number of `card_deliveries` that ended
-  `ignored` since the learner's latest message in the Telegram thread or
-  latest answered card — derived, never stored. After the last card or nudge
-  the platform waits 1, 2, 4, then 7 days for silence 1, 2, 3, 4+, and keeps
-  writing weekly from there until `/mute`. Anything the learner writes or taps
-  resets it to zero.
+  (`schedules` of kind `nudge`) and the weekly notes (`coach_notes`), counted
+  on the learner's calendar. `initiations_today` and `last_initiation` read
+  the one list of these (`repository._initiations`), so the day's count, the
+  backoff clock and the weekly floor cannot disagree about what was sent.
+- **Silence backoff.** Silence is the number of messages the platform sent
+  since the learner's last contact that went unanswered — derived, never
+  stored. A card is unanswered once it ended `ignored` (a day untouched) or
+  `folded` (a newer card went out while it was open); a nudge or a weekly
+  note, once a day has passed without its button pressed, or, for a nudge,
+  its lesson opened (`lesson_progress.last_seen`). Last contact
+  (`last_contact`) is the latest of a message in the Telegram thread and
+  `card_deliveries.answered_at`, which only the learner's own move sets — a
+  tap, a written answer, or a skip: Another question and Not today are their
+  move too and end a silence. After the last initiation the platform waits 1,
+  2, 4, then 7 days for silence 1, 2, 3, 4+, and keeps writing weekly from
+  there until `/mute`.
 - **Not today.** `users.cards_paused_until` holds cards — never reminders —
   until the next morning; set by a card's own button.
 - **Mute.** `users.muted_until` pauses everything the platform starts; the
@@ -436,8 +444,9 @@ to the model as a sentence:
 **Reminders are not initiations of ours.** A reminder is the learner's
 appointment, set for a time they named, so it goes out at that time
 regardless of a spent budget, Not today or a backoff wait (quiet hours and mute
-still hold), and the reminders due together go out as one message. It does
-count as the day's message, which the coach then reads as spent. A reminder
+still hold), and the reminders due together go out as one message. For the
+same reason it neither spends the day's message nor pays the weekly floor: a
+learner with a daily reminder still gets their card. A reminder
 goes into the eternal Telegram thread through the ordinary harness `run()`,
 with the `reminder` prompt module, and its row is `done` once it is sent. A
 reminder is held, never cancelled, for a learner with no link: unpairing to
@@ -487,8 +496,11 @@ from its opening, with `[Read it]`. Its first call about a section sends
 nothing and hands the section's text back, so the message is written with it
 in view. A nudge is stored as the tutor's message in the thread, so a reply is
 read with it, and as a `schedules` row of kind `nudge`, born `done` with
-`due_at` the moment it went out: `callback_data` holds 64 bytes, which a
-lesson locator can outgrow, so Quick check carries the row's id. Quick check
+`due_at` the moment it went out — added only once Telegram has the message, so
+a refused send spends nothing: `callback_data` holds 64 bytes, which a
+lesson locator can outgrow, so Quick check carries the row's id. A lesson
+nudged in the last three days (`review.REST`) is not nudged again, whatever
+the backoff says. Quick check
 sends a level 1 card on the lesson, as the learner's own move — no
 initiation, the day's `CARDS_PER_DAY` its bound — and is spent once. There is
 no free-text send tool: "still waiting for your answer" cannot be said.
@@ -515,8 +527,8 @@ beyond it the row waits for tomorrow's open. A failed run goes through
 `repository.retry`; a spent monthly ceiling defers it to the next morning with
 nothing sent.
 
-**The weekly floor** (`floor.py`): when a week has passed with no card or
-nudge sent on the platform's own account — counted from pairing for a learner who has had
+**The weekly floor** (`floor.py`): when a week has passed with no card,
+nudge or note sent on the platform's own account — counted from pairing for a learner who has had
 none — and a run ends silent, code sends one anyway, chosen with no model: the
 lesson finished most recently whose ladder is due and had no card in three
 days, at its level, with a card the learner has not seen in two weeks. The
@@ -534,7 +546,8 @@ for, bounded by `CARDS_PER_DAY`; a press that sends none gives the button
 back — or, with nothing slipping, a link to the lesson read last and left
 unfinished. It is a tool, not a timer: the state block says whether
 one is available and what code would write in it, and the run decides. It is
-refused within 7 days of the last, without a tap answered in the last 14, and
+refused within 7 days of the last, without a tap answered in the last 14, with
+neither a lesson slipping nor one unfinished — nothing to put under it — and
 by the gates; once sent it counts in `initiations_today`.
 
 ## Spaced repetition
@@ -598,12 +611,16 @@ marked answer, the ladder moved and the message edited into ✓ or ✗, the righ
 answer, the explanation and a link to the section — no model is asked. A card
 answered once is answered: a second tap changes nothing. A card nobody taps
 in a day is `ignored`, and the ladder does not move; the backoff is what
-answers silence.
+answers silence. An ignored card is still open (`repository.is_open`, the one
+rule taps, the other buttons and a written answer all go by): a late tap
+grades it, as a late written answer does. A card answered in writing loses
+its buttons.
 
 **The streak** (`streak.py`) is the first line of a card and of its feedback,
-`Day 5 · <lesson title>`, from its second day: consecutive days on the
-learner's calendar with a tap answered right or wrong (a skip is not an
-answer), one missed day forgiven, two in a row ending it. It is derived from
+`Day 5 · <lesson title>`, from its second day: the calendar days on the
+learner's clock from the first day of a run of days with a tap answered right
+or wrong (a skip is not an answer) to the last, one missed day forgiven and
+still counted, two in a row ending it. It is derived from
 `card_deliveries` each time the line is written, never stored, and shown
 nowhere else — nothing is sent when it grows or when it ends.
 
@@ -625,9 +642,12 @@ the learner is waiting on a tap; level and ladder do not move. *Not today*
 tomorrow's open — not `muted_until`, which would hold the learner's reminders
 too. *This card is wrong* (`w`) retires the card on the first report, files an
 `error` incident against its section (`HarnessRepository.file_incident`, on the
-thread chat) and then behaves as Another question. Under the feedback on a
-tapped card: *Next* (`x`) sends the next due card now — no initiation is spent,
-`CARDS_PER_DAY` bounds it; *Harder one* (`h`, absent at level 3) sends a card
+thread chat) and commits both before anything is sent; then it behaves as
+Another question, and a swap Telegram refuses leaves the card put aside with
+its buttons off. Under the feedback on a card graded by a tap (an `order` card
+put aside half-way has a `chosen` but no feedback): *Next* (`x`) sends the next
+due card now — no initiation is spent, `CARDS_PER_DAY` bounds it; *Harder one*
+(`h`, absent at level 3), under the same bound, sends a card
 of the lesson a level up, written if none exists, and a right answer to it
 sets the level while a wrong one changes nothing (`card_deliveries.harder`);
 *Explain* (`e`) and *In my own words* (`m`) are `chat` runs on the thread with
@@ -640,8 +660,11 @@ Two harder cards (level 2+) skipped in a row, within seven days of each other
 and the later within seven days of now, mean only level 1 is served until
 then, whatever the ladder's level says — derived from `card_deliveries`
 (`repository.level_one_only`). When a new card goes out, any earlier card
-still open is edited to one line, `<lesson title> — skipped`, without buttons;
-an answered card is left as it is.
+still open from the last day is edited to one line, `<lesson title> —
+skipped`, without buttons, and closed as `folded`: not a skip, since the
+learner did nothing, so it feeds neither `level_one_only` nor the learner's
+last contact, and it counts toward the silence. An answered card is left as
+it is.
 
 **Levels are per lesson** (`review_state.level`, `level_run`). Level 1 is the
 main point itself, level 2 tells two ideas apart, level 3 spots the error in
@@ -703,7 +726,12 @@ safety nets are for when it does not — a message, caption or edit Telegram
 will not parse is resent unformatted rather than dropped, and a message over
 4096 characters is split.
 
-A voice note in a private chat is an answer like a typed one: one over 120 s
+A voice note in a private chat is an answer like a typed one, once
+`TRANSCRIPTION_MODEL` is set — unset, the default, it gets "I can't take voice
+notes yet" and nothing is downloaded. The model is set only after one real
+Russian and one real English voice note have come back right through it
+(candidates: `mistralai/voxtral-mini-transcribe`, `openai/whisper-large-v3`):
+what it hears is what gets graded. One over 120 s
 is refused before download; otherwise, once the caps allow it, it is
 downloaded, transcribed (`speech.py`, cost to `background_runs`), shown back as
 a `Heard:` line and run as text. The audio is never stored or logged. A failed
@@ -725,7 +753,8 @@ since Telegram spins the button until it is, and a press nothing handles, or
 from a chat nobody paired, ends there; so does one from a group, which is
 answered and dropped. An edit that would change nothing — a
 double tap — is Telegram's 400 "message is not modified", and is not an error.
-Changing `allowed_updates` takes `python -m app.cli set-webhook <url>` again.
+Changing `allowed_updates` takes `python -m app.cli set-webhook <url>` again,
+which `make deploy` does every time (`make webhook`).
 
 A 403 from Telegram means the bot was blocked. The link goes to `broken`, and a
 broken link holds that learner's schedules exactly as a mute does — nothing is

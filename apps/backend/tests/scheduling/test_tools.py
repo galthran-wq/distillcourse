@@ -160,7 +160,7 @@ async def test_muting_from_the_conversation_stops_the_next_message(
         created_by="system",
     )
 
-    with tutor.override(model=calling("mute_proactive")):
+    with tutor.override(model=calling("mute_bot")):
         await runner.run(repo, thread, "/mute")
     before = len(await repo.rows(thread))
     with replying(), coach.override(model=deciding()):
@@ -182,7 +182,7 @@ async def test_the_learner_can_turn_the_messages_back_on(
     repo = HarnessRepository(session, user.id)
     await repository.mute(session, user.id, until=datetime.now(UTC) + timedelta(days=7))
 
-    with tutor.override(model=calling("unmute_proactive")):
+    with tutor.override(model=calling("unmute_bot")):
         await runner.run(repo, thread, "you can write to me again")
 
     await session.refresh(user)

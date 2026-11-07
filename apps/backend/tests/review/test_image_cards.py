@@ -112,6 +112,12 @@ async def test_a_figure_card_is_a_photo_whose_caption_the_tap_answers_in(
     [(message_id, feedback)] = bot.captioned
     assert message_id == sent.tg_message_id
     assert card.prompt in feedback and "✓ average." in feedback
+    # The answer buttons came off with the caption edit; the feedback's own
+    # went on.
+    [(rekeyed, keyboard)] = bot.rekeyed
+    assert rekeyed == sent.tg_message_id
+    assert keyboard is not None and f"k:{sent.id}" not in str(keyboard)
+    assert f"x:{sent.id}" in str(keyboard)
 
 
 async def test_a_formula_card_is_sent_typeset(

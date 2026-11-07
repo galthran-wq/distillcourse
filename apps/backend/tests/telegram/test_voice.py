@@ -317,3 +317,19 @@ async def test_a_malformed_transcription_answer_is_a_failure(
 
     with pytest.raises(speech.TranscriptionFailed):
         await speech.transcribe(AUDIO)
+
+
+@pytest.mark.usefixtures("thread")
+async def test_with_no_transcription_model_a_voice_note_is_declined(
+    client: AsyncClient,
+    bot: Bot,
+    ears: Ears,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Off until a model is chosen on real speech: what it hears is graded."""
+    monkeypatch.setattr(settings, "TRANSCRIPTION_MODEL", None)
+
+    await deliver(client, voice())
+
+    assert ears.downloads == []
+    assert bot.texts == [updates.VOICE_OFF]

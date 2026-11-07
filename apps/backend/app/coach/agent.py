@@ -77,10 +77,12 @@ async def decide(
 ) -> Decision:
     """One run, charged to `background_runs` whether or not it decides —
     including one that fails before the model is asked: that row is also what
-    the daily run cap counts."""
-    await check_cost_ceiling(session)
+    the daily run cap counts, so a run the ceiling refuses is counted too."""
+    # Read before anything can fail: the rollback below expires `user`.
+    user_id = user.id
     usage = RunUsage()
     try:
+        await check_cost_ceiling(session)
         deps = HarnessDeps(
             repo=HarnessRepository(session, user.id),
             chat=await thread.of(session, user.id),
@@ -102,6 +104,6 @@ async def decide(
         await session.rollback()
         raise
     finally:
-        await charge_background(session, user.id, KIND, usage)
+        await charge_background(session, user_id, KIND, usage)
         await session.commit()
     return result.output

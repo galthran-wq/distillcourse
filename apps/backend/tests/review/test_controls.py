@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.coach.agent import coach
-from app.content.locators import LESSON_SECTION
+from app.content.locators import LESSON_SECTION, section_key
 from app.core.config import settings
 from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
@@ -31,9 +31,9 @@ from app.review import cards, controls, ladder
 from app.review import repository as review
 from app.scheduling import policy, worker
 from app.scheduling import repository as scheduling
-from app.telegram import thread
+from app.telegram import api, thread
 from app.telegram.outbox import Outbox
-from app.telegram.updates import TAP_BUSY
+from app.telegram.updates import TAP_BUSY, TAP_FAILED
 from tests.coach.conftest import deciding
 from tests.conftest import Bot
 from tests.harness.conftest import echoing
@@ -111,20 +111,19 @@ async def other_lesson(session: AsyncSession, user: User) -> None:
     """A second lesson indexed, due, and with a card already written. Added
     after the first card is out, so that card is the first lesson's: due an
     hour back on both clocks, the poller's and the one a press reads."""
-    session.add(
-        Document(
-            corpus="lesson",
-            course_slug="information-theory",
-            locator=f"{OTHER}#{OTHER_SECTION}",
-            title="Asymmetry",
-            breadcrumb="Information Theory › KL › Asymmetry",
-            text="KL divergence is not symmetric.",
-            anchors=[OTHER_SECTION],
-            position=0,
-            meta={"word_count": 5},
-            content_hash="c" * 64,
-        )
+    section = Document(
+        corpus="lesson",
+        course_slug="information-theory",
+        locator=f"{OTHER}#{OTHER_SECTION}",
+        title="Asymmetry",
+        breadcrumb="Information Theory › KL › Asymmetry",
+        text="KL divergence is not symmetric.",
+        anchors=[OTHER_SECTION],
+        position=0,
+        meta={"word_count": 5},
+        content_hash="c" * 64,
     )
+    session.add(section)
     session.add(
         ReviewCard(
             lesson=OTHER,
@@ -135,7 +134,7 @@ async def other_lesson(session: AsyncSession, user: User) -> None:
             options=["no", "yes"],
             answer=0,
             explanation="Swapping the arguments changes the value.",
-            content_hash="c" * 64,
+            content_hash=cards.fingerprint(section),
         )
     )
     await session.commit()
@@ -288,7 +287,7 @@ async def test_a_wrong_card_is_retired_filed_and_swapped(
     assert wrong.status == "retired"
     [incident] = (await session.scalars(select(Incident))).all()
     assert LESSON_SECTION.fullmatch(incident.locator)
-    assert incident.locator == cards.locator(wrong)
+    assert incident.locator == section_key(wrong.lesson, wrong.anchor)
     assert incident.kind == "error"
     assert str(wrong.id) in incident.summary
     assert wrong.prompt in incident.summary
@@ -296,7 +295,40 @@ async def test_a_wrong_card_is_retired_filed_and_swapped(
     assert first.outcome == "skipped"
     assert swapped.card_id == easier.id
     with no_model():
-        assert await cards.existing(session, user.id, LESSON, 2) is None
+        assert (
+            await cards.existing(session, user.id, LESSON, 2, datetime.now(UTC)) is None
+        )
+
+
+async def test_a_wrong_card_is_retired_and_filed_when_the_swap_is_refused(
+    client: AsyncClient,
+    session: AsyncSession,
+    user: User,
+    bot: Bot,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The report holds whatever Telegram does with the edit: a message too
+    old to edit leaves the card put aside, not active with a second press
+    repeating the same failure."""
+    await ladder_row(session, user, level=2)
+    wrong = await stored_card(session, level=2, prompt="A broken card: ____")
+    await stored_card(session, level=1)
+    sent = await card_out(session, user)
+
+    async def refused(*_: object, **__: object) -> None:
+        raise api.TelegramError("Bad Request: message can't be edited")
+
+    monkeypatch.setattr(api, "edit_message_text", refused)
+    with no_model():
+        await press(client, f"w:{sent.id}", sent)
+
+    await session.refresh(wrong)
+    assert wrong.status == "retired"
+    assert len((await session.scalars(select(Incident))).all()) == 1
+    [first] = await deliveries(session, user)
+    assert first.outcome == "skipped"
+    assert bot.rekeyed[-1] == (sent.tg_message_id, None)
+    assert TAP_FAILED not in bot.texts
 
 
 async def test_a_retired_card_is_never_served_again(
@@ -312,7 +344,7 @@ async def test_a_retired_card_is_never_served_again(
     sent.sent_at = datetime.now(UTC) - cards.UNSEEN_FOR - timedelta(days=1)
     await session.commit()
     with card_models():
-        picked = await cards.pick(session, user.id, LESSON, 1)
+        picked = await cards.pick(session, user.id, LESSON, 1, datetime.now(UTC))
 
     assert picked is not None and picked.id != wrong.id
 
@@ -365,6 +397,26 @@ async def test_next_stops_at_the_daily_cap(
 
     assert bot.texts[-1] == controls.TODAYS
     assert bot.texts.count(controls.TODAYS) == 1
+    assert len(await deliveries(session, user)) == 1
+
+
+async def test_harder_stops_at_the_daily_cap_before_writing(
+    client: AsyncClient,
+    session: AsyncSession,
+    user: User,
+    bot: Bot,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "CARDS_PER_DAY", 1)
+    await ladder_row(session, user)
+    await stored_card(session)
+    sent = await tapped(client, session, user)
+
+    # No card of level 2 exists: a press past the cap would pay the writer.
+    with no_model():
+        await press(client, f"h:{sent.id}", sent)
+
+    assert bot.texts[-1] == controls.TODAYS
     assert len(await deliveries(session, user)) == 1
 
 
@@ -627,9 +679,36 @@ async def test_a_new_card_folds_an_open_one_and_leaves_an_answered_one(
     assert bot.rekeyed[-1] == (open_one.tg_message_id, None)
     assert answered.tg_message_id not in [message_id for message_id, _ in folded]
     await session.refresh(open_one)
-    assert open_one.outcome == "skipped"
+    # The platform closed it, not the learner: no answer, and it is silence.
+    assert (open_one.outcome, open_one.answered_at) == ("folded", None)
 
     # Folded once: the next card leaves it alone.
     edits = len(bot.edited)
     await cards.deliver(session, outbox, user.id, card, datetime.now(UTC))
     assert open_one.tg_message_id not in [m for m, _ in bot.edited[edits:]]
+
+
+async def test_a_card_folded_unanswered_is_silence_and_not_an_answer(
+    session: AsyncSession, user: User, link: TgLink
+) -> None:
+    """The coach's card today folds yesterday's, sent a few seconds under a
+    day earlier: that is a second card let go, not the learner coming back."""
+    await ladder_row(session, user)
+    card = await stored_card(session)
+    outbox = Outbox(session=session, link=link)
+    now = datetime.now(UTC)
+    first = await cards.deliver(
+        session, outbox, user.id, card, now - timedelta(hours=23), initiated=True
+    )
+    await cards.deliver(session, outbox, user.id, card, now, initiated=True)
+    assert first is not None
+    await session.refresh(first)
+    assert (first.outcome, first.answered_at) == ("folded", None)
+    assert await scheduling.last_contact(session, user.id) is None
+    assert await scheduling.silence(session, user.id, now) == 1
+
+    later = now + policy.IGNORED_AFTER
+    await cards.expire(session, later)
+
+    assert await scheduling.silence(session, user.id, later) == 2
+    assert await scheduling.last_contact(session, user.id) is None

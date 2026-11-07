@@ -24,6 +24,7 @@ from app.models import (
 )
 from app.scheduling import policy
 from app.scheduling import repository as scheduling
+from app.telegram import api
 from app.telegram.outbox import Outbox
 from tests.coach.conftest import deciding
 from tests.conftest import Bot
@@ -305,7 +306,7 @@ async def test_outside_the_waking_hours_not_today_and_a_backoff_are_refused(
 
     assert said(late)[0].startswith("Not sent: it is outside")
     assert said(paused)[0].startswith("Not sent: the learner pressed Not today")
-    assert said(waiting)[0].startswith("Not sent: 4 cards in a row")
+    assert said(waiting)[0].startswith("Not sent: 4 messages in a row")
     assert bot.sent == []
 
 
@@ -383,3 +384,83 @@ async def test_a_quick_check_on_someone_elses_nudge_does_nothing(
     await deliver(client, tap(f"q:{row.id}"))
 
     assert bot.sent == []
+
+
+async def test_a_nudge_telegram_refused_spends_nothing(
+    session: AsyncSession, user: User, link: TgLink, bot: Bot
+) -> None:
+    """Recorded only once it is out: a refused send must not hold the day's
+    message, restart the backoff, or poison the retry with its own gate."""
+    await started(session, user)
+    bot.refuse = api.TelegramError("Bad Request: wrong HTTP URL")
+
+    with pytest.raises(api.TelegramError):
+        await run(session, user, link, nudge(), nudge())
+
+    since = policy.day_start(NOON, policy.Hours.of(user))
+    assert await scheduling.initiations_today(session, user.id, since) == 0
+    assert await scheduling.last_initiation(session, user.id) is None
+    assert await sent_nudges(session, user) == []
+
+
+# Silence
+
+
+async def test_a_nudge_left_alone_a_day_adds_to_the_silence(
+    session: AsyncSession, user: User, link: TgLink
+) -> None:
+    await started(session, user)
+    card = await stored_card(session)
+    session.add(
+        CardDelivery(
+            user_id=user.id,
+            card_id=card.id,
+            tg_message_id=1,
+            sent_at=NOON - timedelta(days=2),
+            outcome="ignored",
+            initiated=True,
+        )
+    )
+    await session.commit()
+    # Only one message in a row so far: a day's wait, which has passed.
+    await run(session, user, link, nudge(), nudge(), at=NOON)
+    assert len(await sent_nudges(session, user)) == 1
+
+    assert await scheduling.silence(session, user.id, NOON + timedelta(hours=23)) == 1
+    assert await scheduling.silence(session, user.id, NOON + timedelta(days=1)) == 2
+
+
+async def test_a_nudge_read_or_answered_with_a_quick_check_is_not_silence(
+    session: AsyncSession, user: User, link: TgLink
+) -> None:
+    progress = await started(session, user)
+    await run(session, user, link, nudge(), nudge())
+    later = NOON + timedelta(days=2)
+    assert await scheduling.silence(session, user.id, later) == 1
+
+    progress.last_seen = NOON + timedelta(hours=2)
+    await session.commit()
+    assert await scheduling.silence(session, user.id, later) == 0
+
+    progress.last_seen = NOON - timedelta(days=1)
+    [row] = await sent_nudges(session, user)
+    row.payload = {**row.payload, nudges.QUICK: True}
+    await session.commit()
+    assert await scheduling.silence(session, user.id, later) == 0
+
+
+async def test_a_lesson_nudged_in_the_last_three_days_is_not_nudged_again(
+    session: AsyncSession, user: User, link: TgLink, bot: Bot
+) -> None:
+    """However the backoff stands: an ignored nudge must not become the same
+    nudge every day."""
+    await started(session, user)
+    await run(session, user, link, nudge(), nudge())
+
+    again = await run(session, user, link, nudge(), at=NOON + timedelta(days=2))
+
+    assert said(again) == [
+        f"Not sent: a nudge on {LESSON} went out in the last 3 days; another "
+        "lesson, or nothing, goes first."
+    ]
+    assert len(bot.sent) == 1

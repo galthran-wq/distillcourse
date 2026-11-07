@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -13,6 +13,7 @@ from app.harness.usage import COST_USD
 from app.models import (
     BackgroundRun,
     CardDelivery,
+    Document,
     Message,
     ReviewCard,
     ReviewState,
@@ -170,13 +171,30 @@ async def test_when_every_card_is_rejected_nothing_is_sent_and_the_review_waits_
     assert bot.sent == []
 
 
+async def test_a_card_outlives_a_change_to_its_sections_metadata(
+    session: AsyncSession, user: User
+) -> None:
+    """A reindex that only restates the metadata — a word count, a lab's
+    hours — leaves the words a card stands on as they were."""
+    card = await stored_card(session)
+    await session.execute(
+        update(Document).values(meta={"word_count": 8}, content_hash="d" * 64)
+    )
+    await session.commit()
+
+    with no_model():
+        picked = await cards.pick(session, user.id, LESSON, 1, datetime.now(UTC))
+
+    assert picked is not None and picked.id == card.id
+
+
 async def test_a_card_whose_section_changed_is_not_served(
     session: AsyncSession, user: User
 ) -> None:
     stale = await stored_card(session, content_hash="b" * 64)
 
     with card_models():
-        picked = await cards.pick(session, user.id, LESSON, 1)
+        picked = await cards.pick(session, user.id, LESSON, 1, datetime.now(UTC))
 
     assert picked is not None
     assert picked.id != stale.id
@@ -190,7 +208,7 @@ async def test_a_card_seen_in_the_last_14_days_is_not_sent_again(
     await sent_before(session, user, card, cards.UNSEEN_FOR - timedelta(days=1))
 
     with card_models():
-        picked = await cards.pick(session, user.id, LESSON, 1)
+        picked = await cards.pick(session, user.id, LESSON, 1, datetime.now(UTC))
 
     assert picked is not None
     assert picked.id != card.id
@@ -203,7 +221,7 @@ async def test_a_card_seen_long_ago_is_served_again_for_free(
     await sent_before(session, user, card, cards.UNSEEN_FOR + timedelta(days=1))
 
     with no_model():
-        picked = await cards.pick(session, user.id, LESSON, 1)
+        picked = await cards.pick(session, user.id, LESSON, 1, datetime.now(UTC))
 
     assert picked is not None
     assert picked.id == card.id
@@ -216,7 +234,7 @@ async def test_cards_are_shared_unless_aimed_at_one_learner(
     theirs = await stored_card(session, prompt="Theirs: ____", owner=other_user)
 
     with no_model():
-        picked = await cards.pick(session, user.id, LESSON, 1)
+        picked = await cards.pick(session, user.id, LESSON, 1, datetime.now(UTC))
     with card_models():
         aimed = await cards.write(
             session, user.id, LESSON, 1, focus="reads entropy as a maximum"
