@@ -341,6 +341,13 @@ only by someone who already knows the material.
   numbered `<Exercise>` blocks, each containing a collapsible `<Solution>` —
   textbook style, no interactive grading. Retrieval practice happens by
   solving, not by clicking.
+
+  *Note — the Telegram bot's review cards are not lessons.* They are tap
+  questions about a finished lesson's main points, and they follow
+  `apps/backend/app/harness/prompts/review.md`, which allows recognition and
+  a streak on the card itself. E1 is unchanged for lessons: no clicking, no
+  streaks on the site. The register rules (L9) govern card text as they
+  govern everything else.
 - **E2 — Production in the discipline's method.** Most exercises require
   producing something, and what counts as production is the DISCIPLINE'S
   method, per the domain overlay: in mathematics — computation, strategy
