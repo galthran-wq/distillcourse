@@ -488,7 +488,7 @@ async def test_explain_runs_the_tutor_on_the_card_and_the_choice(
 
     assert card.prompt in explained
     assert "tapped 'maximum': wrong" in explained
-    assert "Right answer: average" in explained
+    assert "Right answer: 'average'" in explained
     assert bot.sent == []
 
 
