@@ -10,7 +10,7 @@ import logfire
 from pydantic_ai.messages import ModelRequest, UserPromptPart
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.coach import wake
+from app.coach import note, wake
 from app.harness import runner
 from app.harness.limits import LimitExceeded, check_run_allowed
 from app.harness.prompts import ContextBlock
@@ -209,6 +209,7 @@ TAP_HANDLERS: dict[str, Callable[[Outbox, Tap], Awaitable[None]]] = {
     cards.HARDER: controls.harder,
     cards.EXPLAIN: controls.explain,
     cards.OWN_WORDS: controls.own_words,
+    note.SEND_IT: note.send_it,
 }
 
 

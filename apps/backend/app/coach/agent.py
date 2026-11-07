@@ -2,7 +2,7 @@
 one learner now, and when to look again.
 
 Not a tutor run. It is handed a summary (`state.py`) rather than the thread,
-its only way to reach the learner is a send tool, and what it returns is when
+its only ways to reach the learner are send tools, and what it returns is when
 to check next — never text to deliver. Staying silent is a run that called no
 send tool, which is the outcome a run starts from.
 """
@@ -15,7 +15,7 @@ from pydantic_ai.usage import RunUsage, UsageLimits
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.coach import state
-from app.coach.tools import send_card
+from app.coach.tools import send_card, send_weekly_note
 from app.coach.wake import KIND
 from app.core.config import settings
 from app.harness.agent import model_for
@@ -65,6 +65,7 @@ coach = Agent(
             read_memory,
             save_memory,
             send_card,
+            send_weekly_note,
         )
     ],
 )

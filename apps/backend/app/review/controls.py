@@ -194,6 +194,17 @@ async def wrong_card(outbox: Outbox, tap: Tap) -> None:
     )
 
 
+async def capped(session: AsyncSession, user_id: uuid.UUID, now: datetime) -> bool:
+    """Whether the day's cards are spent, those the learner asked for
+    included: what bounds a button that sends one."""
+    user = await session.get(User, user_id)
+    assert user is not None
+    since = policy.day_start(now, policy.Hours.of(user))
+    return await repository.cards_today(session, user_id, since) >= (
+        settings.CARDS_PER_DAY
+    )
+
+
 async def next_card(outbox: Outbox, tap: Tap) -> None:
     """The next due card, now. The learner asked, so it spends no initiation;
     the day's cap is what bounds it."""
@@ -203,13 +214,8 @@ async def next_card(outbox: Outbox, tap: Tap) -> None:
     sent, card = found
     session, user_id = outbox.session, outbox.link.user_id
     now = datetime.now(UTC)
-    user = await session.get(User, user_id)
-    assert user is not None
     async with _pressing(outbox, sent, card, cards.NEXT):
-        since = policy.day_start(now, policy.Hours.of(user))
-        if await repository.cards_today(session, user_id, since) >= (
-            settings.CARDS_PER_DAY
-        ):
+        if await capped(session, user_id, now):
             await outbox.send(TODAYS)
             return
         async with thread.typing(outbox.link.tg_chat_id):

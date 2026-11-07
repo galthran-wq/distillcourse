@@ -29,8 +29,9 @@ today), stated once in `scheduling/gates.py` — lives in
 coach in `apps/backend/app/coach/` — a pydantic-ai agent of its own
 (`COACH_MODEL`), not a tutor run, handed a summary built by code
 (`state.py`) and never the thread, reaching the learner only through send
-tools (`send_card`; no free-text tool) that return the gates' refusal as a
-sentence, returning only when to look next; one live `schedules` row of kind
+tools (`send_card`, and `send_weekly_note`, `note.py`, whose numbers code
+writes and only its next step the model; no free-text tool) that return the
+gates' refusal as a sentence, returning only when to look next; one live `schedules` row of kind
 `coach` per linked learner is when it looks (`wake.py`: its own
 `next_check_at` clamped to 4 h – 7 d, pulled to an hour out by a lesson
 finished or a return after a week away), and a silent week ends in a card
@@ -48,7 +49,9 @@ what the tutor remembers about a learner across every chat and medium in
 `apps/backend/app/memory/`, the spaced-repetition ladder — advice the coach
 reads, never a queue of its own — in `apps/backend/app/review/` — a review is a tap
 card, written on first need by a toolless writer and kept only if a second
-toolless check passes it, graded by code with no model, its spend in
+toolless check passes it, graded by code with no model, its first line
+carrying the streak derived from `card_deliveries` (`streak.py`; shown there
+only, and nothing is ever sent about it), its spend in
 `background_runs` beside `messages.usage` under the monthly ceiling, and the
 rules it follows in `prompts/review.md` (pedagogy E1 governs lessons only) —
 and everything the lab API is — pairing and bearer tokens, the manifest a notebook reads,

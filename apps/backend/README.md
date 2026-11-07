@@ -478,7 +478,8 @@ saved under that prefix from any chat (`prompts/memory.md`), and binding.
 `send_card(lesson, level=None, focus=None)` — a tap card of a lesson they
 finished, at the ladder's level unless told otherwise; a `focus` has a card
 written at one confusion, for that learner alone (`owner_id`). There is no
-free-text send tool: "still waiting for your answer" cannot be said. Staying
+free-text send tool: "still waiting for your answer" cannot be said.
+`send_weekly_note(next_step)` is the other send tool (`note.py`, below). Staying
 silent is a run that calls no send tool, and no answer text is ever
 delivered. What it returns is a `Decision`: `next_check_at`, on the learner's
 clock, and a one-line `reason` handed to the next run. A run is limited to 8
@@ -507,6 +508,19 @@ none — and a run ends silent, code sends one anyway, chosen with no model: the
 lesson finished most recently whose ladder is due and had no card in three
 days, at its level, with a card the learner has not seen in two weeks. The
 gates hold for it too. The bot does not get to give up on a learner.
+
+**The weekly note** (`note.py`, `coach_notes`): one line per course with
+`holding/total` — ladders at step 2 or above whose last outcome is not
+`failed` — then `Slipping:` with up to three lessons whose last outcome is
+`failed` or whose last tap was wrong, then `Next:` and the model's
+`next_step` (at most 200 characters, the only text it writes). Under it, a
+*Send it* button (`s:<note_id>`, spent once) that puts a card on the lesson
+slipping most lately — a card the learner asked for, bounded by
+`CARDS_PER_DAY` — or, with nothing slipping, a link to the lesson read last
+and left unfinished. It is a tool, not a timer: the state block says whether
+one is available and what code would write in it, and the run decides. It is
+refused within 7 days of the last, without a tap answered in the last 14, and
+by the gates; once sent it counts in `initiations_today`.
 
 ## Spaced repetition
 
@@ -570,6 +584,13 @@ answer, the explanation and a link to the section — no model is asked. A card
 answered once is answered: a second tap changes nothing. A card nobody taps
 in a day is `ignored`, and the ladder does not move; the backoff is what
 answers silence.
+
+**The streak** (`streak.py`) is the first line of a card and of its feedback,
+`Day 5 · <lesson title>`, from its second day: consecutive days on the
+learner's calendar with a tap answered right or wrong (a skip is not an
+answer), one missed day forgiven, two in a row ending it. It is derived from
+`card_deliveries` each time the line is written, never stored, and shown
+nowhere else — nothing is sent when it grows or when it ends.
 
 An **`order` card** (level 3, only for a lesson with a sequence its text
 forces) lists three to five steps numbered under the prompt, in an order code

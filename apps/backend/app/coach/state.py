@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.coach import note
 from app.harness.prompts import ContextBlock, render
 from app.harness.title import transcript
 from app.memory import repository as memory
@@ -108,7 +109,7 @@ async def _answer_hours(
     taps = await session.scalars(
         select(CardDelivery.answered_at).where(
             CardDelivery.user_id == user.id,
-            CardDelivery.outcome.in_(("correct", "wrong")),
+            CardDelivery.outcome.in_(review.ANSWERED),
             CardDelivery.answered_at >= since,
         )
     )
@@ -235,6 +236,7 @@ async def block(session: AsyncSession, user: User, row: Schedule, now: datetime)
         await _deliveries(session, user, hours),
         await _answer_hours(session, user, now, hours),
         await _due(session, user, now, hours),
+        await note.block(session, user.id, now),
         *await _memories(session, user),
         await _reading(session, user, hours),
         await _messages(session, user),
