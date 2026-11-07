@@ -21,9 +21,21 @@ routes), SQLAlchemy 2.0 typed models — never SQLModel, never a sync session.
 what CI runs. Migrations are explicit and always reversible — autogenerate is
 a draft to rewrite, never the artefact. `apps/backend/README.md` is the guide.
 
-The tutor harness lives in `apps/backend/app/harness/`; everything about
-messages the platform starts by itself — the poller process, quiet hours, the
-open card, the silence backoff — lives in `apps/backend/app/scheduling/`, the Telegram channel
+The tutor harness lives in `apps/backend/app/harness/`; the queue of what the
+platform does on its own — the poller process, reminders, and the limits on
+what it may start (quiet hours, one message a day, the silence backoff, Not
+today), stated once in `scheduling/gates.py` — lives in
+`apps/backend/app/scheduling/`; what the bot sends and when is decided by the
+coach in `apps/backend/app/coach/` — a pydantic-ai agent of its own
+(`COACH_MODEL`), not a tutor run, handed a summary built by code
+(`state.py`) and never the thread, reaching the learner only through send
+tools (`send_card`; no free-text tool) that return the gates' refusal as a
+sentence, returning only when to look next; one live `schedules` row of kind
+`coach` per linked learner is when it looks (`wake.py`: its own
+`next_check_at` clamped to 4 h – 7 d, pulled to an hour out by a lesson
+finished or a return after a week away), and a silent week ends in a card
+chosen by code (`floor.py`); `bot-*` memories are the learner's binding
+instructions to it — the Telegram channel
 it delivers over — webhook, pairing, sending, voice notes transcribed to text
 (`speech.py`, `TRANSCRIPTION_MODEL`; the audio is never stored), and the
 images it sends: a lesson figure from the index's `metadata.figures` (an SVG
@@ -33,8 +45,8 @@ Sans lacks) and a formula typeset by matplotlib's mathtext
 (`formula.py`), as tools only a run with an outbox is given and as cards — in
 `apps/backend/app/telegram/`,
 what the tutor remembers about a learner across every chat and medium in
-`apps/backend/app/memory/`, the spaced-repetition ladder those proactive
-messages are mostly made of in `apps/backend/app/review/` — a review is a tap
+`apps/backend/app/memory/`, the spaced-repetition ladder — advice the coach
+reads, never a queue of its own — in `apps/backend/app/review/` — a review is a tap
 card, written on first need by a toolless writer and kept only if a second
 toolless check passes it, graded by code with no model, its spend in
 `background_runs` beside `messages.usage` under the monthly ceiling, and the
