@@ -77,6 +77,12 @@ def upgrade() -> None:
     op.create_index(
         "ix_card_deliveries_user_sent", "card_deliveries", ["user_id", "sent_at"]
     )
+    op.create_index(
+        "ix_card_deliveries_open",
+        "card_deliveries",
+        ["sent_at"],
+        postgresql_where=sa.text("outcome IS NULL"),
+    )
     op.add_column(
         "review_state",
         sa.Column("level", sa.SmallInteger(), server_default="1", nullable=False),
@@ -114,6 +120,7 @@ def downgrade() -> None:
     op.drop_table("background_runs")
     op.drop_column("review_state", "level_run")
     op.drop_column("review_state", "level")
+    op.drop_index("ix_card_deliveries_open", table_name="card_deliveries")
     op.drop_index("ix_card_deliveries_user_sent", table_name="card_deliveries")
     op.drop_table("card_deliveries")
     op.drop_index("ix_review_cards_lesson_level", table_name="review_cards")

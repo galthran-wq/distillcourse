@@ -33,9 +33,9 @@ class User(Base):
     __tablename__ = "users"
     # The waking window is same-day: `opens <= t < closes`, so it must open
     # before it closes and 18:00–02:00 cannot be expressed. Everything that
-    # counts waking hours reads it as one interval inside a date — the slot
-    # timeout that carries over the night, the budget that resets at local
-    # midnight — and wrapping the window is a change to all of that rather than
+    # counts waking hours reads it as one interval inside a date — the budget
+    # that resets at local midnight, the morning a deferred row opens on — and
+    # wrapping the window is a change to all of that rather than
     # to this constraint. The settings page says so where a learner sets it.
     __table_args__ = (
         CheckConstraint("quiet_start < quiet_end", name="ck_users_quiet_hours"),
@@ -283,11 +283,11 @@ class Incident(Base):
 class Schedule(Base):
     """One thing the platform intends to say to a learner on its own.
 
-    `due_at` is when the row next needs attention and its status says what
-    that attention is: a `pending` row fires, an `awaiting_reply` row counts
-    as ignored. `payload` carries `note` — what the message is about, in
-    words the run is given — and `topic`, the course or subject the rotation
-    steers away from after an ignored message.
+    `due_at` is when a `pending` or `deferred` row next fires; `done`,
+    `cancelled` and `failed` are where it ends. `payload` carries `note` for a
+    reminder — what the message is about, in words the run is given — and
+    `lesson` and `completed_at` for a review, the lesson its card is drawn from
+    and when the learner finished it, which orders what is due.
     """
 
     __tablename__ = "schedules"
@@ -311,8 +311,9 @@ class Schedule(Base):
     )
     created_by: Mapped[str] = mapped_column(String(8))
     attempts: Mapped[int] = mapped_column(default=0)
-    # How a delivered message ended. Kept because the engagement machine that
-    # reads it is designed from real ignore data, not guessed at now.
+    # Historical: how a delivered message ended under the old slot model.
+    # Nothing writes it now; whether a card was ignored is
+    # `card_deliveries.outcome`.
     outcome: Mapped[str | None] = mapped_column(String(16), default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -403,7 +404,16 @@ class CardDelivery(Base):
     """
 
     __tablename__ = "card_deliveries"
-    __table_args__ = (Index("ix_card_deliveries_user_sent", "user_id", "sent_at"),)
+    __table_args__ = (
+        Index("ix_card_deliveries_user_sent", "user_id", "sent_at"),
+        # What `expire` scans every cycle: the open deliveries, a small set in a
+        # table that is never pruned.
+        Index(
+            "ix_card_deliveries_open",
+            "sent_at",
+            postgresql_where=text("outcome IS NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid7)
     user_id: Mapped[uuid.UUID] = mapped_column(

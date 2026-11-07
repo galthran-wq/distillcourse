@@ -50,7 +50,7 @@ async def _initiations_allowed(
 ) -> list[Schedule]:
     """What the platform may say on its own account, of what is due.
 
-    The slot, the daily budget and the silence backoff govern messages the
+    The open card, the daily budget and the silence backoff govern messages the
     platform starts. A reminder is the learner's own appointment, set for a
     time they named, so none of them holds it back ("remind me on Friday"
     arrives on Friday). It is still a message: delivering one spends the day's
@@ -169,10 +169,13 @@ async def _fire(
         if later:
             await repository.defer(session, later, due_at=now)
         return
-    # Only now, with the message out: a run that never happened must not spend
-    # the overflow's day.
+    # Only now, with a message out: a run that never happened, or reviews of
+    # which no card went out, must not spend the overflow's day.
     if later:
-        await repository.defer(session, later, due_at=policy.tomorrow_open(now, hours))
+        sent = bool(reminders) or len(unsent) < len(reviews)
+        await repository.defer(
+            session, later, due_at=policy.tomorrow_open(now, hours) if sent else now
+        )
     # A review with no card to send is put off on its ladder rather than in
     # the queue: a row held for a day would be released by the learner's next
     # message, and every release would pay for another batch nobody keeps.

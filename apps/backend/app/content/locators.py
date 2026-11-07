@@ -1,5 +1,7 @@
 import re
 
+from app.core.config import settings
+
 # One bound on a slug for the whole service: the grammar below, the path
 # parameters of the lesson routes and `documents.course_slug` are all this
 # number, so a course cannot be ratable while being too long to index.
@@ -61,3 +63,11 @@ def course_of(locator: str) -> str:
 def path_of(locator: str) -> str:
     """Everything after the corpus: `<course>/<slug>[#<anchor>]` for a lesson."""
     return locator.partition(":")[2]
+
+
+def lesson_url(locator: str) -> str:
+    """A lesson locator, with or without its anchor, as the page on the site.
+    The one place the site's lesson route is spelled out here."""
+    lesson, hash_, anchor = path_of(locator).partition("#")
+    course, _, slug = lesson.partition("/")
+    return f"{settings.FRONTEND_HOST}/courses/{course}/lessons/{slug}{hash_}{anchor}"

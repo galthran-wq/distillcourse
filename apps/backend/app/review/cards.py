@@ -13,13 +13,11 @@ from datetime import UTC, datetime, timedelta
 from html import escape
 from typing import TYPE_CHECKING
 
-import logfire
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.content.locators import path_of
-from app.content.search import sections
-from app.core.config import settings
+from app.content.locators import lesson_url
+from app.content.search import section_of, sections
 from app.models import CardDelivery, ReviewCard
 from app.review import repository, subject, writer
 from app.scheduling import policy
@@ -65,9 +63,13 @@ async def write(
         return []
     material = (await subject.materials(session, [lesson]))[lesson]
     by_anchor = {section.anchor or "": section for section in found}
+    # The batch size is the prompt's to ask for and the code's to hold to: a
+    # writer that returns more would have them all checked and stored.
     drafts = [
         card
-        for card in await writer.draft(session, user_id, material, found, level, focus)
+        for card in (
+            await writer.draft(session, user_id, material, found, level, focus)
+        )[: writer.BATCH]
         if card.kind in writer.KINDS[level] and card.section in by_anchor
     ]
     kept = (
@@ -88,10 +90,6 @@ async def write(
         )
         for card in kept
     ]
-    if not cards:
-        logfire.warn(
-            "no card of a batch survived the check", lesson=lesson, level=level
-        )
     session.add_all(cards)
     await session.commit()
     return cards
@@ -174,6 +172,10 @@ async def deliver(
     return delivery
 
 
+def _locator(card: ReviewCard) -> str:
+    return card.lesson if card.anchor is None else f"{card.lesson}#{card.anchor}"
+
+
 def _feedback(
     title: str, section: str, card: ReviewCard, outcome: repository.Tapped
 ) -> str:
@@ -181,10 +183,7 @@ def _feedback(
     answer = (
         f"line {right}" if card.kind == "spot_error" else escape(right, quote=False)
     )
-    course, _, slug = path_of(card.lesson).partition("/")
-    link = f"{settings.FRONTEND_HOST}/courses/{course}/lessons/{slug}"
-    if card.anchor is not None:
-        link = f"{link}#{card.anchor}"
+    link = lesson_url(_locator(card))
     mark = RIGHT if outcome == "correct" else WRONG
     return (
         f"{_question(title, card)}\n\n{mark} {answer}. {escape(card.explanation, quote=False)} "
@@ -220,14 +219,8 @@ async def answer(outbox: Outbox, tap: Tap) -> None:
     await repository.grade(session, sent, card, outcome, chosen=option)
     await session.commit()
     title = (await subject.materials(session, [card.lesson]))[card.lesson].title
-    section = next(
-        (
-            chunk.title
-            for chunk in await _sections(session, card.lesson)
-            if chunk.anchor == card.anchor
-        ),
-        title,
-    )
+    chunk = section_of(await sections(session, card.lesson), _locator(card))
+    section = title if chunk is None else chunk.title
     await outbox.edit_text(sent.tg_message_id, _feedback(title, section, card, outcome))
 
 

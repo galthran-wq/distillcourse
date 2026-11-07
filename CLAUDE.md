@@ -42,7 +42,8 @@ is the no-browser fallback, and a `DISTILL_TOKEN` env var or Colab Secret
 outranks both. Its one kind no comparison can answer, a `review`
 checkpoint, is decided by a single toolless model call (`app/labs/judge.py`)
 that borrows the harness's plumbing — the model, the usage row and the monthly
-ceiling, which sums `lab_submissions.usage` alongside `messages.usage`.
+ceiling, which sums `lab_submissions.usage` and `background_runs.usage`
+alongside `messages.usage`.
 `distill.ask(text, *objects)` is the tutor itself, not a second agent: the
 web chat's stream path (`runner.start_stream`) in a chat of kind `lab`
 (`chats.lab_lesson`), one per lab and kept on the server — a question naming

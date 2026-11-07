@@ -26,9 +26,6 @@ from app.telegram.outbox import Outbox
 # learner is told, because silence reads as a broken bot.
 RUN_WAIT_SECONDS = 5.0
 RUN_ATTEMPTS = 6
-# How far back the cards a message may be about reach: the day a card is open
-# for before it counts as ignored.
-LATE_ANSWER = policy.IGNORED_AFTER
 
 PAIR_FIRST = (
     "This chat is not connected to a distillcourse account. Sign in on the "
@@ -196,7 +193,7 @@ async def _open_reviews(
     """The cards this message may be about: a learner who writes "it's the
     second one" is answering a card, and the run is handed the ids it grades
     one by."""
-    sent = await cards.recent(repo.session, repo.user_id, now - LATE_ANSWER)
+    sent = await cards.recent(repo.session, repo.user_id, now - policy.IGNORED_AFTER)
     return await subject.open_block(repo.session, sent)
 
 

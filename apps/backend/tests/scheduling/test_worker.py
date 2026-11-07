@@ -487,6 +487,46 @@ async def test_a_failed_run_does_not_spend_the_overflows_day(
 
 
 @pytest.mark.usefixtures("thread")
+async def test_a_review_with_no_card_does_not_spend_the_overflows_day(
+    session: AsyncSession, user: User
+) -> None:
+    """The lesson finished last has no card to send, so nothing went out:
+    the review behind it is still due today rather than tomorrow morning."""
+    empty = await repository.create(
+        session,
+        user_id=user.id,
+        kind="review",
+        due_at=NOON - timedelta(minutes=1),
+        # A lesson the index does not hold has no section to write a card from.
+        payload={
+            "lesson": "lesson:information-theory/not-indexed",
+            "completed_at": (NOON - timedelta(days=1)).isoformat(),
+        },
+        created_by="system",
+    )
+    behind = await repository.create(
+        session,
+        user_id=user.id,
+        kind="review",
+        due_at=NOON - timedelta(minutes=1),
+        payload={
+            "lesson": LESSON,
+            "completed_at": (NOON - timedelta(days=5)).isoformat(),
+        },
+        created_by="system",
+    )
+
+    with replying():
+        await worker.cycle(session, NOON)
+
+    await session.refresh(empty)
+    await session.refresh(behind)
+    assert empty.status == "cancelled"
+    assert (behind.status, behind.due_at) == ("deferred", NOON)
+    assert await cards_sent(session, user) == []
+
+
+@pytest.mark.usefixtures("thread")
 async def test_a_muted_learner_is_left_alone(session: AsyncSession, user: User) -> None:
     """A mute is not a reschedule: the row is not claimed at all, so it keeps
     the time it was meant for."""
