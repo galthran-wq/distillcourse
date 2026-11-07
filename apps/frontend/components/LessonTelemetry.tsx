@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth/store";
+import { anchorIn } from "@/lib/lesson/position";
 import { ReadingTracker, beacon } from "@/lib/telemetry/tracker";
 import { watch } from "@/lib/telemetry/watch";
 
@@ -15,7 +16,7 @@ export default function LessonTelemetry({ lesson }: { lesson: string }) {
 
   useEffect(() => {
     if (status !== "signed-in") return;
-    return watch(new ReadingTracker(lesson, beacon));
+    return watch(new ReadingTracker(lesson, beacon), () => anchorIn(lesson));
   }, [lesson, status]);
 
   return null;

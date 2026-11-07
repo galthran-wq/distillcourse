@@ -414,12 +414,13 @@ to the model as a sentence:
   interval within a date, and wrapping it is a change to all of that, not to
   the constraint alone.
 - **One initiation a day** (`policy.DAILY_INITIATIONS`): the cards sent on the
-  platform's own account (`card_deliveries.initiated`) and the reminders
-  delivered, counted on the learner's calendar.
+  platform's own account (`card_deliveries.initiated`), the reading nudges
+  (`schedules` of kind `nudge`) and the reminders delivered, counted on the
+  learner's calendar.
 - **Silence backoff.** Silence is the number of `card_deliveries` that ended
   `ignored` since the learner's latest message in the Telegram thread or
-  latest answered card — derived, never stored. After the last card the
-  platform waits 1, 2, 4, then 7 days for silence 1, 2, 3, 4+, and keeps
+  latest answered card — derived, never stored. After the last card or nudge
+  the platform waits 1, 2, 4, then 7 days for silence 1, 2, 3, 4+, and keeps
   writing weekly from there until `/mute`. Anything the learner writes or taps
   resets it to zero.
 - **Not today.** `users.cards_paused_until` holds cards — never reminders —
@@ -463,12 +464,12 @@ engage — everything the bot starts is easy or interesting, or it stays silent
 thread: replaying hundreds of unanswered cards is what made the old bot talk
 about its own queue, and it is the costly part of a run. The summary carries
 the last run's reason and what woke this one, whether a card can go out now,
-days since the last answer and the silence count, the last ten cards with
-their outcomes, taps and messages by hour of day over 30 days, the due ladders
+days since the last answer and the silence count, the last ten cards and
+nudges with the cards' outcomes, taps and messages by hour of day over 30 days, the due ladders
 (the ten most recent and the ten longest overdue) with step, level and last
 outcome, the `review-*` memory descriptions, the `bot-*` memories in full, the
-lessons read last with how far they scrolled, and the learner's last three
-messages, fenced, for language and tone. A `bot-*` memory is what the learner
+lessons read last with how far they scrolled and, for an unfinished one, the
+section they stopped in, and the learner's last three messages, fenced, for language and tone. A `bot-*` memory is what the learner
 told the tutor about the bot itself — "only mornings", "less philosophy" —
 saved under that prefix from any chat (`prompts/memory.md`), and binding.
 
@@ -477,8 +478,20 @@ saved under that prefix from any chat (`prompts/memory.md`), and binding.
 `save_memory` (registered on it, not copied), and reach the learner with
 `send_card(lesson, level=None, focus=None)` — a tap card of a lesson they
 finished, at the ladder's level unless told otherwise; a `focus` has a card
-written at one confusion, for that learner alone (`owner_id`). There is no
-free-text send tool: "still waiting for your answer" cannot be said. Staying
+written at one confusion, for that learner alone (`owner_id`) — or with
+`send_nudge(kind, lesson, text, anchor=None)` (`nudges.py`), a message of at
+most 300 characters with a link into a lesson: `resume` for one started and
+not finished, linked to `last_anchor` unless told otherwise, with
+`[Continue]` and `[Quick check instead]`; `hook` for one not opened, a puzzle
+from its opening, with `[Read it]`. Its first call about a section sends
+nothing and hands the section's text back, so the message is written with it
+in view. A nudge is stored as the tutor's message in the thread, so a reply is
+read with it, and as a `schedules` row of kind `nudge`, born `done` with
+`due_at` the moment it went out: `callback_data` holds 64 bytes, which a
+lesson locator can outgrow, so Quick check carries the row's id. Quick check
+sends a level 1 card on the lesson, as the learner's own move — no
+initiation, the day's `CARDS_PER_DAY` its bound — and is spent once. There is
+no free-text send tool: "still waiting for your answer" cannot be said. Staying
 silent is a run that calls no send tool, and no answer text is ever
 delivered. What it returns is a `Decision`: `next_check_at`, on the learner's
 clock, and a one-line `reason` handed to the next run. A run is limited to 8
@@ -501,8 +514,8 @@ beyond it the row waits for tomorrow's open. A failed run goes through
 `repository.retry`; a spent monthly ceiling defers it to the next morning with
 nothing sent.
 
-**The weekly floor** (`floor.py`): when a week has passed with no card sent on
-the platform's own account — counted from pairing for a learner who has had
+**The weekly floor** (`floor.py`): when a week has passed with no card or
+nudge sent on the platform's own account — counted from pairing for a learner who has had
 none — and a run ends silent, code sends one anyway, chosen with no model: the
 lesson finished most recently whose ladder is due and had no card in three
 days, at its level, with a card the learner has not seen in two weeks. The
@@ -854,6 +867,14 @@ most the seconds that passed since this reader last flushed this lesson, and a
 beat that is not covered is not stored. The first flush has nothing to be
 measured against and is allowed one heartbeat's worth, below every threshold
 there is.
+
+A heartbeat may also carry `anchor`, the section the reader is in (the site
+reads it from the position store the table of contents highlights), under the
+index's anchor grammar; one outside it drops the beat like any unreadable
+event. `lesson_progress.last_anchor` is the anchor of the latest heartbeat
+that had one — a heartbeat rather than an event of its own, because it is sent
+only while the reader is attending, so it names where they stopped rather than
+where a tab was left. It is what a reading nudge links back to.
 
 The aggregate is a full recompute from the events of one (reader, lesson), not
 an increment: the projection cannot drift from the log, and
