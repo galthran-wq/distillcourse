@@ -57,6 +57,7 @@ class Sent:
     tg_chat_id: int
     text: str
     html: bool
+    keyboard: api.Keyboard | None = None
 
 
 @dataclass
@@ -69,15 +70,25 @@ class Bot:
     """
 
     sent: list[Sent] = field(default_factory=list)
+    answered: list[str] = field(default_factory=list)
     refuse: Exception | None = None
 
     async def send_message(
-        self, tg_chat_id: int, text: str, *, html: bool = True
-    ) -> None:
+        self,
+        tg_chat_id: int,
+        text: str,
+        *,
+        html: bool = True,
+        keyboard: api.Keyboard | None = None,
+    ) -> int:
         if self.refuse is not None:
             failure, self.refuse = self.refuse, None
             raise failure
-        self.sent.append(Sent(tg_chat_id, text, html))
+        self.sent.append(Sent(tg_chat_id, text, html, keyboard))
+        return len(self.sent)
+
+    async def answer_callback(self, callback_id: str, text: str | None = None) -> None:
+        self.answered.append(callback_id)
 
     @property
     def texts(self) -> list[str]:
@@ -89,6 +100,7 @@ def bot(monkeypatch: pytest.MonkeyPatch) -> Bot:
     """Nothing in the suite reaches api.telegram.org."""
     stub = Bot()
     monkeypatch.setattr(api, "send_message", stub.send_message)
+    monkeypatch.setattr(api, "answer_callback", stub.answer_callback)
     return stub
 
 

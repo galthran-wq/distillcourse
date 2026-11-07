@@ -57,11 +57,11 @@ app/
     worker.py        # the poller process + the daily housekeeping sweep
     tools.py         # reminder and mute tools, run by the tutor
   telegram/
-    api.py           # the Bot API client: sendMessage, setWebhook
+    api.py           # the Bot API client: messages, photos, edits, inline keyboards
     repository.py    # links, pairing codes, update dedup
-    outbox.py        # sending: length split, HTML fallback, blocked bot
+    outbox.py        # sending and editing: length split, HTML fallback, blocked bot
     thread.py        # the one thread and the run that speaks into it
-    updates.py       # one incoming message, end to end; bot commands
+    updates.py       # one incoming message or button press, end to end; bot commands
     tools.py         # send_message, run by the tutor
   labs/
     repository.py    # pairing codes and tokens; challenges, state, submissions
@@ -519,13 +519,26 @@ saying so — silence reads as a broken bot.
 
 Formatting is the tutor's job (`prompts/medium/telegram.md`): it writes
 Telegram HTML and keeps its own messages under the limit. The backend's two
-safety nets are for when it does not — a message Telegram will not parse is
-resent unformatted rather than dropped, and one over 4096 characters is split.
+safety nets are for when it does not — a message, caption or edit Telegram
+will not parse is resent unformatted rather than dropped, and a message over
+4096 characters is split.
 
 `/clear`, `/compact`, `/mute` and `/unmute` are bot commands, handled by the
 backend rather than by the model: `/clear` writes the marker that cuts the
 history, `/compact` is the same summarisation the site does, and the two mutes
 set `users.muted_until`.
+
+Buttons are inline keyboards, not quiz polls: a poll caps its explanation at
+200 characters and cannot be edited into feedback. A button's `callback_data`
+is `<prefix>:<payload>` (64 bytes at most, Telegram's limit), and a press
+arrives as a `callback_query` update — deduplicated by `update_id` like a
+message, private chats only — that is routed to `updates.TAP_HANDLERS` by its
+prefix. The press is answered (`answerCallbackQuery`) before anything else,
+since Telegram spins the button until it is, and a press nothing handles, or
+from a chat nobody paired, ends there; so does one from a group, which is
+answered and dropped. An edit that would change nothing — a
+double tap — is Telegram's 400 "message is not modified", and is not an error.
+Changing `allowed_updates` takes `python -m app.cli set-webhook <url>` again.
 
 A 403 from Telegram means the bot was blocked. The link goes to `broken`, and a
 broken link holds that learner's schedules exactly as a mute does — nothing is
