@@ -22,9 +22,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.content.locators import lesson_url
 from app.content.search import figure_url, figures, section_of, sections
+from app.core.clock import zone
 from app.harness.repository import HarnessRepository
-from app.models import CardDelivery, ReviewCard, ReviewState
-from app.review import ladder, repository, subject, writer
+from app.models import CardDelivery, ReviewCard, ReviewState, User
+from app.review import ladder, repository, streak, subject, writer
 from app.scheduling import policy
 from app.telegram import api, formula, thread
 from app.telegram.outbox import Outbox
@@ -246,11 +247,11 @@ def _sequence(steps: list[int]) -> str:
     return " → ".join(str(step + 1) for step in steps)
 
 
-def _question(title: str, card: ReviewCard, chosen: list[int] | None = None) -> str:
+def _question(head: str, card: ReviewCard, chosen: list[int] | None = None) -> str:
     """The card as the learner reads it. An `order` card's steps are numbered
     under the prompt, since its buttons hold only the numbers, followed by the
     order tapped so far."""
-    text = f"<b>{escape(title, quote=False)}</b>\n\n{card.prompt}"
+    text = f"<b>{escape(head, quote=False)}</b>\n\n{card.prompt}"
     if card.kind != "order":
         return text
     steps = "\n".join(
@@ -263,6 +264,18 @@ def _question(title: str, card: ReviewCard, chosen: list[int] | None = None) -> 
 
 async def title_of(session: AsyncSession, card: ReviewCard) -> str:
     return (await subject.materials(session, [card.lesson]))[card.lesson].title
+
+
+async def heading(session: AsyncSession, user_id: uuid.UUID, card: ReviewCard) -> str:
+    """The first line of a card and of its feedback, the one place the streak
+    is shown: read when the line is written, so the feedback on today's first
+    answer already counts it."""
+    user = await session.get(User, user_id)
+    assert user is not None
+    tz = zone(user.timezone)
+    days = streak.local_days(await repository.answer_times(session, user_id), tz)
+    count = streak.streak(days, datetime.now(tz).date())
+    return streak.line(count, await title_of(session, card))
 
 
 def skipped(title: str) -> str:
@@ -401,7 +414,7 @@ async def deliver(
     is what the feedback edits. None when Telegram would not take the card's
     image, which retires the card."""
     delivery_id = uuid.uuid7()
-    question = _question(await title_of(session, card), card)
+    question = _question(await heading(session, user_id, card), card)
     repo = HarnessRepository(session, user_id)
     async with thread.holding(repo, await thread.of(session, user_id)):
         message_id = await _send(
@@ -430,10 +443,12 @@ async def offer(
     now: datetime,
     *,
     focus: str | None = None,
+    asked: bool = False,
 ) -> CardDelivery | None:
-    """A card of this ladder's lesson sent on the platform's own account, or
-    None when there was none to send. Picked, or written when the learner has
-    seen every card there is; with a `focus`, written for them alone.
+    """A card of this ladder's lesson sent on the platform's own account —
+    or, `asked`, because the learner pressed for it — or None when there was
+    none to send. Picked, or written when the learner has seen every card
+    there is; with a `focus`, written for them alone.
 
     At the level asked for, else the ladder's own — and at level 1 whatever
     was asked while `level_one_only` holds.
@@ -449,7 +464,7 @@ async def offer(
         level = state.level
     if focus is not None:
         for card in await write(session, user_id, lesson, level, focus=focus):
-            sent = await deliver(session, outbox, user_id, card, initiated=True)
+            sent = await deliver(session, outbox, user_id, card, initiated=not asked)
             if sent is not None:
                 return sent
         return None
@@ -457,7 +472,7 @@ async def offer(
         picked = await pick(session, user_id, lesson, level)
         if picked is None:
             return None
-        sent = await deliver(session, outbox, user_id, picked, initiated=True)
+        sent = await deliver(session, outbox, user_id, picked, initiated=not asked)
         if sent is not None:
             return sent
     return None
@@ -482,7 +497,7 @@ async def replace(
     delivery_id = uuid.uuid7()
     await outbox.edit_text(
         sent.tg_message_id,
-        _question(await title_of(session, card), card),
+        _question(await heading(session, user_id, card), card),
         keyboard=_buttons(delivery_id, card, []),
     )
     return await _record(session, delivery_id, user_id, card, sent.tg_message_id)
@@ -505,14 +520,14 @@ def _right(card: ReviewCard) -> str:
     return f"line {right}" if card.kind == "spot_error" else escape(right, quote=False)
 
 
-def _feedback(title: str, section: str, sent: CardDelivery, card: ReviewCard) -> str:
+def _feedback(head: str, section: str, sent: CardDelivery, card: ReviewCard) -> str:
     link = lesson_url(locator(card))
     mark = RIGHT if sent.outcome == "correct" else WRONG
     chosen = None
     if card.kind == "order":
         assert isinstance(sent.chosen, list)
         chosen = sent.chosen
-    question = _question(title, card, chosen)
+    question = _question(head, card, chosen)
 
     def text(explanation: str) -> str:
         return (
@@ -566,16 +581,16 @@ async def _grade(
     outcome: repository.Tapped,
     chosen: int | list[int],
 ) -> None:
-    await repository.grade(outbox.session, sent, card, outcome, chosen=chosen)
-    await outbox.session.commit()
-    title = await title_of(outbox.session, card)
-    chunk = section_of(await sections(outbox.session, card.lesson), locator(card))
-    section = title if chunk is None else chunk.title
+    session = outbox.session
+    await repository.grade(session, sent, card, outcome, chosen=chosen)
+    await session.commit()
+    chunk = section_of(await sections(session, card.lesson), locator(card))
+    section = await title_of(session, card) if chunk is None else chunk.title
     await edit(
         outbox,
         sent.tg_message_id,
         card,
-        _feedback(title, section, sent, card),
+        _feedback(await heading(session, sent.user_id, card), section, sent, card),
         keyboard=follow_ups(sent, card),
     )
 
@@ -641,7 +656,7 @@ async def arrange(outbox: Outbox, tap: Tap) -> None:
         outbox,
         sent.tg_message_id,
         card,
-        _question(await title_of(outbox.session, card), card, chosen),
+        _question(await heading(outbox.session, sent.user_id, card), card, chosen),
         keyboard=_buttons(sent.id, card, chosen),
     )
 

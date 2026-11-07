@@ -34,6 +34,7 @@ OWN_WORDS = "m"
 ASKED = "asked"
 
 Tapped = Literal["correct", "wrong"]
+ANSWERED: tuple[Tapped, ...] = ("correct", "wrong")
 
 
 def _resting(now: datetime) -> Exists:
@@ -295,3 +296,14 @@ async def cards_today(
         )
     )
     return int(total or 0)
+
+
+async def answer_times(session: AsyncSession, user_id: uuid.UUID) -> Sequence[datetime]:
+    """When the learner answered a card with a tap, right or wrong: what the
+    streak is counted from. A skip is not an answer."""
+    moments = await session.scalars(
+        select(CardDelivery.answered_at).where(
+            CardDelivery.user_id == user_id, CardDelivery.outcome.in_(ANSWERED)
+        )
+    )
+    return [moment for moment in moments if moment is not None]
