@@ -1,10 +1,9 @@
 import asyncio
 import html
-import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 import logfire
@@ -16,8 +15,7 @@ from app.harness.limits import LimitExceeded, check_run_allowed
 from app.harness.prompts import ContextBlock
 from app.harness.repository import HarnessRepository
 from app.models import BackgroundRun, Chat, TgLink
-from app.review import repository as review
-from app.review import subject
+from app.review import cards, subject
 from app.scheduling import policy
 from app.scheduling import repository as scheduling
 from app.telegram import api, repository, speech, thread
@@ -29,10 +27,6 @@ from app.telegram.outbox import Outbox
 # learner is told, because silence reads as a broken bot.
 RUN_WAIT_SECONDS = 5.0
 RUN_ATTEMPTS = 6
-# How long after a review was sent an answer to it is still read as one. The
-# slot times out in four waking hours; a learner who comes back the next
-# morning is answering, not changing the subject.
-LATE_ANSWER = timedelta(days=1)
 
 PAIR_FIRST = (
     "This chat is not connected to a distillcourse account. Sign in on the "
@@ -166,21 +160,15 @@ async def dismiss(payload: dict[str, Any]) -> None:
 
 
 async def _clear(repo: HarnessRepository, chat: Chat) -> str:
-    # Under the claim runs take, because that is what serializes the thread: a
-    # marker written beside a run in flight is overtaken by that run's output,
-    # and the history it was meant to cut survives.
-    run_id = uuid.uuid4()
-    if not await repo.claim_run(chat, run_id):
-        raise runner.RunBusy
-    try:
+    # A marker written beside a run in flight is overtaken by that run's
+    # output, and the history it was meant to cut survives.
+    async with thread.holding(repo, chat):
         await repo.add_messages(
             chat,
             [ModelRequest(parts=[UserPromptPart(content=CLEARED)])],
             role="system",
             marker="clear",
         )
-    finally:
-        await repo.release_run(chat, run_id)
     return "Cleared. Nothing above this line reaches the tutor."
 
 
@@ -209,7 +197,9 @@ _COMMANDS: dict[str, Callable[[HarnessRepository, Chat], Awaitable[str]]] = {
 
 # Keyed by the `callback_data` prefix before the first ":". A handler is
 # called with the learner's outbox and the tap; the button is already answered.
-TAP_HANDLERS: dict[str, Callable[[Outbox, Tap], Awaitable[None]]] = {}
+TAP_HANDLERS: dict[str, Callable[[Outbox, Tap], Awaitable[None]]] = {
+    cards.TAP: cards.answer,
+}
 
 
 async def _pair(session: AsyncSession, update: Update, code: str) -> None:
@@ -234,14 +224,11 @@ async def _pair(session: AsyncSession, update: Update, code: str) -> None:
 async def _open_reviews(
     repo: HarnessRepository, now: datetime
 ) -> tuple[ContextBlock, ...]:
-    """Whatever review this message may be an answer to.
-
-    A learner who writes while a review of theirs is open must not leave it
-    hanging until it times out, and one who answers hours late is still
-    answering — so the run is handed both, with the ids it closes them by.
-    """
-    rows = await review.ungraded(repo.session, repo.user_id, now - LATE_ANSWER)
-    return await subject.open_block(repo.session, rows)
+    """The cards this message may be about: a learner who writes "it's the
+    second one" is answering a card, and the run is handed the ids it grades
+    one by."""
+    sent = await cards.recent(repo.session, repo.user_id, now - policy.IGNORED_AFTER)
+    return await subject.open_block(repo.session, sent)
 
 
 # A refresh under Telegram's ~5s display, so the bar never flickers off

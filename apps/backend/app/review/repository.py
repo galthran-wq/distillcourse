@@ -5,34 +5,44 @@ attempt at delivering it. Keeping the two apart is what makes the delivery
 layer disposable: a bug that loses, duplicates or cancels schedule rows is
 repaired by the next poller cycle, because the ladder is still standing.
 
-Transactions: the ladder moves — `start`, `apply`, `mark`, `cancel_deliveries`
-— flush and leave the commit to the caller, because recording one outcome is
-three of them and a crash between two would leave the ladder moved and the
-delivery ungraded, which the next `settle` would then settle a second time.
+Transactions: `start` and `move` flush and leave the commit to the caller,
+which records a graded card in the same transaction as the ladder it moves.
 `settle` and `materialize` are cycle steps and commit their own batch.
 """
 
 import uuid
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
+from typing import Literal
 
-from sqlalchemy import ColumnElement, and_, func, or_, select
+from sqlalchemy import ColumnElement, and_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.content.locators import course_of
-from app.models import ReviewState, Schedule, TgLink
+from app.models import (
+    CardDelivery,
+    LessonProgress,
+    ReviewCard,
+    ReviewState,
+    Schedule,
+    TgLink,
+)
 from app.review import ladder
-from app.review.ladder import Outcome, Rung, Settlement
+from app.review.ladder import Rung
 from app.scheduling import repository as scheduling
 
-# A delivery still on its way to the learner, or waiting for their answer.
-# While one exists the ladder is represented in the queue already.
-LIVE = (*scheduling.WAITING, "awaiting_reply")
-# What `settle` and the outcome tool write into a delivered row's payload: the
-# only record of whether that delivery has been accounted for.
+# A delivery still on its way to the learner. While one exists the ladder is
+# represented in the queue already.
+LIVE = scheduling.WAITING
+# What `settle` writes into a failed row's payload: the only record of whether
+# that row has been accounted for.
 OUTCOME = "outcome"
-GRADES = ("passed", "partial", "failed")
+# How long a lesson rests after a card of it was sent, answered or not. A
+# ladder an unanswered card left due must not come straight back as the next
+# message; another lesson, or nothing, goes first.
+REST = timedelta(days=3)
+
+Tapped = Literal["correct", "wrong"]
 
 
 def _about(lesson: object) -> ColumnElement[bool]:
@@ -82,24 +92,12 @@ async def state_of(
     return await session.get(ReviewState, (user_id, lesson))
 
 
-async def delivery(
-    session: AsyncSession, user_id: uuid.UUID, schedule_id: uuid.UUID
-) -> Schedule | None:
-    """One delivered review of this learner's, by the id its context quoted."""
-    row: Schedule | None = await session.scalar(
-        select(Schedule).where(
-            Schedule.id == schedule_id, Schedule.user_id == user_id, _of_a_ladder()
-        )
-    )
-    return row
-
-
-async def _move(
+async def move(
     session: AsyncSession,
     state: ReviewState,
     to: Rung,
     *,
-    outcome: Outcome | Settlement,
+    outcome: str,
     now: datetime,
 ) -> None:
     state.step = to.step
@@ -109,24 +107,70 @@ async def _move(
     await session.flush()
 
 
-async def apply(
-    session: AsyncSession,
-    user_id: uuid.UUID,
-    lesson: str,
-    outcome: Outcome,
-    now: datetime,
-) -> ReviewState | None:
-    """Move the ladder of one lesson, as the tutor graded it."""
+async def postpone(
+    session: AsyncSession, user_id: uuid.UUID, lesson: str, now: datetime
+) -> None:
+    """Move a ladder out of today without moving its rung: what was due could
+    not be put to the learner, for a reason that is ours."""
     state = await state_of(session, user_id, lesson)
+    if state is not None:
+        await move(
+            session,
+            state,
+            ladder.deferred(rung(state), now),
+            outcome="deferred",
+            now=now,
+        )
+
+
+async def delivery(
+    session: AsyncSession, user_id: uuid.UUID, delivery_id: uuid.UUID
+) -> tuple[CardDelivery, ReviewCard] | None:
+    """One card sent to this learner, locked: a tap and a written answer to
+    the same card, or two taps, must not both grade it."""
+    found = (
+        await session.execute(
+            select(CardDelivery, ReviewCard)
+            .join(ReviewCard, ReviewCard.id == CardDelivery.card_id)
+            .where(CardDelivery.id == delivery_id, CardDelivery.user_id == user_id)
+            .with_for_update(of=CardDelivery)
+        )
+    ).first()
+    return None if found is None else (found[0], found[1])
+
+
+async def grade(
+    session: AsyncSession,
+    sent: CardDelivery,
+    card: ReviewCard,
+    outcome: Tapped | ladder.Outcome,
+    *,
+    chosen: int | None = None,
+) -> ReviewState | None:
+    """Record what became of a card and move its ladder; the caller commits.
+
+    A tap moves the ladder no further than the card's level allows and moves
+    the level with it. A written answer, graded by the tutor, is recall rather
+    than recognition, so it moves the ladder as a review always did and leaves
+    the level alone.
+    """
+    now = datetime.now(UTC)
+    sent.answered_at = now
+    sent.chosen = chosen
+    sent.outcome = outcome
+    state = await state_of(session, sent.user_id, card.lesson)
     if state is None:
         return None
-    await _move(
-        session,
-        state,
-        ladder.advance(rung(state), outcome, now),
-        outcome=outcome,
-        now=now,
-    )
+    at = rung(state)
+    match outcome:
+        case "correct" | "wrong":
+            state.level, state.level_run = ladder.next_level(
+                state.level, state.level_run, outcome
+            )
+            to = ladder.after_card(at, card.level, outcome, now)
+        case _:
+            to = ladder.advance(at, outcome, now)
+    await move(session, state, to, outcome=outcome, now=now)
     return state
 
 
@@ -137,6 +181,8 @@ async def materialize(session: AsyncSession, now: datetime) -> Sequence[Schedule
     transport is that thread, and a row with nowhere to go would be cancelled
     on sight and made again every cycle for as long as they live. Pairing later
     needs no repair — the ladder is still there, and its rows appear next cycle.
+    Nor for a lesson that is resting (`REST`): its ladder stays due, and a row
+    appears once the rest is over.
     """
     reachable = (
         select(TgLink.user_id)
@@ -155,14 +201,33 @@ async def materialize(session: AsyncSession, now: datetime) -> Sequence[Schedule
         .correlate(ReviewState)
         .exists()
     )
-    states = (
-        await session.scalars(
-            select(ReviewState)
+    resting = (
+        select(CardDelivery.id)
+        .join(ReviewCard, ReviewCard.id == CardDelivery.card_id)
+        .where(
+            CardDelivery.user_id == ReviewState.user_id,
+            ReviewCard.lesson == ReviewState.lesson,
+            CardDelivery.sent_at > now - REST,
+        )
+        .correlate(ReviewState)
+        .exists()
+    )
+    found = (
+        await session.execute(
+            select(ReviewState, LessonProgress.completed_at)
+            .outerjoin(
+                LessonProgress,
+                and_(
+                    LessonProgress.user_id == ReviewState.user_id,
+                    LessonProgress.lesson == ReviewState.lesson,
+                ),
+            )
             .where(
                 ReviewState.next_due_at.is_not(None),
                 ReviewState.next_due_at <= now,
                 reachable,
                 ~queued,
+                ~resting,
             )
             # The lock discipline the poller claims with: a second worker skips
             # the ladders this one is materialising rather than delivering them
@@ -177,16 +242,15 @@ async def materialize(session: AsyncSession, now: datetime) -> Sequence[Schedule
             due_at=due_at,
             payload={
                 "lesson": state.lesson,
-                "note": f"a review of {state.lesson} is due",
-                # The topic is what the poller rotates away from after an
-                # ignored message; for a review that is its course.
-                "topic": course_of(state.lesson),
-                "step": state.step,
+                # What the poller ranks the due reviews of one learner by: the
+                # lesson finished last is the one they are likeliest to want.
+                # A lab's ladder has no reading behind it and ranks last.
+                "completed_at": None if completed is None else completed.isoformat(),
             },
             status="pending",
             created_by="system",
         )
-        for state in states
+        for state, completed in found
         if (due_at := state.next_due_at) is not None
     ]
     session.add_all(rows)
@@ -194,93 +258,27 @@ async def materialize(session: AsyncSession, now: datetime) -> Sequence[Schedule
     return rows
 
 
-async def mark(session: AsyncSession, row: Schedule, outcome: str) -> None:
-    # Reassigned rather than mutated: SQLAlchemy compares a JSONB attribute by
-    # identity, and a dict changed in place is not seen as changed at all.
-    row.payload = {**row.payload, OUTCOME: outcome}
-    await session.flush()
+async def settle(session: AsyncSession, now: datetime) -> None:
+    """Account for review rows that ran out of attempts.
 
-
-async def _reviews(
-    session: AsyncSession, *where: ColumnElement[bool]
-) -> Sequence[Schedule]:
-    return (
+    Nothing else does: left alone, the ladder stays due in the past, so
+    `materialize` queues the same review every cycle, forever. A failure of
+    ours is not evidence about the learner, so it is a deferral and the rung
+    does not move.
+    """
+    rows = (
         await session.scalars(
-            select(Schedule).where(_of_a_ladder(), *where).order_by(Schedule.claimed_at)
+            select(Schedule).where(
+                _of_a_ladder(),
+                Schedule.status == "failed",
+                # No key at all, so a row is accounted for exactly once.
+                ~Schedule.payload.has_key(OUTCOME),
+            )
         )
     ).all()
-
-
-async def settle(session: AsyncSession, now: datetime) -> None:
-    """Account for review sessions that are over and were never graded.
-
-    A session the learner never answered is an `ignored` rung. A session they
-    did answer, on the items the tutor did not report, is a deferral and
-    nothing more: what they said counted, and the rest is asked another day
-    rather than held against them. So is a delivery that never reached them at
-    all — nothing was learned about the learner from our own outage either.
-    """
-    for row in await _reviews(
-        session,
-        # No key at all, so a row is accounted for exactly once — unlike the
-        # predicate `ungraded` reads by, which lets a late answer overwrite a
-        # settlement that is already written.
-        ~Schedule.payload.has_key(OUTCOME),
-        or_(
-            and_(Schedule.status == "done", Schedule.outcome.is_not(None)),
-            # A delivery out of attempts is as over as one that timed out, and
-            # nothing else accounts for it: leave it and the ladder stays due in
-            # the past, so `materialize` queues the same review every cycle,
-            # forever.
-            Schedule.status == "failed",
-        ),
-    ):
-        state = await state_of(session, row.user_id, row.payload["lesson"])
-        settlement: Settlement = "ignored" if row.outcome == "ignored" else "deferred"
-        if state is not None:
-            to = (
-                ladder.advance(rung(state), "ignored", now)
-                if settlement == "ignored"
-                else ladder.deferred(rung(state), now)
-            )
-            await _move(session, state, to, outcome=settlement, now=now)
-        await mark(session, row, settlement)
+    for row in rows:
+        await postpone(session, row.user_id, row.payload["lesson"], now)
+        # Reassigned rather than mutated: SQLAlchemy compares a JSONB attribute
+        # by identity, and a dict changed in place is not seen as changed.
+        row.payload = {**row.payload, OUTCOME: "deferred"}
     await session.commit()
-
-
-async def ungraded(
-    session: AsyncSession, user_id: uuid.UUID, since: datetime
-) -> Sequence[Schedule]:
-    """The reviews this learner still owes an answer on.
-
-    The slot that is open, and the ones that closed recently: a learner who
-    answers an hour after we gave up is answering, and the tutor grades that
-    from the thread rather than telling them they are too late. An ignore or a
-    deferral is not a grade, so those rows are still here — the ladder is where
-    a late answer is applied, and an ignore left the rung exactly where it was.
-    """
-    return await _reviews(
-        session,
-        func.coalesce(Schedule.payload[OUTCOME].astext, "").notin_(GRADES),
-        Schedule.user_id == user_id,
-        Schedule.claimed_at >= since,
-        Schedule.status.in_(("awaiting_reply", "done")),
-    )
-
-
-async def cancel_deliveries(
-    session: AsyncSession, user_id: uuid.UUID, lesson: str
-) -> None:
-    """Drop what is queued for a lesson whose rung has just moved.
-
-    A late answer is graded against a review the ladder had already given up on
-    and put back in the queue; that queued copy asks about a rung the learner
-    is no longer on.
-    """
-    rows = await _reviews(
-        session,
-        Schedule.user_id == user_id,
-        _about(lesson),
-        Schedule.status.in_(scheduling.WAITING),
-    )
-    await scheduling.drop(session, rows)

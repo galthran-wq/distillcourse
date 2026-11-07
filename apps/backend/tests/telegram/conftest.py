@@ -86,3 +86,25 @@ def ears(monkeypatch: pytest.MonkeyPatch) -> Ears:
     monkeypatch.setattr(api, "download_file", stub.download_file)
     monkeypatch.setattr(speech, "transcribe", stub.transcribe)
     return stub
+
+
+def tap(
+    data: str,
+    *,
+    update_id: int = 1,
+    chat_type: str = "private",
+    callback_id: str = "cb-1",
+    message_id: int = 55,
+) -> dict[str, Any]:
+    return {
+        "update_id": update_id,
+        "callback_query": {
+            "id": callback_id,
+            "from": {"id": TG_CHAT_ID},
+            "message": {
+                "message_id": message_id,
+                "chat": {"id": TG_CHAT_ID, "type": chat_type},
+            },
+            "data": data,
+        },
+    }

@@ -12,12 +12,11 @@ from app.core.db import session_factory
 from app.core.observability import configure
 from app.harness import runner
 from app.harness.limits import LimitExceeded
-from app.harness.prompts import RunKind
 from app.harness.repository import HarnessRepository
 from app.labs import repository as labs
 from app.models import Schedule, User
+from app.review import cards
 from app.review import repository as review
-from app.review import subject
 from app.scheduling import policy, repository
 from app.telegram import api, thread
 from app.telegram import repository as telegram
@@ -33,10 +32,6 @@ BUSY_RETRY = timedelta(minutes=2)
 def _prompt(rows: Sequence[Schedule]) -> str:
     items = "\n".join(f"- {row.payload['note']}" for row in rows)
     return f"Open the thread. What is due now:\n{items}"
-
-
-def _run_kind(rows: Sequence[Schedule]) -> RunKind:
-    return "review" if any(row.kind == "review" for row in rows) else "proactive"
 
 
 def _split(
@@ -55,17 +50,17 @@ async def _initiations_allowed(
 ) -> list[Schedule]:
     """What the platform may say on its own account, of what is due.
 
-    The slot, the daily budget and the silence backoff govern messages the
+    The open card, the daily budget and the silence backoff govern messages the
     platform starts. A reminder is the learner's own appointment, set for a
     time they named, so none of them holds it back ("remind me on Friday"
     arrives on Friday). It is still a message: delivering one spends the day's
     budget for the reviews that come after it.
     """
     hours = policy.Hours.of(user)
-    deadline = await repository.open_slot_deadline(session, user.id)
+    deadline = await repository.open_card_deadline(session, user.id)
     if deadline is not None:
-        # One proactive message at a time: what else is due waits for the open
-        # one to be answered or to time out.
+        # One card at a time: what else is due waits for the open one to be
+        # answered or to go a day unanswered.
         await repository.defer(session, rows, due_at=deadline)
         return []
     spent = await repository.initiations_today(
@@ -140,19 +135,19 @@ async def _fire(
         await repository.drop(session, dropped)
         await session.commit()
         return
-    chat = await thread.of(session, user.id)
-    now_items, later = policy.session_items(
-        due, avoid=await repository.ignored_topic(session, user.id)
-    )
+    outbox = Outbox(session=session, link=link)
+    now_items, later = policy.session_items(due)
+    reminders, reviews = _split(now_items, "reminder")
     try:
-        await thread.converse(
-            HarnessRepository(session, user.id),
-            chat,
-            Outbox(session=session, link=link),
-            _prompt(now_items),
-            run_kind=_run_kind(now_items),
-            blocks=await subject.due_block(session, now_items),
-        )
+        if reminders:
+            await thread.converse(
+                HarnessRepository(session, user.id),
+                await thread.of(session, user.id),
+                outbox,
+                _prompt(reminders),
+                run_kind="proactive",
+            )
+        unsent = [row for row in reviews if not await _send_card(session, outbox, row)]
     except runner.RunBusy:
         await repository.defer(session, due, due_at=now + BUSY_RETRY)
         return
@@ -174,28 +169,50 @@ async def _fire(
         if later:
             await repository.defer(session, later, due_at=now)
         return
-    # Only now, with the message out: a run that never happened must not spend
-    # the overflow's day.
+    # Only now, with a message out: a run that never happened, or reviews of
+    # which no card went out, must not spend the overflow's day.
     if later:
-        await repository.defer(session, later, due_at=policy.tomorrow_open(now, hours))
-    # A reminder is over once it is delivered — nothing is waiting for an answer
-    # to it. Only what the platform asked of its own accord holds the slot open.
-    sent, initiations = _split(now_items, "reminder")
-    await repository.deliver(session, sent)
-    await repository.open_slot(
-        session, initiations, deadline=policy.slot_deadline(now, hours)
-    )
+        sent = bool(reminders) or len(unsent) < len(reviews)
+        await repository.defer(
+            session, later, due_at=policy.tomorrow_open(now, hours) if sent else now
+        )
+    # A review with no card to send is put off on its ladder rather than in
+    # the queue: a row held for a day would be released by the learner's next
+    # message, and every release would pay for another batch nobody keeps.
+    await repository.drop(session, unsent)
+    for row in unsent:
+        await review.postpone(session, row.user_id, row.payload["lesson"], now)
+    await repository.deliver(session, [row for row in now_items if row not in unsent])
+
+
+async def _send_card(session: AsyncSession, outbox: Outbox, row: Schedule) -> bool:
+    """Whether a card went out for this review. A card is picked, or written
+    when the learner has seen every card there is, at the level the ladder is
+    on."""
+    lesson: str = row.payload["lesson"]
+    state = await review.state_of(session, row.user_id, lesson)
+    level = 1 if state is None else state.level
+    card = await cards.pick(session, row.user_id, lesson, level)
+    if card is None:
+        logfire.warn(
+            "no card to send: the review is put off a day",
+            lesson=lesson,
+            level=level,
+        )
+        return False
+    repo = HarnessRepository(session, row.user_id)
+    async with thread.holding(repo, await thread.of(session, row.user_id)):
+        await cards.deliver(session, outbox, row.user_id, card)
+    return True
 
 
 async def cycle(session: AsyncSession, now: datetime) -> None:
     await repository.sweep_leases(session, now)
-    await repository.close_answered(session)
+    await cards.expire(session, now)
     await _release_on_reply(session, now)
-    await repository.expire_slots(session, now)
-    # The ladders read the sessions that just closed and then put what they owe
-    # into the queue, in that order: a review settled as ignored is due again
-    # from now, and its next delivery is made in this same cycle rather than
-    # thirty seconds later.
+    # The ladders account for the deliveries that failed and then put what
+    # they owe into the queue, in that order: a ladder put off a day must not
+    # be queued again in the same cycle.
     await review.settle(session, now)
     await review.materialize(session, now)
     batches: dict[uuid.UUID, list[Schedule]] = defaultdict(list)

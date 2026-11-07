@@ -19,11 +19,10 @@ QUOTE_SOURCE = "learner-quote"
 ATTACHMENT_SOURCE = "learner-attachment"
 
 Medium = Literal["web", "telegram", "notebook"]
-RunKind = Literal["chat", "review", "proactive", "compact"]
+RunKind = Literal["chat", "proactive", "compact"]
 
 _MODULES: dict[RunKind, tuple[str, ...]] = {
     "chat": ("memory.md", "courses.md"),
-    "review": ("memory.md", "courses.md", "review.md"),
     "proactive": ("memory.md", "courses.md", "proactive.md"),
     # A compaction returns memory candidates, so it is held to the same rules
     # about them as a dialogue is.

@@ -9,7 +9,7 @@ from app.telegram import api
 
 # Bound before the suite's autouse stub replaces them on the module: these
 # tests are of the real calls.
-from app.telegram.api import answer_callback, send_message
+from app.telegram.api import answer_callback, edit_message_text, send_message
 
 CALL = {"chat_id": 4242, "text": "entropy is the average surprisal"}
 
@@ -152,7 +152,7 @@ async def test_an_edit_replaces_text_and_buttons(
 ) -> None:
     posted = answering(monkeypatch, result={"message_id": 17})
 
-    await api.edit_message_text(4242, 17, "Right.", keyboard=KEYBOARD)
+    await edit_message_text(4242, 17, "Right.", keyboard=KEYBOARD)
 
     assert posted.method == "editMessageText"
     assert posted.json == {
@@ -184,7 +184,7 @@ async def test_unformatted_edits_and_captions_carry_no_parse_mode(
     """What the outbox falls back to when Telegram will not parse the HTML."""
     posted = answering(monkeypatch, result={"message_id": 17})
 
-    await api.edit_message_text(4242, 17, "<b>x", html=False)
+    await edit_message_text(4242, 17, "<b>x", html=False)
     assert posted.json == {"chat_id": 4242, "message_id": 17, "text": "<b>x"}
 
     await api.edit_message_caption(4242, 17, "<b>x", html=False)
@@ -279,7 +279,7 @@ async def test_an_edit_that_changes_nothing_is_not_an_error(
         "and reply markup are exactly the same",
     )
 
-    await api.edit_message_text(4242, 17, "Right.")
+    await edit_message_text(4242, 17, "Right.")
 
 
 async def test_callback_data_over_telegrams_limit_is_refused_before_sending(

@@ -1,0 +1,36 @@
+## Writing review cards
+
+You write a batch of review cards about one lesson. The lesson's text, the
+concepts it introduces and the concepts next to it in the course are below.
+Write only from that text: a card whose answer the text does not state is a
+wrong card, however true it is elsewhere.
+
+Each card:
+
+- tests one main point of one section, and names that section by the anchor
+  given beside it;
+- is of a kind the level allows, which the request names;
+- has a `prompt` of at most 900 characters in Telegram HTML — only `<b>`,
+  `<i>`, `<code>`; a literal `<`, `>` or `&` is `&lt;`, `&gt;`, `&amp;`. No
+  LaTeX: a formula is written in plain unicode (`H(X) = −Σ p log p`);
+- has two to four `options` of at most 40 characters of plain text, exactly
+  one of them right, and `answer`, the index of the right one counted from 0;
+- has an `explanation` of one or two sentences of plain text that says why
+  the right answer is right — the mechanism, not a restatement of the option.
+
+The kinds:
+
+- `gap` — a sentence stating the main point with the key term replaced by
+  `____`; the options are candidates for the gap.
+- `choice` — a direct question about the main point.
+- `tell_apart` — a case or a statement, and the question of which of two
+  confusable ideas it belongs to; the options name the ideas.
+- `spot_error` — an argument or derivation the prompt sets out in numbered
+  lines (`1.`, `2.`, …), exactly one of them wrong; the options are the line
+  numbers as `"1"`, `"2"`, …, and the explanation says what the wrong line
+  should have said.
+
+Wrong options are the confusions a reader of this lesson actually has — the
+neighbouring concept, the reversed direction, the dropped condition. The cards
+of one batch test different points. Never name the lesson's sources, an
+author or a book.
