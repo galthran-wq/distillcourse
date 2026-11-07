@@ -105,7 +105,10 @@ async def test_a_figure_card_is_a_photo_whose_caption_the_tap_answers_in(
         "entropy-as-average-surprise/average.svg"
     )
     assert photo.caption is not None and card.prompt in photo.caption
-    assert photo.keyboard is not None and len(photo.keyboard) == len(card.options)
+    assert photo.keyboard is not None
+    assert [row[0]["text"] for row in photo.keyboard][: len(card.options)] == (
+        card.options
+    )
     assert bot.sent == [] and bot.edited == []
     [(message_id, feedback)] = bot.captioned
     assert message_id == sent.tg_message_id
