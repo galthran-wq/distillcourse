@@ -81,6 +81,7 @@ app/
     ladder.py        # the intervals, the levels, and what an answer does to them
     repository.py    # review_state, the rows it materialises, grading a card
     cards.py         # pick, write on first need, send, grade a tap, expire
+    controls.py      # the other buttons under a card: skip, pause, flag, follow-ups
     writer.py        # the two toolless calls a batch costs: write, then check
     subject.py       # what a review is about: the lesson's concepts; the cards sent
     tools.py         # report_review_outcome, run by the tutor on a written answer
@@ -405,6 +406,8 @@ What reaches the learner is decided per user, in `policy.py`:
 - **What goes first.** Reminders, then the review of the lesson finished most
   recently (`payload.completed_at`; a lab's ladder, with no reading behind it,
   last).
+- **Not today.** `users.cards_paused_until` holds cards — reviews, never
+  reminders — until the next morning; set by a card's own button.
 - **Mute.** `users.muted_until` pauses everything the platform starts; the
   learner sets it in conversation (the tutor's mute tool), and answers to what
   they write are unaffected. A muted learner's rows are not claimed rather than
@@ -483,6 +486,34 @@ answer, the explanation and a link to the section — no model is asked. A card
 answered once is answered: a second tap changes nothing. A card nobody taps
 in a day is `ignored`, and the ladder does not move; the backoff is what
 answers silence.
+
+**The other buttons** (`controls.py`, `<prefix>:<delivery_id>`). Under an open
+card: *Another question* (`a`) marks it `skipped` and edits the message in
+place into a card one level lower on the same lesson, else one of the next due
+lesson, else "Nothing else for now" — from cards already written only, since
+the learner is waiting on a tap; level and ladder do not move. *Not today*
+(`n`) skips it, takes the buttons off and sets `users.cards_paused_until` to
+tomorrow's open — not `muted_until`, which would hold the learner's reminders
+too. *This card is wrong* (`w`) retires the card on the first report, files an
+`error` incident against its section (`HarnessRepository.file_incident`, on the
+thread chat) and then behaves as Another question. Under the feedback on a
+tapped card: *Next* (`x`) sends the next due card now — no initiation is spent,
+`CARDS_PER_DAY` bounds it; *Harder one* (`h`, absent at level 3) sends a card
+of the lesson a level up, written if none exists, and a right answer to it
+sets the level while a wrong one changes nothing (`card_deliveries.harder`);
+*Explain* (`e`) and *In my own words* (`m`) are `chat` runs on the thread with
+the card in their context. Own words are graded by `report_review_outcome` as
+recall: `passed` is a right answer at the level and climbs past `STEP_CAP`.
+Each feedback button is spent once (`card_deliveries.follow_ups`) and given
+back if what it started fails. A card sent out of turn cancels the poller's
+queued row for its lesson.
+
+Two harder cards (level 2+) skipped in a row, within seven days of each other
+and the later within seven days of now, mean only level 1 is served until
+then, whatever the ladder's level says — derived from `card_deliveries`
+(`repository.level_one_only`). When a new card goes out, any earlier card
+still open is edited to one line, `<lesson title> — skipped`, without buttons;
+an answered card is left as it is.
 
 **Levels are per lesson** (`review_state.level`, `level_run`). Level 1 is the
 main point itself, level 2 tells two ideas apart, level 3 spots the error in

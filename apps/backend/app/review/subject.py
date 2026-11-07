@@ -22,6 +22,7 @@ from app.content.structure import (
 )
 from app.harness import prompts
 from app.models import CardDelivery, ReviewCard
+from app.review.repository import ASKED, OWN_WORDS
 
 SENT = "Review cards sent in the last day"
 # The cards are graded by taps, which are not messages: a chat run sees only
@@ -115,7 +116,16 @@ def _status(delivery: CardDelivery, card: ReviewCard) -> str:
         return "not answered yet"
     if delivery.chosen is None:
         return f"graded {delivery.outcome}"
-    return f"tapped {card.options[delivery.chosen]!r}: {delivery.outcome}"
+    tapped = f"tapped {card.options[delivery.chosen]!r}: {delivery.outcome}"
+    own = delivery.follow_ups.get(OWN_WORDS)
+    if own is None:
+        return tapped
+    if own == ASKED:
+        return (
+            f"{tapped}; they asked to answer it in their own words, which is "
+            "not graded yet"
+        )
+    return f"{tapped}; their own words graded {own}"
 
 
 async def open_block(
