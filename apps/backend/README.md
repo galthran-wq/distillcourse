@@ -120,7 +120,7 @@ send an `Authorization` header — authenticates over the same cookie for free.
   attempt caps), the per-IP limit on signup and login, and the instance-wide
   `MONTHLY_COST_CEILING_USD` backed by a spend limit on the OpenRouter key.
 - `users.timezone` is read from the browser at signup and at every login,
-  because proactive messages are scheduled against the user's own clock.
+  because the coach and reminders are scheduled against the user's own clock.
 - Password reset and email verification do not exist; the operator resets a
   password from the CLI below.
 - Notebooks do not use the cookie. A lab page issues a 10-minute single-use
@@ -270,7 +270,8 @@ re-model the Telegram thread.
 Caps are enforcement, not telemetry: messages per user per day, an
 instance-wide monthly ceiling computed from the cost recorded on every run, on
 every judged lab submission and on every model call with no message to hang
-it on (`background_runs`: the card writer and checker, transcriptions), web
+it on (`background_runs`: the card writer and checker, transcriptions, coach
+runs), web
 searches per user per day, and memory
 writes per run. Set a spend limit on the OpenRouter key too — that one holds
 even if this code is wrong.

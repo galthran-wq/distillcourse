@@ -1,11 +1,9 @@
-from datetime import UTC, datetime, time, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from pydantic_ai.messages import ModelMessage, ModelResponse
 from pydantic_ai.models.function import AgentInfo, FunctionModel
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import User
 from tests.harness.conftest import call
 
 
@@ -35,19 +33,3 @@ def deciding(
         )
 
     return FunctionModel(turn)
-
-
-async def awake(session: AsyncSession, user: User) -> None:
-    """The whole day is waking hours, so that a send tool, which reads the
-    real clock rather than the test's, is never refused for the hour the
-    suite happens to run at."""
-    user.quiet_start, user.quiet_end = time(0), time(23, 59, 59)
-    await session.commit()
-
-
-async def asleep(session: AsyncSession, user: User) -> None:
-    """Waking hours that do not include the real clock's present hour."""
-    hour = datetime.now(UTC).hour
-    opens = (hour + 1) % 24 if hour < 23 else 1
-    user.quiet_start, user.quiet_end = time(opens), time(opens, 30)
-    await session.commit()

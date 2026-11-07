@@ -101,6 +101,21 @@ async def move(
     await session.flush()
 
 
+async def resting(
+    session: AsyncSession, user_id: uuid.UUID, lesson: str, now: datetime
+) -> bool:
+    """Whether a card of this lesson went to the learner within REST."""
+    found = await session.scalar(
+        select(
+            select(ReviewState.lesson)
+            .where(ReviewState.user_id == user_id, ReviewState.lesson == lesson)
+            .where(_resting(now))
+            .exists()
+        )
+    )
+    return bool(found)
+
+
 async def postpone(
     session: AsyncSession, user_id: uuid.UUID, lesson: str, now: datetime
 ) -> None:

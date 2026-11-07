@@ -40,8 +40,9 @@ RUN_REQUESTS = 8
 
 
 class Decision(BaseModel):
-    # On the learner's clock: what the run was asked for, and what it reads
-    # its state in.
+    # Wall-clock time on the learner's clock, which is what the run was asked
+    # for and reads its state in; any zone written on it is set aside
+    # (`wake.clamp`).
     next_check_at: datetime
     # One line, handed to the next run.
     reason: str
@@ -72,16 +73,21 @@ coach = Agent(
 async def decide(
     session: AsyncSession, user: User, outbox: Outbox, row: Schedule, now: datetime
 ) -> Decision:
-    """One run, charged to `background_runs` whether or not it decides: that
-    row is also what the daily run cap counts."""
+    """One run, charged to `background_runs` whether or not it decides —
+    including one that fails before the model is asked: that row is also what
+    the daily run cap counts."""
     await check_cost_ceiling(session)
-    repo = HarnessRepository(session, user.id)
-    deps = HarnessDeps(repo=repo, chat=await thread.of(session, user.id), outbox=outbox)
-    summary = await state.block(session, user, row, now)
-    # Nothing that waits on a model holds a pooled connection while it does.
-    await session.commit()
     usage = RunUsage()
     try:
+        deps = HarnessDeps(
+            repo=HarnessRepository(session, user.id),
+            chat=await thread.of(session, user.id),
+            outbox=outbox,
+            now=now,
+        )
+        summary = await state.block(session, user, row, now)
+        # Nothing that waits on a model holds a pooled connection while it does.
+        await session.commit()
         result = await coach.run(
             summary,
             model=model_for(settings.COACH_MODEL),

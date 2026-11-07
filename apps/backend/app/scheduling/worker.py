@@ -36,6 +36,28 @@ def _prompt(rows: Sequence[Schedule]) -> str:
     return f"Open the thread. What they asked to be reminded of now:\n{items}"
 
 
+async def _settle(
+    session: AsyncSession,
+    rows: Sequence[Schedule],
+    exc: Exception,
+    now: datetime,
+    hours: policy.Hours,
+) -> None:
+    """Rows whose run failed: held, or tried again, by what failed."""
+    match exc:
+        case LimitExceeded():
+            await repository.defer(
+                session, rows, due_at=policy.tomorrow_open(now, hours)
+            )
+        case api.BotBlocked():
+            # The link is marked broken, which keeps the poller off this
+            # learner until a message proves the channel is back; the rows
+            # keep their time, so that releases them at once.
+            await repository.defer(session, rows, due_at=now)
+        case _:
+            await repository.retry(session, rows, now=now, error=str(exc))
+
+
 async def _remind(
     session: AsyncSession, user: User, rows: list[Schedule], now: datetime
 ) -> None:
@@ -64,17 +86,8 @@ async def _remind(
     except runner.RunBusy:
         await repository.defer(session, rows, due_at=now + BUSY_RETRY)
         return
-    except LimitExceeded:
-        await repository.defer(session, rows, due_at=policy.tomorrow_open(now, hours))
-        return
-    except api.BotBlocked:
-        # The link is marked broken, which keeps the poller off this learner
-        # until a message proves the channel is back; the rows keep their
-        # time, so that releases them at once.
-        await repository.defer(session, rows, due_at=now)
-        return
     except Exception as exc:
-        await repository.retry(session, rows, now=now, error=str(exc))
+        await _settle(session, rows, exc, now, hours)
         return
     await repository.deliver(session, rows)
 
@@ -103,14 +116,8 @@ async def _coach(
         decision = await decide(session, user, outbox, row, now)
         if await floor.owed(session, link, now):
             await floor.send(session, outbox, user, now)
-    except LimitExceeded:
-        await repository.defer(session, [row], due_at=policy.tomorrow_open(now, hours))
-        return
-    except api.BotBlocked:
-        await repository.defer(session, [row], due_at=now)
-        return
     except Exception as exc:
-        await repository.retry(session, [row], now=now, error=str(exc))
+        await _settle(session, [row], exc, now, hours)
         return
     await wake.follow(
         session, row, wake.clamp(decision.next_check_at, now, hours), decision.reason

@@ -6,7 +6,13 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from httpx import AsyncClient
-from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    UserPromptPart,
+)
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +27,7 @@ from app.models import BackgroundRun, CardDelivery, Chat, Schedule, TgLink, User
 from app.scheduling import policy, worker
 from app.scheduling import repository as scheduling
 from app.telegram.outbox import Outbox
-from tests.coach.conftest import asleep, awake, deciding
+from tests.coach.conftest import deciding
 from tests.conftest import Bot, replying
 from tests.harness.conftest import calling, returns
 from tests.review.conftest import (  # noqa: F401  (a shared fixture)
@@ -71,12 +77,13 @@ async def run(
     link: TgLink,
     *sends: dict[str, object],
     asked: list[list[ModelMessage]] | None = None,
+    at: datetime = NOON,
 ) -> list[ModelMessage]:
     """One coach run on a fresh wake-up; what its last request was handed."""
     seen = [] if asked is None else asked
-    row = await wake_up(session, user, at=NOON)
+    row = await wake_up(session, user, at=at)
     with coach.override(model=deciding(*sends, asked=seen)):
-        await decide(session, user, Outbox(session=session, link=link), row, NOON)
+        await decide(session, user, Outbox(session=session, link=link), row, at)
     return seen[-1]
 
 
@@ -103,11 +110,19 @@ async def test_the_run_is_handed_a_summary_and_never_the_thread(
     link: TgLink,
     thread: Chat,  # noqa: F811
 ) -> None:
-    await HarnessRepository(session, user.id).add_messages(
+    repo = HarnessRepository(session, user.id)
+
+    def said(text: str) -> ModelRequest:
+        return ModelRequest(parts=[UserPromptPart(content=text)])
+
+    await repo.add_messages(thread, [said("a remark too old to pass")], role="user")
+    await repo.add_messages(
         thread,
-        [ModelRequest(parts=[UserPromptPart(content="a thread-only remark")])],
-        role="user",
+        [ModelResponse(parts=[TextPart(content="a tutor's reply")])],
+        role="agent",
     )
+    for remark in ("a thread-only remark", "a second", "a third"):
+        await repo.add_messages(thread, [said(remark)], role="user")
     await ladder(session, user)
     asked: list[list[ModelMessage]] = []
 
@@ -125,6 +140,9 @@ async def test_the_run_is_handed_a_summary_and_never_the_thread(
     # Their last messages are summarised for language and tone, fenced as
     # the learner's; nothing else of the thread is there.
     assert '<untrusted source="learner-messages">' in prompt.content
+    assert "a thread-only remark" in prompt.content
+    assert "a tutor's reply" not in prompt.content
+    assert "a remark too old to pass" not in prompt.content
 
 
 async def test_a_bot_memory_the_tutor_saved_is_in_the_next_summary(
@@ -165,7 +183,6 @@ async def test_every_run_is_charged_where_the_cap_counts_it(
 async def test_send_card_sends_one_card_at_the_lessons_level(
     session: AsyncSession, user: User, link: TgLink, bot: Bot
 ) -> None:
-    await awake(session, user)
     await stored_card(session)
     await ladder(session, user)
 
@@ -179,7 +196,6 @@ async def test_send_card_sends_one_card_at_the_lessons_level(
 async def test_a_second_card_the_same_day_is_refused(
     session: AsyncSession, user: User, link: TgLink, bot: Bot
 ) -> None:
-    await awake(session, user)
     await stored_card(session)
     await ladder(session, user)
 
@@ -192,7 +208,6 @@ async def test_a_second_card_the_same_day_is_refused(
 async def test_a_backoff_wait_is_refused(
     session: AsyncSession, user: User, link: TgLink, bot: Bot
 ) -> None:
-    await awake(session, user)
     await ladder(session, user)
     card = await stored_card(session, prompt="An old one: ____")
     session.add_all(
@@ -200,7 +215,7 @@ async def test_a_backoff_wait_is_refused(
             user_id=user.id,
             card_id=card.id,
             tg_message_id=1,
-            sent_at=datetime.now(UTC) - timedelta(days=days),
+            sent_at=NOON - timedelta(days=days),
             outcome="ignored",
             initiated=True,
         )
@@ -217,9 +232,8 @@ async def test_a_backoff_wait_is_refused(
 async def test_not_today_is_refused(
     session: AsyncSession, user: User, link: TgLink, bot: Bot
 ) -> None:
-    await awake(session, user)
     await ladder(session, user)
-    user.cards_paused_until = datetime.now(UTC) + timedelta(hours=10)
+    user.cards_paused_until = NOON + timedelta(hours=10)
     await session.commit()
 
     messages = await run(session, user, link, {"lesson": LESSON})
@@ -231,19 +245,44 @@ async def test_not_today_is_refused(
 async def test_outside_the_waking_hours_is_refused(
     session: AsyncSession, user: User, link: TgLink, bot: Bot
 ) -> None:
-    await asleep(session, user)
     await ladder(session, user)
+
+    messages = await run(
+        session, user, link, {"lesson": LESSON}, at=NOON.replace(hour=23)
+    )
+
+    assert sent_back(messages)[0].startswith("Not sent: it is outside")
+    assert bot.sent == []
+
+
+async def test_a_lesson_carded_within_the_rest_is_refused(
+    session: AsyncSession, user: User, link: TgLink, bot: Bot
+) -> None:
+    await ladder(session, user)
+    card = await stored_card(session)
+    session.add(
+        CardDelivery(
+            user_id=user.id,
+            card_id=card.id,
+            tg_message_id=1,
+            sent_at=NOON - timedelta(days=2),
+            answered_at=NOON - timedelta(days=2),
+            outcome="wrong",
+            initiated=True,
+        )
+    )
+    await session.commit()
 
     messages = await run(session, user, link, {"lesson": LESSON})
 
-    assert sent_back(messages)[0].startswith("Not sent: it is outside")
+    assert sent_back(messages)[0].startswith(f"Not sent: a card of {LESSON} went out")
+    assert "Review ladders due (0)" in prompt_of(messages)
     assert bot.sent == []
 
 
 async def test_a_lesson_never_finished_is_refused(
     session: AsyncSession, user: User, link: TgLink, bot: Bot
 ) -> None:
-    await awake(session, user)
 
     messages = await run(session, user, link, {"lesson": LESSON})
 
@@ -272,6 +311,33 @@ def test_a_next_look_without_a_zone_is_on_the_learners_clock() -> None:
     moscow = policy.Hours(ZoneInfo("Europe/Moscow"), time(9), time(22))
     asked = (NOON + timedelta(days=1)).replace(hour=13, tzinfo=None)
     assert wake.clamp(asked, NOON, moscow) == asked.replace(tzinfo=moscow.tz)
+
+
+def test_a_next_look_written_in_utc_is_still_on_the_learners_clock() -> None:
+    """A model writes `Z` on the local time it means."""
+    moscow = policy.Hours(ZoneInfo("Europe/Moscow"), time(9), time(22))
+    asked = (NOON + timedelta(days=1)).replace(hour=14)
+    assert wake.clamp(asked, NOON, moscow) == asked.replace(tzinfo=moscow.tz)
+
+
+async def test_a_pull_during_a_run_moves_the_look_the_run_sets(
+    session: AsyncSession, user: User
+) -> None:
+    row = await wake_up(session, user, at=NOON)
+    row.lease_until = NOON + timedelta(minutes=10)
+    await session.commit()
+
+    soon = NOON + wake.SOON
+    await wake.pull(session, user.id, soon, wake.finished(LESSON))
+    await session.commit()
+    await wake.follow(session, row, NOON + timedelta(days=2), "later")
+
+    following = await session.scalar(
+        select(Schedule).where(Schedule.kind == wake.KIND, Schedule.status == "pending")
+    )
+    assert following is not None
+    assert following.due_at == soon
+    assert following.payload == {"reason": "later", "note": wake.finished(LESSON)}
 
 
 async def test_there_is_never_more_than_one_live_wake_up(
@@ -389,7 +455,6 @@ async def test_a_lesson_opened_after_a_week_away_pulls_the_next_look_forward(
 async def test_a_silent_run_after_a_silent_week_still_sends_one_card(
     session: AsyncSession, user: User, link: TgLink, bot: Bot
 ) -> None:
-    await awake(session, user)
     await stored_card(session)
     await ladder(session, user)
     link.created_at = NOON - floor.FLOOR - timedelta(hours=1)

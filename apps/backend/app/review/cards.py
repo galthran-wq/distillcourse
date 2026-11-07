@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.content.locators import lesson_url
 from app.content.search import figure_url, figures, section_of, sections
 from app.harness.repository import HarnessRepository
-from app.models import CardDelivery, ReviewCard
+from app.models import CardDelivery, ReviewCard, ReviewState
 from app.review import ladder, repository, subject, writer
 from app.scheduling import policy
 from app.telegram import api, formula, thread
@@ -425,20 +425,28 @@ async def deliver(
 async def offer(
     session: AsyncSession,
     outbox: Outbox,
-    user_id: uuid.UUID,
-    lesson: str,
-    level: int,
+    state: ReviewState,
+    level: int | None,
+    now: datetime,
     *,
     focus: str | None = None,
 ) -> CardDelivery | None:
-    """A card of this lesson sent on the platform's own account, or None when
-    there was none to send. Picked, or written when the learner has seen every
-    card there is; with a `focus`, written for them alone.
+    """A card of this ladder's lesson sent on the platform's own account, or
+    None when there was none to send. Picked, or written when the learner has
+    seen every card there is; with a `focus`, written for them alone.
+
+    At the level asked for, else the ladder's own — and at level 1 whatever
+    was asked while `level_one_only` holds.
 
     A card whose image Telegram refused is retired by `deliver`, and the next
     one in line is tried in its place — once, so an outage of the site's
     figures cannot retire a whole lesson's cards in one go.
     """
+    user_id, lesson = state.user_id, state.lesson
+    if await repository.level_one_only(session, user_id, now):
+        level = 1
+    elif level is None:
+        level = state.level
     if focus is not None:
         for card in await write(session, user_id, lesson, level, focus=focus):
             sent = await deliver(session, outbox, user_id, card, initiated=True)

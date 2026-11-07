@@ -8,10 +8,10 @@ once (`ensure`). Nothing else writes these rows.
 """
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Final
 
-from sqlalchemy import ColumnElement, and_, func, select, update
+from sqlalchemy import ColumnElement, and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import BackgroundRun, Event, Schedule, TgLink
@@ -29,6 +29,8 @@ SOON = timedelta(hours=1)
 # A learner seen after this long without a tap, a message or a lesson opened
 # is back, and worth a look today rather than at the run's own time.
 AWAY = timedelta(days=7)
+# Where `pull` leaves word on a row a run holds, for `follow` to honour.
+PULLED = "pulled"
 # What a row says woke it, for the next run to read.
 OWN = "the check you set"
 FIRST = "no earlier run: the learner has just connected, or a run failed"
@@ -44,12 +46,11 @@ def _live() -> ColumnElement[bool]:
 
 
 def _row(user_id: uuid.UUID, due_at: datetime, reason: str, note: str) -> Schedule:
-    return Schedule(
+    return scheduling.new(
         user_id=user_id,
         kind=KIND,
         due_at=due_at,
         payload={"reason": reason, "note": note},
-        status="pending",
         created_by="system",
     )
 
@@ -72,7 +73,9 @@ async def pull(
     session: AsyncSession, user_id: uuid.UUID, at: datetime, note: str
 ) -> None:
     """Bring the learner's next look forward to `at`, never back. A row a run
-    holds is left alone: that run is looking already. The caller commits."""
+    holds keeps its time — that run built its state before this happened — and
+    is left word instead, which `follow` carries onto the row after it. The
+    caller commits."""
     await session.execute(
         update(Schedule)
         .where(
@@ -82,6 +85,23 @@ async def pull(
             Schedule.due_at > at,
         )
         .values(due_at=at, payload=Schedule.payload.op("||")({"note": note}))
+    )
+    # One zone and one format, so that the strings order as the moments do.
+    stamp = at.astimezone(UTC).isoformat()
+    await session.execute(
+        update(Schedule)
+        .where(
+            Schedule.user_id == user_id,
+            _live(),
+            Schedule.lease_until.is_not(None),
+            or_(
+                ~Schedule.payload.has_key(PULLED),
+                Schedule.payload[PULLED]["at"].astext > stamp,
+            ),
+        )
+        .values(
+            payload=Schedule.payload.op("||")({PULLED: {"at": stamp, "note": note}})
+        )
     )
 
 
@@ -107,10 +127,10 @@ async def returned(session: AsyncSession, user_id: uuid.UUID, now: datetime) -> 
 
 def clamp(moment: datetime, now: datetime, hours: policy.Hours) -> datetime:
     """The run's own next look, held to between EARLIEST and LATEST from now
-    and moved into the learner's waking hours. A time with no zone is on the
-    learner's clock, which is what the run was asked for."""
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=hours.tz)
+    and moved into the learner's waking hours. It is read as wall-clock time
+    on the learner's clock, whatever zone it carries: that is what the run was
+    asked for, and a model writes `Z` on a local time as often as not."""
+    moment = moment.replace(tzinfo=hours.tz)
     return policy.next_open(min(max(moment, now + EARLIEST), now + LATEST), hours)
 
 
@@ -118,13 +138,20 @@ async def follow(
     session: AsyncSession, row: Schedule, due_at: datetime, reason: str
 ) -> None:
     """Close the row a run woke on and open the next, in one transaction, so
-    a learner is never without one nor with two."""
+    a learner is never without one nor with two. A pull that arrived while
+    the run held the row wins where it is sooner."""
+    # Locked, so a pull cannot land between this read and the commit.
+    await session.refresh(row, ["payload"], with_for_update=True)
+    note = OWN
+    pulled = row.payload.get(PULLED)
+    if pulled is not None and datetime.fromisoformat(pulled["at"]) < due_at:
+        due_at, note = datetime.fromisoformat(pulled["at"]), pulled["note"]
     row.status = "done"
     row.lease_until = None
     # Flushed first: the unique index on live rows sees the old one go before
     # the new one arrives.
     await session.flush()
-    session.add(_row(row.user_id, due_at, reason, OWN))
+    session.add(_row(row.user_id, due_at, reason, note))
     await session.commit()
 
 

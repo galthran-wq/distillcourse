@@ -24,6 +24,26 @@ CLAIM_BATCH = 100
 WAITING = ("pending", "deferred")
 
 
+def new(
+    *,
+    user_id: uuid.UUID,
+    kind: ScheduleKind,
+    due_at: datetime,
+    payload: dict[str, Any],
+    created_by: CreatedBy,
+) -> Schedule:
+    """A row not yet added to any session, for a caller that commits it with
+    something else."""
+    return Schedule(
+        user_id=user_id,
+        kind=kind,
+        due_at=due_at,
+        payload=payload,
+        status="pending",
+        created_by=created_by,
+    )
+
+
 async def create(
     session: AsyncSession,
     *,
@@ -33,12 +53,11 @@ async def create(
     payload: dict[str, Any],
     created_by: CreatedBy,
 ) -> Schedule:
-    row = Schedule(
+    row = new(
         user_id=user_id,
         kind=kind,
         due_at=due_at,
         payload=payload,
-        status="pending",
         created_by=created_by,
     )
     session.add(row)
@@ -229,11 +248,14 @@ async def silence(session: AsyncSession, user_id: uuid.UUID) -> int:
 
 
 async def last_initiation(session: AsyncSession, user_id: uuid.UUID) -> datetime | None:
-    """When the platform last opened the conversation of its own accord — a
-    reminder is the learner's appointment, not ours, so it does not count. The
-    same messages `silence` counts, so the wait runs from the last of them."""
+    """When the platform last opened the conversation of its own accord: the
+    last card it sent on its own account. A card the learner asked for (Next,
+    Harder) was their move, and a reminder is their appointment, not ours, so
+    neither counts."""
     moment: datetime | None = await session.scalar(
-        select(func.max(CardDelivery.sent_at)).where(CardDelivery.user_id == user_id)
+        select(func.max(CardDelivery.sent_at)).where(
+            CardDelivery.user_id == user_id, CardDelivery.initiated
+        )
     )
     return moment
 

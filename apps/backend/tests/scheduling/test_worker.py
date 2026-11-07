@@ -38,7 +38,7 @@ from app.models import (
 from app.scheduling import policy, repository, worker
 from app.telegram import api
 from app.telegram import repository as telegram
-from tests.coach.conftest import awake, deciding
+from tests.coach.conftest import deciding
 from tests.conftest import Bot, replying
 from tests.review.conftest import (  # noqa: F401  (a shared fixture)
     LESSON,
@@ -173,7 +173,6 @@ async def test_a_silent_run_sends_nothing_and_sets_the_next_look(
 async def test_a_run_that_sends_a_card_is_held_to_one_a_day(
     session: AsyncSession, user: User, bot: Bot
 ) -> None:
-    await awake(session, user)
     await ladder(session, user)
     await due_wake(session, user)
 
@@ -324,7 +323,6 @@ async def test_a_blocked_bot_pauses_everything_for_that_learner(
 ) -> None:
     """No retries into a dead channel: the send fails, the link is marked
     broken, and nothing of that learner's is claimed until it is repaired."""
-    await awake(session, user)
     await ladder(session, user)
     row = await due_wake(session, user)
     bot.refuse = api.BotBlocked("bot was blocked by the user")

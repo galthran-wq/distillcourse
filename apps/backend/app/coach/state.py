@@ -27,6 +27,7 @@ from app.models import (
     Schedule,
     User,
 )
+from app.review import repository as review
 from app.review.tools import NOTE_PREFIX
 from app.scheduling import gates, policy
 from app.scheduling import repository as scheduling
@@ -35,8 +36,8 @@ from app.scheduling import repository as scheduling
 # ("only mornings"). Carried in full, and binding (`prompts/coach.md`).
 BOT_PREFIX = "bot-"
 DELIVERIES = 10
-# Ladders due, from each end: the lessons finished last and the ones overdue
-# longest. The middle of a long list decides nothing the ends do not.
+# Ladders due, from each end: the lessons finished last and the ones finished
+# longest ago. The middle of a long list decides nothing the ends do not.
 DUE_ENDS = 10
 HOURS_OVER = timedelta(days=30)
 READING = 5
@@ -142,13 +143,9 @@ def _ends(states: Sequence[ReviewState]) -> Sequence[ReviewState]:
 async def _due(
     session: AsyncSession, user: User, now: datetime, hours: policy.Hours
 ) -> ContextBlock:
-    states = (
-        await session.scalars(
-            select(ReviewState)
-            .where(ReviewState.user_id == user.id, ReviewState.next_due_at <= now)
-            .order_by(ReviewState.next_due_at.desc())
-        )
-    ).all()
+    """The ladders `send_card` would take: one carded within the rest is left
+    out, as the floor and the Next button leave it out."""
+    states = await review.due(session, user.id, now, recent_first=True)
     lines = [
         f"- `{state.lesson}`: step {state.step}, level {state.level}, last "
         f"{state.last_outcome or 'not asked yet'}, due since "
@@ -157,7 +154,7 @@ async def _due(
         if state.next_due_at is not None
     ]
     return ContextBlock(
-        title=f"Review ladders due ({len(states)}), the most recent first",
+        title=f"Review ladders due ({len(states)}), the lesson finished last first",
         body="\n".join(lines) or "None.",
     )
 
