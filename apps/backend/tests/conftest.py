@@ -73,6 +73,9 @@ class Bot:
     answered: list[str] = field(default_factory=list)
     # (message_id, text) of every edit, in order.
     edited: list[tuple[int, str]] = field(default_factory=list)
+    # (message_id, keyboard) of every edit, of text or of buttons alone; None
+    # is a message left with no buttons.
+    rekeyed: list[tuple[int, api.Keyboard | None]] = field(default_factory=list)
     refuse: Exception | None = None
 
     async def send_message(
@@ -102,6 +105,15 @@ class Bot:
         keyboard: api.Keyboard | None = None,
     ) -> None:
         self.edited.append((message_id, text))
+        self.rekeyed.append((message_id, keyboard))
+
+    async def edit_message_keyboard(
+        self, tg_chat_id: int, message_id: int, keyboard: api.Keyboard | None
+    ) -> None:
+        self.rekeyed.append((message_id, keyboard))
+
+    async def send_chat_action(self, tg_chat_id: int) -> None:
+        pass
 
     @property
     def texts(self) -> list[str]:
@@ -115,6 +127,8 @@ def bot(monkeypatch: pytest.MonkeyPatch) -> Bot:
     monkeypatch.setattr(api, "send_message", stub.send_message)
     monkeypatch.setattr(api, "answer_callback", stub.answer_callback)
     monkeypatch.setattr(api, "edit_message_text", stub.edit_message_text)
+    monkeypatch.setattr(api, "edit_message_keyboard", stub.edit_message_keyboard)
+    monkeypatch.setattr(api, "send_chat_action", stub.send_chat_action)
     return stub
 
 

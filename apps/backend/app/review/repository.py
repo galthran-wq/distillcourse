@@ -15,7 +15,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
-from sqlalchemy import ColumnElement, and_, select
+from sqlalchemy import ColumnElement, Exists, and_, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,6 +41,14 @@ OUTCOME = "outcome"
 # ladder an unanswered card left due must not come straight back as the next
 # message; another lesson, or nothing, goes first.
 REST = timedelta(days=3)
+# After two harder cards skipped in a row, only level 1 is served for this
+# long from the second: the bot must not slide back into what was being
+# ignored.
+SKIP_HOLD = timedelta(days=7)
+# The key `follow_ups` keeps "In my own words" under — the button's prefix —
+# and what it holds until the answer is graded.
+OWN_WORDS = "m"
+ASKED = "asked"
 
 Tapped = Literal["correct", "wrong"]
 
@@ -57,6 +65,21 @@ def _of_a_ladder() -> ColumnElement[bool]:
     in the queue by something other than a ladder, and nothing here can say
     what it was of."""
     return and_(Schedule.kind == "review", Schedule.payload.has_key("lesson"))
+
+
+def _resting(now: datetime) -> Exists:
+    """The ladder, correlated, had a card sent within REST."""
+    return (
+        select(CardDelivery.id)
+        .join(ReviewCard, ReviewCard.id == CardDelivery.card_id)
+        .where(
+            CardDelivery.user_id == ReviewState.user_id,
+            ReviewCard.lesson == ReviewState.lesson,
+            CardDelivery.sent_at > now - REST,
+        )
+        .correlate(ReviewState)
+        .exists()
+    )
 
 
 def rung(state: ReviewState) -> Rung:
@@ -152,7 +175,7 @@ async def grade(
     A tap moves the ladder no further than the card's level allows and moves
     the level with it. A written answer, graded by the tutor, is recall rather
     than recognition, so it moves the ladder as a review always did and leaves
-    the level alone.
+    the level alone. A harder card the learner asked for moves only the level.
     """
     now = datetime.now(UTC)
     sent.answered_at = now
@@ -161,6 +184,13 @@ async def grade(
     state = await state_of(session, sent.user_id, card.lesson)
     if state is None:
         return None
+    if sent.harder:
+        # Volunteered: a right answer earns the level it was asked at, never
+        # lowers one, and a wrong one is not held against them.
+        if outcome in ("correct", "passed"):
+            state.level, state.level_run = max(state.level, card.level), 0
+        await session.flush()
+        return state
     at = rung(state)
     match outcome:
         case "correct" | "wrong":
@@ -172,6 +202,110 @@ async def grade(
             to = ladder.advance(at, outcome, now)
     await move(session, state, to, outcome=outcome, now=now)
     return state
+
+
+def skip(sent: CardDelivery, now: datetime) -> None:
+    """A card put aside unanswered. Nothing is learned from it, so nothing
+    else moves; answering it now is no longer possible."""
+    sent.answered_at = now
+    sent.outcome = "skipped"
+
+
+async def recall(
+    session: AsyncSession, sent: CardDelivery, card: ReviewCard, outcome: ladder.Outcome
+) -> ReviewState | None:
+    """Grade the learner's own words on a card they already tapped; the caller
+    commits. `passed` is real recall: it counts as a right answer at the level
+    and climbs past the level's cap. Anything less leaves the ladder where the
+    tap put it — they offered, and were not asked."""
+    sent.follow_ups = {**sent.follow_ups, OWN_WORDS: outcome}
+    state = await state_of(session, sent.user_id, card.lesson)
+    if state is None or outcome != "passed":
+        await session.flush()
+        return state
+    now = datetime.now(UTC)
+    state.level, state.level_run = ladder.next_level(
+        state.level, state.level_run, "correct"
+    )
+    await move(
+        session,
+        state,
+        ladder.advance(rung(state), "passed", now),
+        outcome=outcome,
+        now=now,
+    )
+    return state
+
+
+async def level_one_only(
+    session: AsyncSession, user_id: uuid.UUID, now: datetime
+) -> bool:
+    """Whether only level 1 is served, whatever a ladder's level says: the
+    learner's last two cards above it were both skipped, within SKIP_HOLD of
+    each other, and the later within SKIP_HOLD of now."""
+    last_two = (
+        await session.execute(
+            select(CardDelivery.outcome, CardDelivery.answered_at)
+            .join(ReviewCard, ReviewCard.id == CardDelivery.card_id)
+            .where(CardDelivery.user_id == user_id, ReviewCard.level >= 2)
+            .order_by(CardDelivery.sent_at.desc())
+            .limit(2)
+        )
+    ).all()
+    skipped = [
+        moment
+        for outcome, moment in last_two
+        if outcome == "skipped" and moment is not None
+    ]
+    return (
+        len(skipped) == 2
+        and now - skipped[0] < SKIP_HOLD
+        and skipped[0] - skipped[1] < SKIP_HOLD
+    )
+
+
+async def due(
+    session: AsyncSession, user_id: uuid.UUID, now: datetime
+) -> Sequence[ReviewState]:
+    """This learner's ladders that are owed a card now, the longest overdue
+    first: what a card the learner asks for is drawn from."""
+    return (
+        await session.scalars(
+            select(ReviewState)
+            .where(
+                ReviewState.user_id == user_id,
+                ReviewState.next_due_at <= now,
+                ~_resting(now),
+            )
+            .order_by(ReviewState.next_due_at)
+        )
+    ).all()
+
+
+async def unqueue(session: AsyncSession, user_id: uuid.UUID, lesson: str) -> None:
+    """Cancel what the poller holds for a lesson a card was just sent for out
+    of turn, so the same review does not arrive twice. Leaves the commit to
+    the caller."""
+    rows = await session.scalars(
+        select(Schedule).where(
+            Schedule.user_id == user_id,
+            Schedule.kind == "review",
+            _about(lesson),
+            Schedule.status.in_(LIVE),
+        )
+    )
+    await scheduling.drop(session, rows.all())
+
+
+async def cards_today(
+    session: AsyncSession, user_id: uuid.UUID, since: datetime
+) -> int:
+    total = await session.scalar(
+        select(func.count()).where(
+            CardDelivery.user_id == user_id, CardDelivery.sent_at >= since
+        )
+    )
+    return int(total or 0)
 
 
 async def materialize(session: AsyncSession, now: datetime) -> Sequence[Schedule]:
@@ -201,17 +335,6 @@ async def materialize(session: AsyncSession, now: datetime) -> Sequence[Schedule
         .correlate(ReviewState)
         .exists()
     )
-    resting = (
-        select(CardDelivery.id)
-        .join(ReviewCard, ReviewCard.id == CardDelivery.card_id)
-        .where(
-            CardDelivery.user_id == ReviewState.user_id,
-            ReviewCard.lesson == ReviewState.lesson,
-            CardDelivery.sent_at > now - REST,
-        )
-        .correlate(ReviewState)
-        .exists()
-    )
     found = (
         await session.execute(
             select(ReviewState, LessonProgress.completed_at)
@@ -227,7 +350,7 @@ async def materialize(session: AsyncSession, now: datetime) -> Sequence[Schedule
                 ReviewState.next_due_at <= now,
                 reachable,
                 ~queued,
-                ~resting,
+                ~_resting(now),
             )
             # The lock discipline the poller claims with: a second worker skips
             # the ladders this one is materialising rather than delivering them

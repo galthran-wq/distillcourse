@@ -53,7 +53,8 @@ async def report_review_outcome(
     """Grade a review card the learner answered in their own words.
 
     Call it once, as soon as you have judged the answer. A card they tapped is
-    graded already, and a card they never answered is left alone: reporting an
+    graded already, unless they asked to answer it in their own words — then
+    grade those. A card they never answered is left alone: reporting an
     outcome you did not observe corrupts the schedule for that lesson.
 
     Args:
@@ -69,11 +70,17 @@ async def report_review_outcome(
     if found is None:
         return "no card of this learner's was sent under that id"
     sent, card = found
-    if sent.answered_at is not None:
+    own = sent.follow_ups.get(repository.OWN_WORDS)
+    if own is not None and own != repository.ASKED:
+        return f"their own words on that card are already graded as {own}"
+    if own is None and sent.answered_at is not None:
         # One card moves the ladder once: a tap and a written answer, or an
         # answer split across two messages, can both reach here.
         return f"that card is already graded as {sent.outcome}"
-    state = await repository.grade(repo.session, sent, card, outcome)
+    if own == repository.ASKED:
+        state = await repository.recall(repo.session, sent, card, outcome)
+    else:
+        state = await repository.grade(repo.session, sent, card, outcome)
     await repo.session.commit()
     kept = "" if notes is None else await _remember(ctx, card.lesson, notes)
     if state is None:
