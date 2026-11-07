@@ -1,8 +1,8 @@
 """coach notes: the weekly note, which spends the day's initiation and may
 carry a button that puts a card on a lesson
 
-Revision ID: 0026
-Revises: 0025
+Revision ID: 0027
+Revises: 0026
 Create Date: 2026-11-07
 
 """
@@ -10,8 +10,8 @@ Create Date: 2026-11-07
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0026"
-down_revision = "0025"
+revision = "0027"
+down_revision = "0026"
 branch_labels = None
 depends_on = None
 

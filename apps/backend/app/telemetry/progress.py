@@ -191,6 +191,24 @@ def _completed_at(user_id: uuid.UUID, lesson: str, threshold: int) -> Select[Any
     )
 
 
+def _last_anchor(user_id: uuid.UUID, lesson: str) -> Select[Any]:
+    anchor = Event.payload["anchor"].astext
+    return (
+        select(anchor)
+        .where(
+            Event.user_id == user_id,
+            Event.lesson == lesson,
+            Event.type == schemas.HEARTBEAT,
+            anchor.is_not(None),
+        )
+        # A batch is stored under one `server_ts`; within it, the browser's
+        # clock is the only order there is, and a forged one misplaces only
+        # the forger's own link back.
+        .order_by(Event.server_ts.desc(), Event.client_ts.desc(), Event.id.desc())
+        .limit(1)
+    )
+
+
 async def threshold_seconds(session: AsyncSession, lesson: str) -> int:
     """How long this lesson has to hold attention before it counts as read."""
     # Every chunk of a lesson carries the whole lesson's word count, so the
@@ -227,6 +245,7 @@ async def recompute(
         "user_id": user_id,
         "lesson": lesson,
         **totals._mapping,
+        "last_anchor": await session.scalar(_last_anchor(user_id, lesson)),
         "completed_at": await session.scalar(
             _completed_at(user_id, lesson, await threshold_seconds(session, lesson))
         ),
@@ -264,6 +283,8 @@ class Reading(BaseModel):
     completed_at: datetime | None
     active_seconds: int
     max_scroll_pct: int
+    # The section they were last reading in, for a link back to it.
+    last_anchor: str | None
     solutions_opened: int
     solutions_total: int | None
     last_seen: datetime
@@ -312,6 +333,7 @@ async def of_reader(
             completed_at=row.completed_at,
             active_seconds=row.active_seconds,
             max_scroll_pct=row.max_scroll_pct,
+            last_anchor=row.last_anchor,
             solutions_opened=row.solutions_opened,
             solutions_total=totals.get(row.lesson),
             last_seen=row.last_seen,

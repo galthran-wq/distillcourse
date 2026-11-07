@@ -29,7 +29,9 @@ today), stated once in `scheduling/gates.py` — lives in
 coach in `apps/backend/app/coach/` — a pydantic-ai agent of its own
 (`COACH_MODEL`), not a tutor run, handed a summary built by code
 (`state.py`) and never the thread, reaching the learner only through send
-tools (`send_card`, and `send_weekly_note`, `note.py`, whose numbers code
+tools (`send_card`; `send_nudge` in `nudges.py` — a link into a lesson,
+to the section `lesson_progress.last_anchor` says the reader stopped in, which
+heartbeats carry; and `send_weekly_note`, `note.py`, whose numbers code
 writes and only its next step the model; no free-text tool) that return the
 gates' refusal as a sentence, returning only when to look next; one live `schedules` row of kind
 `coach` per linked learner is when it looks (`wake.py`: its own

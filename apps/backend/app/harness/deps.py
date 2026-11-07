@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from app.harness.repository import HarnessRepository
@@ -23,3 +23,6 @@ class HarnessDeps:
     # A run the poller started reads the poller's clock, so that what its
     # state says and what its tools check are one moment.
     now: datetime | None = None
+    # The sections a coach run has been shown by `send_nudge`, which sends
+    # nothing about a section until the run has read it.
+    nudge_read: set[str] = field(default_factory=set)

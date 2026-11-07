@@ -15,7 +15,7 @@ from pydantic_ai.usage import RunUsage, UsageLimits
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.coach import state
-from app.coach.tools import send_card, send_weekly_note
+from app.coach.tools import send_card, send_nudge, send_weekly_note
 from app.coach.wake import KIND
 from app.core.config import settings
 from app.harness.agent import model_for
@@ -66,6 +66,7 @@ coach = Agent(
             save_memory,
             send_card,
             send_weekly_note,
+            send_nudge,
         )
     ],
 )

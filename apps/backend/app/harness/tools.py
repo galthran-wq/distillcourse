@@ -171,7 +171,8 @@ async def get_user_progress(
     """What the learner has read, lesson by lesson, most recent first.
 
     `active_seconds` and `max_scroll_pct` are how long they spent and how far
-    down they got; `completed_at` is set once the lesson counts as read.
+    down they got; `last_anchor` is the section they were last reading in;
+    `completed_at` is set once the lesson counts as read.
     `solutions_opened` against `solutions_total` says how much of the exercise
     material they have already seen — there is no point walking them through a
     solution they have open. A lesson they never opened has no entry.

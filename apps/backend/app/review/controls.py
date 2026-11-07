@@ -13,14 +13,15 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Update, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import InstrumentedAttribute
 
 from app.core.config import settings
 from app.harness.repository import HarnessRepository
-from app.models import CardDelivery, CoachNote, ReviewCard, User
+from app.models import CardDelivery, CoachNote, ReviewCard, Schedule, User
 from app.review import cards, ladder, repository, subject
 from app.scheduling import policy
 from app.scheduling import repository as scheduling
@@ -105,6 +106,25 @@ async def _pressing(
         await outbox.edit_keyboard(message_id, keyboard())
 
 
+def spending[M: CardDelivery | Schedule](
+    outbox: Outbox,
+    row: M,
+    column: InstrumentedAttribute[dict[str, Any]],
+    key: str,
+    value: object,
+    message_id: int,
+    keyboard: Callable[[], api.Keyboard | None],
+) -> AbstractAsyncContextManager[_Press]:
+    """A button spent by setting `key` in the row's JSONB `column`, acted on
+    as `_pressing` does."""
+    model, name = type(row), column.key
+    setattr(row, name, {**getattr(row, name), key: value})
+    restore = (
+        update(model).where(model.id == row.id).values({name: column.op("-")(key)})
+    )
+    return _pressing(outbox, restore, message_id, keyboard)
+
+
 def _following_up(
     outbox: Outbox,
     sent: CardDelivery,
@@ -114,14 +134,14 @@ def _following_up(
 ) -> AbstractAsyncContextManager[_Press]:
     """A button under the feedback, spent in its delivery's `follow_ups`; it
     leaves the keyboard once done."""
-    sent.follow_ups = {**sent.follow_ups, prefix: value}
-    restore = (
-        update(CardDelivery)
-        .where(CardDelivery.id == sent.id)
-        .values(follow_ups=CardDelivery.follow_ups.op("-")(prefix))
-    )
-    return _pressing(
-        outbox, restore, sent.tg_message_id, lambda: cards.follow_ups(sent, card)
+    return spending(
+        outbox,
+        sent,
+        CardDelivery.follow_ups,
+        prefix,
+        value,
+        sent.tg_message_id,
+        lambda: cards.follow_ups(sent, card),
     )
 
 
@@ -248,6 +268,23 @@ async def _asked(
     return sent
 
 
+async def send_asked_for(
+    outbox: Outbox, find: Callable[[], Awaitable[ReviewCard | None]]
+) -> bool:
+    """The card `find` picks, sent because the learner asked for it, as
+    `_asked` bounds it. Whether one went out."""
+    session, user_id, now = outbox.session, outbox.link.user_id, datetime.now(UTC)
+
+    async def found() -> bool:
+        card = await find()
+        return (
+            card is not None
+            and await cards.deliver(session, outbox, user_id, card, now) is not None
+        )
+
+    return await _asked(outbox, now, found)
+
+
 async def next_card(outbox: Outbox, tap: Tap) -> None:
     """The next due card, now."""
     found = await _tapped(outbox, tap)
@@ -257,16 +294,12 @@ async def next_card(outbox: Outbox, tap: Tap) -> None:
     session, user_id = outbox.session, outbox.link.user_id
     now = datetime.now(UTC)
 
-    async def following() -> bool:
+    async def following() -> ReviewCard | None:
         easy = await repository.level_one_only(session, user_id, now)
-        due = await _due_card(session, user_id, now, cards.pick, easy=easy)
-        return (
-            due is not None
-            and await cards.deliver(session, outbox, user_id, due, now) is not None
-        )
+        return await _due_card(session, user_id, now, cards.pick, easy=easy)
 
     async with _following_up(outbox, sent, card, cards.NEXT):
-        await _asked(outbox, now, following)
+        await send_asked_for(outbox, following)
 
 
 async def send_it(outbox: Outbox, tap: Tap) -> None:

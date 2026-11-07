@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.coach import note
+from app.coach import note, nudges
 from app.harness.prompts import ContextBlock, render
 from app.harness.title import transcript
 from app.memory import repository as memory
@@ -90,14 +90,32 @@ async def _deliveries(
         .order_by(CardDelivery.sent_at.desc())
         .limit(DELIVERIES)
     )
-    lines = [
-        f"- {_day(sent.sent_at, hours)} `{card.lesson}`, {card.kind} level "
-        f"{card.level}: {sent.outcome or 'open'}"
-        + ("" if sent.initiated else " (they asked for it)")
+    sent_cards = [
+        (
+            sent.sent_at,
+            f"`{card.lesson}`, {card.kind} level {card.level}: "
+            f"{sent.outcome or 'open'}"
+            + ("" if sent.initiated else " (they asked for it)"),
+        )
         for sent, card in rows.tuples()
     ]
+    sent_nudges = [
+        (
+            row.due_at,
+            f"`{nudges.locator(row.payload['lesson'], row.payload['anchor'])}`, "
+            f"{row.payload['nudge']} nudge",
+        )
+        for row in await session.scalars(
+            select(Schedule)
+            .where(Schedule.user_id == user.id, Schedule.kind == nudges.KIND)
+            .order_by(Schedule.due_at.desc())
+            .limit(DELIVERIES)
+        )
+    ]
+    newest = sorted([*sent_cards, *sent_nudges], reverse=True)[:DELIVERIES]
+    lines = [f"- {_day(moment, hours)} {line}" for moment, line in newest]
     return ContextBlock(
-        title="The last cards sent, newest first",
+        title="The last cards and nudges sent, newest first",
         body="\n".join(lines) or "None yet.",
     )
 
@@ -178,6 +196,14 @@ async def _memories(session: AsyncSession, user: User) -> list[ContextBlock]:
     return blocks
 
 
+def _left(row: LessonProgress) -> str:
+    if row.completed_at is not None:
+        return "finished"
+    if row.last_anchor is None:
+        return "unfinished"
+    return f"unfinished, stopped at `{row.last_anchor}`"
+
+
 async def _reading(
     session: AsyncSession, user: User, hours: policy.Hours
 ) -> ContextBlock:
@@ -189,8 +215,7 @@ async def _reading(
     )
     lines = [
         f"- `{row.lesson}`: {row.max_scroll_pct}% scrolled, last read "
-        f"{_day(row.last_seen, hours)}, "
-        + ("finished" if row.completed_at is not None else "unfinished")
+        f"{_day(row.last_seen, hours)}, " + _left(row)
         for row in rows
     ]
     return ContextBlock(
