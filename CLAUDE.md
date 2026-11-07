@@ -23,12 +23,16 @@ a draft to rewrite, never the artefact. `apps/backend/README.md` is the guide.
 
 The tutor harness lives in `apps/backend/app/harness/`; everything about
 messages the platform starts by itself — the poller process, quiet hours, the
-proactive slot — lives in `apps/backend/app/scheduling/`, the Telegram channel
+open card, the silence backoff — lives in `apps/backend/app/scheduling/`, the Telegram channel
 it delivers over — webhook, pairing, sending — in `apps/backend/app/telegram/`,
 what the tutor remembers about a learner across every chat and medium in
 `apps/backend/app/memory/`, the spaced-repetition ladder those proactive
-messages are mostly made of in `apps/backend/app/review/`, and everything the
-lab API is — pairing and bearer tokens, the manifest a notebook reads,
+messages are mostly made of in `apps/backend/app/review/` — a review is a tap
+card, written on first need by a toolless writer and kept only if a second
+toolless check passes it, graded by code with no model, its spend in
+`background_runs` beside `messages.usage` under the monthly ceiling, and the
+rules it follows in `prompts/review.md` (pedagogy E1 governs lessons only) —
+and everything the lab API is — pairing and bearer tokens, the manifest a notebook reads,
 the checkpoints it submits and what they are graded against — in
 `apps/backend/app/labs/`. Pairing runs notebook-first: `distill.login()` gets
 a device code, prints an approval URL (`/labs/pair/[code]`, cookie-authed) and
@@ -38,7 +42,8 @@ is the no-browser fallback, and a `DISTILL_TOKEN` env var or Colab Secret
 outranks both. Its one kind no comparison can answer, a `review`
 checkpoint, is decided by a single toolless model call (`app/labs/judge.py`)
 that borrows the harness's plumbing — the model, the usage row and the monthly
-ceiling, which sums `lab_submissions.usage` alongside `messages.usage`.
+ceiling, which sums `lab_submissions.usage` and `background_runs.usage`
+alongside `messages.usage`.
 `distill.ask(text, *objects)` is the tutor itself, not a second agent: the
 web chat's stream path (`runner.start_stream`) in a chat of kind `lab`
 (`chats.lab_lesson`), one per lab and kept on the server — a question naming

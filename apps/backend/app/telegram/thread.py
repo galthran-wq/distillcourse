@@ -5,6 +5,8 @@ opening the conversation — so it belongs to neither of them.
 """
 
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +30,21 @@ async def of(session: AsyncSession, user_id: uuid.UUID) -> Chat:
     if chat is not None:
         return chat
     return await HarnessRepository(session, user_id).create_chat(kind="telegram")
+
+
+@asynccontextmanager
+async def holding(repo: HarnessRepository, chat: Chat) -> AsyncIterator[None]:
+    """The thread's claim, for work that writes into it without a run. The
+    claim is what serializes the thread, whoever writes: a card or a marker
+    put in beside a run in flight lands in the middle of what that run says.
+    """
+    run_id = uuid.uuid4()
+    if not await repo.claim_run(chat, run_id):
+        raise runner.RunBusy
+    try:
+        yield
+    finally:
+        await repo.release_run(chat, run_id)
 
 
 async def converse(

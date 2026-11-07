@@ -1,6 +1,10 @@
+import uuid
 from typing import Any
 
 from pydantic_ai.usage import RunUsage
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models import BackgroundRun
 
 REQUESTS = "requests"
 INPUT_TOKENS = "input_tokens"
@@ -25,3 +29,12 @@ def usage_row(usage: RunUsage) -> dict[str, Any]:
         # out of jsonb the way the ceiling sums the cost.
         WEB_SEARCH_CALLS: usage.details.get(WEB_SEARCH_CALLS, 0),
     }
+
+
+async def charge_background(
+    session: AsyncSession, user_id: uuid.UUID | None, kind: str, usage: RunUsage
+) -> None:
+    """Record a call that belongs to no chat, where the monthly ceiling sums it.
+    Uncommitted: it is written in the caller's transaction."""
+    session.add(BackgroundRun(user_id=user_id, kind=kind, usage=usage_row(usage)))
+    await session.flush()

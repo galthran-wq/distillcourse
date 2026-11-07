@@ -38,3 +38,25 @@ async def deliver(
     """One update, as Telegram posts it. The reply is written by the background
     task the route starts, which httpx runs before it hands the response back."""
     return await client.post(WEBHOOK, json=payload, headers={api.SECRET_HEADER: secret})
+
+
+def tap(
+    data: str,
+    *,
+    update_id: int = 1,
+    chat_type: str = "private",
+    callback_id: str = "cb-1",
+    message_id: int = 55,
+) -> dict[str, Any]:
+    return {
+        "update_id": update_id,
+        "callback_query": {
+            "id": callback_id,
+            "from": {"id": TG_CHAT_ID},
+            "message": {
+                "message_id": message_id,
+                "chat": {"id": TG_CHAT_ID, "type": chat_type},
+            },
+            "data": data,
+        },
+    }

@@ -71,6 +71,8 @@ class Bot:
 
     sent: list[Sent] = field(default_factory=list)
     answered: list[str] = field(default_factory=list)
+    # (message_id, text) of every edit, in order.
+    edited: list[tuple[int, str]] = field(default_factory=list)
     refuse: Exception | None = None
 
     async def send_message(
@@ -90,6 +92,17 @@ class Bot:
     async def answer_callback(self, callback_id: str, text: str | None = None) -> None:
         self.answered.append(callback_id)
 
+    async def edit_message_text(
+        self,
+        tg_chat_id: int,
+        message_id: int,
+        text: str,
+        *,
+        html: bool = True,
+        keyboard: api.Keyboard | None = None,
+    ) -> None:
+        self.edited.append((message_id, text))
+
     @property
     def texts(self) -> list[str]:
         return [item.text for item in self.sent]
@@ -101,6 +114,7 @@ def bot(monkeypatch: pytest.MonkeyPatch) -> Bot:
     stub = Bot()
     monkeypatch.setattr(api, "send_message", stub.send_message)
     monkeypatch.setattr(api, "answer_callback", stub.answer_callback)
+    monkeypatch.setattr(api, "edit_message_text", stub.edit_message_text)
     return stub
 
 

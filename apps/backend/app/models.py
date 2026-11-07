@@ -33,9 +33,9 @@ class User(Base):
     __tablename__ = "users"
     # The waking window is same-day: `opens <= t < closes`, so it must open
     # before it closes and 18:00–02:00 cannot be expressed. Everything that
-    # counts waking hours reads it as one interval inside a date — the slot
-    # timeout that carries over the night, the budget that resets at local
-    # midnight — and wrapping the window is a change to all of that rather than
+    # counts waking hours reads it as one interval inside a date — the budget
+    # that resets at local midnight, the morning a deferred row opens on — and
+    # wrapping the window is a change to all of that rather than
     # to this constraint. The settings page says so where a learner sets it.
     __table_args__ = (
         CheckConstraint("quiet_start < quiet_end", name="ck_users_quiet_hours"),
@@ -283,11 +283,11 @@ class Incident(Base):
 class Schedule(Base):
     """One thing the platform intends to say to a learner on its own.
 
-    `due_at` is when the row next needs attention and its status says what
-    that attention is: a `pending` row fires, an `awaiting_reply` row counts
-    as ignored. `payload` carries `note` — what the message is about, in
-    words the run is given — and `topic`, the course or subject the rotation
-    steers away from after an ignored message.
+    `due_at` is when a `pending` or `deferred` row next fires; `done`,
+    `cancelled` and `failed` are where it ends. `payload` carries `note` for a
+    reminder — what the message is about, in words the run is given — and
+    `lesson` and `completed_at` for a review, the lesson its card is drawn from
+    and when the learner finished it, which orders what is due.
     """
 
     __tablename__ = "schedules"
@@ -311,8 +311,9 @@ class Schedule(Base):
     )
     created_by: Mapped[str] = mapped_column(String(8))
     attempts: Mapped[int] = mapped_column(default=0)
-    # How a delivered message ended. Kept because the engagement machine that
-    # reads it is designed from real ignore data, not guessed at now.
+    # Historical: how a delivered message ended under the old slot model.
+    # Nothing writes it now; whether a card was ignored is
+    # `card_deliveries.outcome`.
     outcome: Mapped[str | None] = mapped_column(String(16), default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -345,7 +346,105 @@ class ReviewState(Base):
     next_due_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), default=None
     )
+    # How hard the cards of this lesson are for this learner, and how many in a
+    # row they have answered right at it. Per lesson: knowing one lesson says
+    # nothing about another.
+    level: Mapped[int] = mapped_column(SmallInteger, default=1, server_default="1")
+    level_run: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
     updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class ReviewCard(Base):
+    """One tap question about one section of a lesson, written by a model on
+    first need and checked against the same text before it is kept.
+
+    Shared between learners unless `owner_id` names one. `content_hash` is the
+    hash of the section it was written from; once the section changes, the
+    card is no longer served.
+    """
+
+    __tablename__ = "review_cards"
+    __table_args__ = (
+        Index("ix_review_cards_lesson_level", "lesson", "level", "status"),
+        CheckConstraint("level BETWEEN 1 AND 3", name="ck_review_cards_level"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid7)
+    lesson: Mapped[str] = mapped_column(String(LESSON_LENGTH))
+    # The h2 anchor of the section the card tests; NULL for a lesson indexed as
+    # one chunk.
+    anchor: Mapped[str | None] = mapped_column(Text, default=None)
+    kind: Mapped[str] = mapped_column(String(16))
+    level: Mapped[int] = mapped_column(SmallInteger)
+    prompt: Mapped[str] = mapped_column(Text)
+    options: Mapped[list[str]] = mapped_column(JSONB)
+    answer: Mapped[int] = mapped_column(JSONB)
+    explanation: Mapped[str] = mapped_column(Text)
+    figure: Mapped[str | None] = mapped_column(Text, default=None)
+    formula: Mapped[str | None] = mapped_column(Text, default=None)
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), default=None
+    )
+    content_hash: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(
+        String(16), default="active", server_default="active"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class CardDelivery(Base):
+    """One card sent to one learner, and what became of it.
+
+    `outcome` stays NULL until a tap grades it, the tutor grades a written
+    answer to it, or a day passes without either (`ignored`).
+    """
+
+    __tablename__ = "card_deliveries"
+    __table_args__ = (
+        Index("ix_card_deliveries_user_sent", "user_id", "sent_at"),
+        # What `expire` scans every cycle: the open deliveries, a small set in a
+        # table that is never pruned.
+        Index(
+            "ix_card_deliveries_open",
+            "sent_at",
+            postgresql_where=text("outcome IS NULL"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid7)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE")
+    )
+    card_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("review_cards.id", ondelete="CASCADE")
+    )
+    tg_message_id: Mapped[int] = mapped_column(BigInteger)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    answered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    chosen: Mapped[int | None] = mapped_column(JSONB, default=None)
+    outcome: Mapped[str | None] = mapped_column(String(16), default=None)
+
+
+class BackgroundRun(Base):
+    """Model spend with no message to hang it on: a card written or checked
+    in the poller. The monthly ceiling sums `usage` here as it does on
+    `messages` and `lab_submissions`."""
+
+    __tablename__ = "background_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid7)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), default=None
+    )
+    kind: Mapped[str] = mapped_column(String(16))
+    usage: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 

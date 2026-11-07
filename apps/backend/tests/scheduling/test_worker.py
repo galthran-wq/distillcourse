@@ -21,6 +21,7 @@ from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
 from app.labs import repository as labs
 from app.models import (
+    CardDelivery,
     Chat,
     LabPairingCode,
     Message,
@@ -36,29 +37,33 @@ from app.scheduling import policy, repository, worker
 from app.telegram import api
 from app.telegram import repository as telegram
 from tests.conftest import Bot, replying
+from tests.review.conftest import (  # noqa: F401  (a shared fixture)
+    LESSON,
+    indexed_section,
+    stored_card,
+)
 from tests.scheduling.conftest import NOON
 
-LESSON = "lesson:information-theory/entropy-as-average-surprise"
 WAKING = policy.Hours(ZoneInfo("UTC"), time(9), time(22))
 
 
+@pytest.fixture(autouse=True)
+async def written(session: AsyncSession, indexed_section: None) -> None:  # noqa: ARG001, F811
+    """Cards enough for every review these tests send: sending one costs no
+    model, which is what keeps the poller's own behaviour the subject here."""
+    for index in range(4):
+        await stored_card(session, prompt=f"Card {index}: ____")
+
+
 async def due_review(
-    session: AsyncSession,
-    user: User,
-    *,
-    note: str = "entropy is due for review",
-    topic: str | None = None,
-    at: datetime | None = None,
+    session: AsyncSession, user: User, *, at: datetime | None = None
 ) -> Schedule:
-    payload: dict[str, object] = {"note": note}
-    if topic is not None:
-        payload["topic"] = topic
     return await repository.create(
         session,
         user_id=user.id,
         kind="review",
         due_at=at or NOON - timedelta(minutes=1),
-        payload=payload,
+        payload={"lesson": LESSON, "completed_at": None},
         created_by="system",
     )
 
@@ -81,8 +86,34 @@ async def thread_messages(session: AsyncSession, user: User, chat: Chat) -> str:
     return json.dumps([row.pydantic_ai for row in rows])
 
 
-async def test_a_due_review_is_delivered_and_waits_for_a_reply(
-    session: AsyncSession, user: User, thread: Chat
+async def cards_sent(session: AsyncSession, user: User) -> list[CardDelivery]:
+    return list(
+        await session.scalars(
+            select(CardDelivery)
+            .where(CardDelivery.user_id == user.id)
+            .order_by(CardDelivery.sent_at)
+        )
+    )
+
+
+async def card_sent(
+    session: AsyncSession, user: User, *, ago: timedelta, outcome: str | None = None
+) -> CardDelivery:
+    card = await stored_card(session, prompt=f"Sent {ago} ago")
+    row = CardDelivery(
+        user_id=user.id,
+        card_id=card.id,
+        tg_message_id=1,
+        sent_at=datetime.now(UTC) - ago,
+        outcome=outcome,
+    )
+    session.add(row)
+    await session.commit()
+    return row
+
+
+async def test_a_due_review_is_sent_as_a_card(
+    session: AsyncSession, user: User, thread: Chat, bot: Bot
 ) -> None:
     row = await due_review(session, user)
 
@@ -90,10 +121,10 @@ async def test_a_due_review_is_delivered_and_waits_for_a_reply(
         await worker.cycle(session, NOON)
 
     await session.refresh(row)
-    assert row.status == "awaiting_reply"
-    assert row.due_at == policy.slot_deadline(NOON, WAKING)
-    assert row.claimed_at == NOON
-    assert "entropy is what you owe me" in await thread_messages(session, user, thread)
+    assert (row.status, row.claimed_at) == ("done", NOON)
+    assert len(await cards_sent(session, user)) == 1
+    assert bot.sent[0].keyboard is not None
+    assert await HarnessRepository(session, user.id).rows(thread) == []
 
 
 async def test_nothing_is_delivered_without_a_connected_thread(
@@ -153,8 +184,8 @@ async def test_a_row_that_never_completes_is_failed(
 async def test_a_thread_already_in_use_is_not_interrupted(
     session: AsyncSession, user: User, thread: Chat
 ) -> None:
-    """The incoming message holds the thread's claim; the proactive run finds
-    it taken and comes back rather than talking over it."""
+    """The incoming message holds the thread's claim; the card finds it taken
+    and comes back rather than landing in the middle of the answer."""
     row = await due_review(session, user)
     repo = HarnessRepository(session, user.id)
     await repo.claim_run(thread, uuid.uuid4())
@@ -165,11 +196,12 @@ async def test_a_thread_already_in_use_is_not_interrupted(
     await session.refresh(row)
     assert row.status == "deferred"
     assert row.due_at == NOON + worker.BUSY_RETRY
-    assert await repo.rows(thread) == []
+    assert await cards_sent(session, user) == []
 
 
+@pytest.mark.usefixtures("thread")
 async def test_quiet_hours_hold_the_message_until_morning(
-    session: AsyncSession, user: User, thread: Chat
+    session: AsyncSession, user: User
 ) -> None:
     night = NOON.replace(hour=23)
     row = await due_review(session, user, at=night)
@@ -180,7 +212,7 @@ async def test_quiet_hours_hold_the_message_until_morning(
     await session.refresh(row)
     assert row.status == "deferred"
     assert row.due_at == policy.next_open(night, WAKING)
-    assert await HarnessRepository(session, user.id).rows(thread) == []
+    assert await cards_sent(session, user) == []
 
 
 @pytest.mark.usefixtures("thread")
@@ -203,72 +235,55 @@ async def test_the_daily_budget_holds_the_second_message(
     assert row.due_at == policy.tomorrow_open(NOON, WAKING)
 
 
+@pytest.mark.usefixtures("thread")
 async def test_one_item_goes_out_a_day_and_the_rest_wait(
-    session: AsyncSession, user: User, thread: Chat
+    session: AsyncSession, user: User
 ) -> None:
-    rows = [await due_review(session, user, note=f"item {index}") for index in range(4)]
+    rows = [await due_review(session, user) for _ in range(4)]
 
     with replying():
         await worker.cycle(session, NOON)
 
     for row in rows:
         await session.refresh(row)
-    delivered = [row for row in rows if row.status == "awaiting_reply"]
+    delivered = [row for row in rows if row.status == "done"]
     postponed = [row for row in rows if row.status == "deferred"]
     assert len(delivered) == 1
     assert [row.due_at for row in postponed] == [policy.tomorrow_open(NOON, WAKING)] * 3
-    assert (await thread_messages(session, user, thread)).count("What is due") == 1
+    assert len(await cards_sent(session, user)) == 1
     assert repository.CLAIM_BATCH > len(rows)
 
-    # Deferred, not lost: the next day carries the next one.
-    tomorrow = NOON + timedelta(days=1)
-    with replying():
-        await worker.cycle(session, tomorrow)
 
-    for row in rows:
-        await session.refresh(row)
-    assert [row.status for row in rows].count("awaiting_reply") == 1
-    assert [row.status for row in rows].count("deferred") == 2
-    assert (await thread_messages(session, user, thread)).count("What is due") == 2
-
-
-async def test_one_message_waits_for_a_reply_at_a_time(
-    session: AsyncSession, user: User, thread: Chat
+@pytest.mark.usefixtures("thread")
+async def test_one_card_waits_for_a_tap_at_a_time(
+    session: AsyncSession, user: User
 ) -> None:
-    open_slot = await due_review(session, user)
-    open_slot.status = "awaiting_reply"
-    open_slot.claimed_at = NOON - timedelta(hours=1)
-    open_slot.due_at = NOON + timedelta(hours=3)
+    """What else is due waits for the open card to be answered, or to go a day
+    without an answer."""
+    open_card = await card_sent(session, user, ago=timedelta(hours=1))
     row = await due_review(session, user)
-    await session.commit()
 
     with replying():
         await worker.cycle(session, NOON)
 
     await session.refresh(row)
     assert row.status == "deferred"
-    assert row.due_at == open_slot.due_at
-    assert await HarnessRepository(session, user.id).rows(thread) == []
+    assert row.due_at == open_card.sent_at + policy.IGNORED_AFTER
+    assert await cards_sent(session, user) == [open_card]
 
 
-async def test_a_reminder_does_not_wait_for_the_open_slot(
+async def test_a_reminder_does_not_wait_for_the_open_card(
     session: AsyncSession, user: User, thread: Chat
 ) -> None:
-    """The learner named a time. An unanswered review of ours must not push
-    their own appointment four waking hours down the day."""
-    open_slot = await due_review(session, user)
-    open_slot.status = "awaiting_reply"
-    open_slot.claimed_at = NOON - timedelta(hours=1)
-    open_slot.due_at = NOON + timedelta(hours=3)
+    """The learner named a time. An unanswered card of ours must not push
+    their own appointment down the day."""
+    await card_sent(session, user, ago=timedelta(hours=1))
     reminder = await due_reminder(session, user)
-    await session.commit()
 
     with replying():
         await worker.cycle(session, NOON)
 
     await session.refresh(reminder)
-    # Delivered and finished: nothing is waiting for an answer to a reminder,
-    # so it does not take the slot the review is still holding either.
     assert reminder.status == "done"
     assert "redo exercise 3" in await thread_messages(session, user, thread)
 
@@ -320,24 +335,19 @@ async def test_a_reminder_waits_for_a_transport_instead_of_being_cancelled(
     )
 
 
-async def went_unanswered(
-    session: AsyncSession, user: User, count: int, *, last: datetime
-) -> None:
+async def went_unanswered(session: AsyncSession, user: User, count: int) -> None:
+    """`count` cards in a row, a day apart, none of them answered; the last one
+    four days ago."""
     for days in range(count):
-        row = await due_review(session, user, note=f"ignored {days}")
-        row.status = "done"
-        row.outcome = "ignored"
-        row.claimed_at = last - timedelta(days=days)
-    await session.commit()
+        await card_sent(session, user, ago=timedelta(days=4 + days), outcome="ignored")
 
 
 @pytest.mark.usefixtures("thread")
 async def test_a_silent_learner_is_held_until_the_wait_is_over(
     session: AsyncSession, user: User
 ) -> None:
-    last = NOON - timedelta(days=3)
-    await went_unanswered(session, user, 4, last=last)
-    rows = [await due_review(session, user, note=f"item {index}") for index in range(2)]
+    await went_unanswered(session, user, 4)
+    rows = [await due_review(session, user) for _ in range(2)]
 
     with replying():
         await worker.cycle(session, NOON)
@@ -353,7 +363,7 @@ async def test_a_silent_learner_is_held_until_the_wait_is_over(
 async def test_any_message_from_the_learner_ends_the_wait(
     session: AsyncSession, user: User, thread: Chat
 ) -> None:
-    await went_unanswered(session, user, 4, last=NOON - timedelta(days=3))
+    await went_unanswered(session, user, 4)
     row = await due_review(session, user)
     with replying():
         await worker.cycle(session, NOON)
@@ -366,7 +376,7 @@ async def test_any_message_from_the_learner_ends_the_wait(
     await session.execute(
         update(Message)
         .where(Message.chat_id == thread.id)
-        .values(created_at=NOON + timedelta(hours=1))
+        .values(created_at=datetime.now(UTC) - timedelta(days=1))
     )
     await session.commit()
     with replying():
@@ -374,13 +384,13 @@ async def test_any_message_from_the_learner_ends_the_wait(
 
     await session.refresh(row)
     assert await repository.silence(session, user.id) == 0
-    assert row.status == "awaiting_reply"
+    assert row.status == "done"
 
 
 async def test_a_reminder_is_delivered_during_a_backoff_wait(
     session: AsyncSession, user: User, thread: Chat
 ) -> None:
-    await went_unanswered(session, user, 4, last=NOON - timedelta(days=3))
+    await went_unanswered(session, user, 4)
     reminder = await due_reminder(session, user)
     held = await due_review(session, user)
 
@@ -398,7 +408,7 @@ async def test_a_reminder_is_delivered_during_a_backoff_wait(
 async def test_a_ladder_makes_no_second_row_while_its_delivery_waits(
     session: AsyncSession, user: User
 ) -> None:
-    await went_unanswered(session, user, 4, last=NOON - timedelta(days=3))
+    await went_unanswered(session, user, 4)
     session.add(
         ReviewState(
             user_id=user.id,
@@ -425,130 +435,31 @@ async def test_a_ladder_makes_no_second_row_while_its_delivery_waits(
     ]
 
 
-async def test_a_reply_closes_the_slot(
-    session: AsyncSession, user: User, thread: Chat
-) -> None:
-    row = await due_review(session, user)
-    row.status = "awaiting_reply"
-    row.claimed_at = datetime.now(UTC) - timedelta(hours=1)
-    row.due_at = NOON + timedelta(hours=3)
-    session.add(
-        Message(
-            chat_id=thread.id,
-            role="user",
-            pydantic_ai={},
-            projection=[],
-        )
-    )
-    await session.commit()
-
-    with replying():
-        await worker.cycle(session, NOON)
-
-    await session.refresh(row)
-    assert row.status == "done"
-    assert row.outcome == "answered"
-
-
-@pytest.mark.usefixtures("thread")
-async def test_a_message_nobody_answered_is_recorded_as_ignored(
+async def test_a_tap_ends_the_silence_as_a_message_does(
     session: AsyncSession, user: User
 ) -> None:
-    row = await due_review(session, user, topic="information-theory")
-    row.status = "awaiting_reply"
-    row.claimed_at = NOON - timedelta(hours=5)
-    row.due_at = NOON - timedelta(minutes=1)
+    await went_unanswered(session, user, 2)
+    assert await repository.silence(session, user.id) == 2
+
+    answered = await card_sent(session, user, ago=timedelta(days=1), outcome="correct")
+    answered.answered_at = datetime.now(UTC) - timedelta(hours=20)
     await session.commit()
 
-    with replying():
-        await worker.cycle(session, NOON)
-
-    await session.refresh(row)
-    assert row.status == "done"
-    assert row.outcome == "ignored"
+    assert await repository.silence(session, user.id) == 0
 
 
-async def test_the_message_after_an_ignored_one_leads_with_another_topic(
-    session: AsyncSession, user: User, thread: Chat
+async def test_a_card_answered_late_still_ends_the_silence(
+    session: AsyncSession, user: User
 ) -> None:
-    ignored = await due_review(session, user, topic="information-theory")
-    ignored.status = "done"
-    ignored.outcome = "ignored"
-    # Far enough back for the one-day wait that one silence earns to be over.
-    ignored.claimed_at = NOON - timedelta(days=1, hours=1)
-    same = [
-        await due_review(
-            session, user, topic="information-theory", note=f"same {index}"
-        )
-        for index in range(2)
-    ]
-    for other in range(2):
-        await due_review(session, user, topic="classical-ml", note=f"other {other}")
+    """Silence counts the ignored cards sent since the learner last did
+    anything: a tap on an old card is something."""
+    await went_unanswered(session, user, 3)
+    old = (await cards_sent(session, user))[0]
+    old.outcome = "correct"
+    old.answered_at = datetime.now(UTC) - timedelta(days=1)
     await session.commit()
 
-    with replying():
-        await worker.cycle(session, NOON)
-
-    for row in same:
-        await session.refresh(row)
-    prompt = await thread_messages(session, user, thread)
-    assert [row.status for row in same] == ["deferred", "deferred"]
-    assert "other 0" in prompt
-    assert "same 0" not in prompt
-
-
-async def test_a_message_runs_the_whole_loop_from_delivery_to_rotation(
-    session: AsyncSession, user: User, thread: Chat
-) -> None:
-    """The sequence in one pass: a due review is delivered, the slot waits, the
-    learner never answers, it times out as ignored, and the message that goes
-    out next — a day later, after the one silence — leads with a different
-    topic."""
-    first = await due_review(
-        session, user, topic="information-theory", note="entropy is due"
-    )
-
-    with replying():
-        await worker.cycle(session, NOON)
-
-    await session.refresh(first)
-    assert (first.status, first.outcome) == ("awaiting_reply", None)
-    assert "entropy is what you owe me" in await thread_messages(session, user, thread)
-
-    timeout = policy.slot_deadline(NOON, WAKING)
-    tomorrow = NOON + timedelta(days=1)
-    same = await due_review(
-        session,
-        user,
-        topic="information-theory",
-        note="mutual information is due",
-        at=timeout,
-    )
-    other = await due_review(
-        session,
-        user,
-        topic="classical-ml",
-        note="bias and variance are due",
-        at=timeout,
-    )
-
-    with replying():
-        await worker.cycle(session, timeout)
-
-    for row in (first, same, other):
-        await session.refresh(row)
-    assert (first.status, first.outcome) == ("done", "ignored")
-    assert same.status == other.status == "deferred"
-
-    with replying():
-        await worker.cycle(session, tomorrow)
-
-    for row in (same, other):
-        await session.refresh(row)
-    prompt = await thread_messages(session, user, thread)
-    assert (other.status, same.status) == ("awaiting_reply", "deferred")
-    assert "bias and variance" in prompt
-    assert "mutual information" not in prompt
+    assert await repository.silence(session, user.id) == 0
 
 
 @pytest.mark.usefixtures("thread")
@@ -560,7 +471,9 @@ async def test_a_failed_run_does_not_spend_the_overflows_day(
     def refuse(_messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
         raise RuntimeError("openrouter is down")
 
-    rows = [await due_review(session, user, note=f"item {index}") for index in range(4)]
+    rows = [
+        await due_reminder(session, user, note=f"item {index}") for index in range(4)
+    ]
 
     with tutor.override(model=FunctionModel(refuse), tools=[]):
         await worker.cycle(session, NOON)
@@ -573,9 +486,48 @@ async def test_a_failed_run_does_not_spend_the_overflows_day(
     ] * 3
 
 
-async def test_a_muted_learner_is_left_alone(
-    session: AsyncSession, user: User, thread: Chat
+@pytest.mark.usefixtures("thread")
+async def test_a_review_with_no_card_does_not_spend_the_overflows_day(
+    session: AsyncSession, user: User
 ) -> None:
+    """The lesson finished last has no card to send, so nothing went out:
+    the review behind it is still due today rather than tomorrow morning."""
+    empty = await repository.create(
+        session,
+        user_id=user.id,
+        kind="review",
+        due_at=NOON - timedelta(minutes=1),
+        # A lesson the index does not hold has no section to write a card from.
+        payload={
+            "lesson": "lesson:information-theory/not-indexed",
+            "completed_at": (NOON - timedelta(days=1)).isoformat(),
+        },
+        created_by="system",
+    )
+    behind = await repository.create(
+        session,
+        user_id=user.id,
+        kind="review",
+        due_at=NOON - timedelta(minutes=1),
+        payload={
+            "lesson": LESSON,
+            "completed_at": (NOON - timedelta(days=5)).isoformat(),
+        },
+        created_by="system",
+    )
+
+    with replying():
+        await worker.cycle(session, NOON)
+
+    await session.refresh(empty)
+    await session.refresh(behind)
+    assert empty.status == "cancelled"
+    assert (behind.status, behind.due_at) == ("deferred", NOON)
+    assert await cards_sent(session, user) == []
+
+
+@pytest.mark.usefixtures("thread")
+async def test_a_muted_learner_is_left_alone(session: AsyncSession, user: User) -> None:
     """A mute is not a reschedule: the row is not claimed at all, so it keeps
     the time it was meant for."""
     row = await due_review(session, user)
@@ -589,7 +541,7 @@ async def test_a_muted_learner_is_left_alone(
     assert row.status == "pending"
     assert row.due_at == due_at
     assert row.claimed_at is None
-    assert await HarnessRepository(session, user.id).rows(thread) == []
+    assert await cards_sent(session, user) == []
 
 
 @pytest.mark.usefixtures("thread")
@@ -611,7 +563,7 @@ async def test_an_open_ended_mute_does_not_outlive_itself(
         await worker.cycle(session, NOON)
 
     await session.refresh(row)
-    assert row.status == "awaiting_reply"
+    assert row.status == "done"
 
 
 @pytest.mark.usefixtures("thread")
@@ -626,7 +578,7 @@ async def test_an_expired_mute_lets_the_platform_write_again(
         await worker.cycle(session, NOON)
 
     await session.refresh(row)
-    assert row.status == "awaiting_reply"
+    assert row.status == "done"
 
 
 @pytest.mark.usefixtures("thread")
@@ -661,7 +613,7 @@ async def test_a_blocked_bot_pauses_everything_for_that_learner(
         await worker.cycle(session, NOON)
 
     await session.refresh(row)
-    assert row.status == "awaiting_reply"
+    assert row.status == "done"
     assert bot.sent != []
 
 
@@ -721,7 +673,7 @@ async def test_a_run_that_fails_is_tried_again_later(
     def refuse(_messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
         raise RuntimeError("openrouter is down")
 
-    row = await due_review(session, user)
+    row = await due_reminder(session, user)
 
     with tutor.override(model=FunctionModel(refuse), tools=[]):
         await worker.cycle(session, NOON)
@@ -735,7 +687,7 @@ async def test_a_run_that_fails_is_tried_again_later(
 async def test_a_spent_budget_holds_the_message_rather_than_failing_it(
     session: AsyncSession, user: User, thread: Chat
 ) -> None:
-    row = await due_review(session, user)
+    row = await due_reminder(session, user)
     session.add(
         Message(
             chat_id=thread.id,
