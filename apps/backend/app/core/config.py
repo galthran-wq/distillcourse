@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     # the lesson before it is kept. A card is written once and reused, so this
     # is paid per batch rather than per message.
     CARD_MODEL: str = DEFAULT_CHAT_MODEL
+    # What decides, in the background, whether the bot says anything to a
+    # learner and when it looks again. It runs a few times a day per learner
+    # on a state summary rather than the thread, so it is cheap at any size.
+    COACH_MODEL: str = DEFAULT_CHAT_MODEL
 
     # What turns a Telegram voice message into text. Not a chat model: it is
     # called on OpenRouter's transcription endpoint, so it has no place in
@@ -108,6 +112,8 @@ class Settings(BaseSettings):
     # Cards a learner can pull with "Next" in one day, counting the ones the
     # platform sent.
     CARDS_PER_DAY: int = 10
+    # How often the coach may wake for one learner in a day, whatever woke it.
+    COACH_RUNS_DAILY: int = 3
     WEB_SEARCH_DAILY_CAP: int = 20
     # The instance-wide ceiling is the software half of the budget; the other
     # half is a spend limit on the OpenRouter key itself.
@@ -154,7 +160,12 @@ class Settings(BaseSettings):
     def _guard_deployments(self) -> Self:
         # `model_for` falls back to the default for an id outside the pool, so
         # a review model set to one would be ignored without a word.
-        for name in ("DEFAULT_CHAT_MODEL", "LAB_REVIEW_MODEL", "CARD_MODEL"):
+        for name in (
+            "DEFAULT_CHAT_MODEL",
+            "LAB_REVIEW_MODEL",
+            "CARD_MODEL",
+            "COACH_MODEL",
+        ):
             if getattr(self, name) not in self.chat_model_pool:
                 raise ValueError(f"{name}={getattr(self, name)} is not in CHAT_MODELS")
         # The defaults above exist so tests and a bare `uv run` work with no

@@ -1,4 +1,4 @@
-"""0023 against a database that still holds the old review runs.
+"""0023 and 0025 against a database that still holds the old review rows.
 
 Alembic runs in a subprocess: `env.py` drives its own event loop and disposes
 the engine the rest of the suite shares. The rows are written on an engine of
@@ -102,7 +102,7 @@ async def test_the_upgrade_closes_open_review_runs_and_the_downgrade_restores_th
                     },
                 )
 
-        alembic("upgrade", "head")
+        alembic("upgrade", "0023")
 
         assert await statuses(own_engine, user_id) == {
             "open": ("done", "ignored"),
@@ -121,6 +121,87 @@ async def test_the_upgrade_closes_open_review_runs_and_the_downgrade_restores_th
     finally:
         alembic("upgrade", "head")
         async with own_engine.begin() as connection:
+            await connection.execute(
+                text("DELETE FROM users WHERE id = :id"), {"id": user_id}
+            )
+
+
+async def test_the_coach_upgrade_drops_review_rows_and_marks_what_the_poller_sent(
+    own_engine: AsyncEngine,
+) -> None:
+    user_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    alembic("downgrade", "0024")
+    try:
+        async with own_engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "INSERT INTO users (id, email, hashed_password, is_active) "
+                    "VALUES (:id, 'migrated@test', 'x', true)"
+                ),
+                {"id": user_id},
+            )
+            for name, kind in (("review", "review"), ("reminder", "reminder")):
+                await connection.execute(
+                    text(
+                        "INSERT INTO schedules (id, user_id, kind, due_at, payload, "
+                        "status, created_by, attempts) VALUES (:id, :user_id, "
+                        ":kind, :now, CAST(:payload AS jsonb), 'pending', 'system', 0)"
+                    ),
+                    {
+                        "id": uuid.uuid4(),
+                        "user_id": user_id,
+                        "kind": kind,
+                        "now": now,
+                        "payload": json.dumps({"name": name}),
+                    },
+                )
+            card_id = uuid.uuid4()
+            await connection.execute(
+                text(
+                    "INSERT INTO review_cards (id, lesson, kind, level, prompt, "
+                    "options, answer, explanation, content_hash) VALUES (:id, "
+                    "'lesson:c/l', 'gap', 1, 'p', '[]', '0', 'e', 'h')"
+                ),
+                {"id": card_id},
+            )
+            for harder in (False, True):
+                await connection.execute(
+                    text(
+                        "INSERT INTO card_deliveries (id, user_id, card_id, "
+                        "tg_message_id, sent_at, harder) VALUES (:id, :user_id, "
+                        ":card_id, 1, :now, :harder)"
+                    ),
+                    {
+                        "id": uuid.uuid4(),
+                        "user_id": user_id,
+                        "card_id": card_id,
+                        "now": now,
+                        "harder": harder,
+                    },
+                )
+
+        alembic("upgrade", "head")
+
+        assert await statuses(own_engine, user_id) == {"reminder": ("pending", None)}
+        async with own_engine.connect() as connection:
+            marked = await connection.execute(
+                text(
+                    "SELECT harder, initiated FROM card_deliveries "
+                    "WHERE user_id = :user_id"
+                ),
+                {"user_id": user_id},
+            )
+            assert sorted(marked.tuples()) == [(False, True), (True, False)]
+
+        alembic("downgrade", "0024")
+        assert await statuses(own_engine, user_id) == {"reminder": ("pending", None)}
+    finally:
+        alembic("upgrade", "head")
+        async with own_engine.begin() as connection:
+            await connection.execute(
+                text("DELETE FROM review_cards WHERE lesson = 'lesson:c/l'")
+            )
             await connection.execute(
                 text("DELETE FROM users WHERE id = :id"), {"id": user_id}
             )

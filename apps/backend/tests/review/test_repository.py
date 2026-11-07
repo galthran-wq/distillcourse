@@ -8,10 +8,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import cli
-from app.models import CardDelivery, LessonProgress, ReviewState, TgLink, User
+from app.models import CardDelivery, LessonProgress, ReviewState, User
 from app.review import ladder
 from app.review import repository as review
-from tests.review.conftest import LESSON, reviews, stored_card
+from tests.review.conftest import LESSON, stored_card
 from tests.review.conftest import ladder as ladder_row
 from tests.scheduling.conftest import NOON
 from tests.telemetry.conftest import (
@@ -87,80 +87,21 @@ async def test_a_second_completion_of_the_same_lesson_changes_nothing(
     assert state.step == 1
 
 
-@pytest.mark.usefixtures("link")
-async def test_a_due_ladder_becomes_exactly_one_delivery(
+async def test_only_a_ladder_that_opens_says_so(
     session: AsyncSession, user: User
 ) -> None:
-    state = await ladder_row(session, user)
-
-    await review.materialize(session, NOON)
-    await review.materialize(session, NOON)
-
-    rows = await reviews(session, user)
-    assert len(rows) == 1
-    assert rows[0].payload == {"lesson": LESSON, "completed_at": None}
-    assert (rows[0].status, rows[0].due_at) == ("pending", state.next_due_at)
+    """What the coach is woken by: a lesson finished, not the same completion
+    derived again by a later flush."""
+    assert await review.start(session, user.id, LESSON, NOW)
+    assert not await review.start(session, user.id, LESSON, NOW)
 
 
-@pytest.mark.usefixtures("link")
-async def test_a_ladder_that_is_not_due_yet_is_not_delivered(
-    session: AsyncSession, user: User
-) -> None:
-    await ladder_row(session, user, due_at=NOON + timedelta(days=1))
-
-    await review.materialize(session, NOON)
-
-    assert await reviews(session, user) == []
-
-
-@pytest.mark.usefixtures("link")
-async def test_a_finished_ladder_is_never_delivered_again(
-    session: AsyncSession, user: User
-) -> None:
-    await ladder_row(session, user, step=len(ladder.STEPS), due_at=None)
-
-    await review.materialize(session, NOON)
-
-    assert await reviews(session, user) == []
-
-
-async def test_nothing_is_materialised_before_the_channel_exists(
-    session: AsyncSession, user: User
-) -> None:
-    """A review with nowhere to go is not a row: the poller would cancel it on
-    sight and the next cycle would make it again, every cycle, forever. Pairing
-    later needs no repair — the ladder stood the whole time."""
-    await ladder_row(session, user)
-
-    await review.materialize(session, NOON)
-    assert await reviews(session, user) == []
-
-    session.add(TgLink(user_id=user.id, tg_chat_id=99))
-    await session.commit()
-    await review.materialize(session, NOON)
-
-    assert len(await reviews(session, user)) == 1
-
-
-@pytest.mark.usefixtures("link")
-async def test_a_broken_channel_materialises_nothing(
-    session: AsyncSession, user: User, link: TgLink
-) -> None:
-    await ladder_row(session, user)
-    link.status = "broken"
-    await session.commit()
-
-    await review.materialize(session, NOON)
-
-    assert await reviews(session, user) == []
-
-
-@pytest.mark.usefixtures("link", "indexed_section")
+@pytest.mark.usefixtures("indexed_section")
 async def test_a_lesson_a_card_was_sent_for_rests_for_three_days(
     session: AsyncSession, user: User
 ) -> None:
     """A card left unanswered leaves its ladder due. The lesson does not come
-    straight back as the next message; it waits out the rest, and then it does.
+    straight back as the next card; it waits out the rest, and then it does.
     """
     await ladder_row(session, user)
     card = await stored_card(session)
@@ -174,75 +115,39 @@ async def test_a_lesson_a_card_was_sent_for_rests_for_three_days(
     )
     await session.commit()
 
-    await review.materialize(session, NOON)
-    assert await reviews(session, user) == []
-
-    await review.materialize(session, NOON + timedelta(hours=1))
-    assert len(await reviews(session, user)) == 1
+    assert await review.due(session, user.id, NOON, recent_first=True) == []
+    later = NOON + timedelta(hours=1)
+    assert len(await review.due(session, user.id, later, recent_first=True)) == 1
 
 
-@pytest.mark.usefixtures("link")
-async def test_a_review_carries_when_its_lesson_was_finished(
-    session: AsyncSession, user: User
-) -> None:
-    """What the poller ranks one learner's due reviews by."""
-    await ladder_row(session, user)
-    finished = NOON - timedelta(days=2)
-    session.add(
-        LessonProgress(
-            user_id=user.id,
-            lesson=LESSON,
-            active_seconds=600,
-            max_scroll_pct=100,
-            proofs_opened=0,
-            solutions_opened=0,
-            demos_touched=0,
-            first_seen=finished,
-            last_seen=finished,
-            completed_at=finished,
-        )
+def progress(user: User, lesson: str, finished: datetime | None) -> LessonProgress:
+    moment = finished or NOON - timedelta(days=30)
+    return LessonProgress(
+        user_id=user.id,
+        lesson=lesson,
+        active_seconds=600,
+        max_scroll_pct=100,
+        proofs_opened=0,
+        solutions_opened=0,
+        demos_touched=0,
+        first_seen=moment,
+        last_seen=moment,
+        completed_at=finished,
     )
-    await session.commit()
-
-    [row] = await review.materialize(session, NOON)
-
-    assert row.payload["completed_at"] == finished.isoformat()
 
 
-@pytest.mark.usefixtures("link")
-async def test_a_delivery_out_of_attempts_is_settled_rather_than_queued_forever(
+async def test_the_lesson_finished_last_is_due_first_and_a_lab_last(
     session: AsyncSession, user: User
 ) -> None:
-    """A failed row is not live, and the ladder behind it stays due in the
-    past: unaccounted for, every cycle makes the same review again. Our outage
-    says nothing about the learner, so it is a deferral.
-    """
-    state = await ladder_row(session, user, step=1)
-    row = (await review.materialize(session, NOON))[0]
-    row.claimed_at = NOON
-    row.status = "failed"
+    """The weekly floor's order: the lesson still in their head first; a lab's
+    ladder, with no reading behind it, after every lesson."""
+    older, newer, lab = (f"{LESSON}-{name}" for name in ("older", "newer", "lab"))
+    for lesson in (older, lab, newer):
+        await ladder_row(session, user, lesson=lesson)
+    session.add(progress(user, older, NOON - timedelta(days=5)))
+    session.add(progress(user, newer, NOON - timedelta(days=1)))
     await session.commit()
 
-    await review.settle(session, NOON)
-    await review.materialize(session, NOON)
+    due = await review.due(session, user.id, NOON, recent_first=True)
 
-    await session.refresh(state)
-    assert (state.step, state.last_outcome) == (1, "deferred")
-    assert state.next_due_at == NOON + ladder.DEFERRAL
-    assert [item.status for item in await reviews(session, user)] == ["failed"]
-
-
-@pytest.mark.usefixtures("link")
-async def test_a_failed_delivery_is_settled_once(
-    session: AsyncSession, user: User
-) -> None:
-    state = await ladder_row(session, user, step=1)
-    row = (await review.materialize(session, NOON))[0]
-    row.status = "failed"
-    await session.commit()
-
-    await review.settle(session, NOON)
-    await review.settle(session, NOON + timedelta(hours=1))
-
-    await session.refresh(state)
-    assert state.next_due_at == NOON + ladder.DEFERRAL
+    assert [state.lesson for state in due] == [newer, older, lab]

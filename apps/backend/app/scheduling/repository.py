@@ -4,14 +4,14 @@ from datetime import datetime, timedelta
 from typing import Any, Literal
 
 import logfire
-from sqlalchemy import ScalarSelect, func, or_, select, true, update
+from sqlalchemy import ColumnElement, ScalarSelect, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models import CardDelivery, Chat, Message, Schedule, TgLink, User
 from app.scheduling import policy
 
-ScheduleKind = Literal["review", "reminder"]
+ScheduleKind = Literal["coach", "reminder"]
 CreatedBy = Literal["system", "user"]
 
 # How long a claimed row stays off limits to other workers. A process that
@@ -24,6 +24,26 @@ CLAIM_BATCH = 100
 WAITING = ("pending", "deferred")
 
 
+def new(
+    *,
+    user_id: uuid.UUID,
+    kind: ScheduleKind,
+    due_at: datetime,
+    payload: dict[str, Any],
+    created_by: CreatedBy,
+) -> Schedule:
+    """A row not yet added to any session, for a caller that commits it with
+    something else."""
+    return Schedule(
+        user_id=user_id,
+        kind=kind,
+        due_at=due_at,
+        payload=payload,
+        status="pending",
+        created_by=created_by,
+    )
+
+
 async def create(
     session: AsyncSession,
     *,
@@ -33,12 +53,11 @@ async def create(
     payload: dict[str, Any],
     created_by: CreatedBy,
 ) -> Schedule:
-    row = Schedule(
+    row = new(
         user_id=user_id,
         kind=kind,
         due_at=due_at,
         payload=payload,
-        status="pending",
         created_by=created_by,
     )
     session.add(row)
@@ -108,11 +127,7 @@ async def defer(
 
 async def drop(session: AsyncSession, rows: Sequence[Schedule]) -> None:
     """Rows nothing will ever deliver. Unlike a defer, these do not come back.
-
-    The one function here that leaves the commit to its caller: dropping what
-    is queued for a lesson is the last step of recording a review outcome
-    (`app/review/tools.py`), and that whole path is one transaction.
-    """
+    Leaves the commit to the caller."""
     for row in rows:
         row.status = "cancelled"
         row.claimed_at = None
@@ -142,11 +157,7 @@ async def retry(
 
 
 async def deliver(session: AsyncSession, rows: Sequence[Schedule]) -> None:
-    """Rows that are finished the moment they are sent: every row is, since
-    what a card asks for is recorded on its delivery, not here. A sent row
-    counts as a message the platform sent, which is what `initiations_today`
-    reads it as.
-    """
+    """Reminders that went out: finished the moment they are sent."""
     for row in rows:
         row.status = "done"
         row.lease_until = None
@@ -172,24 +183,29 @@ async def sweep_leases(session: AsyncSession, now: datetime) -> None:
 async def initiations_today(
     session: AsyncSession, user_id: uuid.UUID, since: datetime
 ) -> int:
-    """Messages the platform started today, not items it delivered — one
-    message may carry more than one item (`policy.SESSION_ITEMS`). A batch is
-    claimed in a single statement, so its rows share the moment that
-    identifies it.
-    """
-    total = await session.scalar(
-        select(func.count(func.distinct(Schedule.claimed_at))).where(
-            Schedule.user_id == user_id,
-            Schedule.claimed_at >= since,
-            Schedule.status == "done",
+    """Messages the platform started today: the cards it sent on its own
+    account, and the reminders — the learner's appointment, but still a
+    message, which the day's one card waits behind."""
+    cards = await session.scalar(
+        select(func.count()).where(
+            CardDelivery.user_id == user_id,
+            CardDelivery.initiated,
+            CardDelivery.sent_at >= since,
         )
     )
-    return int(total or 0)
+    reminders = await session.scalar(
+        select(func.count()).where(
+            Schedule.user_id == user_id,
+            Schedule.kind == "reminder",
+            Schedule.status == "done",
+            Schedule.claimed_at >= since,
+        )
+    )
+    return int(cards or 0) + int(reminders or 0)
 
 
-def _last_message(user_id: object) -> ScalarSelect[datetime]:
-    """When the learner last wrote in the Telegram thread. `user_id` is a value
-    or a column, which is what lets the same subquery be correlated."""
+def _last_message(user_id: uuid.UUID) -> ScalarSelect[datetime]:
+    """When the learner last wrote in the Telegram thread."""
     return (
         select(func.max(Message.created_at))
         .join(Chat, Chat.id == Message.chat_id)
@@ -198,16 +214,20 @@ def _last_message(user_id: object) -> ScalarSelect[datetime]:
     )
 
 
-async def open_card_deadline(
-    session: AsyncSession, user_id: uuid.UUID
-) -> datetime | None:
-    """When the card still waiting for a tap counts as ignored, if one is."""
-    sent: datetime | None = await session.scalar(
-        select(func.max(CardDelivery.sent_at)).where(
-            CardDelivery.user_id == user_id, CardDelivery.outcome.is_(None)
-        )
+def _answered(user_id: uuid.UUID) -> ColumnElement[datetime]:
+    """When the learner last wrote in the thread or tapped a card."""
+    last_tap = (
+        select(func.max(CardDelivery.answered_at))
+        .where(CardDelivery.user_id == user_id)
+        .scalar_subquery()
     )
-    return None if sent is None else sent + policy.IGNORED_AFTER
+    # greatest() skips NULLs, so either one alone is enough.
+    return func.greatest(_last_message(user_id), last_tap)
+
+
+async def last_answer(session: AsyncSession, user_id: uuid.UUID) -> datetime | None:
+    moment: datetime | None = await session.scalar(select(_answered(user_id)))
+    return moment
 
 
 async def silence(session: AsyncSession, user_id: uuid.UUID) -> int:
@@ -216,13 +236,7 @@ async def silence(session: AsyncSession, user_id: uuid.UUID) -> int:
     thread and the deliveries rather than stored, so it cannot drift from
     either.
     """
-    last_answer = (
-        select(func.max(CardDelivery.answered_at))
-        .where(CardDelivery.user_id == user_id)
-        .scalar_subquery()
-    )
-    # greatest() skips NULLs, so either one alone is enough to count from.
-    since = func.greatest(_last_message(user_id), last_answer)
+    since = _answered(user_id)
     total = await session.scalar(
         select(func.count()).where(
             CardDelivery.user_id == user_id,
@@ -234,43 +248,16 @@ async def silence(session: AsyncSession, user_id: uuid.UUID) -> int:
 
 
 async def last_initiation(session: AsyncSession, user_id: uuid.UUID) -> datetime | None:
-    """When the platform last opened the conversation of its own accord — a
-    reminder is the learner's appointment, not ours, so it does not count. The
-    same messages `silence` counts, so the wait runs from the last of them."""
+    """When the platform last opened the conversation of its own accord: the
+    last card it sent on its own account. A card the learner asked for (Next,
+    Harder) was their move, and a reminder is their appointment, not ours, so
+    neither counts."""
     moment: datetime | None = await session.scalar(
-        select(func.max(CardDelivery.sent_at)).where(CardDelivery.user_id == user_id)
-    )
-    return moment
-
-
-async def held_past_a_reply(session: AsyncSession, now: datetime) -> Sequence[Schedule]:
-    """Reviews still held for a learner who has written since the platform's
-    last card went unanswered.
-
-    The silence that held them is over the moment the learner writes, but a
-    deferred row is not looked at again until its `due_at`, which a wait put
-    days out.
-    """
-    latest = (
-        select(CardDelivery.sent_at, CardDelivery.outcome)
-        .where(CardDelivery.user_id == Schedule.user_id)
-        .order_by(CardDelivery.sent_at.desc())
-        .limit(1)
-        .correlate(Schedule)
-        .lateral()
-    )
-    rows = await session.scalars(
-        select(Schedule)
-        .join(latest, true())
-        .where(
-            Schedule.status == "deferred",
-            Schedule.kind == "review",
-            Schedule.due_at > now,
-            latest.c.outcome == "ignored",
-            _last_message(Schedule.user_id) > latest.c.sent_at,
+        select(func.max(CardDelivery.sent_at)).where(
+            CardDelivery.user_id == user_id, CardDelivery.initiated
         )
     )
-    return rows.all()
+    return moment
 
 
 async def users_by_id(

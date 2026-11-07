@@ -89,7 +89,7 @@ def model_for(openrouter_id: str, *, reasoning: bool = False) -> OpenRouterModel
     )
     # Only where the model has a reasoning trace AND the caller has a place to
     # show it: the web streaming chat, whose client renders the trace in a
-    # dropdown. Never for a title, a compaction, a proactive message or a
+    # dropdown. Never for a title, a compaction, a reminder or a
     # Telegram turn — none of them surface it, and the tokens would be billed
     # against the monthly ceiling for nothing. Low effort: it is a UX affordance,
     # not a quality lever. `exclude` defaults False, so the trace is returned.

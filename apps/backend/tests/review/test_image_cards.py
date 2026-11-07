@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models import CardDelivery, Document, ReviewCard, User
 from app.review import cards, writer
-from app.scheduling import worker
 from app.telegram import api
 from tests.conftest import Bot
 from tests.review.conftest import (
@@ -21,11 +20,11 @@ from tests.review.conftest import (
     card_models,
     draft,
     no_model,
+    send_due,
     stored_card,
     writing,
 )
 from tests.review.conftest import ladder as ladder_row
-from tests.scheduling.conftest import NOON
 from tests.telegram.conftest import deliver, tap
 
 pytestmark = pytest.mark.usefixtures("link", "indexed_section")
@@ -67,7 +66,7 @@ async def test_the_writer_is_given_the_figures_and_a_card_keeps_one_it_can_send(
     )
 
     with card_models(write=batch):
-        await worker.cycle(session, NOON)
+        await send_due(session, user)
 
     assert f"`{FIGURE}`: bars The average." in asked[0]
     kept = list(await session.scalars(select(ReviewCard)))
@@ -95,7 +94,7 @@ async def test_a_figure_card_is_a_photo_whose_caption_the_tap_answers_in(
     card = await stored_card(session, level=2, figure=FIGURE)
 
     with no_model():
-        await worker.cycle(session, NOON)
+        await send_due(session, user)
         sent = await delivered(session, user)
         await deliver(client, tap(f"k:{sent.id}:0", message_id=sent.tg_message_id))
 
@@ -122,7 +121,7 @@ async def test_a_formula_card_is_sent_typeset(
     await stored_card(session, formula=FORMULA)
 
     with no_model():
-        await worker.cycle(session, NOON)
+        await send_due(session, user)
 
     [photo] = bot.photos
     assert isinstance(photo.photo, bytes) and photo.photo.startswith(b"\x89PNG")
@@ -137,7 +136,7 @@ async def test_a_card_whose_image_telegram_refuses_is_retired_for_the_next(
     bot.refuse = api.TelegramError("Bad Request: wrong file identifier/HTTP URL")
 
     with no_model():
-        await worker.cycle(session, NOON)
+        await send_due(session, user)
 
     await session.refresh(refused)
     assert refused.status == "retired"
@@ -154,7 +153,7 @@ async def test_a_photo_cards_feedback_fits_a_caption(
     await session.commit()
 
     with no_model():
-        await worker.cycle(session, NOON)
+        await send_due(session, user)
         sent = await delivered(session, user)
         await deliver(client, tap(f"k:{sent.id}:0", message_id=sent.tg_message_id))
 

@@ -16,11 +16,14 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.coach import floor
 from app.content.ingest import ingest
 from app.content.schemas import ContentIndex
 from app.harness.agent import tutor
-from app.models import Document, ReviewCard, ReviewState, Schedule, User
+from app.models import CardDelivery, Document, ReviewCard, ReviewState, User
 from app.review import writer
+from app.telegram import repository as telegram
+from app.telegram.outbox import Outbox
 from tests.conftest import Bot
 from tests.content.conftest import corpus_index  # noqa: F401  (a shared fixture)
 from tests.harness.conftest import call
@@ -67,16 +70,14 @@ async def ladder(
     return row
 
 
-async def reviews(session: AsyncSession, user: User) -> list[Schedule]:
-    """This learner's review deliveries, delivered ones first. Rows made in one
-    transaction share a `created_at`, so it is no order at all."""
-    return list(
-        await session.scalars(
-            select(Schedule)
-            .where(Schedule.user_id == user.id, Schedule.kind == "review")
-            .order_by(Schedule.claimed_at.nullslast(), Schedule.due_at)
-        )
-    )
+async def send_due(
+    session: AsyncSession, user: User, now: datetime = NOON
+) -> CardDelivery | None:
+    """A card for what is due, chosen the way the weekly floor chooses one —
+    with no model, which keeps the cards themselves the subject here."""
+    link = await telegram.link_for_user(session, user.id)
+    assert link is not None
+    return await floor.send(session, Outbox(session=session, link=link), user, now)
 
 
 def echoed(bot: Bot) -> str:

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import CardDelivery, ReviewCard, ReviewState, User
 from app.review import cards, ladder, subject, writer
-from app.scheduling import policy, worker
+from app.scheduling import policy
 from tests.conftest import Bot
 from tests.review.conftest import (
     LESSON,
@@ -21,6 +21,7 @@ from tests.review.conftest import (
     draft,
     no_model,
     section_hash,
+    send_due,
     writing,
 )
 from tests.review.conftest import ladder as ladder_row
@@ -99,7 +100,7 @@ async def delivered(
     state = await ladder_row(session, user, step=step, level=level)
     await order_card(session)
     with no_model():
-        await worker.cycle(session, NOON)
+        await send_due(session, user)
     sent = await session.scalar(
         select(CardDelivery).where(CardDelivery.user_id == user.id)
     )

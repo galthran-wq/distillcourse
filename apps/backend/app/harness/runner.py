@@ -150,7 +150,7 @@ def _model(
 ) -> OpenRouterModel:
     """Which model answers. The learner's choice is theirs for the dialogue
     they are having; a run the platform starts by itself — a review, a
-    proactive message, a compaction — is the instance's own spending and goes
+    reminder, a compaction — is the instance's own spending and goes
     to the default, whatever the chat was last switched to (#10).
 
     `reasoning` is asked for only by the web streaming path, the one place a

@@ -1,5 +1,4 @@
-"""Cards: written on first need, checked before they are kept, sent by the
-poller, and graded by a tap with no model anywhere near it."""
+"""Cards: written on first need, checked before they are kept, sent, and graded by a tap with no model anywhere near it."""
 
 from datetime import UTC, datetime, timedelta
 
@@ -20,7 +19,7 @@ from app.models import (
     User,
 )
 from app.review import cards, ladder
-from app.scheduling import policy, worker
+from app.scheduling import policy
 from tests.conftest import TG_CHAT_ID, Bot
 from tests.review.conftest import (
     LESSON,
@@ -29,8 +28,8 @@ from tests.review.conftest import (
     checking,
     draft,
     no_model,
-    reviews,
     section_hash,
+    send_due,
     stored_card,
     writing,
 )
@@ -81,7 +80,7 @@ async def test_a_due_review_is_a_card_with_no_tutor_run(
     card = await stored_card(session)
 
     with no_model():
-        await worker.cycle(session, NOON)
+        await send_due(session, user)
 
     [sent] = await deliveries(session, user)
     assert sent.card_id == card.id
@@ -99,7 +98,6 @@ async def test_a_due_review_is_a_card_with_no_tutor_run(
         [{"text": "This card is wrong", "callback_data": f"w:{sent.id}"}],
     ]
     assert await session.scalar(select(func.count()).select_from(Message)) == 0
-    assert [row.status for row in await reviews(session, user)] == ["done"]
 
 
 async def test_a_first_review_writes_a_checked_batch_and_sends_one_of_it(
@@ -108,7 +106,7 @@ async def test_a_first_review_writes_a_checked_batch_and_sends_one_of_it(
     await ladder_row(session, user)
 
     with card_models():
-        await worker.cycle(session, NOON)
+        await send_due(session, user)
 
     written = await all_cards(session)
     assert len(written) == 3
@@ -158,18 +156,17 @@ async def test_when_every_card_is_rejected_nothing_is_sent_and_the_review_waits_
     state = await ladder_row(session, user)
 
     with card_models(check=checking(False, False, False)):
-        await worker.cycle(session, NOON)
+        await send_due(session, user)
 
     assert bot.sent == []
     assert await all_cards(session) == []
     state = await refreshed(session, state)
     assert (state.step, state.last_outcome) == (0, "deferred")
     assert state.next_due_at == NOON + ladder.DEFERRAL
-    assert [row.status for row in await reviews(session, user)] == ["cancelled"]
 
     # Not tried again until then: the ladder is no longer due.
     with no_model():
-        await worker.cycle(session, NOON + timedelta(minutes=1))
+        assert await send_due(session, user, NOON + timedelta(minutes=1)) is None
     assert bot.sent == []
 
 
@@ -237,7 +234,7 @@ async def test_a_tap_grades_with_no_model_and_a_second_tap_changes_nothing(
     await stored_card(session)
 
     with no_model():
-        await worker.cycle(session, NOON)
+        await send_due(session, user)
         [sent] = await deliveries(session, user)
         await deliver(
             client,
@@ -271,7 +268,7 @@ async def test_a_wrong_tap_shows_the_right_answer_and_eases_the_next_card(
     await stored_card(session, level=2)
 
     with no_model():
-        await worker.cycle(session, NOON)
+        await send_due(session, user)
         [sent] = await deliveries(session, user)
         await deliver(client, tap(f"k:{sent.id}:2"))
 
@@ -320,10 +317,10 @@ async def test_writing_is_charged_to_background_runs_and_counts_toward_the_ceili
         await cards.write(session, user.id, LESSON, 1)
 
 
-async def test_a_spent_budget_holds_a_review_that_needs_a_new_card(
+async def test_a_spent_budget_writes_nothing_and_leaves_the_ladder(
     session: AsyncSession, user: User, bot: Bot
 ) -> None:
-    await ladder_row(session, user)
+    state = await ladder_row(session, user)
     session.add(
         BackgroundRun(
             user_id=user.id,
@@ -333,12 +330,11 @@ async def test_a_spent_budget_holds_a_review_that_needs_a_new_card(
     )
     await session.commit()
 
-    with no_model():
-        await worker.cycle(session, NOON)
+    with no_model(), pytest.raises(LimitExceeded):
+        await send_due(session, user)
 
-    [row] = await reviews(session, user)
-    assert (row.status, row.attempts) == ("deferred", 0)
-    assert row.due_at == policy.tomorrow_open(NOON, policy.Hours.of(user))
+    state = await refreshed(session, state)
+    assert (state.step, state.last_outcome) == (0, None)
     assert bot.sent == []
 
 

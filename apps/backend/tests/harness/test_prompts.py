@@ -26,7 +26,7 @@ WEB_RESULT = ContextBlock(
 
 @pytest.mark.parametrize(
     ("medium", "run_kind"),
-    [("web", "chat"), ("telegram", "proactive")],
+    [("web", "chat"), ("telegram", "reminder")],
 )
 def test_assembly_matches_snapshot(medium: Medium, run_kind: RunKind) -> None:
     snapshot = SNAPSHOTS / f"{medium}-{run_kind}.md"
@@ -79,5 +79,5 @@ def test_a_passage_spelling_out_the_escaping_is_escaped_again() -> None:
 
 def test_run_kind_selects_its_module() -> None:
     chat = assemble("telegram", "chat")
-    assert "## Proactive message" not in chat
-    assert "## Proactive message" in assemble("telegram", "proactive")
+    assert "## Reminder" not in chat
+    assert "## Reminder" in assemble("telegram", "reminder")

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 from app.harness.repository import HarnessRepository
 from app.harness.steering import Steering
@@ -19,3 +20,6 @@ class HarnessDeps:
     outbox: Outbox | None = None
     # Only a web run can be written to while it answers.
     steering: Steering | None = None
+    # A run the poller started reads the poller's clock, so that what its
+    # state says and what its tools check are one moment.
+    now: datetime | None = None

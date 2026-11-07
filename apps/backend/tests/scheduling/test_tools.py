@@ -4,11 +4,13 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.coach.agent import coach
 from app.harness import runner
 from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
 from app.models import Chat, Schedule, User
 from app.scheduling import policy, repository, worker
+from tests.coach.conftest import deciding
 from tests.conftest import replying
 from tests.harness.conftest import calling, echoing
 from tests.scheduling.conftest import NOON
@@ -17,7 +19,10 @@ FRIDAY = NOON + timedelta(days=2)
 
 
 async def only_schedule(session: AsyncSession) -> Schedule:
-    return (await session.scalars(select(Schedule))).one()
+    """The one reminder: a cycle also gives the learner a coach wake-up."""
+    return (
+        await session.scalars(select(Schedule).where(Schedule.kind == "reminder"))
+    ).one()
 
 
 async def test_the_agent_sets_a_reminder_the_learner_asked_for(
@@ -130,13 +135,14 @@ async def test_a_reminder_reaches_the_learner_at_its_time(
         )
     ):
         await runner.run(repo, thread, "remind me on Friday to redo exercise 3")
-    with replying(text="you were going to redo exercise 3"):
+    with (
+        replying(text="you were going to redo exercise 3"),
+        coach.override(model=deciding()),
+    ):
         await worker.cycle(session, FRIDAY)
 
     row = await only_schedule(session)
     stored = str([message.pydantic_ai for message in await repo.rows(thread)])
-    # Delivered, not awaiting an answer: a reminder asked for nothing, so it
-    # does not hold the proactive slot the reviews queue behind.
     assert row.status == "done"
     assert "you were going to redo exercise 3" in stored
 
@@ -145,28 +151,28 @@ async def test_muting_from_the_conversation_stops_the_next_message(
     session: AsyncSession, user: User, thread: Chat
 ) -> None:
     repo = HarnessRepository(session, user.id)
-    review = await repository.create(
+    wake_up = await repository.create(
         session,
         user_id=user.id,
-        kind="review",
+        kind="coach",
         due_at=NOON - timedelta(minutes=1),
-        payload={"note": "entropy is due for review"},
+        payload={"reason": "", "note": "a check"},
         created_by="system",
     )
 
     with tutor.override(model=calling("mute_proactive")):
         await runner.run(repo, thread, "/mute")
     before = len(await repo.rows(thread))
-    with replying():
+    with replying(), coach.override(model=deciding()):
         await worker.cycle(session, NOON)
 
     await session.refresh(user)
-    await session.refresh(review)
+    await session.refresh(wake_up)
     assert user.muted_until == policy.INDEFINITE
     # Held where it stands, not pushed out to the year 9999: the mute is undone
     # by clearing one column, and this row is due again the moment it is.
-    assert review.status == "pending"
-    assert review.claimed_at is None
+    assert wake_up.status == "pending"
+    assert wake_up.claimed_at is None
     assert len(await repo.rows(thread)) == before
 
 
