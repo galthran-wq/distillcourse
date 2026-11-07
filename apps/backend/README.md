@@ -63,7 +63,8 @@ app/
     thread.py        # the one thread, its claim, and the run that speaks into it
     updates.py       # one incoming message or button press, end to end; bot commands
     speech.py        # a voice note as text, via OpenRouter transcription; audio never stored
-    tools.py         # send_message, run by the tutor
+    formula.py       # LaTeX math as a PNG, through matplotlib's mathtext
+    tools.py         # send_message; the telegram toolset: send_figure, send_formula
   labs/
     repository.py    # pairing codes and tokens; challenges, state, submissions
     verify.py        # what a posted checkpoint is worth: comparison and metrics
@@ -81,6 +82,7 @@ app/
     ladder.py        # the intervals, the levels, and what an answer does to them
     repository.py    # review_state, the rows it materialises, grading a card
     cards.py         # pick, write on first need, send, grade a tap, expire
+    controls.py      # the other buttons under a card: skip, pause, flag, follow-ups
     writer.py        # the two toolless calls a batch costs: write, then check
     subject.py       # what a review is about: the lesson's concepts; the cards sent
     tools.py         # report_review_outcome, run by the tutor on a written answer
@@ -292,6 +294,21 @@ so the only chats it can write to are the ones that repository can see.
   nothing has its final answer delivered for it, and one that sent something
   does not get its answer sent on top. On the site the tool says there is
   nothing to send: the answer is the delivery there.
+- `send_figure` / `send_formula` — an image into the Telegram thread: a figure
+  `fetch_content` lists for the passage named (`Passage.figures`, from the
+  index's `metadata.figures`; any other `src` is refused), or 1–6 lines of
+  LaTeX math typeset by `telegram/formula.py` — mathtext with the `cm`
+  fontset, on a thread (`asyncio.to_thread`), at 200 dpi on white. mathtext has
+  no environments: `aligned` and `pmatrix` come back to the model as the
+  parser's message, and an aligned derivation is sent one step per line; a
+  line too wide for a photo (Telegram refuses one past 20:1) is refused the
+  same way, from the parse alone (`formula.check`), before anything is
+  drawn. An
+  SVG figure goes as its URL on the site's PNG route
+  (`/course-assets-png/<course>/<lesson>/<file>`, which renders it with
+  resvg), a raster as served. A photo is not counted as the delivery: the
+  final answer still follows it. They are a toolset of their own, handed only
+  to a run with an outbox, so no other medium is offered them.
 - `read_memory` / `save_memory` / `delete_memory` — the learner profile below.
 - `report_review_outcome` — the grade of a review card the learner answered
   in writing rather than with a tap, by its delivery id; it moves the ladder.
@@ -405,6 +422,8 @@ What reaches the learner is decided per user, in `policy.py`:
 - **What goes first.** Reminders, then the review of the lesson finished most
   recently (`payload.completed_at`; a lab's ladder, with no reading behind it,
   last).
+- **Not today.** `users.cards_paused_until` holds cards — reviews, never
+  reminders — until the next morning; set by a card's own button.
 - **Mute.** `users.muted_until` pauses everything the platform starts; the
   learner sets it in conversation (the tutor's mute tool), and answers to what
   they write are unaffected. A muted learner's rows are not claimed rather than
@@ -475,8 +494,20 @@ nothing is sent. Both calls run on `CARD_MODEL`, and what they cost goes to
 row to the next morning. Cards are shared between learners unless `owner_id`
 names one.
 
+The writer is given each section's figures and may show a card with one —
+`figure`, the `src` of one of its section's, or `formula`, one line of LaTeX
+math — never both; a card whose figure its section does not list, or whose
+formula does not parse or is too wide for a photo, is dropped before the
+check. Such a card's prompt is at most 400 characters, and its feedback cuts
+the explanation short where the whole would pass Telegram's 1024-character
+caption.
+
 A card goes out as a message with one button per option
-(`k:<delivery_id>:<option>`), recorded in `card_deliveries`. **A tap is
+(`k:<delivery_id>:<option>`), recorded in `card_deliveries`; a card with an
+image goes out as a photo with its prompt as the caption, and its feedback
+edits the caption. A photo Telegram refuses — the site's figure unreachable,
+a picture past its limits — retires the card (`status = 'retired'`) and the
+next card in line is sent instead, once. **A tap is
 graded by code**: the delivery is locked, the option compared with the
 marked answer, the ladder moved and the message edited into ✓ or ✗, the right
 answer, the explanation and a link to the section — no model is asked. A card
@@ -492,6 +523,34 @@ the message to show the order so far and drops that number; the order lives
 in `card_deliveries.chosen`, so a restart mid-card loses nothing, and the
 card stays unanswered until the last step is placed. That tap grades it, all
 or nothing, exactly as a single tap grades any other card.
+
+**The other buttons** (`controls.py`, `<prefix>:<delivery_id>`). Under an open
+card: *Another question* (`a`) marks it `skipped` and edits the message in
+place into a card one level lower on the same lesson, else one of the next due
+lesson, else "Nothing else for now" — from cards already written only, since
+the learner is waiting on a tap; level and ladder do not move. *Not today*
+(`n`) skips it, takes the buttons off and sets `users.cards_paused_until` to
+tomorrow's open — not `muted_until`, which would hold the learner's reminders
+too. *This card is wrong* (`w`) retires the card on the first report, files an
+`error` incident against its section (`HarnessRepository.file_incident`, on the
+thread chat) and then behaves as Another question. Under the feedback on a
+tapped card: *Next* (`x`) sends the next due card now — no initiation is spent,
+`CARDS_PER_DAY` bounds it; *Harder one* (`h`, absent at level 3) sends a card
+of the lesson a level up, written if none exists, and a right answer to it
+sets the level while a wrong one changes nothing (`card_deliveries.harder`);
+*Explain* (`e`) and *In my own words* (`m`) are `chat` runs on the thread with
+the card in their context. Own words are graded by `report_review_outcome` as
+recall: `passed` is a right answer at the level and climbs past `STEP_CAP`.
+Each feedback button is spent once (`card_deliveries.follow_ups`) and given
+back if what it started fails. A card sent out of turn cancels the poller's
+queued row for its lesson.
+
+Two harder cards (level 2+) skipped in a row, within seven days of each other
+and the later within seven days of now, mean only level 1 is served until
+then, whatever the ladder's level says — derived from `card_deliveries`
+(`repository.level_one_only`). When a new card goes out, any earlier card
+still open is edited to one line, `<lesson title> — skipped`, without buttons;
+an answered card is left as it is.
 
 **Levels are per lesson** (`review_state.level`, `level_run`). Level 1 is the
 main point itself, level 2 tells two ideas apart, level 3 spots the error in

@@ -15,7 +15,7 @@ from app.harness.limits import LimitExceeded, check_run_allowed
 from app.harness.prompts import ContextBlock
 from app.harness.repository import HarnessRepository
 from app.models import BackgroundRun, Chat, TgLink
-from app.review import cards, subject
+from app.review import cards, controls, subject
 from app.scheduling import policy
 from app.scheduling import repository as scheduling
 from app.telegram import api, repository, speech, thread
@@ -48,6 +48,7 @@ BUSY_HEARD = (
 )
 FAILED = "Something went wrong on my side. Send that again in a minute."
 TAP_FAILED = "Something went wrong on my side. Press that again in a minute."
+TAP_BUSY = "Still finishing the previous message. Press that again in a minute."
 TOO_LONG = "Too long. Keep it under two minutes."
 UNHEARD = "Couldn't make that out. Send it as text?"
 # Checked on what Telegram reports, before anything is downloaded.
@@ -200,6 +201,13 @@ _COMMANDS: dict[str, Callable[[HarnessRepository, Chat], Awaitable[str]]] = {
 TAP_HANDLERS: dict[str, Callable[[Outbox, Tap], Awaitable[None]]] = {
     cards.TAP: cards.answer,
     cards.ORDER: cards.arrange,
+    cards.ANOTHER: controls.another,
+    cards.NOT_TODAY: controls.not_today,
+    cards.WRONG_CARD: controls.wrong_card,
+    cards.NEXT: controls.next_card,
+    cards.HARDER: controls.harder,
+    cards.EXPLAIN: controls.explain,
+    cards.OWN_WORDS: controls.own_words,
 }
 
 
@@ -230,20 +238,6 @@ async def _open_reviews(
     one by."""
     sent = await cards.recent(repo.session, repo.user_id, now - policy.IGNORED_AFTER)
     return await subject.open_block(repo.session, sent)
-
-
-# A refresh under Telegram's ~5s display, so the bar never flickers off
-# mid-run.
-TYPING_REFRESH_SECONDS = 4.5
-
-
-async def _typing(tg_chat_id: int) -> None:
-    """Keeps the "typing…" bar up until cancelled. Failures are swallowed:
-    the indicator is a nicety, the answer is what matters."""
-    while True:
-        with suppress(api.TelegramError):
-            await api.send_chat_action(tg_chat_id)
-        await asyncio.sleep(TYPING_REFRESH_SECONDS)
 
 
 async def _answer(
@@ -322,6 +316,19 @@ async def _guarded(outbox: Outbox, failed: str, what: str) -> AsyncIterator[None
             await outbox.send(failed)
 
 
+@asynccontextmanager
+async def _refused(outbox: Outbox, busy: str) -> AsyncIterator[None]:
+    """The two refusals the learner is told about rather than given an error
+    for: the thread is held by another run, or a cap is spent — swallowed, the
+    bot looks broken."""
+    try:
+        yield
+    except runner.RunBusy:
+        await outbox.send(busy)
+    except LimitExceeded as exc:
+        await outbox.send(str(exc))
+
+
 async def handle(
     session_factory: async_sessionmaker[AsyncSession], update: Update
 ) -> None:
@@ -340,27 +347,20 @@ async def handle(
         chat = await thread.of(session, link.user_id)
         outbox = Outbox(session=session, link=link)
         handler = _COMMANDS.get(command)
-        typing = asyncio.create_task(_typing(update.tg_chat_id))
-        try:
-            # Nested so the guard covers the answers below as well.
-            async with _guarded(outbox, FAILED, "telegram update failed"):
-                try:
-                    if update.voice is not None:
-                        text = await _hear(repo, outbox, update.voice)
-                        if text is not None:
-                            await _answer(repo, chat, outbox, text, BUSY_HEARD)
-                    elif handler is None:
-                        await _answer(repo, chat, outbox, update.text)
-                    else:
-                        await outbox.send(await handler(repo, chat))
-                except runner.RunBusy:
-                    await outbox.send(BUSY)
-                except LimitExceeded as exc:
-                    # A cap is not an error to swallow: the learner is told why
-                    # the tutor stopped answering, or the bot looks broken.
-                    await outbox.send(str(exc))
-        finally:
-            typing.cancel()
+        # Nested so the guard covers the answers below as well.
+        async with (
+            thread.typing(update.tg_chat_id),
+            _guarded(outbox, FAILED, "telegram update failed"),
+            _refused(outbox, BUSY),
+        ):
+            if update.voice is not None:
+                text = await _hear(repo, outbox, update.voice)
+                if text is not None:
+                    await _answer(repo, chat, outbox, text, BUSY_HEARD)
+            elif handler is None:
+                await _answer(repo, chat, outbox, update.text)
+            else:
+                await outbox.send(await handler(repo, chat))
 
 
 async def handle_tap(
@@ -378,5 +378,8 @@ async def handle_tap(
         if link is None:
             return
         outbox = Outbox(session=session, link=link)
-        async with _guarded(outbox, TAP_FAILED, "telegram tap failed"):
+        async with (
+            _guarded(outbox, TAP_FAILED, "telegram tap failed"),
+            _refused(outbox, TAP_BUSY),
+        ):
             await handler(outbox, tap)

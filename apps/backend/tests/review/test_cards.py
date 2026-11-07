@@ -88,8 +88,15 @@ async def test_a_due_review_is_a_card_with_no_tutor_run(
     assert bot.sent[0].tg_chat_id == TG_CHAT_ID
     assert "Entropy is the ____ of surprisal." in bot.texts[0]
     assert bot.sent[0].keyboard == [
-        [{"text": option, "callback_data": f"k:{sent.id}:{index}"}]
-        for index, option in enumerate(card.options)
+        *(
+            [{"text": option, "callback_data": f"k:{sent.id}:{index}"}]
+            for index, option in enumerate(card.options)
+        ),
+        [
+            {"text": "Another question", "callback_data": f"a:{sent.id}"},
+            {"text": "Not today", "callback_data": f"n:{sent.id}"},
+        ],
+        [{"text": "This card is wrong", "callback_data": f"w:{sent.id}"}],
     ]
     assert await session.scalar(select(func.count()).select_from(Message)) == 0
     assert [row.status for row in await reviews(session, user)] == ["done"]
@@ -247,7 +254,7 @@ async def test_a_tap_grades_with_no_model_and_a_second_tap_changes_nothing(
     assert sent.answered_at is not None
     assert (state.step, state.level, state.level_run) == (1, 1, 1)
     assert state.last_outcome == "correct"
-    [(message_id, feedback, _)] = bot.edited
+    [(message_id, feedback)] = bot.edited
     assert message_id == sent.tg_message_id
     assert "✓ average. Each outcome's surprisal" in feedback
     link = (

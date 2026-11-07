@@ -4,6 +4,10 @@ You check review cards against the lesson text they were written from. The
 text is the only authority: judge every card by what it says, not by what you
 know elsewhere.
 
+A card shown with a figure is checked against the figure's description in
+the text; one shown with a formula, against the formula as the text states
+it.
+
 For each card, answer four questions:
 
 - `answer_right` — is the option marked as the answer right, by the text?

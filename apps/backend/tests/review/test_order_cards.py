@@ -111,9 +111,26 @@ def numbers(sent: CardDelivery, *left: int, reset: bool = False) -> list[Any]:
     row = [
         {"text": str(step + 1), "callback_data": f"o:{sent.id}:{step}"} for step in left
     ]
+    controls = [
+        [
+            {"text": "Another question", "callback_data": f"a:{sent.id}"},
+            {"text": "Not today", "callback_data": f"n:{sent.id}"},
+        ],
+        [{"text": "This card is wrong", "callback_data": f"w:{sent.id}"}],
+    ]
     if not reset:
-        return [row]
-    return [row, [{"text": "Reset", "callback_data": f"o:{sent.id}:r"}]]
+        return [row, *controls]
+    return [row, [{"text": "Reset", "callback_data": f"o:{sent.id}:r"}], *controls]
+
+
+def edits(bot: Bot) -> list[tuple[int, str, Any]]:
+    """Every text edit with the keyboard it left."""
+    return [
+        (message_id, text, keyboard)
+        for (message_id, text), (_, keyboard) in zip(
+            bot.edited, bot.rekeyed, strict=True
+        )
+    ]
 
 
 def test_an_order_card_is_never_shown_in_its_answer() -> None:
@@ -192,7 +209,7 @@ async def test_each_tap_shows_the_order_so_far_and_is_kept_on_the_row(
     await session.refresh(sent)
     assert sent.chosen == [1, 3]
     assert sent.outcome is None
-    [(_, first, after_one), (_, second, after_two)] = bot.edited
+    [(_, first, after_one), (_, second, after_two)] = edits(bot)
     assert "Your order: 2" in first
     assert after_one == numbers(sent, 0, 2, 3, reset=True)
     assert "Your order: 2 → 4" in second
@@ -224,8 +241,14 @@ async def test_the_last_tap_grades_the_whole_order_as_any_card_is_graded(
     assert (state.level, state.level_run) == ladder.next_level(3, 0, outcome)
     assert state.step == ladder.after_card(before, 3, outcome, NOON).step
     assert state.last_outcome == outcome
-    feedback, keyboard = bot.edited[-1][1:]
-    assert keyboard is None
+    feedback, keyboard = edits(bot)[-1][1:]
+    # Level 3 has no harder card.
+    assert keyboard is not None
+    assert [b["text"] for row in keyboard for b in row] == [
+        "Next",
+        "Explain",
+        "In my own words",
+    ]
     mark = "✓" if outcome == "correct" else "✗"
     assert f"{mark} 2 → 4 → 1 → 3." in feedback
     assert "Each step works on what the one before it produced." in feedback
@@ -242,7 +265,7 @@ async def test_reset_clears_the_order_and_brings_every_number_back(
 
     await session.refresh(sent)
     assert sent.chosen is None
-    _, text, keyboard = bot.edited[-1]
+    _, text, keyboard = edits(bot)[-1]
     assert "Your order" not in text
     assert keyboard == numbers(sent, 0, 1, 2, 3)
 

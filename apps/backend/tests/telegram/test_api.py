@@ -9,7 +9,14 @@ from app.telegram import api
 
 # Bound before the suite's autouse stub replaces them on the module: these
 # tests are of the real calls.
-from app.telegram.api import answer_callback, edit_message_text, send_message
+from app.telegram.api import (
+    answer_callback,
+    edit_message_caption,
+    edit_message_keyboard,
+    edit_message_text,
+    send_message,
+    send_photo,
+)
 
 CALL = {"chat_id": 4242, "text": "entropy is the average surprisal"}
 
@@ -167,7 +174,7 @@ async def test_an_edit_replaces_text_and_buttons(
 async def test_a_caption_edit(monkeypatch: pytest.MonkeyPatch) -> None:
     posted = answering(monkeypatch, result={"message_id": 17})
 
-    await api.edit_message_caption(4242, 17, "Figure 2")
+    await edit_message_caption(4242, 17, "Figure 2")
 
     assert posted.method == "editMessageCaption"
     assert posted.json == {
@@ -187,10 +194,10 @@ async def test_unformatted_edits_and_captions_carry_no_parse_mode(
     await edit_message_text(4242, 17, "<b>x", html=False)
     assert posted.json == {"chat_id": 4242, "message_id": 17, "text": "<b>x"}
 
-    await api.edit_message_caption(4242, 17, "<b>x", html=False)
+    await edit_message_caption(4242, 17, "<b>x", html=False)
     assert posted.json == {"chat_id": 4242, "message_id": 17, "caption": "<b>x"}
 
-    await api.send_photo(
+    await send_photo(
         4242, "https://distillcourse.example/f.png", caption="<b>x", html=False
     )
     assert posted.json == {
@@ -205,7 +212,7 @@ async def test_a_keyboard_edit_to_none_takes_the_buttons_off(
 ) -> None:
     posted = answering(monkeypatch, result={"message_id": 17})
 
-    await api.edit_message_keyboard(4242, 17, None)
+    await edit_message_keyboard(4242, 17, None)
 
     assert posted.method == "editMessageReplyMarkup"
     assert posted.json == {"chat_id": 4242, "message_id": 17}
@@ -216,7 +223,7 @@ async def test_a_keyboard_edit_sends_the_new_buttons(
 ) -> None:
     posted = answering(monkeypatch, result={"message_id": 17})
 
-    await api.edit_message_keyboard(4242, 17, KEYBOARD)
+    await edit_message_keyboard(4242, 17, KEYBOARD)
 
     assert posted.json == {"chat_id": 4242, "message_id": 17, "reply_markup": MARKUP}
 
@@ -237,7 +244,7 @@ async def test_an_answered_tap_with_and_without_a_toast(
 async def test_a_photo_by_url_is_json(monkeypatch: pytest.MonkeyPatch) -> None:
     posted = answering(monkeypatch, result={"message_id": 21})
 
-    message_id = await api.send_photo(
+    message_id = await send_photo(
         4242, "https://distillcourse.example/f.png", caption="Fig", keyboard=KEYBOARD
     )
 
@@ -260,7 +267,7 @@ async def test_a_photo_from_bytes_is_multipart(
     posted = answering(monkeypatch, result={"message_id": 22})
     png = b"\x89PNG\r\n\x1a\n"
 
-    message_id = await api.send_photo(4242, png, keyboard=KEYBOARD)
+    message_id = await send_photo(4242, png, keyboard=KEYBOARD)
 
     assert message_id == 22
     assert posted.json is None

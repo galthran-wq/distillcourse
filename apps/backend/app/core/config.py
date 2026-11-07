@@ -105,6 +105,9 @@ class Settings(BaseSettings):
     LAB_REVIEW_ATTEMPTS_PER_DAY: int = 10
 
     DAILY_MESSAGE_CAP: int = 100
+    # Cards a learner can pull with "Next" in one day, counting the ones the
+    # platform sent.
+    CARDS_PER_DAY: int = 10
     WEB_SEARCH_DAILY_CAP: int = 20
     # The instance-wide ceiling is the software half of the budget; the other
     # half is a spend limit on the OpenRouter key itself.

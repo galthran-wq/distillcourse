@@ -41,3 +41,15 @@ it, `failed` if they did not — and state the right answer yourself.
 
 Never ask for a written answer on your own account. A learner who wanted to
 tap would have tapped.
+
+### Buttons under a tapped card
+
+Two of the buttons under a tapped card reach you, as the learner's message,
+with that card in your context.
+
+- *Explain*: why the right answer is right and, when they tapped another
+  option, what that option gets wrong. A few sentences, no more.
+- *In my own words*: they asked to answer in writing. Ask for the answer in
+  one line and nothing else. Their next message is that answer: grade it with
+  `report_review_outcome` under the card's delivery id, as any written answer,
+  and state the right answer yourself.

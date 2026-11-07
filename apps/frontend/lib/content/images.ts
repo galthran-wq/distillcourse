@@ -1,5 +1,5 @@
-import { readFileSync, statSync } from "node:fs";
-import { basename, extname } from "node:path";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { basename, extname, join } from "node:path";
 import type { LoadedCourse } from "./load";
 
 /**
@@ -18,6 +18,24 @@ export function isRasterFile(path: string): boolean {
   return (RASTER_EXTENSIONS as readonly string[]).includes(
     extname(path).toLowerCase(),
   );
+}
+
+/**
+ * The frame files of a file-tier `<FigureSequence name>` — `figures/<name>-1.svg`,
+ * `<name>-2.png`, … in the lesson dir — in frame order. Empty for a component
+ * sequence (a PascalCase name) or a missing `figures/`.
+ */
+export function sequenceFrames(lessonDir: string, name: string): string[] {
+  if (!/^[a-z0-9-]+$/.test(name)) return [];
+  const exts = ["svg", ...RASTER_EXTENSIONS.map((e) => e.slice(1))].join("|");
+  const re = new RegExp(`^${name}-\\d+\\.(${exts})$`);
+  try {
+    return readdirSync(join(lessonDir, "figures"))
+      .filter((f) => re.test(f))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  } catch {
+    return [];
+  }
 }
 
 export interface ImageInfo {
@@ -204,6 +222,11 @@ export const MAX_FIGURE_BYTES = 6_000_000;
  */
 export function assetUrl(course: string, lesson: string, file: string): string {
   return `/course-assets/${course}/${lesson}/${basename(file)}`;
+}
+
+/** The directory `assetUrl` serves from, under the app's root. */
+export function assetDir(appRoot: string): string {
+  return join(appRoot, "public", "course-assets");
 }
 
 /**

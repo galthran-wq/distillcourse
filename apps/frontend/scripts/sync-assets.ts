@@ -17,9 +17,10 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { wantedAssets } from "../lib/content/assets";
+import { assetDir } from "../lib/content/images";
 import { appRoot, contentRoot, repoRoot } from "./paths";
 
-const publicRoot = join(appRoot, "public", "course-assets");
+const publicRoot = assetDir(appRoot);
 const wanted = wantedAssets(contentRoot, publicRoot);
 
 let copied = 0;

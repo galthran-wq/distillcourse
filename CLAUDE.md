@@ -25,7 +25,12 @@ The tutor harness lives in `apps/backend/app/harness/`; everything about
 messages the platform starts by itself — the poller process, quiet hours, the
 open card, the silence backoff — lives in `apps/backend/app/scheduling/`, the Telegram channel
 it delivers over — webhook, pairing, sending, voice notes transcribed to text
-(`speech.py`, `TRANSCRIPTION_MODEL`; the audio is never stored) — in
+(`speech.py`, `TRANSCRIPTION_MODEL`; the audio is never stored), and the
+images it sends: a lesson figure from the index's `metadata.figures` (an SVG
+through the site's `/course-assets-png/` route, which renders it with resvg
+and a vendored Source Sans 3, plus DejaVu Sans for the math glyphs Source
+Sans lacks) and a formula typeset by matplotlib's mathtext
+(`formula.py`), as tools only a run with an outbox is given and as cards — in
 `apps/backend/app/telegram/`,
 what the tutor remembers about a learner across every chat and medium in
 `apps/backend/app/memory/`, the spaced-repetition ladder those proactive
@@ -224,8 +229,11 @@ Rules that override defaults:
   concludes the material itself is at fault it calls
   `report_content_incident`, which writes a row to `incidents` in the
   production database (locator `lesson:<course>/<slug>#<anchor>`, kind
-  `error|unclear|other`, a one-paragraph summary). Nothing in the app reads
-  that table; it is triaged by hand. When asked about "an issue from the
+  `error|unclear|other`, a one-paragraph summary). The second source is the
+  bot: a learner who presses "This card is wrong" under a review card
+  retires that card and files an `error` row against its section, its
+  summary naming the card id and prompt (`app/review/controls.py`). Nothing
+  in the app reads that table; it is triaged by hand. When asked about "an issue from the
   agent" or reader feedback, read the open ones on the deploy host:
   `docker compose exec -T db psql -U postgres -d distillcourse -x -c
   "SELECT id, locator, kind, summary, created_at FROM incidents WHERE

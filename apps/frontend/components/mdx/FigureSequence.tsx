@@ -1,9 +1,7 @@
-import { readdirSync } from "node:fs";
-import { join } from "node:path";
 import { figures } from "@/components/figures";
 import { creditFor, loadCredits } from "@/lib/content/credits";
 import { loadFigureSvg } from "@/lib/content/figure-svg";
-import { RASTER_EXTENSIONS } from "@/lib/content/images";
+import { sequenceFrames } from "@/lib/content/images";
 import FrameStepper from "./FrameStepper";
 import FrameStepperNodes from "./FrameStepperNodes";
 import SourcedImage, { resolveImage } from "./SourcedImage";
@@ -48,19 +46,7 @@ export default function FigureSequence({ name, alt, caption, lessonDir }: Props)
   }
 
   // File tiers: figures/<name>-1.<ext>, <name>-2.<ext>, … in the lesson dir.
-  let files: string[] = [];
-  if (/^[a-z0-9-]+$/.test(name)) {
-    try {
-      const re = new RegExp(
-        `^${name}-\\d+\\.(svg|${RASTER_EXTENSIONS.map((e) => e.slice(1)).join("|")})$`,
-      );
-      files = readdirSync(join(lessonDir, "figures"))
-        .filter((f) => re.test(f))
-        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-    } catch {
-      files = [];
-    }
-  }
+  const files = sequenceFrames(lessonDir, name);
 
   // Sourced-image tier: raster frames step through the same carousel, each
   // frame carrying its own credit line (frames may come from one plate or
