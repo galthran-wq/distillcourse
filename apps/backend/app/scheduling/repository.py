@@ -4,14 +4,14 @@ from datetime import datetime, timedelta
 from typing import Any, Literal
 
 import logfire
-from sqlalchemy import ColumnElement, ScalarSelect, func, or_, select, update
+from sqlalchemy import ColumnElement, ScalarSelect, and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models import CardDelivery, Chat, Message, Schedule, TgLink, User
 from app.scheduling import policy
 
-ScheduleKind = Literal["coach", "reminder"]
+ScheduleKind = Literal["coach", "reminder", "nudge"]
 CreatedBy = Literal["system", "user"]
 
 # How long a claimed row stays off limits to other workers. A process that
@@ -184,8 +184,8 @@ async def initiations_today(
     session: AsyncSession, user_id: uuid.UUID, since: datetime
 ) -> int:
     """Messages the platform started today: the cards it sent on its own
-    account, and the reminders — the learner's appointment, but still a
-    message, which the day's one card waits behind."""
+    account, its reading nudges, and the reminders — the learner's
+    appointment, but still a message, which the day's one card waits behind."""
     cards = await session.scalar(
         select(func.count()).where(
             CardDelivery.user_id == user_id,
@@ -193,15 +193,17 @@ async def initiations_today(
             CardDelivery.sent_at >= since,
         )
     )
-    reminders = await session.scalar(
+    others = await session.scalar(
         select(func.count()).where(
             Schedule.user_id == user_id,
-            Schedule.kind == "reminder",
             Schedule.status == "done",
-            Schedule.claimed_at >= since,
+            or_(
+                and_(Schedule.kind == "reminder", Schedule.claimed_at >= since),
+                and_(Schedule.kind == "nudge", Schedule.due_at >= since),
+            ),
         )
     )
-    return int(cards or 0) + int(reminders or 0)
+    return int(cards or 0) + int(others or 0)
 
 
 def _last_message(user_id: uuid.UUID) -> ScalarSelect[datetime]:
@@ -249,14 +251,20 @@ async def silence(session: AsyncSession, user_id: uuid.UUID) -> int:
 
 async def last_initiation(session: AsyncSession, user_id: uuid.UUID) -> datetime | None:
     """When the platform last opened the conversation of its own accord: the
-    last card it sent on its own account. A card the learner asked for (Next,
-    Harder) was their move, and a reminder is their appointment, not ours, so
-    neither counts."""
-    moment: datetime | None = await session.scalar(
-        select(func.max(CardDelivery.sent_at)).where(
-            CardDelivery.user_id == user_id, CardDelivery.initiated
-        )
+    last card it sent on its own account, or reading nudge. A card the learner
+    asked for (Next, Harder, Quick check) was their move, and a reminder is
+    their appointment, not ours, so neither counts."""
+    card = (
+        select(func.max(CardDelivery.sent_at))
+        .where(CardDelivery.user_id == user_id, CardDelivery.initiated)
+        .scalar_subquery()
     )
+    nudge = (
+        select(func.max(Schedule.due_at))
+        .where(Schedule.user_id == user_id, Schedule.kind == "nudge")
+        .scalar_subquery()
+    )
+    moment: datetime | None = await session.scalar(select(func.greatest(card, nudge)))
     return moment
 
 

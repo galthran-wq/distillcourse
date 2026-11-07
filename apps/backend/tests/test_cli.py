@@ -1,5 +1,5 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -101,6 +101,41 @@ async def test_rebuild_progress_recomputes_the_aggregate_from_the_events(
     aggregate = await session.get(LessonProgress, (user.id, lesson))
     assert aggregate is not None
     assert aggregate.active_seconds == 10
+
+
+async def test_rebuild_progress_restores_the_last_section_from_the_events(
+    session: AsyncSession,
+) -> None:
+    lesson = "lesson:information-theory/entropy"
+    user = await crud.create_user(
+        session, email=random_email(), password=random_password(), timezone="UTC"
+    )
+    start = datetime.now(UTC)
+    session.add_all(
+        Event(
+            id=uuid.uuid4(),
+            user_id=user.id,
+            lesson=lesson,
+            type="heartbeat",
+            payload=payload,
+            client_ts=start + timedelta(seconds=index),
+            server_ts=start + timedelta(seconds=index),
+        )
+        for index, payload in enumerate(
+            [
+                {"seconds": 10, "anchor": "surprise"},
+                {"seconds": 10, "anchor": "average"},
+                {"seconds": 10, "anchor": None},
+            ]
+        )
+    )
+    await session.commit()
+
+    await cli.rebuild_progress(session)
+
+    aggregate = await session.get(LessonProgress, (user.id, lesson))
+    assert aggregate is not None
+    assert aggregate.last_anchor == "average"
 
 
 async def test_reset_password_reports_an_unknown_email(session: AsyncSession) -> None:
