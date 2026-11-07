@@ -29,7 +29,14 @@ from tests.review.conftest import (
     ladder as ladder_row,
 )
 from tests.scheduling.conftest import NOON
-from tests.telegram.conftest import deliver, message, tap
+from tests.telegram.conftest import (  # noqa: F401  (a shared fixture)
+    Ears,
+    deliver,
+    ears,
+    message,
+    tap,
+    voice,
+)
 from tests.telemetry.conftest import (
     HEARTBEATS_TO_COMPLETE,
     aggregate,
@@ -154,6 +161,32 @@ async def test_a_learner_who_writes_is_handed_the_cards_of_the_last_day(
     assert "report_review_outcome" in prompt
     # The rules for grading a written answer come with the cards.
     assert "Never ask for a written answer on your own account" in prompt
+
+
+@pytest.mark.usefixtures("indexed_section")
+async def test_a_spoken_answer_is_handed_the_open_card_like_a_typed_one(
+    client: AsyncClient,
+    session: AsyncSession,
+    user: User,
+    bot: Bot,
+    ears: Ears,  # noqa: F811
+) -> None:
+    """Voice is transport: the transcript takes the typed answer's path, the
+    card of the last day and all."""
+    await ladder_row(session, user)
+    card = await stored_card(session)
+    sent = await card_out(session, user)
+    bot.sent.clear()
+    ears.heard = "the weighted average of surprisal"
+
+    with tutor.override(model=echoing()):
+        await deliver(client, voice())
+
+    assert "<i>Heard:</i> the weighted average of surprisal" in bot.texts
+    prompt = echoed(bot)
+    assert subject.SENT in prompt
+    assert f"delivery `{sent.id}`" in prompt
+    assert card.prompt in prompt
 
 
 @pytest.mark.usefixtures("indexed_section")

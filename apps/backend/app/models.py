@@ -433,8 +433,8 @@ class CardDelivery(Base):
 
 class BackgroundRun(Base):
     """Model spend with no message to hang it on: a card written or checked
-    in the poller. The monthly ceiling sums `usage` here as it does on
-    `messages` and `lab_submissions`."""
+    in the poller, a voice note transcribed. The monthly ceiling sums `usage`
+    here as it does on `messages` and `lab_submissions`."""
 
     __tablename__ = "background_runs"
 

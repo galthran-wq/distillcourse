@@ -79,6 +79,12 @@ class Settings(BaseSettings):
     # is paid per batch rather than per message.
     CARD_MODEL: str = DEFAULT_CHAT_MODEL
 
+    # What turns a Telegram voice message into text. Not a chat model: it is
+    # called on OpenRouter's transcription endpoint, so it has no place in
+    # CHAT_MODELS. It must take Telegram's Opus-in-Ogg as sent — nothing
+    # converts the audio first.
+    TRANSCRIPTION_MODEL: str = "mistralai/voxtral-mini-transcribe"
+
     # The tutor's only route out to the open web. Unset, web_search reports
     # itself unavailable and the agent answers from the corpus.
     PERPLEXITY_API_KEY: str | None = None
