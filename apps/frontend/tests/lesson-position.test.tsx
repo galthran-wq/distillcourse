@@ -3,6 +3,7 @@ import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import LessonPosition from "@/components/LessonPosition";
 import {
+  anchorIn,
   anchorUnder,
   clearPosition,
   currentLocator,
@@ -42,6 +43,13 @@ describe("the reader's position", () => {
     clearPosition("intro", "surprise");
 
     expect(currentLocator()).toBe("lesson:info-theory/entropy");
+  });
+
+  it("gives the section to that lesson's heartbeat and to no other's", () => {
+    setPosition({ course: "info-theory", lesson: "entropy", anchor: "the-average" });
+
+    expect(anchorIn("lesson:info-theory/entropy")).toBe("the-average");
+    expect(anchorIn("lesson:intro/surprise")).toBeNull();
   });
 
   it("forgets the lesson the reader left", () => {

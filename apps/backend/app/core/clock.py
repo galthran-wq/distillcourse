@@ -25,7 +25,7 @@ def _known_timezone(value: str) -> str:
     return value
 
 
-# Scheduling (quiet hours, proactive reviews) reads this straight from the row,
+# Scheduling (quiet hours, the coach, reminders) reads this straight from the row,
 # so anything that is not an IANA zone has to be rejected at the door — at
 # signup, at login, and where the learner sets it by hand. The length bound
 # runs first because ZoneInfo turns the name into a filesystem path, and an

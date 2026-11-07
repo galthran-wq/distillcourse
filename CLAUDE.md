@@ -21,14 +21,42 @@ routes), SQLAlchemy 2.0 typed models — never SQLModel, never a sync session.
 what CI runs. Migrations are explicit and always reversible — autogenerate is
 a draft to rewrite, never the artefact. `apps/backend/README.md` is the guide.
 
-The tutor harness lives in `apps/backend/app/harness/`; everything about
-messages the platform starts by itself — the poller process, quiet hours, the
-proactive slot — lives in `apps/backend/app/scheduling/`, the Telegram channel
-it delivers over — webhook, pairing, sending — in `apps/backend/app/telegram/`,
+The tutor harness lives in `apps/backend/app/harness/`; the queue of what the
+platform does on its own — the poller process, reminders, and the limits on
+what it may start (quiet hours, one message a day, the silence backoff, Not
+today), stated once in `scheduling/gates.py` — lives in
+`apps/backend/app/scheduling/`; what the bot sends and when is decided by the
+coach in `apps/backend/app/coach/` — a pydantic-ai agent of its own
+(`COACH_MODEL`), not a tutor run, handed a summary built by code
+(`state.py`) and never the thread, reaching the learner only through send
+tools (`send_card`; `send_nudge` in `nudges.py` — a link into a lesson,
+to the section `lesson_progress.last_anchor` says the reader stopped in, which
+heartbeats carry; and `send_weekly_note`, `note.py`, whose numbers code
+writes and only its next step the model; no free-text tool) that return the
+gates' refusal as a sentence, returning only when to look next; one live `schedules` row of kind
+`coach` per linked learner is when it looks (`wake.py`: its own
+`next_check_at` clamped to 4 h – 7 d, pulled to an hour out by a lesson
+finished or a return after a week away), and a silent week ends in a card
+chosen by code (`floor.py`); `bot-*` memories are the learner's binding
+instructions to it — the Telegram channel
+it delivers over — webhook, pairing, sending, voice notes transcribed to text
+(`speech.py`, `TRANSCRIPTION_MODEL`; the audio is never stored), and the
+images it sends: a lesson figure from the index's `metadata.figures` (an SVG
+through the site's `/course-assets-png/` route, which renders it with resvg
+and a vendored Source Sans 3, plus DejaVu Sans for the math glyphs Source
+Sans lacks) and a formula typeset by matplotlib's mathtext
+(`formula.py`), as tools only a run with an outbox is given and as cards — in
+`apps/backend/app/telegram/`,
 what the tutor remembers about a learner across every chat and medium in
-`apps/backend/app/memory/`, the spaced-repetition ladder those proactive
-messages are mostly made of in `apps/backend/app/review/`, and everything the
-lab API is — pairing and bearer tokens, the manifest a notebook reads,
+`apps/backend/app/memory/`, the spaced-repetition ladder — advice the coach
+reads, never a queue of its own — in `apps/backend/app/review/` — a review is a tap
+card, written on first need by a toolless writer and kept only if a second
+toolless check passes it, graded by code with no model, its first line
+carrying the streak derived from `card_deliveries` (`streak.py`; shown there
+only, and nothing is ever sent about it), its spend in
+`background_runs` beside `messages.usage` under the monthly ceiling, and the
+rules it follows in `prompts/review.md` (pedagogy E1 governs lessons only) —
+and everything the lab API is — pairing and bearer tokens, the manifest a notebook reads,
 the checkpoints it submits and what they are graded against — in
 `apps/backend/app/labs/`. Pairing runs notebook-first: `distill.login()` gets
 a device code, prints an approval URL (`/labs/pair/[code]`, cookie-authed) and
@@ -38,7 +66,10 @@ is the no-browser fallback, and a `DISTILL_TOKEN` env var or Colab Secret
 outranks both. Its one kind no comparison can answer, a `review`
 checkpoint, is decided by a single toolless model call (`app/labs/judge.py`)
 that borrows the harness's plumbing — the model, the usage row and the monthly
-ceiling, which sums `lab_submissions.usage` alongside `messages.usage`.
+ceiling, which sums `lab_submissions.usage` and `background_runs.usage`
+(model spend with no message: the card writer and checker, a transcription,
+a coach run)
+alongside `messages.usage`.
 `distill.ask(text, *objects)` is the tutor itself, not a second agent: the
 web chat's stream path (`runner.start_stream`) in a chat of kind `lab`
 (`chats.lab_lesson`), one per lab and kept on the server — a question naming
@@ -216,8 +247,11 @@ Rules that override defaults:
   concludes the material itself is at fault it calls
   `report_content_incident`, which writes a row to `incidents` in the
   production database (locator `lesson:<course>/<slug>#<anchor>`, kind
-  `error|unclear|other`, a one-paragraph summary). Nothing in the app reads
-  that table; it is triaged by hand. When asked about "an issue from the
+  `error|unclear|other`, a one-paragraph summary). The second source is the
+  bot: a learner who presses "This card is wrong" under a review card
+  retires that card and files an `error` row against its section, its
+  summary naming the card id and prompt (`app/review/controls.py`). Nothing
+  in the app reads that table; it is triaged by hand. When asked about "an issue from the
   agent" or reader feedback, read the open ones on the deploy host:
   `docker compose exec -T db psql -U postgres -d distillcourse -x -c
   "SELECT id, locator, kind, summary, created_at FROM incidents WHERE

@@ -1,25 +1,26 @@
 import asyncio
-import uuid
-from collections.abc import Awaitable, Callable
-from contextlib import suppress
+import html
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 import logfire
 from pydantic_ai.messages import ModelRequest, UserPromptPart
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.coach import nudges, wake
+from app.core.config import settings
 from app.harness import runner
-from app.harness.limits import LimitExceeded
+from app.harness.limits import LimitExceeded, check_run_allowed
 from app.harness.prompts import ContextBlock
 from app.harness.repository import HarnessRepository
-from app.models import Chat
-from app.review import repository as review
-from app.review import subject
+from app.models import BackgroundRun, Chat, TgLink
+from app.review import cards, controls, subject
 from app.scheduling import policy
 from app.scheduling import repository as scheduling
-from app.telegram import api, repository, thread
+from app.telegram import api, repository, speech, thread
 from app.telegram.outbox import Outbox
 
 # The thread is the queue: one run holds it at a time, whichever process
@@ -28,10 +29,6 @@ from app.telegram.outbox import Outbox
 # learner is told, because silence reads as a broken bot.
 RUN_WAIT_SECONDS = 5.0
 RUN_ATTEMPTS = 6
-# How long after a review was sent an answer to it is still read as one. The
-# slot times out in four waking hours; a learner who comes back the next
-# morning is answering, not changing the subject.
-LATE_ANSWER = timedelta(days=1)
 
 PAIR_FIRST = (
     "This chat is not connected to a distillcourse account. Sign in on the "
@@ -47,56 +44,135 @@ PAIRED = (
     "/mute — stop messages the platform starts (/unmute resumes them)"
 )
 BUSY = "Still finishing the previous message. Send that again in a minute."
+# A voice note's transcript is already on screen: retyping it beats re-recording.
+BUSY_HEARD = (
+    "Still finishing the previous message. Send what I heard as text in a minute."
+)
 FAILED = "Something went wrong on my side. Send that again in a minute."
+TAP_FAILED = "Something went wrong on my side. Press that again in a minute."
+TAP_BUSY = "Still finishing the previous message. Press that again in a minute."
+TOO_LONG = "Too long. Keep it under two minutes."
+UNHEARD = "Couldn't make that out. Send it as text?"
+VOICE_OFF = "I can't take voice notes yet. Send it as text?"
+# Checked on what Telegram reports, before anything is downloaded.
+VOICE_SECONDS = 120
+# The learner sees what was heard, because that is what gets graded; a long
+# answer is recognisable from its start.
+HEARD_CHARS = 200
 CLEARED = "The learner cleared the thread; nothing before this point is yours."
 
 
 @dataclass(frozen=True)
+class Voice:
+    file_id: str
+    duration: int
+
+
+@dataclass(frozen=True)
 class Update:
+    """A message. `text` is empty when it is a `voice`, whose transcript stands
+    in for it."""
+
     update_id: int
     tg_chat_id: int
     text: str
+    voice: Voice | None = None
 
 
-def parse(payload: dict[str, Any]) -> Update | None:
-    """The three fields this bot acts on, or nothing.
+@dataclass(frozen=True)
+class Tap:
+    """A pressed inline button. `data` is `<prefix>:<payload>`."""
 
-    A sticker, a photo, an edit: shapes that carry no text for the tutor to
-    read, all answered with the same silence. So is anything outside a private
-    chat — a pairing code redeemed in a group would hand that group the
-    learner's own thread.
-    """
-    update_id = payload.get("update_id")
-    message = payload.get("message") or {}
-    chat = message.get("chat") or {}
-    text = message.get("text")
+    update_id: int
+    tg_chat_id: int
+    callback_id: str
+    message_id: int
+    data: str
+
+
+def _private_chat(holder: dict[str, Any]) -> int | None:
+    chat = holder.get("chat") or {}
+    tg_chat_id = chat.get("id")
+    if chat.get("type") != "private" or not isinstance(tg_chat_id, int):
+        return None
+    return tg_chat_id
+
+
+def _tap(update_id: int, query: dict[str, Any]) -> Tap | None:
+    message = query.get("message") or {}
+    tg_chat_id = _private_chat(message)
+    callback_id = query.get("id")
+    message_id = message.get("message_id")
+    data = query.get("data")
     if (
-        not isinstance(update_id, int)
-        or chat.get("type") != "private"
-        or not isinstance(chat.get("id"), int)
-        or not isinstance(text, str)
-        or not text.strip()
+        tg_chat_id is None
+        or not isinstance(callback_id, str)
+        or not isinstance(message_id, int)
+        or not isinstance(data, str)
     ):
         return None
-    return Update(update_id=update_id, tg_chat_id=chat["id"], text=text.strip())
+    return Tap(
+        update_id=update_id,
+        tg_chat_id=tg_chat_id,
+        callback_id=callback_id,
+        message_id=message_id,
+        data=data,
+    )
+
+
+def parse(payload: dict[str, Any]) -> Update | Tap | None:
+    """The fields this bot acts on, or nothing.
+
+    A sticker, a photo, an edit, an audio file, a video note: shapes that
+    carry nothing for the tutor to read, all answered with the same silence. So
+    is anything outside a private chat — a pairing code redeemed in a group
+    would hand that group the learner's own thread, and a button pressed there
+    would act on it. A voice message is kept, to be read once transcribed.
+    """
+    update_id = payload.get("update_id")
+    if not isinstance(update_id, int):
+        return None
+    if "callback_query" in payload:
+        return _tap(update_id, payload["callback_query"] or {})
+    message = payload.get("message") or {}
+    tg_chat_id = _private_chat(message)
+    if tg_chat_id is None:
+        return None
+    voice = message.get("voice") or {}
+    file_id, duration = voice.get("file_id"), voice.get("duration")
+    if isinstance(file_id, str) and isinstance(duration, int):
+        return Update(
+            update_id=update_id,
+            tg_chat_id=tg_chat_id,
+            text="",
+            voice=Voice(file_id=file_id, duration=duration),
+        )
+    text = message.get("text")
+    if not isinstance(text, str) or not text.strip():
+        return None
+    return Update(update_id=update_id, tg_chat_id=tg_chat_id, text=text.strip())
+
+
+async def dismiss(payload: dict[str, Any]) -> None:
+    """Answer a button press `parse` dropped. Telegram spins a pressed button
+    until it is answered, in a group as anywhere else."""
+    query = payload.get("callback_query") or {}
+    callback_id = query.get("id")
+    if isinstance(callback_id, str):
+        with suppress(api.TelegramError):
+            await api.answer_callback(callback_id)
 
 
 async def _clear(repo: HarnessRepository, chat: Chat) -> str:
-    # Under the claim runs take, because that is what serializes the thread: a
-    # marker written beside a run in flight is overtaken by that run's output,
-    # and the history it was meant to cut survives.
-    run_id = uuid.uuid4()
-    if not await repo.claim_run(chat, run_id):
-        raise runner.RunBusy
-    try:
+    # A marker written beside a run in flight is overtaken by that run's
+    # output, and the history it was meant to cut survives.
+    async with thread.holding(repo, chat):
         await repo.add_messages(
             chat,
             [ModelRequest(parts=[UserPromptPart(content=CLEARED)])],
             role="system",
             marker="clear",
         )
-    finally:
-        await repo.release_run(chat, run_id)
     return "Cleared. Nothing above this line reaches the tutor."
 
 
@@ -123,6 +199,23 @@ _COMMANDS: dict[str, Callable[[HarnessRepository, Chat], Awaitable[str]]] = {
 }
 
 
+# Keyed by the `callback_data` prefix before the first ":". A handler is
+# called with the learner's outbox and the tap; the button is already answered.
+TAP_HANDLERS: dict[str, Callable[[Outbox, Tap], Awaitable[None]]] = {
+    cards.TAP: cards.answer,
+    cards.ORDER: cards.arrange,
+    cards.ANOTHER: controls.another,
+    cards.NOT_TODAY: controls.not_today,
+    cards.WRONG_CARD: controls.wrong_card,
+    cards.NEXT: controls.next_card,
+    cards.HARDER: controls.harder,
+    cards.EXPLAIN: controls.explain,
+    cards.OWN_WORDS: controls.own_words,
+    cards.SEND_IT: controls.send_it,
+    nudges.QUICK_CHECK: nudges.quick_check,
+}
+
+
 async def _pair(session: AsyncSession, update: Update, code: str) -> None:
     if not code:
         await api.send_message(update.tg_chat_id, START_HELP, html=False)
@@ -145,32 +238,15 @@ async def _pair(session: AsyncSession, update: Update, code: str) -> None:
 async def _open_reviews(
     repo: HarnessRepository, now: datetime
 ) -> tuple[ContextBlock, ...]:
-    """Whatever review this message may be an answer to.
-
-    A learner who writes while a review of theirs is open must not leave it
-    hanging until it times out, and one who answers hours late is still
-    answering — so the run is handed both, with the ids it closes them by.
-    """
-    rows = await review.ungraded(repo.session, repo.user_id, now - LATE_ANSWER)
-    return await subject.open_block(repo.session, rows)
-
-
-# A refresh under Telegram's ~5s display, so the bar never flickers off
-# mid-run.
-TYPING_REFRESH_SECONDS = 4.5
-
-
-async def _typing(tg_chat_id: int) -> None:
-    """Keeps the "typing…" bar up until cancelled. Failures are swallowed:
-    the indicator is a nicety, the answer is what matters."""
-    while True:
-        with suppress(api.TelegramError):
-            await api.send_chat_action(tg_chat_id)
-        await asyncio.sleep(TYPING_REFRESH_SECONDS)
+    """The cards this message may be about: a learner who writes "it's the
+    second one" is answering a card, and the run is handed the ids it grades
+    one by."""
+    sent = await cards.recent(repo.session, repo.user_id, now - policy.IGNORED_AFTER)
+    return await subject.open_block(repo.session, sent)
 
 
 async def _answer(
-    repo: HarnessRepository, chat: Chat, outbox: Outbox, text: str
+    repo: HarnessRepository, chat: Chat, outbox: Outbox, text: str, busy: str = BUSY
 ) -> None:
     for attempt in range(RUN_ATTEMPTS):
         try:
@@ -181,9 +257,91 @@ async def _answer(
             return
         except runner.RunBusy:
             if attempt + 1 == RUN_ATTEMPTS:
-                await outbox.send(BUSY)
+                await outbox.send(busy)
                 return
             await asyncio.sleep(RUN_WAIT_SECONDS)
+
+
+async def _hear(repo: HarnessRepository, outbox: Outbox, voice: Voice) -> str | None:
+    """The voice message as text, or None once the learner has been told why
+    there is none. A guess is never passed on as what they said."""
+    if settings.TRANSCRIPTION_MODEL is None:
+        await outbox.send(VOICE_OFF)
+        return None
+    if voice.duration > VOICE_SECONDS:
+        await outbox.send(TOO_LONG)
+        return None
+    # Before the download: a learner past a cap must not spend on the way to
+    # being told so.
+    await check_run_allowed(repo)
+    try:
+        audio = await api.download_file(voice.file_id)
+        text, usage = await speech.transcribe(audio)
+    except api.TelegramError, speech.TranscriptionFailed:
+        logfire.exception("a telegram voice message was not transcribed")
+        await outbox.send(UNHEARD)
+        return None
+    session = outbox.session
+    session.add(
+        BackgroundRun(user_id=outbox.link.user_id, kind=speech.TRANSCRIBE, usage=usage)
+    )
+    await session.commit()
+    if not text:
+        await outbox.send(UNHEARD)
+        return None
+    heard = text if len(text) <= HEARD_CHARS else text[:HEARD_CHARS] + "…"
+    # Its own outbox: this line is not the answer, and counted as one it would
+    # keep the run's answer from being delivered.
+    await Outbox(session=session, link=outbox.link).send(
+        f"<i>Heard:</i> {html.escape(heard)}"
+    )
+    return text
+
+
+async def _learner(session: AsyncSession, tg_chat_id: int) -> TgLink | None:
+    """The learner behind a message or a tap, which is also them coming back:
+    after a week away, the coach looks again soon rather than at its own
+    time."""
+    link = await repository.link_for_chat(session, tg_chat_id)
+    if link is None:
+        return None
+    if link.status != "active":
+        # They are reaching us, so whatever broke the channel is over.
+        await repository.set_status(session, link, "active")
+    await wake.returned(session, link.user_id, datetime.now(UTC))
+    await session.commit()
+    return link
+
+
+@asynccontextmanager
+async def _guarded(outbox: Outbox, failed: str, what: str) -> AsyncIterator[None]:
+    """The top of a background task: nothing catches what escapes here, the
+    update id is already recorded so Telegram will not deliver it again, and an
+    update that ends in silence is a bot that looks dead. Saying so is best
+    effort — the channel may be what broke."""
+    try:
+        yield
+    except api.BotBlocked:
+        # The outbox has recorded that the channel is down. There is nowhere
+        # left to say anything about it.
+        return
+    except Exception:
+        logfire.exception(what)
+        with suppress(Exception):
+            await outbox.send(failed)
+
+
+@asynccontextmanager
+async def _refused(outbox: Outbox, busy: str) -> AsyncIterator[None]:
+    """The two refusals the learner is told about rather than given an error
+    for: the thread is held by another run, or a cap is spent — swallowed, the
+    bot looks broken."""
+    try:
+        yield
+    except runner.RunBusy:
+        await outbox.send(busy)
+    except LimitExceeded as exc:
+        await outbox.send(str(exc))
 
 
 async def handle(
@@ -192,47 +350,51 @@ async def handle(
     """One incoming message, end to end. Runs after the webhook has answered
     Telegram, so how long the tutor thinks is nobody's timeout."""
     async with session_factory() as session:
-        link = await repository.link_for_chat(session, update.tg_chat_id)
         command, _, argument = update.text.partition(" ")
         if command == "/start":
             await _pair(session, update, argument.strip())
             return
+        link = await _learner(session, update.tg_chat_id)
         if link is None:
             await api.send_message(update.tg_chat_id, PAIR_FIRST, html=False)
             return
-        if link.status != "active":
-            # They are writing to us, so whatever broke the channel is over.
-            await repository.set_status(session, link, "active")
         repo = HarnessRepository(session, link.user_id)
         chat = await thread.of(session, link.user_id)
         outbox = Outbox(session=session, link=link)
         handler = _COMMANDS.get(command)
-        typing = asyncio.create_task(_typing(update.tg_chat_id))
-        try:
-            try:
-                if handler is None:
-                    await _answer(repo, chat, outbox, update.text)
-                else:
-                    await outbox.send(await handler(repo, chat))
-            except runner.RunBusy:
-                await outbox.send(BUSY)
-            except LimitExceeded as exc:
-                # A cap is not an error to swallow: the learner is told why the
-                # tutor stopped answering, or the bot looks broken.
-                await outbox.send(str(exc))
-        except api.BotBlocked:
-            # The outbox has recorded that the channel is down. There is
-            # nowhere left to say anything about it.
+        # Nested so the guard covers the answers below as well.
+        async with (
+            thread.typing(update.tg_chat_id),
+            _guarded(outbox, FAILED, "telegram update failed"),
+            _refused(outbox, BUSY),
+        ):
+            if update.voice is not None:
+                text = await _hear(repo, outbox, update.voice)
+                if text is not None:
+                    await _answer(repo, chat, outbox, text, BUSY_HEARD)
+            elif handler is None:
+                await _answer(repo, chat, outbox, update.text)
+            else:
+                await outbox.send(await handler(repo, chat))
+
+
+async def handle_tap(
+    session_factory: async_sessionmaker[AsyncSession], tap: Tap
+) -> None:
+    # Telegram spins the pressed button until this is answered, whatever comes
+    # of the tap — an unknown button and an unpaired chat included.
+    with suppress(api.TelegramError):
+        await api.answer_callback(tap.callback_id)
+    handler = TAP_HANDLERS.get(tap.data.partition(":")[0])
+    if handler is None:
+        return
+    async with session_factory() as session:
+        link = await _learner(session, tap.tg_chat_id)
+        if link is None:
             return
-        except Exception:
-            # Nested so this covers the two answers above as well. It is the
-            # top of a background task: nothing catches what escapes here, the
-            # update id is already recorded so Telegram will not deliver the
-            # message again, and an update that ends in silence is a bot that
-            # looks dead. Saying so is best effort — the channel may be what
-            # broke.
-            logfire.exception("telegram update failed")
-            with suppress(Exception):
-                await outbox.send(FAILED)
-        finally:
-            typing.cancel()
+        outbox = Outbox(session=session, link=link)
+        async with (
+            _guarded(outbox, TAP_FAILED, "telegram tap failed"),
+            _refused(outbox, TAP_BUSY),
+        ):
+            await handler(outbox, tap)

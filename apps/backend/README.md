@@ -38,7 +38,7 @@ app/
     tools.py         # the tools themselves; importing it registers them
     web_search.py    # the Perplexity call behind the web_search tool
     repository.py    # user-scoped reads and writes over chats and messages
-    usage.py         # the shape of messages.usage, written once, read by caps
+    usage.py         # the shape of messages.usage, written once, read by caps; background_runs
     limits.py        # the daily cap, the monthly ceiling, the web search cap
     runner.py        # claim, persist, stream, stop, compact
     steering.py      # messages a web run takes while it answers
@@ -52,17 +52,26 @@ app/
     rate_limit.py    # fixed-window limiter for signup, login and pairing
     observability.py # logfire: fastapi + sqlalchemy + httpx
   scheduling/
-    policy.py        # quiet hours, the slot timeout, the budget, coalescing
-    repository.py    # schedules: claim, lease, defer, slot, outcome
+    policy.py        # quiet hours, the daily budget, the backoff
+    repository.py    # schedules: claim, lease, defer; silence and initiations counted
+    gates.py         # whether the platform may open the conversation now, as a sentence
     worker.py        # the poller process + the daily housekeeping sweep
     tools.py         # reminder and mute tools, run by the tutor
+  coach/
+    agent.py         # the deciding agent: its tools, its run, its Decision
+    state.py         # the summary it is handed instead of the thread
+    tools.py         # send_card: the only way it reaches the learner
+    wake.py          # its one live wake-up row per learner, and what pulls it forward
+    floor.py         # the card a silent week ends in, chosen by code
   telegram/
-    api.py           # the Bot API client: sendMessage, setWebhook
+    api.py           # the Bot API client: messages, photos, edits, inline keyboards
     repository.py    # links, pairing codes, update dedup
-    outbox.py        # sending: length split, HTML fallback, blocked bot
-    thread.py        # the one thread and the run that speaks into it
-    updates.py       # one incoming message, end to end; bot commands
-    tools.py         # send_message, run by the tutor
+    outbox.py        # sending and editing: length split, HTML fallback, blocked bot
+    thread.py        # the one thread, its claim, and the run that speaks into it
+    updates.py       # one incoming message or button press, end to end; bot commands
+    speech.py        # a voice note as text, via OpenRouter transcription; audio never stored
+    formula.py       # LaTeX math as a PNG, through matplotlib's mathtext
+    tools.py         # send_message; the telegram toolset: send_figure, send_formula
   labs/
     repository.py    # pairing codes and tokens; challenges, state, submissions
     verify.py        # what a posted checkpoint is worth: comparison and metrics
@@ -77,10 +86,13 @@ app/
     repository.py    # the learner profile: index, read, upsert, delete
     tools.py         # read_memory / save_memory / delete_memory
   review/
-    ladder.py        # the intervals and what an outcome does to them
-    repository.py    # review_state, and the deliveries it materialises
-    subject.py       # what a review is about: the lesson's concepts
-    tools.py         # report_review_outcome, run by the tutor
+    ladder.py        # the intervals, the levels, and what an answer does to them
+    repository.py    # review_state, what is due, grading a card
+    cards.py         # pick, write on first need, send, grade a tap, expire
+    controls.py      # the other buttons under a card: skip, pause, flag, follow-ups
+    writer.py        # the two toolless calls a batch costs: write, then check
+    subject.py       # what a review is about: the lesson's concepts; the cards sent
+    tools.py         # report_review_outcome, run by the tutor on a written answer
   models.py          # SQLAlchemy 2.0 declarative tables
   crud.py            # user reads/writes
   lessons/state.py   # what a user did to a lesson: rating, bookmark
@@ -108,7 +120,7 @@ send an `Authorization` header — authenticates over the same cookie for free.
   attempt caps), the per-IP limit on signup and login, and the instance-wide
   `MONTHLY_COST_CEILING_USD` backed by a spend limit on the OpenRouter key.
 - `users.timezone` is read from the browser at signup and at every login,
-  because proactive messages are scheduled against the user's own clock.
+  because the coach and reminders are scheduled against the user's own clock.
 - Password reset and email verification do not exist; the operator resets a
   password from the CLI below.
 - Notebooks do not use the cookie. A lab page issues a 10-minute single-use
@@ -251,13 +263,16 @@ response run as concurrent tasks, and all of them drive the run's single
 `AsyncSession`, which two coroutines cannot use at once.
 
 The model is the chat's for a dialogue the learner is having and the configured
-default for anything the platform starts by itself — reviews, proactive
-messages, compactions — which is why the web API refuses to run in, compact or
+default for anything the platform starts by itself — reminders,
+compactions — which is why the web API refuses to run in, compact or
 re-model the Telegram thread.
 
 Caps are enforcement, not telemetry: messages per user per day, an
-instance-wide monthly ceiling computed from the cost recorded on every run and
-on every judged lab submission, web searches per user per day, and memory
+instance-wide monthly ceiling computed from the cost recorded on every run, on
+every judged lab submission and on every model call with no message to hang
+it on (`background_runs`: the card writer and checker, transcriptions, coach
+runs), web
+searches per user per day, and memory
 writes per run. Set a spend limit on the OpenRouter key too — that one holds
 even if this code is wrong.
 
@@ -287,9 +302,25 @@ so the only chats it can write to are the ones that repository can see.
   nothing has its final answer delivered for it, and one that sent something
   does not get its answer sent on top. On the site the tool says there is
   nothing to send: the answer is the delivery there.
+- `send_figure` / `send_formula` — an image into the Telegram thread: a figure
+  `fetch_content` lists for the passage named (`Passage.figures`, from the
+  index's `metadata.figures`; any other `src` is refused), or 1–6 lines of
+  LaTeX math typeset by `telegram/formula.py` — mathtext with the `cm`
+  fontset, on a thread (`asyncio.to_thread`), at 200 dpi on white. mathtext has
+  no environments: `aligned` and `pmatrix` come back to the model as the
+  parser's message, and an aligned derivation is sent one step per line; a
+  line too wide for a photo (Telegram refuses one past 20:1) is refused the
+  same way, from the parse alone (`formula.check`), before anything is
+  drawn. An
+  SVG figure goes as its URL on the site's PNG route
+  (`/course-assets-png/<course>/<lesson>/<file>`, which renders it with
+  resvg), a raster as served. A photo is not counted as the delivery: the
+  final answer still follows it. They are a toolset of their own, handed only
+  to a run with an outbox, so no other medium is offered them.
 - `read_memory` / `save_memory` / `delete_memory` — the learner profile below.
-- `report_review_outcome` — how one review went, which is what schedules the
-  next one. See spaced repetition below.
+- `report_review_outcome` — the grade of a review card the learner answered
+  in writing rather than with a tap, by its delivery id; it moves the ladder.
+  See spaced repetition below.
 - `get_user_progress` — the reading history: per lesson, how long they spent,
   how far they scrolled, when it counted as finished, and how many of its
   solutions they opened against how many it ships (`solutions_total`, from the
@@ -352,11 +383,13 @@ queries them in psql (`docs/deployment.md`).
 
 ## Proactive scheduling
 
-`schedules` is the queue of everything the platform intends to say on its own:
-reviews that come due and reminders a learner asked for. A second process of
-this same image (`python -m app.scheduling.worker`, the `scheduler` compose
-service) polls it every 30 seconds. There is no broker — Postgres is the queue,
-and one table beats a Redis and a Celery for a handful of messages a day.
+`schedules` is the queue of everything the platform intends to do on its own:
+reminders a learner asked for, and one wake-up (`kind = 'coach'`) per learner
+with a working Telegram link — the moment the coach next looks at them (see
+The coach). A second process of this same image (`python -m
+app.scheduling.worker`, the `scheduler` compose service) polls it every 30
+seconds. There is no broker — Postgres is the queue, and one table beats a
+Redis and a Celery for a handful of messages a day.
 
 A cycle claims what is due in one statement (`FOR UPDATE SKIP LOCKED`, then a
 lease) and commits before running anything, so a lock is never held for as long
@@ -368,47 +401,56 @@ an expired lease exactly the set of rows a dead worker was holding: they go back
 to pending, one attempt poorer, and a row that fails three times is failed with
 a logfire error.
 
-What reaches the learner is decided per user, in `policy.py`:
+The limits on what the platform starts are code the coach cannot talk its way
+past. `scheduling/gates.py` states them, and the send tools return its refusal
+to the model as a sentence:
 
 - **Quiet hours** `users.quiet_start`–`users.quiet_end` (09:00–22:00 by
   default) on `users.timezone`, both ends the learner's to move on the settings
-  page; outside them the row waits for the next morning. The window is
-  same-day: it must open before it closes, so a night-shift window like
-  18:00–02:00 cannot be expressed. Everything that counts waking hours (the
-  slot timeout, the daily budget) reads it as one interval within a date, and
-  wrapping it is a change to all of that, not to the constraint alone.
-- **One open slot.** A delivered message sets `awaiting_reply`, and `due_at`
-  then means the moment it counts as ignored — four *waking* hours later, so a
-  message at 21:30 is not written off overnight. Everything else due waits for
-  that slot to close.
-- **Three initiations a day**, counted as messages rather than items: what is
-  due for one learner is coalesced into a single message of at most three
-  items, and the rest wait for tomorrow.
-- **Reminders are not initiations.** The slot and the budget govern what the
-  platform says on its own account; a reminder is the learner's appointment,
-  set for a time they named, so it goes out at that time regardless of an open
-  slot or a spent budget (quiet hours and mute still hold). Nothing is waiting
-  for an answer to it, so it is `done` on delivery rather than holding the slot
-  — though it does count as a message sent, against the day's budget for the
-  reviews behind it.
-- **Rotation.** After a message the learner let time out, the next one leads
-  with a different `payload.topic`.
+  page; outside them nothing is sent, and a wake-up or a reminder that comes
+  due waits for the next morning. The window is same-day: it must open before
+  it closes, so a night-shift window like 18:00–02:00 cannot be expressed.
+  Everything that counts waking hours (the daily budget) reads it as one
+  interval within a date, and wrapping it is a change to all of that, not to
+  the constraint alone.
+- **One initiation a day** (`policy.DAILY_INITIATIONS`): the cards sent on the
+  platform's own account (`card_deliveries.initiated`), the reading nudges
+  (`schedules` of kind `nudge`) and the weekly notes (`coach_notes`), counted
+  on the learner's calendar. `initiations_today` and `last_initiation` read
+  the one list of these (`repository._initiations`), so the day's count, the
+  backoff clock and the weekly floor cannot disagree about what was sent.
+- **Silence backoff.** Silence is the number of messages the platform sent
+  since the learner's last contact that went unanswered — derived, never
+  stored. A card is unanswered once it ended `ignored` (a day untouched) or
+  `folded` (a newer card went out while it was open); a nudge or a weekly
+  note, once a day has passed without its button pressed, or, for a nudge,
+  its lesson opened (`lesson_progress.last_seen`). Last contact
+  (`last_contact`) is the latest of a message in the Telegram thread and
+  `card_deliveries.answered_at`, which only the learner's own move sets — a
+  tap, a written answer, or a skip: Another question and Not today are their
+  move too and end a silence. After the last initiation the platform waits 1,
+  2, 4, then 7 days for silence 1, 2, 3, 4+, and keeps writing weekly from
+  there until `/mute`.
+- **Not today.** `users.cards_paused_until` holds cards — never reminders —
+  until the next morning; set by a card's own button.
 - **Mute.** `users.muted_until` pauses everything the platform starts; the
   learner sets it in conversation (the tutor's mute tool), and answers to what
   they write are unaffected. A muted learner's rows are not claimed rather than
   pushed past the mute, so they keep the time they were meant for and an
   open-ended mute — a timestamp in the year 9999 — is undone by clearing one
-  column.
+  column. A broken link (a blocked bot) holds them the same way; both are
+  `claim_due`'s, before anything runs.
 
-Delivery goes into the learner's eternal Telegram thread through the ordinary
-harness `run()`, with the `proactive` or `review` prompt module. Rows exist only
-for a learner who has paired Telegram: the reminder tool refuses to create one
-otherwise, and a review that reaches the poller with no thread behind it is
-cancelled rather than rescheduled — its ladder materialises it again the moment
-a link exists. A reminder is held instead: it has no such backing state, and
-unpairing to move to another phone must not silently cancel what the learner
-asked for by name. Whether they replied is read back from the thread, so the
-outcome (`answered` / `ignored`) is recorded whichever way a message arrived.
+**Reminders are not initiations of ours.** A reminder is the learner's
+appointment, set for a time they named, so it goes out at that time
+regardless of a spent budget, Not today or a backoff wait (quiet hours and mute
+still hold), and the reminders due together go out as one message. For the
+same reason it neither spends the day's message nor pays the weekly floor: a
+learner with a daily reminder still gets their card. A reminder
+goes into the eternal Telegram thread through the ordinary harness `run()`,
+with the `reminder` prompt module, and its row is `done` once it is sent. A
+reminder is held, never cancelled, for a learner with no link: unpairing to
+move to another phone must not silently cancel what they asked for by name.
 
 One replica, deliberately: `compose.yml` runs a single `scheduler`, and the
 lease is sized for one run rather than for a whole batch of users, so a second
@@ -418,6 +460,95 @@ twice. Scale it and that assumption has to be revisited first.
 The worker also owns the daily housekeeping sweep of rows nothing will read
 again: expired sessions, pairing codes past their ten minutes — Telegram's and
 the labs' — and update ids older than a week.
+
+## The coach
+
+`app/coach/` decides whether the bot says anything to a learner, and when it
+looks again. It is a pydantic-ai agent of its own (`COACH_MODEL`), not a tutor
+run, and its one rule is the epic's: assume the learner does not want to
+engage — everything the bot starts is easy or interesting, or it stays silent
+(`prompts/coach.md`).
+
+**What it is handed** is a summary built by code (`state.py`), never the
+thread: replaying hundreds of unanswered cards is what made the old bot talk
+about its own queue, and it is the costly part of a run. The summary carries
+the last run's reason and what woke this one, whether a card can go out now,
+days since the last answer and the silence count, the last ten cards and
+nudges with the cards' outcomes, taps and messages by hour of day over 30 days, the due ladders
+(the ten most recent and the ten longest overdue) with step, level and last
+outcome, the `review-*` memory descriptions, the `bot-*` memories in full, the
+lessons read last with how far they scrolled and, for an unfinished one, the
+section they stopped in, and the learner's last three messages, fenced, for language and tone. A `bot-*` memory is what the learner
+told the tutor about the bot itself — "only mornings", "less philosophy" —
+saved under that prefix from any chat (`prompts/memory.md`), and binding.
+
+**What it can do**: read with the tutor's own `search_content`,
+`fetch_content`, `get_course_structure`, `get_user_progress`, `read_memory` and
+`save_memory` (registered on it, not copied), and reach the learner with
+`send_card(lesson, level=None, focus=None)` — a tap card of a lesson they
+finished, at the ladder's level unless told otherwise; a `focus` has a card
+written at one confusion, for that learner alone (`owner_id`) — or with
+`send_nudge(kind, lesson, text, anchor=None)` (`nudges.py`), a message of at
+most 300 characters with a link into a lesson: `resume` for one started and
+not finished, linked to `last_anchor` unless told otherwise, with
+`[Continue]` and `[Quick check instead]`; `hook` for one not opened, a puzzle
+from its opening, with `[Read it]`. Its first call about a section sends
+nothing and hands the section's text back, so the message is written with it
+in view. A nudge is stored as the tutor's message in the thread, so a reply is
+read with it, and as a `schedules` row of kind `nudge`, born `done` with
+`due_at` the moment it went out — added only once Telegram has the message, so
+a refused send spends nothing: `callback_data` holds 64 bytes, which a
+lesson locator can outgrow, so Quick check carries the row's id. A lesson
+nudged in the last three days (`review.REST`) is not nudged again, whatever
+the backoff says. Quick check
+sends a level 1 card on the lesson, as the learner's own move — no
+initiation, the day's `CARDS_PER_DAY` its bound — and is spent once. There is
+no free-text send tool: "still waiting for your answer" cannot be said.
+`send_weekly_note(next_step)` is the third send tool (`note.py`, below). Staying
+silent is a run that calls no send tool, and no answer text is ever
+delivered. What it returns is a `Decision`: `next_check_at`, on the learner's
+clock, and a one-line `reason` handed to the next run. A run is limited to 8
+requests; it costs a `background_runs` row of kind `coach`, written whether or
+not it decided.
+
+**When it wakes** is one live `schedules` row per learner (a unique partial
+index on `kind = 'coach'` and a waiting status), `payload = {reason, note}`:
+
+| Trigger | Effect |
+|---|---|
+| The run's own `next_check_at` | The next row, clamped to 4 hours – 7 days out, then into the waking window |
+| A lesson finished (reading or a lab: `review.start` opening a ladder) | The row pulled to now + 1 hour |
+| A tap, a message or a lesson opened after 7 days without any | The row pulled to now + 1 hour |
+| No live row (a new link, a row that failed) | `wake.ensure` creates one, due now |
+
+A pull only ever moves a row earlier and leaves one a run holds alone.
+`COACH_RUNS_DAILY` runs a learner per day, counted from `background_runs`;
+beyond it the row waits for tomorrow's open. A failed run goes through
+`repository.retry`; a spent monthly ceiling defers it to the next morning with
+nothing sent.
+
+**The weekly floor** (`floor.py`): when a week has passed with no card,
+nudge or note sent on the platform's own account — counted from pairing for a learner who has had
+none — and a run ends silent, code sends one anyway, chosen with no model: the
+lesson finished most recently whose ladder is due and had no card in three
+days, at its level, with a card the learner has not seen in two weeks. The
+gates hold for it too. The bot does not get to give up on a learner.
+
+**The weekly note** (`note.py`, `coach_notes`): one line per course with
+`holding/total` — ladders at step 2 or above that are not slipping — then
+`Slipping:` with up to three lessons whose last outcome is `failed` or whose
+last tap was wrong, then `Next:` and the model's `next_step` (at most 200
+characters, the only text it writes). The row is written before the message
+goes out and taken back if Telegram refuses it. Under it, a *Send it* button
+(`s:<note_id>`, a review control in `review/controls.py` beside Next) that
+puts a card on the lesson slipping most lately — a card the learner asked
+for, bounded by `CARDS_PER_DAY`; a press that sends none gives the button
+back — or, with nothing slipping, a link to the lesson read last and left
+unfinished. It is a tool, not a timer: the state block says whether
+one is available and what code would write in it, and the run decides. It is
+refused within 7 days of the last, without a tap answered in the last 14, with
+neither a lesson slipping nor one unfinished — nothing to put under it — and
+by the gates; once sent it counts in `initiations_today`.
 
 ## Spaced repetition
 
@@ -432,47 +563,124 @@ what `rebuild-progress` leans on.
 
 A ladder opens when telemetry derives `lesson_completed`, on the completion
 instant rather than on the flush that noticed it. The intervals are 1, 3, 7
-and 21 days, and an outcome moves the rung: **success stretches, failure
-compresses** — `passed` climbs, `partial` repeats the interval that was not
-quite enough, `failed` drops back to the one that was. `ignored` moves nothing
-(silence is not evidence about what they know) but re-arms the same interval
-from now, so a learner who was away does not come back to a queue. `passed` on
-the last rung finishes the ladder: `next_due_at` goes NULL, nothing is
-scheduled again, and the row stays as history. A later stumble does not
-resurrect it.
+and 21 days, and a passed review on the last rung finishes the ladder:
+`next_due_at` goes NULL, nothing is scheduled again, and the row stays as
+history. A later stumble does not resurrect it.
 
-Deliveries are materialised from the ladder each poller cycle: a due row with
-no live delivery and a working Telegram link becomes a `schedules` row, which
-from there is ordinary proactive work (#15) — quiet hours, one open slot,
-three initiations a day, coalescing, topic rotation. Nothing is materialised
-for a learner who has not paired: a row with nowhere to go would be cancelled
-on sight and made again every cycle, and pairing later needs no repair because
-the ladder stood the whole time.
+The ladder is advice. Nothing turns a due ladder into a message by itself:
+the coach reads the due ladders and decides (see The coach), and what is due
+for a card the learner asks for — *Next*, *Another question* — leaves out a
+lesson a card was sent for in the last three days (`repository.REST`): a card
+left unanswered leaves its ladder due, and it must not come straight back as
+the next message.
 
-The review itself is a dialogue, not a quiz. The run is given the lesson's
-concepts from the index — what it introduces and reinforces, plus the
-concepts introduced in the lessons either side, which are the ones a learner
-confuses them with — and the format the rung calls for (free recall,
-discrimination, application, justification). `prompts/review.md` governs how
-it is conducted; `report_review_outcome` is how it ends, and its `notes`
-become a memory, so the next review of that lesson starts from the sore spot.
-Only the opening question is a `review` run — every turn after it is an
-incoming message, so a `chat` run, whose modules do not include review.md.
-The context block that carries the open review carries the module with it, or
-the dialogue those rules describe would govern only the message nobody has
-answered yet.
+A review is a **tap card** (`review_cards`): one question about one main
+point of one section, two to four options, one of them right. Cards are
+written on first need and reused: `cards.pick` serves a card of the lesson at
+the learner's level that they have not seen in 14 days, from a section whose
+`documents.content_hash` still matches the card's, and only when there is
+none does `cards.write` spend a model call. The writer is handed the lesson —
+its chunks from the index, the concepts it introduces and the ones introduced
+next door — and writes a batch of three at the requested level
+(`writer.py`, `prompts/card_writer.md`, governed by `prompts/review.md`). A
+second toolless call checks each card against the same text: the marked
+answer is right, every other option is wrong, there is one answer, it is a
+main point (`prompts/card_check.md`). A card that fails any of it is dropped;
+when none survives, nothing is sent (the weekly floor puts that ladder off a
+day, so it does not pay for the same batch every run). Both calls run on
+`CARD_MODEL`, and what they cost goes to `background_runs`, which the monthly
+ceiling sums; a spent ceiling defers the coach's run to the next morning. Cards are shared between learners unless `owner_id`
+names one.
 
-Whether an item was graded is recorded in the delivery's payload, which is
-also what makes grading it twice a no-op: two runs can hold the same item when
-an answer arrives split across two messages, and one delivery moves the ladder
-once. The poller settles what was never graded: a session nobody answered is
-an `ignored` rung on every item, a session they did answer is a deferral on
-the items the tutor never reached — the rung does not move and nothing is held
-against them. A delivery that ran out of attempts is a deferral too; left
-unaccounted for it would be neither live nor settled, and the ladder behind it
-would be materialised again every cycle forever. A settlement is not a grade,
-so an answer that arrives after the slot timed out is still graded from the
-thread, and the delivery the ladder had already queued again is cancelled.
+The writer is given each section's figures and may show a card with one —
+`figure`, the `src` of one of its section's, or `formula`, one line of LaTeX
+math — never both; a card whose figure its section does not list, or whose
+formula does not parse or is too wide for a photo, is dropped before the
+check. Such a card's prompt is at most 400 characters, and its feedback cuts
+the explanation short where the whole would pass Telegram's 1024-character
+caption.
+
+A card goes out as a message with one button per option
+(`k:<delivery_id>:<option>`), recorded in `card_deliveries`; a card with an
+image goes out as a photo with its prompt as the caption, and its feedback
+edits the caption. A photo Telegram refuses — the site's figure unreachable,
+a picture past its limits — retires the card (`status = 'retired'`) and the
+next card in line is sent instead, once. **A tap is
+graded by code**: the delivery is locked, the option compared with the
+marked answer, the ladder moved and the message edited into ✓ or ✗, the right
+answer, the explanation and a link to the section — no model is asked. A card
+answered once is answered: a second tap changes nothing. A card nobody taps
+in a day is `ignored`, and the ladder does not move; the backoff is what
+answers silence. An ignored card is still open (`repository.is_open`, the one
+rule taps, the other buttons and a written answer all go by): a late tap
+grades it, as a late written answer does. A card answered in writing loses
+its buttons.
+
+**The streak** (`streak.py`) is the first line of a card and of its feedback,
+`Day 5 · <lesson title>`, from its second day: the calendar days on the
+learner's clock from the first day of a run of days with a tap answered right
+or wrong (a skip is not an answer) to the last, one missed day forgiven and
+still counted, two in a row ending it. It is derived from
+`card_deliveries` each time the line is written, never stored, and shown
+nowhere else — nothing is sent when it grows or when it ends.
+
+An **`order` card** (level 3, only for a lesson with a sequence its text
+forces) lists three to five steps numbered under the prompt, in an order code
+shuffled so it is never the answer; its buttons are the numbers
+(`o:<delivery_id>:<step>`, and `o:<delivery_id>:r` to reset). Each tap edits
+the message to show the order so far and drops that number; the order lives
+in `card_deliveries.chosen`, so a restart mid-card loses nothing, and the
+card stays unanswered until the last step is placed. That tap grades it, all
+or nothing, exactly as a single tap grades any other card.
+
+**The other buttons** (`controls.py`, `<prefix>:<delivery_id>`). Under an open
+card: *Another question* (`a`) marks it `skipped` and edits the message in
+place into a card one level lower on the same lesson, else one of the next due
+lesson, else "Nothing else for now" — from cards already written only, since
+the learner is waiting on a tap; level and ladder do not move. *Not today*
+(`n`) skips it, takes the buttons off and sets `users.cards_paused_until` to
+tomorrow's open — not `muted_until`, which would hold the learner's reminders
+too. *This card is wrong* (`w`) retires the card on the first report, files an
+`error` incident against its section (`HarnessRepository.file_incident`, on the
+thread chat) and commits both before anything is sent; then it behaves as
+Another question, and a swap Telegram refuses leaves the card put aside with
+its buttons off. Under the feedback on a card graded by a tap (an `order` card
+put aside half-way has a `chosen` but no feedback): *Next* (`x`) sends the next
+due card now — no initiation is spent, `CARDS_PER_DAY` bounds it; *Harder one*
+(`h`, absent at level 3), under the same bound, sends a card
+of the lesson a level up, written if none exists, and a right answer to it
+sets the level while a wrong one changes nothing (`card_deliveries.harder`);
+*Explain* (`e`) and *In my own words* (`m`) are `chat` runs on the thread with
+the card in their context. Own words are graded by `report_review_outcome` as
+recall: `passed` is a right answer at the level and climbs past `STEP_CAP`.
+Each feedback button is spent once (`card_deliveries.follow_ups`) and given
+back if what it started fails.
+
+Two harder cards (level 2+) skipped in a row, within seven days of each other
+and the later within seven days of now, mean only level 1 is served until
+then, whatever the ladder's level says — derived from `card_deliveries`
+(`repository.level_one_only`). When a new card goes out, any earlier card
+still open from the last day is edited to one line, `<lesson title> —
+skipped`, without buttons, and closed as `folded`: not a skip, since the
+learner did nothing, so it feeds neither `level_one_only` nor the learner's
+last contact, and it counts toward the silence. An answered card is left as
+it is.
+
+**Levels are per lesson** (`review_state.level`, `level_run`). Level 1 is the
+main point itself, level 2 tells two ideas apart, level 3 spots the error in
+a short argument or puts the steps of one in order. Three right answers in a
+row raise the level, a wrong one lowers it. A right tap climbs the ladder only
+up to its level's cap (`ladder.STEP_CAP`: rung 1 at level 1, rung 2 at level
+2) and at the cap re-arms the interval it is on, so only level 3 can finish a
+ladder. A wrong tap drops back a rung.
+
+A learner may answer a card in writing instead. Every message they send is
+handed the cards of the last day with their delivery ids and the review
+module, and `report_review_outcome(delivery_id, …)` is how the tutor grades
+the answer: `passed` climbs, `partial` repeats the interval, `failed` drops
+back, uncapped — recall is not recognition — and the level stays. It grades a
+card once, whichever of a tap and a written answer came first; its `notes`
+become a memory, so the next conversation starts from the sore spot.
 
 ## Telegram
 
@@ -502,24 +710,51 @@ deliveries, which is the failure the learner would actually notice.
 
 The eternal thread is created by the backend and by nothing else
 (`telegram/thread.py`). The web API creates web chats only, and refuses to
-stream into, compact or re-model a telegram chat (a lab chat it may continue), because the poller reads any message
-in that thread as the learner's answer to the review it is waiting on.
+stream into, compact or re-model a telegram chat (a lab chat it may continue), because the silence backoff reads any message
+in that thread as the learner's own.
 
 Serialization is the thread's own claim, which is the only thing both processes
-can see: a proactive run finds the thread held by an incoming message and comes
-back later, and an incoming message waits for a proactive run to finish rather
-than talking over it. A wait that outlasts the run is answered with a line
+can see: a reminder run or a card finds the thread held by an incoming
+message and comes back later (a card the coach was sending is refused, and the
+coach told so), and an incoming message waits for a reminder run to finish
+rather than talking over it. A wait that outlasts the run is answered with a line
 saying so — silence reads as a broken bot.
 
 Formatting is the tutor's job (`prompts/medium/telegram.md`): it writes
 Telegram HTML and keeps its own messages under the limit. The backend's two
-safety nets are for when it does not — a message Telegram will not parse is
-resent unformatted rather than dropped, and one over 4096 characters is split.
+safety nets are for when it does not — a message, caption or edit Telegram
+will not parse is resent unformatted rather than dropped, and a message over
+4096 characters is split.
+
+A voice note in a private chat is an answer like a typed one, once
+`TRANSCRIPTION_MODEL` is set — unset, the default, it gets "I can't take voice
+notes yet" and nothing is downloaded. The model is set only after one real
+Russian and one real English voice note have come back right through it
+(candidates: `mistralai/voxtral-mini-transcribe`, `openai/whisper-large-v3`):
+what it hears is what gets graded. One over 120 s
+is refused before download; otherwise, once the caps allow it, it is
+downloaded, transcribed (`speech.py`, cost to `background_runs`), shown back as
+a `Heard:` line and run as text. The audio is never stored or logged. A failed
+or empty transcription gets "Couldn't make that out. Send it as text?" and
+starts no run.
 
 `/clear`, `/compact`, `/mute` and `/unmute` are bot commands, handled by the
 backend rather than by the model: `/clear` writes the marker that cuts the
 history, `/compact` is the same summarisation the site does, and the two mutes
 set `users.muted_until`.
+
+Buttons are inline keyboards, not quiz polls: a poll caps its explanation at
+200 characters and cannot be edited into feedback. A button's `callback_data`
+is `<prefix>:<payload>` (64 bytes at most, Telegram's limit), and a press
+arrives as a `callback_query` update — deduplicated by `update_id` like a
+message, private chats only — that is routed to `updates.TAP_HANDLERS` by its
+prefix. The press is answered (`answerCallbackQuery`) before anything else,
+since Telegram spins the button until it is, and a press nothing handles, or
+from a chat nobody paired, ends there; so does one from a group, which is
+answered and dropped. An edit that would change nothing — a
+double tap — is Telegram's 400 "message is not modified", and is not an error.
+Changing `allowed_updates` takes `python -m app.cli set-webhook <url>` again,
+which `make deploy` does every time (`make webhook`).
 
 A 403 from Telegram means the bot was blocked. The link goes to `broken`, and a
 broken link holds that learner's schedules exactly as a mute does — nothing is
@@ -684,6 +919,14 @@ most the seconds that passed since this reader last flushed this lesson, and a
 beat that is not covered is not stored. The first flush has nothing to be
 measured against and is allowed one heartbeat's worth, below every threshold
 there is.
+
+A heartbeat may also carry `anchor`, the section the reader is in (the site
+reads it from the position store the table of contents highlights), under the
+index's anchor grammar; one outside it drops the beat like any unreadable
+event. `lesson_progress.last_anchor` is the anchor of the latest heartbeat
+that had one — a heartbeat rather than an event of its own, because it is sent
+only while the reader is attending, so it names where they stopped rather than
+where a tab was left. It is what a reading nudge links back to.
 
 The aggregate is a full recompute from the events of one (reader, lesson), not
 an increment: the projection cannot drift from the log, and

@@ -1,6 +1,6 @@
 "use client";
 
-import { sectionKey } from "@/lib/content/locator";
+import { lessonKey, sectionKey } from "@/lib/content/locator";
 import type { TocEntry } from "@/lib/content/toc";
 import { createStore } from "@/lib/store";
 
@@ -110,6 +110,15 @@ export function articleProgress(top: number, height: number, viewport: number): 
   // floor keeps it from dividing by zero or by a negative.
   const span = Math.max(height - viewport, 1);
   return Math.min(1, Math.max(0, -top / span));
+}
+
+/** The section the reader is in, if they are in this lesson (its key). */
+export function anchorIn(lesson: string): string | null {
+  const current = position.get();
+  if (current === null || lessonKey(current.course, current.lesson) !== lesson) {
+    return null;
+  }
+  return current.anchor;
 }
 
 /** The reader's position in the locator namespace the harness tools speak. */

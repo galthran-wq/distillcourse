@@ -4,16 +4,26 @@ from datetime import datetime, timedelta
 from typing import Any, Literal
 
 import logfire
-from sqlalchemy import func, select, update
+from sqlalchemy import ColumnElement, ScalarSelect, and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import InstrumentedAttribute
 
 from app.core.config import settings
-from app.models import Chat, Message, Schedule, TgLink, User
+from app.models import (
+    CardDelivery,
+    Chat,
+    CoachNote,
+    LessonProgress,
+    Message,
+    Schedule,
+    TgLink,
+    User,
+)
+from app.review import repository as review
 from app.scheduling import policy
 
-ScheduleKind = Literal["review", "reminder"]
+ScheduleKind = Literal["coach", "reminder", "nudge"]
 CreatedBy = Literal["system", "user"]
-Outcome = Literal["answered", "ignored"]
 
 # How long a claimed row stays off limits to other workers. A process that
 # dies mid-run leaves nothing waiting longer than this. It has to outlast the
@@ -23,6 +33,30 @@ Outcome = Literal["answered", "ignored"]
 LEASE = timedelta(seconds=settings.RUN_CLAIM_TTL_SECONDS) + timedelta(minutes=5)
 CLAIM_BATCH = 100
 WAITING = ("pending", "deferred")
+# The key a nudge's Quick check button is spent under in its payload
+# (`coach.nudges`), which is also the learner answering it.
+QUICK = "quick"
+
+
+def new(
+    *,
+    user_id: uuid.UUID,
+    kind: ScheduleKind,
+    due_at: datetime,
+    payload: dict[str, Any],
+    created_by: CreatedBy,
+    status: str = "pending",
+) -> Schedule:
+    """A row not yet added to any session, for a caller that commits it with
+    something else."""
+    return Schedule(
+        user_id=user_id,
+        kind=kind,
+        due_at=due_at,
+        payload=payload,
+        status=status,
+        created_by=created_by,
+    )
 
 
 async def create(
@@ -34,12 +68,11 @@ async def create(
     payload: dict[str, Any],
     created_by: CreatedBy,
 ) -> Schedule:
-    row = Schedule(
+    row = new(
         user_id=user_id,
         kind=kind,
         due_at=due_at,
         payload=payload,
-        status="pending",
         created_by=created_by,
     )
     session.add(row)
@@ -109,11 +142,7 @@ async def defer(
 
 async def drop(session: AsyncSession, rows: Sequence[Schedule]) -> None:
     """Rows nothing will ever deliver. Unlike a defer, these do not come back.
-
-    The one function here that leaves the commit to its caller: dropping what
-    is queued for a lesson is the last step of recording a review outcome
-    (`app/review/tools.py`), and that whole path is one transaction.
-    """
+    Leaves the commit to the caller."""
     for row in rows:
         row.status = "cancelled"
         row.claimed_at = None
@@ -142,24 +171,8 @@ async def retry(
     await session.commit()
 
 
-async def open_slot(
-    session: AsyncSession, rows: Sequence[Schedule], *, deadline: datetime
-) -> None:
-    """The message went out: `due_at` now means the moment it counts as ignored."""
-    for row in rows:
-        row.status = "awaiting_reply"
-        row.due_at = deadline
-        row.lease_until = None
-    await session.commit()
-
-
 async def deliver(session: AsyncSession, rows: Sequence[Schedule]) -> None:
-    """Rows that are finished the moment they are sent.
-
-    A reminder is one: it asked for nothing, so there is no reply to wait for
-    and no outcome to record. It still counts as a message the platform sent,
-    which is what `initiations_today` reads it as.
-    """
+    """Reminders that went out: finished the moment they are sent."""
     for row in rows:
         row.status = "done"
         row.lease_until = None
@@ -182,82 +195,135 @@ async def sweep_leases(session: AsyncSession, now: datetime) -> None:
         )
 
 
-async def close_answered(session: AsyncSession) -> None:
-    """Close the slots the learner replied to.
-
-    A reply is any message of theirs in the thread after the platform opened
-    it; the poller reads it from the thread rather than being told, so the
-    bookkeeping holds whichever way a message arrived.
-    """
-    replied = (
-        select(Message.id)
-        .join(Chat, Chat.id == Message.chat_id)
-        .where(
-            Chat.user_id == Schedule.user_id,
-            Chat.kind == "telegram",
-            Message.role == "user",
-            Message.created_at > Schedule.claimed_at,
-        )
-        .correlate(Schedule)
-        .exists()
-    )
-    await session.execute(
-        update(Schedule)
-        .where(Schedule.status == "awaiting_reply", replied)
-        .values(status="done", outcome="answered")
-    )
-    await session.commit()
-
-
-async def expire_slots(session: AsyncSession, now: datetime) -> None:
-    await session.execute(
-        update(Schedule)
-        .where(Schedule.status == "awaiting_reply", Schedule.due_at <= now)
-        .values(status="done", outcome="ignored")
-    )
-    await session.commit()
-
-
-async def open_slot_deadline(
-    session: AsyncSession, user_id: uuid.UUID
-) -> datetime | None:
-    deadline: datetime | None = await session.scalar(
-        select(func.min(Schedule.due_at)).where(
-            Schedule.user_id == user_id, Schedule.status == "awaiting_reply"
-        )
-    )
-    return deadline
+# What the platform starts on its own account, each counted by when it went
+# out. A reminder is not here: it is the learner's appointment, so it neither
+# spends the day's message nor pays the weekly floor, and a learner with a daily
+# reminder still gets their card.
+def _initiations(
+    user_id: uuid.UUID,
+) -> list[tuple[InstrumentedAttribute[datetime], ColumnElement[bool]]]:
+    return [
+        (
+            CardDelivery.sent_at,
+            and_(CardDelivery.user_id == user_id, CardDelivery.initiated),
+        ),
+        (Schedule.due_at, and_(Schedule.user_id == user_id, Schedule.kind == "nudge")),
+        (CoachNote.sent_at, CoachNote.user_id == user_id),
+    ]
 
 
 async def initiations_today(
     session: AsyncSession, user_id: uuid.UUID, since: datetime
 ) -> int:
-    """Messages the platform started today, not items it delivered — one
-    message may carry three. A batch is claimed in a single statement, so its
-    rows share the moment that identifies it.
+    """Messages the platform started today: its cards, reading nudges and
+    weekly notes."""
+    total = 0
+    for sent_at, mine in _initiations(user_id):
+        total += int(
+            await session.scalar(select(func.count()).where(mine, sent_at >= since))
+            or 0
+        )
+    return total
+
+
+async def last_initiation(session: AsyncSession, user_id: uuid.UUID) -> datetime | None:
+    """When the platform last opened the conversation of its own accord: what
+    the backoff waits from and what pays the weekly floor. A card the learner
+    asked for (Next, Harder, Quick check) was their move."""
+    latest = [
+        select(func.max(sent_at)).where(mine).scalar_subquery()
+        for sent_at, mine in _initiations(user_id)
+    ]
+    moment: datetime | None = await session.scalar(select(func.greatest(*latest)))
+    return moment
+
+
+def _last_message(user_id: uuid.UUID) -> ScalarSelect[datetime]:
+    """When the learner last wrote in the Telegram thread."""
+    return (
+        select(func.max(Message.created_at))
+        .join(Chat, Chat.id == Message.chat_id)
+        .where(Chat.user_id == user_id, Chat.kind == "telegram", Message.role == "user")
+        .scalar_subquery()
+    )
+
+
+def _contact(user_id: uuid.UUID) -> ColumnElement[datetime]:
+    """When the learner last wrote in the thread or did anything to a card —
+    a skip included: it is their move, so it ends a silence."""
+    # greatest() skips NULLs, so either one alone is enough.
+    return func.greatest(_last_message(user_id), review.responded(user_id))
+
+
+async def last_contact(session: AsyncSession, user_id: uuid.UUID) -> datetime | None:
+    moment: datetime | None = await session.scalar(select(_contact(user_id)))
+    return moment
+
+
+async def silence(session: AsyncSession, user_id: uuid.UUID, now: datetime) -> int:
+    """How many messages in a row the platform sent that the learner let go
+    unanswered, counted since their last contact. A card is unanswered once it
+    expired or a newer card folded it; a nudge or a weekly note, once a day has
+    passed without its button pressed — or, for a nudge, its lesson opened.
+    Read back rather than stored, so it cannot drift from what it counts.
     """
-    total = await session.scalar(
-        select(func.count(func.distinct(Schedule.claimed_at))).where(
-            Schedule.user_id == user_id,
-            Schedule.claimed_at >= since,
-            Schedule.status.in_(("awaiting_reply", "done")),
+    since = _contact(user_id)
+    expired = now - policy.IGNORED_AFTER
+    cards = await session.scalar(
+        select(func.count()).where(
+            CardDelivery.user_id == user_id,
+            CardDelivery.outcome.in_((review.IGNORED, review.FOLDED)),
+            or_(since.is_(None), CardDelivery.sent_at > since),
         )
     )
-    return int(total or 0)
-
-
-async def ignored_topic(session: AsyncSession, user_id: uuid.UUID) -> str | None:
-    """The topic to lead away from: the one the last message was about, if the
-    learner let that message time out."""
-    row = await session.scalar(
-        select(Schedule)
-        .where(Schedule.user_id == user_id, Schedule.outcome.is_not(None))
-        .order_by(Schedule.claimed_at.desc())
-        .limit(1)
+    read = (
+        select(LessonProgress.lesson)
+        .where(
+            LessonProgress.user_id == Schedule.user_id,
+            LessonProgress.lesson == Schedule.payload["lesson"].astext,
+            LessonProgress.last_seen > Schedule.due_at,
+        )
+        .correlate(Schedule)
+        .exists()
     )
-    if row is None or row.outcome != "ignored":
-        return None
-    return policy.topic(row)
+    nudges = await session.scalar(
+        select(func.count()).where(
+            Schedule.user_id == user_id,
+            Schedule.kind == "nudge",
+            Schedule.due_at <= expired,
+            or_(since.is_(None), Schedule.due_at > since),
+            ~Schedule.payload.has_key(QUICK),
+            ~read,
+        )
+    )
+    notes = await session.scalar(
+        select(func.count()).where(
+            CoachNote.user_id == user_id,
+            CoachNote.sent_at <= expired,
+            or_(since.is_(None), CoachNote.sent_at > since),
+            CoachNote.pressed_at.is_(None),
+        )
+    )
+    return int(cards or 0) + int(nudges or 0) + int(notes or 0)
+
+
+async def nudged(
+    session: AsyncSession, user_id: uuid.UUID, lesson: str, since: datetime
+) -> bool:
+    """Whether a reading nudge on this lesson went out since a moment."""
+    found = await session.scalar(
+        select(
+            select(Schedule.id)
+            .where(
+                Schedule.user_id == user_id,
+                Schedule.kind == "nudge",
+                Schedule.payload["lesson"].astext == lesson,
+                Schedule.due_at >= since,
+            )
+            .exists()
+        )
+    )
+    return bool(found)
 
 
 async def users_by_id(
@@ -274,6 +340,16 @@ async def mute(
         update(User).where(User.id == user_id).values(muted_until=until)
     )
     await session.commit()
+
+
+async def pause_cards(
+    session: AsyncSession, user_id: uuid.UUID, *, until: datetime
+) -> None:
+    """Leaves the commit to the caller, which commits it with the card it
+    put aside."""
+    await session.execute(
+        update(User).where(User.id == user_id).values(cards_paused_until=until)
+    )
 
 
 async def pending_reminders(

@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
-import { ReadingTracker, type EventBatch } from "@/lib/telemetry/tracker";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  HEARTBEAT_SECONDS,
+  ReadingTracker,
+  type EventBatch,
+} from "@/lib/telemetry/tracker";
 import { watch } from "@/lib/telemetry/watch";
 
 // The page the gate describes: an environment the reader opens, a solution,
@@ -20,13 +24,13 @@ const LESSON = `
 
 let stop: (() => void) | undefined;
 
-function reading() {
+function reading(anchor?: () => string | null) {
   document.body.innerHTML = LESSON;
   const batches: EventBatch[] = [];
   const tracker = new ReadingTracker("lesson:information-theory/entropy", (batch) =>
     batches.push(batch),
   );
-  stop = watch(tracker);
+  stop = watch(tracker, anchor);
   return {
     batches,
     events: () => {
@@ -45,9 +49,27 @@ function open(id: string) {
 afterEach(() => {
   stop?.();
   stop = undefined;
+  vi.useRealTimers();
 });
 
 describe("watching a lesson page", () => {
+  it("sends the section the reader is in with each heartbeat", () => {
+    vi.useFakeTimers();
+    let section = "surprise";
+    const session = reading(() => section);
+
+    vi.advanceTimersByTime(HEARTBEAT_SECONDS * 1000);
+    section = "drill";
+    vi.advanceTimersByTime(HEARTBEAT_SECONDS * 1000);
+
+    expect(
+      session
+        .events()
+        .filter((event) => event.type === "heartbeat")
+        .map((event) => event.payload.anchor),
+    ).toEqual(["surprise", "drill"]);
+  });
+
   it("reports the arrival and, on a page that fits, the whole depth", () => {
     const session = reading();
 

@@ -1,4 +1,4 @@
-.PHONY: up down logs deploy reindex backup restore-drill
+.PHONY: up down logs deploy reindex webhook backup restore-drill
 
 # The same file docker compose substitutes from, so a build and the index that
 # describes it cannot disagree about which lessons exist. `?=` keeps compose's
@@ -31,7 +31,15 @@ deploy:
 	docker compose build
 	docker compose up -d --remove-orphans
 	$(MAKE) reindex
+	$(MAKE) webhook
 	docker compose ps
+
+# Telegram keeps what setWebhook was last told — the URL and which update
+# kinds to post — on its side, so a release that changes `allowed_updates`
+# (app/telegram/api.py) is not live until this runs. Idempotent, hence every
+# deploy rather than a step to remember. No bot configured, nothing to tell.
+webhook:
+	if [ -n "$(TELEGRAM_BOT_TOKEN)" ]; then docker compose exec -T backend python -m app.cli set-webhook "$(FRONTEND_HOST)/api/tg/webhook"; fi
 
 # Node is required here, not just docker: the export runs the site's own MDX
 # pipeline, which is the only way an indexed anchor and a page anchor cannot

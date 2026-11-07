@@ -21,7 +21,7 @@ from pydantic_ai.ui.vercel_ai.response_types import (
     ToolInputAvailableChunk,
 )
 
-from app.core.config import settings
+from app.content.locators import lesson_url
 from app.harness import prompts
 from app.harness.agent import tutor
 from app.harness.deps import HarnessDeps
@@ -39,8 +39,7 @@ def url(chat: Chat) -> str:
     """The chat on the site: the lab's lesson page, which opens the chat it is
     named by."""
     assert chat.lab_lesson is not None
-    course, _, lesson = chat.lab_lesson.removeprefix("lesson:").partition("/")
-    return f"{settings.FRONTEND_HOST}/courses/{course}/lessons/{lesson}?chat={chat.id}"
+    return f"{lesson_url(chat.lab_lesson)}?chat={chat.id}"
 
 
 def question(text: str) -> VercelAIAdapter[HarnessDeps, str]:
