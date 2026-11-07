@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.harness.limits import LimitExceeded, check_run_allowed
 from app.harness.repository import HarnessRepository
 from app.models import BackgroundRun, Chat, LabSubmission, User
+from app.telegram import speech
 
 QUESTION = ModelRequest(parts=[UserPromptPart(content="what is entropy?")])
 ANSWER = ModelResponse(parts=[TextPart(content="expected surprise")])
@@ -75,7 +76,7 @@ async def test_the_ceiling_counts_what_the_platform_spent_for_itself(
     repo.session.add(
         BackgroundRun(
             user_id=user.id,
-            kind="transcribe",
+            kind=speech.TRANSCRIBE,
             usage={"cost_usd": settings.MONTHLY_COST_CEILING_USD, "requests": 1},
         )
     )

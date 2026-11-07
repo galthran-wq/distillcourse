@@ -185,11 +185,13 @@ async def download_file(file_id: str) -> bytes:
     if not isinstance(path, str):
         raise TelegramError("getFile named no file")
     url = f"{API_URL}/file/bot{settings.TELEGRAM_BOT_TOKEN}/{path}"
+    # Not through _call: the file URL answers raw bytes, not the JSON envelope
+    # every error mapping in _call is read from.
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
             response = await client.get(url)
     except httpx.HTTPError as exc:
-        raise TelegramError(f"the file download did not reach telegram: {exc!r}")
+        raise TelegramError(f"the file download did not reach telegram: {exc}")
     if not response.is_success:
         raise TelegramError(f"the file download failed: {response.status_code}")
     return response.content

@@ -13,6 +13,8 @@ import httpx
 from app.core.config import settings
 from app.harness.usage import COST_USD, INPUT_TOKENS, OUTPUT_TOKENS, REQUESTS
 
+# The background_runs kind a transcription is billed under.
+TRANSCRIBE = "transcribe"
 URL = "https://openrouter.ai/api/v1/audio/transcriptions"
 # Two minutes of speech is the longest a learner may send; this leaves the
 # provider room to be slow about it.
@@ -35,21 +37,29 @@ async def transcribe(audio: bytes) -> tuple[str, dict[str, Any]]:
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
             response = await client.post(URL, json=body, headers=headers)
-        answer: dict[str, Any] = response.json()
+        answer = response.json()
     except httpx.HTTPError as exc:
         raise TranscriptionFailed(f"transcription did not reach openrouter: {exc!r}")
     except ValueError:
+        raise TranscriptionFailed(f"transcription answered {response.status_code}")
+    if not isinstance(answer, dict):
         raise TranscriptionFailed(f"transcription answered {response.status_code}")
     text = answer.get("text")
     if not response.is_success or not isinstance(text, str):
         raise TranscriptionFailed(
             f"transcription failed: {response.status_code} {answer.get('error')}"
         )
-    usage = answer.get("usage") or {}
+    usage = answer.get("usage")
+    if not isinstance(usage, dict):
+        usage = {}
     cost = usage.get("cost")
+    try:
+        cost_usd = float(cost) if cost is not None else None
+    except TypeError, ValueError:
+        raise TranscriptionFailed(f"transcription reported a cost of {cost!r}")
     return text.strip(), {
         REQUESTS: 1,
         INPUT_TOKENS: usage.get(INPUT_TOKENS, 0),
         OUTPUT_TOKENS: usage.get(OUTPUT_TOKENS, 0),
-        COST_USD: float(cost) if cost is not None else None,
+        COST_USD: cost_usd,
     }

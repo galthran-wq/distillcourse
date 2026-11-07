@@ -1,4 +1,5 @@
 import base64
+import html
 from typing import Any
 
 import httpx
@@ -9,19 +10,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
 from app.models import BackgroundRun, Chat, Message, TgLink, User
 from app.telegram import api, speech, updates
 from tests.conftest import TG_CHAT_ID, Bot, replying
-from tests.harness.conftest import echoing
 from tests.telegram.conftest import AUDIO, Ears, deliver, voice
 
 pytestmark = pytest.mark.usefixtures("link")
 
 # Bound before the `ears` fixture replaces it on the module, for the tests of
 # the real call.
-TRANSCRIBE = speech.transcribe
+REAL_TRANSCRIBE = speech.transcribe
 
 
 @pytest.fixture
@@ -86,15 +85,32 @@ async def test_the_transcript_is_shown_and_answered_like_typed_text(
 async def test_what_was_heard_is_escaped_and_cut(
     client: AsyncClient, bot: Bot, ears: Ears
 ) -> None:
-    ears.heard = "a < b " + "x" * 300
+    transcript = "a < b " + "x" * 300
+    ears.heard = transcript
 
     with replying():
         await deliver(client, voice())
 
-    heard = bot.texts[0]
-    assert heard.startswith("<i>Heard:</i> a &lt; b xxx")
-    assert heard.endswith("x…")
-    assert len(heard) < len("<i>Heard:</i> ") + updates.HEARD_CHARS + 10
+    assert bot.texts[0] == (
+        "<i>Heard:</i> " + html.escape(transcript[: updates.HEARD_CHARS]) + "…"
+    )
+
+
+@pytest.mark.usefixtures("ears")
+async def test_a_busy_thread_points_at_the_transcript_rather_than_a_re_recording(
+    monkeypatch: pytest.MonkeyPatch,
+    client: AsyncClient,
+    session: AsyncSession,
+    thread: Chat,
+    bot: Bot,
+) -> None:
+    monkeypatch.setattr(updates, "RUN_ATTEMPTS", 1)
+    await HarnessRepository(session, thread.user_id).claim_run(thread, thread.id)
+
+    with replying():
+        await deliver(client, voice())
+
+    assert bot.texts == ["<i>Heard:</i> more data lowers variance", updates.BUSY_HEARD]
 
 
 async def test_a_voice_over_two_minutes_is_refused_unheard(
@@ -154,7 +170,7 @@ async def test_what_a_transcription_cost_is_kept_and_counted(
 
     run = await session.scalar(select(BackgroundRun))
     assert run is not None
-    assert (run.user_id, run.kind) == (user.id, "transcribe")
+    assert (run.user_id, run.kind) == (user.id, speech.TRANSCRIBE)
     assert run.usage["cost_usd"] == settings.MONTHLY_COST_CEILING_USD
     # The transcription spent the budget, so the run after it is refused, and
     # said to be as it would be for a typed message.
@@ -168,7 +184,7 @@ async def test_a_spent_budget_is_reported_before_anything_is_downloaded(
     session.add(
         BackgroundRun(
             user_id=user.id,
-            kind="transcribe",
+            kind=speech.TRANSCRIBE,
             usage={"cost_usd": settings.MONTHLY_COST_CEILING_USD},
         )
     )
@@ -179,6 +195,20 @@ async def test_a_spent_budget_is_reported_before_anything_is_downloaded(
     assert ears.downloads == []
     assert len(bot.texts) == 1
     assert "monthly budget" in bot.texts[0]
+
+
+@pytest.mark.usefixtures("thread")
+async def test_a_learner_at_the_daily_cap_is_told_before_anything_is_downloaded(
+    monkeypatch: pytest.MonkeyPatch, client: AsyncClient, bot: Bot, ears: Ears
+) -> None:
+    monkeypatch.setattr(settings, "DAILY_MESSAGE_CAP", 0)
+
+    await deliver(client, voice())
+
+    assert ears.downloads == []
+    assert ears.transcribed == []
+    assert len(bot.texts) == 1
+    assert "daily message cap" in bot.texts[0]
 
 
 @pytest.mark.usefixtures("thread")
@@ -200,7 +230,7 @@ async def test_no_audio_reaches_the_database_or_the_logs(
         return httpx.Response(400, json={"error": {"message": "bad audio"}})
 
     # The real transcription call, failing, so what it logs is under test.
-    monkeypatch.setattr(speech, "transcribe", TRANSCRIBE)
+    monkeypatch.setattr(speech, "transcribe", REAL_TRANSCRIBE)
     monkeypatch.setattr(httpx.AsyncClient, "post", refused)
     await deliver(client, voice())
     monkeypatch.setattr(speech, "transcribe", ears.transcribe)
@@ -272,11 +302,18 @@ async def test_download_file_asks_for_the_path_then_fetches_it(
     assert await api.download_file("voice-file") == AUDIO
 
 
-@pytest.mark.usefixtures("ears", "thread")
-async def test_the_tutor_is_told_a_message_may_be_misheard(
-    client: AsyncClient, bot: Bot
+@pytest.mark.parametrize(
+    "answer",
+    [["a list"], {"text": "hi", "usage": {"cost": "free"}}],
+    ids=["not-an-object", "bad-cost"],
+)
+async def test_a_malformed_transcription_answer_is_a_failure(
+    monkeypatch: pytest.MonkeyPatch, answer: object
 ) -> None:
-    with tutor.override(model=echoing()):
-        await deliver(client, voice())
+    async def post(_self: httpx.AsyncClient, _url: str, **_: Any) -> httpx.Response:
+        return httpx.Response(200, json=answer)
 
-    assert "mis-hearing" in "\n".join(bot.texts)
+    monkeypatch.setattr(httpx.AsyncClient, "post", post)
+
+    with pytest.raises(speech.TranscriptionFailed):
+        await speech.transcribe(AUDIO)

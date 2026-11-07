@@ -12,7 +12,7 @@ from pydantic_ai.messages import ModelRequest, UserPromptPart
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.harness import runner
-from app.harness.limits import LimitExceeded, check_cost_ceiling
+from app.harness.limits import LimitExceeded, check_run_allowed
 from app.harness.prompts import ContextBlock
 from app.harness.repository import HarnessRepository
 from app.models import BackgroundRun, Chat, TgLink
@@ -48,6 +48,10 @@ PAIRED = (
     "/mute — stop messages the platform starts (/unmute resumes them)"
 )
 BUSY = "Still finishing the previous message. Send that again in a minute."
+# A voice note's transcript is already on screen: retyping it beats re-recording.
+BUSY_HEARD = (
+    "Still finishing the previous message. Send what I heard as text in a minute."
+)
 FAILED = "Something went wrong on my side. Send that again in a minute."
 TAP_FAILED = "Something went wrong on my side. Press that again in a minute."
 TOO_LONG = "Too long. Keep it under two minutes."
@@ -255,7 +259,7 @@ async def _typing(tg_chat_id: int) -> None:
 
 
 async def _answer(
-    repo: HarnessRepository, chat: Chat, outbox: Outbox, text: str
+    repo: HarnessRepository, chat: Chat, outbox: Outbox, text: str, busy: str = BUSY
 ) -> None:
     for attempt in range(RUN_ATTEMPTS):
         try:
@@ -266,18 +270,20 @@ async def _answer(
             return
         except runner.RunBusy:
             if attempt + 1 == RUN_ATTEMPTS:
-                await outbox.send(BUSY)
+                await outbox.send(busy)
                 return
             await asyncio.sleep(RUN_WAIT_SECONDS)
 
 
-async def _hear(session: AsyncSession, outbox: Outbox, voice: Voice) -> str | None:
+async def _hear(repo: HarnessRepository, outbox: Outbox, voice: Voice) -> str | None:
     """The voice message as text, or None once the learner has been told why
     there is none. A guess is never passed on as what they said."""
     if voice.duration > VOICE_SECONDS:
         await outbox.send(TOO_LONG)
         return None
-    await check_cost_ceiling(session)
+    # Before the download: a learner past a cap must not spend on the way to
+    # being told so.
+    await check_run_allowed(repo)
     try:
         audio = await api.download_file(voice.file_id)
         text, usage = await speech.transcribe(audio)
@@ -285,8 +291,9 @@ async def _hear(session: AsyncSession, outbox: Outbox, voice: Voice) -> str | No
         logfire.exception("a telegram voice message was not transcribed")
         await outbox.send(UNHEARD)
         return None
+    session = outbox.session
     session.add(
-        BackgroundRun(user_id=outbox.link.user_id, kind="transcribe", usage=usage)
+        BackgroundRun(user_id=outbox.link.user_id, kind=speech.TRANSCRIBE, usage=usage)
     )
     await session.commit()
     if not text:
@@ -351,9 +358,9 @@ async def handle(
             async with _guarded(outbox, FAILED, "telegram update failed"):
                 try:
                     if update.voice is not None:
-                        text = await _hear(session, outbox, update.voice)
+                        text = await _hear(repo, outbox, update.voice)
                         if text is not None:
-                            await _answer(repo, chat, outbox, text)
+                            await _answer(repo, chat, outbox, text, BUSY_HEARD)
                     elif handler is None:
                         await _answer(repo, chat, outbox, update.text)
                     else:

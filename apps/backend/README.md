@@ -62,6 +62,7 @@ app/
     outbox.py        # sending and editing: length split, HTML fallback, blocked bot
     thread.py        # the one thread and the run that speaks into it
     updates.py       # one incoming message or button press, end to end; bot commands
+    speech.py        # a voice note as text, via OpenRouter transcription; audio never stored
     tools.py         # send_message, run by the tutor
   labs/
     repository.py    # pairing codes and tokens; challenges, state, submissions
@@ -256,8 +257,9 @@ messages, compactions — which is why the web API refuses to run in, compact or
 re-model the Telegram thread.
 
 Caps are enforcement, not telemetry: messages per user per day, an
-instance-wide monthly ceiling computed from the cost recorded on every run and
-on every judged lab submission, web searches per user per day, and memory
+instance-wide monthly ceiling computed from the cost recorded on every run,
+on every judged lab submission and on every background run (`background_runs`:
+transcriptions), web searches per user per day, and memory
 writes per run. Set a spend limit on the OpenRouter key too — that one holds
 even if this code is wrong.
 
@@ -522,6 +524,13 @@ Telegram HTML and keeps its own messages under the limit. The backend's two
 safety nets are for when it does not — a message, caption or edit Telegram
 will not parse is resent unformatted rather than dropped, and a message over
 4096 characters is split.
+
+A voice note in a private chat is an answer like a typed one: one over 120 s
+is refused before download; otherwise, once the caps allow it, it is
+downloaded, transcribed (`speech.py`, cost to `background_runs`), shown back as
+a `Heard:` line and run as text. The audio is never stored or logged. A failed
+or empty transcription gets "Couldn't make that out. Send it as text?" and
+starts no run.
 
 `/clear`, `/compact`, `/mute` and `/unmute` are bot commands, handled by the
 backend rather than by the model: `/clear` writes the marker that cuts the
