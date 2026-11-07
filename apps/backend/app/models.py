@@ -234,6 +234,9 @@ class LessonProgress(Base):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), default=None
     )
+    # The section the latest heartbeat that named one was sent from: where to
+    # send the reader back to, which no scroll depth can name.
+    last_anchor: Mapped[str | None] = mapped_column(Text, default=None)
 
 
 class LessonPass(Base):
@@ -294,7 +297,10 @@ class Schedule(Base):
     `cancelled` and `failed` are where it ends. `payload` carries `note` for a
     reminder — what the message is about, in words the run is given — and, for
     a `coach` wake-up, `reason`, the line the last run left for this one, and
-    `note`, what woke it.
+    `note`, what woke it. A `nudge` is born `done`, `due_at` the moment it was
+    sent: the record of a reading nudge, whose id its Quick check button
+    carries, and `payload` its `nudge` kind, `lesson`, `anchor` and, once the
+    button is spent, `quick`.
     """
 
     __tablename__ = "schedules"

@@ -103,6 +103,29 @@ describe("the reading tracker", () => {
     expect(reading.events()[0].payload.seconds).toBe(HEARTBEAT_SECONDS);
   });
 
+  it("names the section the reader is in on a heartbeat", () => {
+    const reading = session();
+
+    reading.advance(BEAT);
+    reading.tracker.tick(true, "the-average");
+    reading.advance(BEAT);
+    reading.tracker.tick(true);
+
+    expect(reading.events().map((event) => event.payload)).toEqual([
+      { seconds: HEARTBEAT_SECONDS, anchor: "the-average" },
+      { seconds: HEARTBEAT_SECONDS },
+    ]);
+  });
+
+  it("drops an anchor the endpoint would refuse, not the heartbeat", () => {
+    const reading = session();
+
+    reading.advance(BEAT);
+    reading.tracker.tick(true, "x".repeat(201));
+
+    expect(reading.events()[0].payload).toEqual({ seconds: HEARTBEAT_SECONDS });
+  });
+
   it("counts nothing while the tab is hidden", () => {
     const reading = read(5, { visible: false });
 

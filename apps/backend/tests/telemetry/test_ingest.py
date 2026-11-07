@@ -194,3 +194,38 @@ async def test_events_of_one_reader_never_reach_another_aggregate(
     await flush(signed_in, session, *beats(4, depth=50))
 
     assert await session.get(LessonProgress, (other_user.id, LESSON)) is None
+
+
+async def test_a_heartbeat_names_the_section_and_one_without_leaves_it(
+    signed_in: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    def beat(anchor: str | None = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {"seconds": HEARTBEAT_SECONDS}
+        if anchor is not None:
+            payload["anchor"] = anchor
+        return event(schemas.HEARTBEAT, payload)
+
+    await flush(signed_in, session, beat("surprise"), beat("энтропия"))
+    assert (await aggregate(session, user)).last_anchor == "энтропия"
+
+    await flush(signed_in, session, beat(), after=HEARTBEAT_SECONDS)
+    assert (await aggregate(session, user)).last_anchor == "энтропия"
+
+
+async def test_an_anchor_outside_the_grammar_is_refused(
+    signed_in: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    await flush(
+        signed_in, session, event(schemas.HEARTBEAT, {"seconds": 10, "anchor": "a"})
+    )
+
+    for forged in ("two words", "a#b", "x" * 201, ""):
+        await flush(
+            signed_in,
+            session,
+            event(schemas.HEARTBEAT, {"seconds": 10, "anchor": forged}),
+            after=HEARTBEAT_SECONDS,
+        )
+
+    assert await stored_events(session, schemas.HEARTBEAT) == 1
+    assert (await aggregate(session, user)).last_anchor == "a"
