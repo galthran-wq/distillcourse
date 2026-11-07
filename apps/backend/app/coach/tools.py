@@ -13,6 +13,7 @@ from pydantic import Field
 from pydantic_ai import RunContext
 
 from app.coach import nudges
+from app.content.locators import LESSON
 from app.content.search import section_of, sections
 from app.harness import runner
 from app.harness.deps import HarnessDeps
@@ -98,14 +99,18 @@ async def send_nudge(
             f"Not sent: the text is {len(text)} characters; "
             f"{nudges.TEXT_CHARS} at most."
         )
-    chunks = await sections(session, lesson)
+    chunks = await sections(session, lesson) if LESSON.fullmatch(lesson) else []
     if not chunks:
         return f"Not sent: {lesson} is not a lesson on the site."
     progress = await session.get(LessonProgress, (repo.user_id, lesson))
     if kind == "resume":
         if progress is None or progress.completed_at is not None:
             return f"Not sent: {lesson} is not a lesson the learner left unfinished."
-        anchor = anchor or progress.last_anchor
+        # Where they stopped may be a heading since renamed: then the top.
+        if not anchor:
+            stopped = progress.last_anchor
+            found = stopped and section_of(chunks, nudges.locator(lesson, stopped))
+            anchor = stopped if found else None
     elif progress is not None:
         return f"Not sent: the learner has opened {lesson} already."
     where = nudges.locator(lesson, anchor)

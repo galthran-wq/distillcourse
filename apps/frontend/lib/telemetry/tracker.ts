@@ -5,6 +5,7 @@
  */
 
 import { API } from "@/lib/api-base";
+import { ANCHOR_SOURCE } from "@/lib/content/locator";
 
 export const ENDPOINT = `${API}/telemetry/events`;
 export const HEARTBEAT_SECONDS = 10;
@@ -16,9 +17,9 @@ export const SCROLL_MARKS = [25, 50, 75, 90, 100];
 // would cost the whole event, and where the reader came from is worth less
 // than knowing they arrived.
 export const MAX_REFERRER = 200;
-// The anchor grammar of app/content/locators.py. An anchor it would refuse
-// costs the whole heartbeat, so such a beat goes out without one.
-const ANCHOR = /^[^\s#]{1,200}$/;
+// An anchor app/content/locators.py would refuse costs the whole heartbeat, so
+// such a beat goes out without one.
+const ANCHOR = new RegExp(`^${ANCHOR_SOURCE}$`);
 
 export type ToggleKind = "proof" | "solution" | "aside";
 

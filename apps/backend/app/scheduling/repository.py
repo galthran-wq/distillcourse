@@ -31,6 +31,7 @@ def new(
     due_at: datetime,
     payload: dict[str, Any],
     created_by: CreatedBy,
+    status: str = "pending",
 ) -> Schedule:
     """A row not yet added to any session, for a caller that commits it with
     something else."""
@@ -39,7 +40,7 @@ def new(
         kind=kind,
         due_at=due_at,
         payload=payload,
-        status="pending",
+        status=status,
         created_by=created_by,
     )
 

@@ -10,21 +10,17 @@ message and the backoff count.
 """
 
 import uuid
-from contextlib import suppress
-from datetime import UTC, datetime
+from datetime import datetime
 from html import escape
 from typing import TYPE_CHECKING, Final, Literal
 
 from pydantic_ai.messages import ModelResponse, TextPart
-from sqlalchemy import select, update
+from sqlalchemy import select
 
 from app.content.locators import lesson_url
-from app.core.config import settings
 from app.harness.repository import HarnessRepository
-from app.models import Schedule, User
+from app.models import Schedule
 from app.review import cards, controls
-from app.review import repository as review
-from app.scheduling import policy
 from app.scheduling import repository as scheduling
 from app.telegram import api, thread
 from app.telegram.outbox import Outbox
@@ -33,7 +29,7 @@ if TYPE_CHECKING:
     from app.telegram.updates import Tap
 
 Kind = Literal["resume", "hook"]
-KIND: Final = "nudge"
+KIND: Final[scheduling.ScheduleKind] = "nudge"
 # The `callback_data` prefix of Quick check instead: `q:<schedule id>`.
 QUICK_CHECK = "q"
 QUICK = "quick"
@@ -71,22 +67,26 @@ async def send(
     middle of a run. Written to the thread as the tutor's own message, so a
     reply to it is read with it in view. Raises `runner.RunBusy`."""
     session = repo.session
+    # The id goes into the keyboard before the row is flushed.
     row = scheduling.new(
         user_id=repo.user_id,
         kind=KIND,
         due_at=now,
         payload={"nudge": kind, "lesson": lesson, "anchor": anchor},
         created_by="system",
+        status="done",
     )
     row.id = uuid.uuid4()
-    row.status = "done"
     chat = await thread.of(session, repo.user_id)
     async with thread.holding(repo, chat):
+        session.add(row)
+        await session.flush()
         await outbox.send(escape(text, quote=False), keyboard=_keyboard(row))
-    session.add(row)
-    await repo.add_messages(
-        chat, [ModelResponse(parts=[TextPart(content=text)])], role="agent"
-    )
+        # Committed with the row, so nothing but the send can fail between
+        # delivery and its record.
+        await repo.add_messages(
+            chat, [ModelResponse(parts=[TextPart(content=text)])], role="agent"
+        )
 
 
 async def _nudge(outbox: Outbox, tap: Tap) -> Schedule | None:
@@ -110,44 +110,27 @@ async def _nudge(outbox: Outbox, tap: Tap) -> Schedule | None:
     return row
 
 
-async def _check(outbox: Outbox, lesson: str) -> None:
-    session, user_id = outbox.session, outbox.link.user_id
-    user = await session.get(User, user_id)
-    assert user is not None
-    since = policy.day_start(datetime.now(UTC), policy.Hours.of(user))
-    if await review.cards_today(session, user_id, since) >= settings.CARDS_PER_DAY:
-        await outbox.send(controls.TODAYS)
-        return
-    async with thread.typing(outbox.link.tg_chat_id):
-        card = await cards.pick(session, user_id, lesson, 1)
-    if card is None:
-        await outbox.send(controls.NOTHING_ELSE)
-        return
-    await cards.deliver(session, outbox, user_id, card)
-
-
 async def quick_check(outbox: Outbox, tap: Tap) -> None:
-    """A level 1 card on the nudge's lesson, now, in place of reading. The
-    learner asked, so it spends no initiation; the day's cap on cards is what
-    bounds it, as it bounds Next. The button is spent before the card is
-    looked for and given back if that fails, so the learner can press it
-    again."""
+    """A level 1 card on the nudge's lesson, in place of reading. The button
+    is spent before the card is looked for and given back if that fails, so
+    the learner can press it again."""
     row = await _nudge(outbox, tap)
     if row is None:
         return
-    session, row_id = outbox.session, row.id
-    row.payload = {**row.payload, QUICK: True}
-    await session.commit()
-    try:
-        await _check(outbox, row.payload["lesson"])
-    except Exception:
-        await session.rollback()
-        await session.execute(
-            update(Schedule)
-            .where(Schedule.id == row_id)
-            .values(payload=Schedule.payload.op("-")(QUICK))
+    session, user_id, lesson = (
+        outbox.session,
+        outbox.link.user_id,
+        row.payload["lesson"],
+    )
+    async with controls.spending(
+        outbox,
+        row,
+        Schedule.payload,
+        QUICK,
+        True,
+        tap.message_id,
+        lambda: _keyboard(row),
+    ):
+        await controls.send_asked_for(
+            outbox, lambda: cards.pick(session, user_id, lesson, 1)
         )
-        await session.commit()
-        raise
-    with suppress(api.TelegramError):
-        await outbox.edit_keyboard(tap.message_id, _keyboard(row))

@@ -162,10 +162,6 @@ async def test_the_link_is_the_lessons_page_at_the_sections_heading(
     [message] = bot.sent
     assert message.keyboard is not None
     assert message.keyboard[0][0]["url"] == LINK
-    # The site's own lesson route and the id rehype-slug gives the heading.
-    assert LINK.endswith(
-        f"/courses/information-theory/lessons/entropy-as-average-surprise#{SECTION}"
-    )
 
 
 async def test_a_hook_links_to_the_top_of_an_unopened_lesson_with_no_quick_check(
@@ -176,6 +172,19 @@ async def test_a_hook_links_to_the_top_of_an_unopened_lesson_with_no_quick_check
     assert said(messages)[1] == f"Sent a hook nudge on {LESSON}."
     [message] = bot.sent
     assert message.keyboard == [[{"text": "Read it", "url": LINK.partition("#")[0]}]]
+
+
+async def test_a_resume_from_a_heading_since_renamed_links_to_the_top(
+    session: AsyncSession, user: User, link: TgLink, bot: Bot
+) -> None:
+    await started(session, user, anchor="a-heading-since-renamed")
+
+    messages = await run(session, user, link, nudge(), nudge())
+
+    assert said(messages)[1] == f"Sent a resume nudge on {LESSON}."
+    [message] = bot.sent
+    assert message.keyboard is not None
+    assert message.keyboard[0][0]["url"] == LINK.partition("#")[0]
 
 
 # What it refuses
@@ -205,17 +214,20 @@ async def test_an_unknown_lesson_or_section_is_refused(
 ) -> None:
     await started(session, user)
     elsewhere = "lesson:information-theory/no-such-lesson"
+    brief = "research:information-theory/a-brief"
 
     messages = await run(
         session,
         user,
         link,
         ("send_nudge", {"kind": "hook", "lesson": elsewhere, "text": TEXT}),
+        ("send_nudge", {"kind": "hook", "lesson": brief, "text": TEXT}),
         nudge(anchor="no-such-section"),
     )
 
     assert said(messages) == [
         f"Not sent: {elsewhere} is not a lesson on the site.",
+        f"Not sent: {brief} is not a lesson on the site.",
         f"Not sent: {LESSON} has no section `no-such-section`.",
     ]
     assert bot.sent == []

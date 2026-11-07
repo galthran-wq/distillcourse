@@ -9,16 +9,17 @@ does nothing.
 
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager, suppress
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import InstrumentedAttribute
 
 from app.core.config import settings
 from app.harness.repository import HarnessRepository
-from app.models import CardDelivery, ReviewCard, User
+from app.models import CardDelivery, ReviewCard, Schedule, User
 from app.review import cards, ladder, repository, subject
 from app.scheduling import policy
 from app.scheduling import repository as scheduling
@@ -69,33 +70,53 @@ async def _tapped(outbox: Outbox, tap: Tap) -> tuple[CardDelivery, ReviewCard] |
 
 
 @asynccontextmanager
-async def _pressing(
+async def spending[M: CardDelivery | Schedule](
     outbox: Outbox,
-    sent: CardDelivery,
-    card: ReviewCard,
-    prefix: str,
-    value: str = PRESSED,
+    row: M,
+    column: InstrumentedAttribute[dict[str, Any]],
+    key: str,
+    value: object,
+    message_id: int,
+    keyboard: Callable[[], api.Keyboard | None],
 ) -> AsyncIterator[None]:
-    """Spend a feedback button before acting on it, so a second press finds it
-    spent, and give it back if the action fails: the learner is told to press
-    it again. Once done, the button leaves the keyboard."""
+    """Spend a button — `key` set in the row's JSONB `column` — before acting
+    on it, so a second press finds it spent, and give it back if the action
+    fails: the learner is told to press it again. Once done, the message's
+    keyboard is redrawn without it."""
     session = outbox.session
-    delivery_id = sent.id
-    sent.follow_ups = {**sent.follow_ups, prefix: value}
+    model, name, row_id = type(row), column.key, row.id
+    setattr(row, name, {**getattr(row, name), key: value})
     await session.commit()
     try:
         yield
     except Exception:
         await session.rollback()
         await session.execute(
-            update(CardDelivery)
-            .where(CardDelivery.id == delivery_id)
-            .values(follow_ups=CardDelivery.follow_ups.op("-")(prefix))
+            update(model).where(model.id == row_id).values({name: column.op("-")(key)})
         )
         await session.commit()
         raise
     with suppress(api.TelegramError):
-        await outbox.edit_keyboard(sent.tg_message_id, cards.follow_ups(sent, card))
+        await outbox.edit_keyboard(message_id, keyboard())
+
+
+def _pressing(
+    outbox: Outbox,
+    sent: CardDelivery,
+    card: ReviewCard,
+    prefix: str,
+    value: str = PRESSED,
+) -> AbstractAsyncContextManager[None]:
+    """A feedback button under a card, spent."""
+    return spending(
+        outbox,
+        sent,
+        CardDelivery.follow_ups,
+        prefix,
+        value,
+        sent.tg_message_id,
+        lambda: cards.follow_ups(sent, card),
+    )
 
 
 async def _due_card(
@@ -194,36 +215,43 @@ async def wrong_card(outbox: Outbox, tap: Tap) -> None:
     )
 
 
+async def send_asked_for(
+    outbox: Outbox, find: Callable[[], Awaitable[ReviewCard | None]]
+) -> None:
+    """A card the learner asked for, now. It spends no initiation; the day's
+    cap on cards is what bounds it."""
+    session, user_id = outbox.session, outbox.link.user_id
+    user = await session.get(User, user_id)
+    assert user is not None
+    since = policy.day_start(datetime.now(UTC), policy.Hours.of(user))
+    if await repository.cards_today(session, user_id, since) >= (
+        settings.CARDS_PER_DAY
+    ):
+        await outbox.send(TODAYS)
+        return
+    async with thread.typing(outbox.link.tg_chat_id):
+        card = await find()
+    if card is None:
+        await outbox.send(NOTHING_ELSE)
+        return
+    await cards.deliver(session, outbox, user_id, card)
+
+
 async def next_card(outbox: Outbox, tap: Tap) -> None:
-    """The next due card, now. The learner asked, so it spends no initiation;
-    the day's cap is what bounds it."""
+    """The next due card."""
     found = await _tapped(outbox, tap)
     if found is None:
         return
     sent, card = found
     session, user_id = outbox.session, outbox.link.user_id
     now = datetime.now(UTC)
-    user = await session.get(User, user_id)
-    assert user is not None
+
+    async def following() -> ReviewCard | None:
+        easy = await repository.level_one_only(session, user_id, now)
+        return await _due_card(session, user_id, now, cards.pick, easy=easy)
+
     async with _pressing(outbox, sent, card, cards.NEXT):
-        since = policy.day_start(now, policy.Hours.of(user))
-        if await repository.cards_today(session, user_id, since) >= (
-            settings.CARDS_PER_DAY
-        ):
-            await outbox.send(TODAYS)
-            return
-        async with thread.typing(outbox.link.tg_chat_id):
-            following = await _due_card(
-                session,
-                user_id,
-                now,
-                cards.pick,
-                easy=await repository.level_one_only(session, user_id, now),
-            )
-        if following is None:
-            await outbox.send(NOTHING_ELSE)
-            return
-        await cards.deliver(session, outbox, user_id, following)
+        await send_asked_for(outbox, following)
 
 
 async def harder(outbox: Outbox, tap: Tap) -> None:
