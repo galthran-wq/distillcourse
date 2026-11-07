@@ -66,6 +66,12 @@ class User(Base):
     muted_until: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), default=None
     )
+    # "Not today" under a card: no card goes out until this moment. Not
+    # `muted_until`, which holds a learner's reminders too — putting the cards
+    # off must not cancel an appointment they made.
+    cards_paused_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
     # Set False by `python -m app.cli deactivate-user`: the session check and
     # the login check both read it, so an account can be closed without deleting
     # what it wrote.
@@ -256,8 +262,9 @@ class LessonPass(Base):
 class Incident(Base):
     """A problem the tutor concluded is in the material, not in the learner.
 
-    Filed by `report_content_incident`; triage is manual (psql) and nothing in
-    the application reads this table.
+    Filed by `report_content_incident`, and by a learner flagging a review
+    card as wrong; triage is manual (psql) and nothing in the application
+    reads this table.
     """
 
     __tablename__ = "incidents"
@@ -429,6 +436,16 @@ class CardDelivery(Base):
     )
     chosen: Mapped[int | None] = mapped_column(JSONB, default=None)
     outcome: Mapped[str | None] = mapped_column(String(16), default=None)
+    # The buttons under the feedback the learner has pressed, by prefix, so a
+    # second press of one does nothing. "In my own words" holds what became of
+    # it: asked for, then the grade of the answer.
+    follow_ups: Mapped[dict[str, str]] = mapped_column(
+        JSONB, default=dict, server_default=text("'{}'::jsonb")
+    )
+    # Sent because the learner asked for a harder card. Volunteered, so it
+    # grades differently: a right answer raises the level, a wrong one changes
+    # nothing.
+    harder: Mapped[bool] = mapped_column(default=False, server_default="false")
 
 
 class BackgroundRun(Base):
