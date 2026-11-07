@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models import Document
 
 # Tier 1 is Postgres FTS. ts_rank_cd has no idf, which on a corpus of hundreds
@@ -103,6 +104,14 @@ def figures(chunks: Sequence[Document]) -> list[Figure]:
     ]
 
 
+def figure_url(src: str) -> str:
+    """A figure the index lists (`/course-assets/...`) as an image Telegram can
+    show: an SVG through the site's PNG route, anything else as served."""
+    if src.lower().endswith(".svg"):
+        return f"{settings.FRONTEND_HOST}/course-assets-png/{src.removeprefix('/course-assets/')}"
+    return f"{settings.FRONTEND_HOST}{src}"
+
+
 async def sections(session: AsyncSession, path: str) -> list[Document]:
     """Every chunk of one document — a locator without its anchor — in reading
     order. A consumer that has them all can answer both "this section" and
@@ -132,6 +141,16 @@ def section_of(chunks: Sequence[Document], locator: str) -> Document | None:
         ),
         None,
     )
+
+
+def passage(chunks: Sequence[Document], locator: str) -> list[Document]:
+    """The chunks a locator names, out of the chunks of its document: all of
+    them without an anchor, the one section with one, none when the anchor
+    names no section."""
+    if locator.partition("#")[2] == "":
+        return list(chunks)
+    chunk = section_of(chunks, locator)
+    return [] if chunk is None else [chunk]
 
 
 async def suggest(

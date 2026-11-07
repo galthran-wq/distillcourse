@@ -299,7 +299,10 @@ so the only chats it can write to are the ones that repository can see.
   LaTeX math typeset by `telegram/formula.py` — mathtext with the `cm`
   fontset, on a thread (`asyncio.to_thread`), at 200 dpi on white. mathtext has
   no environments: `aligned` and `pmatrix` come back to the model as the
-  parser's message, and an aligned derivation is sent one step per line. An
+  parser's message, and an aligned derivation is sent one step per line; a
+  line too wide for a photo (Telegram refuses one past 20:1) is refused the
+  same way, from the parse alone (`formula.check`), before anything is
+  drawn. An
   SVG figure goes as its URL on the site's PNG route
   (`/course-assets-png/<course>/<lesson>/<file>`, which renders it with
   resvg), a raster as served. A photo is not counted as the delivery: the
@@ -491,13 +494,17 @@ names one.
 The writer is given each section's figures and may show a card with one —
 `figure`, the `src` of one of its section's, or `formula`, one line of LaTeX
 math — never both; a card whose figure its section does not list, or whose
-formula does not render, is dropped before the check. Such a card's prompt is
-at most 400 characters, so the feedback still fits a caption.
+formula does not parse or is too wide for a photo, is dropped before the
+check. Such a card's prompt is at most 400 characters, and its feedback cuts
+the explanation short where the whole would pass Telegram's 1024-character
+caption.
 
 A card goes out as a message with one button per option
 (`k:<delivery_id>:<option>`), recorded in `card_deliveries`; a card with an
 image goes out as a photo with its prompt as the caption, and its feedback
-edits the caption. **A tap is
+edits the caption. A photo Telegram refuses — the site's figure unreachable,
+a picture past its limits — retires the card (`status = 'retired'`) and the
+next card in line is sent instead, once. **A tap is
 graded by code**: the delivery is locked, the option compared with the
 marked answer, the ladder moved and the message edited into ✓ or ✗, the right
 answer, the explanation and a link to the section — no model is asked. A card

@@ -14,7 +14,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field
 from pydantic_ai import RunContext, ToolFailed
 
-from app.content.search import Figure, figures, search, section_of, sections, suggest
+from app.content.search import Figure, figures, passage, search, sections, suggest
 from app.content.structure import CourseStructure, structure
 from app.harness import web_search as web
 from app.harness.agent import tutor
@@ -119,7 +119,8 @@ async def fetch_content(
     session = ctx.deps.repo.session
     path, _, anchor = locator.partition("#")
     chunks = await sections(session, path)
-    if not chunks:
+    named = passage(chunks, locator)
+    if not named:
         return NotFound(did_you_mean=await _suggestions(ctx, locator))
 
     if anchor == "":
@@ -132,9 +133,7 @@ async def fetch_content(
             figures=figures(chunks),
         )
 
-    chunk = section_of(chunks, locator)
-    if chunk is None:
-        return NotFound(did_you_mean=await _suggestions(ctx, locator))
+    [chunk] = named
     position = chunks.index(chunk)
     return Passage(
         locator=chunk.locator,

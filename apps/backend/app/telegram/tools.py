@@ -5,8 +5,7 @@ from typing import Annotated
 from pydantic import Field
 from pydantic_ai import FunctionToolset, RunContext
 
-from app.content.locators import figure_url
-from app.content.search import figures, section_of, sections
+from app.content.search import figure_url, figures, passage, sections
 from app.harness.deps import HarnessDeps
 from app.telegram import api, formula
 from app.telegram.outbox import Outbox
@@ -72,12 +71,9 @@ async def send_figure(
         caption: a line under the image, in the medium's Telegram HTML; the
             figure's own caption when omitted.
     """
-    path, _, anchor = locator.partition("#")
-    chunks = await sections(ctx.deps.repo.session, path)
-    if anchor != "":
-        chunk = section_of(chunks, locator)
-        chunks = [] if chunk is None else [chunk]
-    figure = next((found for found in figures(chunks) if found.src == src), None)
+    chunks = await sections(ctx.deps.repo.session, locator.partition("#")[0])
+    named = passage(chunks, locator)
+    figure = next((found for found in figures(named) if found.src == src), None)
     if figure is None:
         return (
             f"{src} is not a figure of {locator}; send one that fetch_content "

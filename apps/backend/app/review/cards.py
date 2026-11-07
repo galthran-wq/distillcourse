@@ -8,17 +8,19 @@ it was aimed at one of them, and served until the section it tests changes.
 """
 
 import asyncio
+import re
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
-from html import escape
+from html import escape, unescape
 from typing import TYPE_CHECKING
 
+import logfire
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.content.locators import figure_url, lesson_url
-from app.content.search import figures, section_of, sections
+from app.content.locators import lesson_url
+from app.content.search import figure_url, figures, section_of, sections
 from app.models import CardDelivery, ReviewCard
 from app.review import repository, subject, writer
 from app.scheduling import policy
@@ -34,6 +36,8 @@ TAP = "k"
 UNSEEN_FOR = timedelta(days=14)
 RIGHT = "✓"
 WRONG = "✗"
+# Telegram's bound on a photo's caption, counted on the text it shows.
+CAPTION_CHARS = 1024
 
 
 async def _sections(session: AsyncSession, lesson: str) -> list[writer.Section]:
@@ -49,14 +53,14 @@ async def _sections(session: AsyncSession, lesson: str) -> list[writer.Section]:
     ]
 
 
-async def _showable(draft: writer.Draft, section: writer.Section) -> bool:
+def _showable(draft: writer.Draft, section: writer.Section) -> bool:
     """A card's image can be sent: its figure is one its section has, and its
     formula renders."""
     if draft.figure is not None:
         return draft.figure in {figure.src for figure in section.figures}
     if draft.formula is not None:
         try:
-            await asyncio.to_thread(formula.render, [draft.formula])
+            formula.check([draft.formula])
         except formula.FormulaError:
             return False
     return True
@@ -87,7 +91,7 @@ async def write(
         )[: writer.BATCH]
         if card.kind in writer.KINDS[level]
         and card.section in by_anchor
-        and await _showable(card, by_anchor[card.section])
+        and _showable(card, by_anchor[card.section])
     ]
     kept = (
         await writer.check(session, user_id, material, found, drafts) if drafts else []
@@ -169,18 +173,35 @@ def _question(title: str, card: ReviewCard) -> str:
 
 async def deliver(
     session: AsyncSession, outbox: Outbox, user_id: uuid.UUID, card: ReviewCard
-) -> CardDelivery:
+) -> CardDelivery | None:
     """Send a card. The delivery is recorded only once Telegram has the
-    message: its id is what the feedback edits."""
+    message: its id is what the feedback edits. None when Telegram would not
+    take the card's image, which retires the card."""
     title = (await subject.materials(session, [card.lesson]))[card.lesson].title
     delivery_id = uuid.uuid7()
     question = _question(title, card)
     keyboard = _buttons(delivery_id, card)
-    photo = await _image(card)
-    if photo is None:
+    if not _is_photo(card):
         message_id = await outbox.send(question, keyboard=keyboard)
     else:
-        message_id = await outbox.send_photo(photo, caption=question, keyboard=keyboard)
+        try:
+            message_id = await outbox.send_photo(
+                await _image(card), caption=question, keyboard=keyboard
+            )
+        except api.BotBlocked:
+            raise
+        # Telegram fetches a figure from the site and holds a picture to its
+        # photo limits; a card it refused, left active, would be picked first
+        # again on every later try and block the lesson's review.
+        except api.TelegramError as exc:
+            logfire.warn(
+                "a card's image was refused: the card is retired",
+                card=card.id,
+                error=str(exc),
+            )
+            card.status = "retired"
+            await session.commit()
+            return None
     # A card always has text, so a message always went out.
     assert message_id is not None
     delivery = CardDelivery(
@@ -195,16 +216,24 @@ async def deliver(
     return delivery
 
 
-async def _image(card: ReviewCard) -> str | bytes | None:
+def _is_photo(card: ReviewCard) -> bool:
+    """A card with an image is sent as a photo, whose text is its caption."""
+    return card.figure is not None or card.formula is not None
+
+
+async def _image(card: ReviewCard) -> str | bytes:
     if card.figure is not None:
         return figure_url(card.figure)
-    if card.formula is not None:
-        return await asyncio.to_thread(formula.render, [card.formula])
-    return None
+    assert card.formula is not None
+    return await asyncio.to_thread(formula.render, [card.formula])
 
 
 def _locator(card: ReviewCard) -> str:
     return card.lesson if card.anchor is None else f"{card.lesson}#{card.anchor}"
+
+
+def _shown(html: str) -> int:
+    return len(unescape(re.sub(r"<[^>]*>", "", html)))
 
 
 def _feedback(
@@ -216,10 +245,20 @@ def _feedback(
     )
     link = lesson_url(_locator(card))
     mark = RIGHT if outcome == "correct" else WRONG
-    return (
-        f"{_question(title, card)}\n\n{mark} {answer}. {escape(card.explanation, quote=False)} "
-        f'<a href="{escape(link)}">{escape(section, quote=False)}</a>'
-    )
+
+    def text(explanation: str) -> str:
+        return (
+            f"{_question(title, card)}\n\n{mark} {answer}. {escape(explanation, quote=False)} "
+            f'<a href="{escape(link)}">{escape(section, quote=False)}</a>'
+        )
+
+    feedback = text(card.explanation)
+    # The grade is committed before the edit, so a caption Telegram refuses
+    # would leave the buttons up with no feedback and nothing to tap again.
+    over = _shown(feedback) - CAPTION_CHARS
+    if _is_photo(card) and over > 0:
+        feedback = text(card.explanation[: -over - 1] + "…")
+    return feedback
 
 
 def _chosen(data: str) -> tuple[uuid.UUID, int] | None:
@@ -253,11 +292,10 @@ async def answer(outbox: Outbox, tap: Tap) -> None:
     chunk = section_of(await sections(session, card.lesson), _locator(card))
     section = title if chunk is None else chunk.title
     feedback = _feedback(title, section, card, outcome)
-    # A card with an image is a photo, whose text is its caption.
-    if card.figure is None and card.formula is None:
-        await outbox.edit_text(sent.tg_message_id, feedback)
-    else:
+    if _is_photo(card):
         await outbox.edit_caption(sent.tg_message_id, feedback)
+    else:
+        await outbox.edit_text(sent.tg_message_id, feedback)
 
 
 async def expire(session: AsyncSession, now: datetime) -> None:

@@ -10,6 +10,7 @@ the model to restate the formula another way.
 import io
 
 from matplotlib.figure import Figure
+from matplotlib.font_manager import FontProperties
 from matplotlib.mathtext import MathTextParser
 from matplotlib.offsetbox import AnchoredOffsetbox, TextArea, VPacker
 
@@ -21,6 +22,11 @@ LINE_GAP = 6
 # The light theme's --ink (apps/frontend/app/globals.css), on white.
 INK = "#15171a"
 PAPER = "white"
+# Telegram refuses a photo longer than 20 times its other side. The extents
+# the parser reports are a little tighter than the drawn image, so the
+# estimate overstates the ratio and errs toward refusing.
+MAX_RATIO = 20
+PAD_INCHES = 0.2
 
 
 class FormulaError(ValueError):
@@ -36,18 +42,34 @@ def _math(line: str) -> str:
     return f"${line.strip().strip('$')}$"
 
 
-def render(lines: list[str]) -> bytes:
-    """`lines` typeset one under another, left-aligned, as a PNG."""
+def check(lines: list[str]) -> list[str]:
+    """`lines` as the math `render` draws, or FormulaError saying why it
+    cannot: a line that does not parse, or a shape Telegram would refuse."""
     if not 1 <= len(lines) <= MAX_LINES:
         raise FormulaError(f"a formula is 1 to {MAX_LINES} lines")
     maths = [_math(line) for line in lines]
-    # Parsed one by one first, so the error names the line it is about; the
-    # same failure at draw time names none.
+    prop = FontProperties(size=FONT_SIZE, math_fontfamily="cm")
+    # Parsed one by one, so the error names the line it is about; the same
+    # failure at draw time names none.
+    extents = []
     for number, math in enumerate(maths, start=1):
         try:
-            _parser.parse(math)
+            extents.append(_parser.parse(math, dpi=72, prop=prop))
         except ValueError as exc:
             raise FormulaError(f"line {number}: {exc}") from exc
+    pad = 2 * PAD_INCHES * 72
+    width = max(extent.width for extent in extents) + pad
+    height = (
+        sum(extent.height for extent in extents) + LINE_GAP * (len(maths) - 1) + pad
+    )
+    if width > MAX_RATIO * height:
+        raise FormulaError("too wide for one image: split it over more lines")
+    return maths
+
+
+def render(lines: list[str]) -> bytes:
+    """`lines` typeset one under another, left-aligned, as a PNG."""
+    maths = check(lines)
     figure = Figure(facecolor=PAPER)
     column = VPacker(
         children=[
@@ -76,6 +98,11 @@ def render(lines: list[str]) -> bytes:
     )
     out = io.BytesIO()
     figure.savefig(
-        out, format="png", dpi=DPI, bbox_inches="tight", pad_inches=0.2, facecolor=PAPER
+        out,
+        format="png",
+        dpi=DPI,
+        bbox_inches="tight",
+        pad_inches=PAD_INCHES,
+        facecolor=PAPER,
     )
     return out.getvalue()

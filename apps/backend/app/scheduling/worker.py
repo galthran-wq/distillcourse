@@ -192,18 +192,23 @@ async def _send_card(session: AsyncSession, outbox: Outbox, row: Schedule) -> bo
     lesson: str = row.payload["lesson"]
     state = await review.state_of(session, row.user_id, lesson)
     level = 1 if state is None else state.level
-    card = await cards.pick(session, row.user_id, lesson, level)
-    if card is None:
-        logfire.warn(
-            "no card to send: the review is put off a day",
-            lesson=lesson,
-            level=level,
-        )
-        return False
     repo = HarnessRepository(session, row.user_id)
-    async with thread.holding(repo, await thread.of(session, row.user_id)):
-        await cards.deliver(session, outbox, row.user_id, card)
-    return True
+    # A card whose image Telegram refused is retired by `deliver`, and the
+    # next one in line is tried in its place — once, so an outage of the
+    # site's figures cannot retire a whole lesson's cards in one cycle.
+    for _ in range(2):
+        card = await cards.pick(session, row.user_id, lesson, level)
+        if card is None:
+            logfire.warn(
+                "no card to send: the review is put off a day",
+                lesson=lesson,
+                level=level,
+            )
+            return False
+        async with thread.holding(repo, await thread.of(session, row.user_id)):
+            if await cards.deliver(session, outbox, row.user_id, card) is not None:
+                return True
+    return False
 
 
 async def cycle(session: AsyncSession, now: datetime) -> None:

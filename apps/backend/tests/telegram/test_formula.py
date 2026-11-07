@@ -51,3 +51,10 @@ def test_an_environment_raises_the_parsers_message(line: str) -> None:
 def test_a_formula_is_one_to_six_lines(count: int) -> None:
     with pytest.raises(formula.FormulaError):
         formula.render(["x"] * count)
+
+
+def test_a_formula_too_wide_for_a_photo_is_refused() -> None:
+    sum_of = " + ".join(f"x_{{{index}}}" for index in range(40))
+    with pytest.raises(formula.FormulaError, match="too wide"):
+        formula.render([sum_of])
+    formula.check(sum_of.split(" + x_{20} + "))

@@ -71,11 +71,3 @@ def lesson_url(locator: str) -> str:
     lesson, hash_, anchor = path_of(locator).partition("#")
     course, _, slug = lesson.partition("/")
     return f"{settings.FRONTEND_HOST}/courses/{course}/lessons/{slug}{hash_}{anchor}"
-
-
-def figure_url(src: str) -> str:
-    """A figure the index lists (`/course-assets/...`) as an image Telegram can
-    show: an SVG through the site's PNG route, anything else as served."""
-    if src.lower().endswith(".svg"):
-        return f"{settings.FRONTEND_HOST}/course-assets-png/{src.removeprefix('/course-assets/')}"
-    return f"{settings.FRONTEND_HOST}{src}"

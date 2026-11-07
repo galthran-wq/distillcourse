@@ -16,7 +16,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_ai import Agent
 from pydantic_ai.usage import RunUsage
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -80,6 +80,13 @@ class Draft(BaseModel):
     # The `src` of one of its section's figures, or one line of LaTeX math.
     figure: str | None = None
     formula: str | None = None
+
+    # A structured-output model fills a field it does not use with "" as often
+    # as it leaves it out.
+    @field_validator("figure", "formula", mode="before")
+    @classmethod
+    def _blank_is_none(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
 
     @model_validator(mode="after")
     def _answerable(self) -> Self:

@@ -21,7 +21,10 @@ function assetTree(): string {
   writeFileSync(join(lesson, "current.svg"), drawn("currentColor"));
   writeFileSync(join(lesson, "ink.svg"), drawn("#15171a"));
   writeFileSync(join(lesson, "black.svg"), drawn("#000000"));
-  writeFileSync(join(lesson, "panel.svg"), drawn("var(--panel, #15171a)"));
+  writeFileSync(join(lesson, "panel.svg"), drawn("var(--panel)"));
+  writeFileSync(join(lesson, "panel-fallback.svg"), drawn("var(--panel, #15171a)"));
+  writeFileSync(join(lesson, "panel-hex.svg"), drawn("#f2f3f5"));
+  writeFileSync(join(lesson, "unknown.svg"), drawn("var(--unknown, #15171a)"));
   writeFileSync(join(lesson, "photo.png"), "not an svg");
   return root;
 }
@@ -29,16 +32,23 @@ function assetTree(): string {
 describe("figurePng", () => {
   const root = assetTree();
 
-  it("draws currentColor and a custom property's fallback as the ink", () => {
-    const current = figurePng(root, "course", "lesson", "current.svg");
+  const png = (file: string) => figurePng(root, "course", "lesson", file);
+
+  it("draws currentColor as the ink", async () => {
+    const current = await png("current.svg");
     expect(current?.subarray(0, 4)).toEqual(PNG_SIGNATURE);
-    const ink = figurePng(root, "course", "lesson", "ink.svg");
-    expect(current).toEqual(ink);
-    expect(figurePng(root, "course", "lesson", "panel.svg")).toEqual(ink);
-    expect(current).not.toEqual(figurePng(root, "course", "lesson", "black.svg"));
+    expect(current).toEqual(await png("ink.svg"));
+    expect(current).not.toEqual(await png("black.svg"));
   });
 
-  it("serves nothing outside the asset tree, nothing missing, nothing but SVG", () => {
+  it("draws a theme token as the light page's, any other name as its fallback", async () => {
+    const panel = await png("panel-hex.svg");
+    expect(await png("panel.svg")).toEqual(panel);
+    expect(await png("panel-fallback.svg")).toEqual(panel);
+    expect(await png("unknown.svg")).toEqual(await png("ink.svg"));
+  });
+
+  it("serves nothing outside the asset tree, nothing missing, nothing but SVG", async () => {
     for (const [course, lesson, file] of [
       ["course", "..", "current.svg"],
       ["..", "course", "current.svg"],
@@ -47,7 +57,7 @@ describe("figurePng", () => {
       ["course", "lesson", "missing.svg"],
       ["course", "lesson", "photo.png"],
     ]) {
-      expect(figurePng(root, course, lesson, file)).toBeUndefined();
+      expect(await figurePng(root, course, lesson, file)).toBeUndefined();
     }
   });
 });

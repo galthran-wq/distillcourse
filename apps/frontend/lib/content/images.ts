@@ -224,6 +224,11 @@ export function assetUrl(course: string, lesson: string, file: string): string {
   return `/course-assets/${course}/${lesson}/${basename(file)}`;
 }
 
+/** The directory `assetUrl` serves from, under the app's root. */
+export function assetDir(appRoot: string): string {
+  return join(appRoot, "public", "course-assets");
+}
+
 /**
  * Drawn art — an SVG, which the theme may invert; anything else is a
  * photograph or a scan, which it only dims.

@@ -1,4 +1,5 @@
-import { ASSET_ROOT, figurePng } from "@/lib/figure-png/render";
+import { assetDir } from "@/lib/content/images";
+import { figurePng } from "@/lib/figure-png/render";
 
 /**
  * `/course-assets/<course>/<lesson>/<file>.svg` as a PNG, for the Telegram
@@ -10,7 +11,7 @@ export async function GET(
   { params }: { params: Promise<{ course: string; lesson: string; file: string }> },
 ): Promise<Response> {
   const { course, lesson, file } = await params;
-  const png = figurePng(ASSET_ROOT, course, lesson, file);
+  const png = await figurePng(assetDir(process.cwd()), course, lesson, file);
   if (png === undefined) return new Response("not found", { status: 404 });
   return new Response(new Uint8Array(png), {
     headers: {

@@ -1,6 +1,8 @@
 """Cards shown with a lesson figure or a formula: written only with an image
 that can be sent, sent as a photo, and answered in its caption."""
 
+import re
+
 import pytest
 from httpx import AsyncClient
 from pydantic import ValidationError
@@ -9,8 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models import CardDelivery, Document, ReviewCard, User
-from app.review import writer
+from app.review import cards, writer
 from app.scheduling import worker
+from app.telegram import api
 from tests.conftest import Bot
 from tests.review.conftest import (
     LESSON,
@@ -73,6 +76,11 @@ async def test_the_writer_is_given_the_figures_and_a_card_keeps_one_it_can_send(
     ]
 
 
+def test_a_blank_image_field_is_no_image() -> None:
+    card = writer.Draft.model_validate(draft(figure="", formula=" "))
+    assert (card.figure, card.formula) == (None, None)
+
+
 def test_a_card_shows_a_figure_or_a_formula_not_both() -> None:
     with pytest.raises(ValidationError, match="not both"):
         writer.Draft.model_validate(draft(figure=FIGURE, formula=FORMULA))
@@ -115,3 +123,38 @@ async def test_a_formula_card_is_sent_typeset(
 
     [photo] = bot.photos
     assert isinstance(photo.photo, bytes) and photo.photo.startswith(b"\x89PNG")
+
+
+async def test_a_card_whose_image_telegram_refuses_is_retired_for_the_next(
+    session: AsyncSession, user: User, bot: Bot
+) -> None:
+    await ladder_row(session, user)
+    refused = await stored_card(session, figure=FIGURE)
+    await stored_card(session, prompt="Plain: ____")
+    bot.refuse = api.TelegramError("Bad Request: wrong file identifier/HTTP URL")
+
+    with no_model():
+        await worker.cycle(session, NOON)
+
+    await session.refresh(refused)
+    assert refused.status == "retired"
+    [sent] = bot.sent
+    assert "Plain: ____" in sent.text
+
+
+async def test_a_photo_cards_feedback_fits_a_caption(
+    client: AsyncClient, session: AsyncSession, user: User, bot: Bot
+) -> None:
+    await ladder_row(session, user)
+    card = await stored_card(session, prompt="p" * 400, formula=FORMULA)
+    card.explanation = "e" * 1000
+    await session.commit()
+
+    with no_model():
+        await worker.cycle(session, NOON)
+        sent = await delivered(session, user)
+        await deliver(client, tap(f"k:{sent.id}:0", message_id=sent.tg_message_id))
+
+    [(_, feedback)] = bot.captioned
+    assert len(re.sub(r"<[^>]*>", "", feedback)) == cards.CAPTION_CHARS
+    assert "e…" in feedback
