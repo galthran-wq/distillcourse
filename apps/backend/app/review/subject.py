@@ -111,12 +111,20 @@ def concepts(material: Material) -> Iterator[str]:
         yield f"- confusable with {concept.name}: {concept.definition}"
 
 
+def _shown(card: ReviewCard, chosen: int | list[int]) -> str:
+    if card.kind == "order":
+        assert isinstance(chosen, list)
+        return " then ".join(repr(card.options[step]) for step in chosen)
+    assert isinstance(chosen, int)
+    return repr(card.options[chosen])
+
+
 def _status(delivery: CardDelivery, card: ReviewCard) -> str:
     if delivery.outcome is None:
         return "not answered yet"
     if delivery.chosen is None:
         return f"graded {delivery.outcome}"
-    tapped = f"tapped {card.options[delivery.chosen]!r}: {delivery.outcome}"
+    tapped = f"tapped {_shown(card, delivery.chosen)}: {delivery.outcome}"
     own = delivery.follow_ups.get(OWN_WORDS)
     if own is None:
         return tapped
@@ -142,7 +150,7 @@ async def open_block(
         f"{_status(delivery, card)}.\n"
         f"  Question: {card.prompt}\n"
         f"  Options: {' | '.join(card.options)}\n"
-        f"  Right answer: {card.options[card.answer]}. {card.explanation}"
+        f"  Right answer: {_shown(card, card.answer)}. {card.explanation}"
         for delivery, card in sent
     ]
     return (prompts.ContextBlock(title=SENT, body="\n".join([*body, "", CLOSE])),)

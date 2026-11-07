@@ -12,6 +12,7 @@ any of it is dropped.
 """
 
 import asyncio
+import random
 import uuid
 from dataclasses import dataclass
 from typing import Annotated, Literal, Self
@@ -37,17 +38,21 @@ PROMPT_CHARS = 900
 CAPTION_PROMPT_CHARS = 400
 # What fits on a phone-width button without being cut.
 OPTION_CHARS = 40
+# An `order` card's steps are listed in the message, not on its buttons, and a
+# step of a derivation needs a line of its own.
+STEP_CHARS = 200
+STEPS = (3, 5)
 EXPLANATION_CHARS = 400
 # A batch is a few thousand tokens out; past this the writer is not coming, and
 # the poller has other learners to serve.
 TIMEOUT_SECONDS = 180
 FOCUS_SOURCE = "review-focus"
 
-Kind = Literal["gap", "choice", "tell_apart", "spot_error"]
+Kind = Literal["gap", "choice", "tell_apart", "spot_error", "order"]
 KINDS: dict[int, tuple[Kind, ...]] = {
     1: ("gap", "choice"),
     2: ("tell_apart",),
-    3: ("spot_error",),
+    3: ("spot_error", "order"),
 }
 
 writer = Agent(name="card-writer")
@@ -71,11 +76,8 @@ class Draft(BaseModel):
     # The anchor of the section the card tests, as the request lists it.
     section: str
     prompt: Annotated[str, Field(min_length=1, max_length=PROMPT_CHARS)]
-    options: Annotated[
-        list[Annotated[str, Field(min_length=1, max_length=OPTION_CHARS)]],
-        Field(min_length=2, max_length=4),
-    ]
-    answer: int
+    options: list[Annotated[str, Field(min_length=1, max_length=STEP_CHARS)]]
+    answer: int | list[int]
     explanation: Annotated[str, Field(min_length=1, max_length=EXPLANATION_CHARS)]
     # The `src` of one of its section's figures, or one line of LaTeX math.
     figure: str | None = None
@@ -90,6 +92,14 @@ class Draft(BaseModel):
 
     @model_validator(mode="after")
     def _answerable(self) -> Self:
+        if self.kind == "order":
+            return self._ordered()
+        if not 2 <= len(self.options) <= 4:
+            raise ValueError("a card has two to four options")
+        if any(len(option) > OPTION_CHARS for option in self.options):
+            raise ValueError(f"an option is at most {OPTION_CHARS} characters")
+        if not isinstance(self.answer, int):
+            raise ValueError("answer is the index of one option")
         if not 0 <= self.answer < len(self.options):
             raise ValueError("answer is not the index of an option")
         if self.figure is not None and self.formula is not None:
@@ -103,6 +113,36 @@ class Draft(BaseModel):
         ]:
             raise ValueError("a spot_error card's options are its line numbers")
         return self
+
+    def _ordered(self) -> Self:
+        low, high = STEPS
+        if not low <= len(self.options) <= high:
+            raise ValueError(f"an order card has {low} to {high} steps")
+        if not isinstance(self.answer, list) or sorted(self.answer) != list(
+            range(len(self.options))
+        ):
+            raise ValueError("answer is every step's index, once, in the right order")
+        return self
+
+
+def shuffled(draft: Draft) -> Draft:
+    """An `order` card with its steps in an order that is not the answer.
+
+    Code shuffles rather than trusting the writer to: a writer lists steps in
+    the order it thought of them, which is the right one, and a card shown in
+    its answer is answered by tapping down the list.
+    """
+    assert isinstance(draft.answer, list)
+    count = len(draft.options)
+    shown = draft.answer
+    while shown == draft.answer:
+        shown = random.sample(range(count), count)
+    return draft.model_copy(
+        update={
+            "options": [draft.options[index] for index in shown],
+            "answer": [shown.index(index) for index in draft.answer],
+        }
+    )
 
 
 class Batch(BaseModel):

@@ -57,7 +57,13 @@ async def _tapped(outbox: Outbox, tap: Tap) -> tuple[CardDelivery, ReviewCard] |
     unpressed."""
     found = await _card(outbox, tap)
     prefix = tap.data.partition(":")[0]
-    if found is None or found[0].chosen is None or prefix in found[0].follow_ups:
+    # An `order` card part-way through holds a `chosen` but is not tapped yet.
+    if (
+        found is None
+        or found[0].answered_at is None
+        or found[0].chosen is None
+        or prefix in found[0].follow_ups
+    ):
         return None
     return found
 

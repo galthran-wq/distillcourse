@@ -19,7 +19,10 @@ Levels make a card harder to think about, never harder to answer:
   missing, or a direct question about it.
 - Level 2 — two ideas told apart: the concept and the one it is confused
   with, which applies to a given case, which statement belongs to which.
-- Level 3 — the error in a short argument or derivation of numbered lines.
+- Level 3 — the error in a short argument or derivation of numbered lines,
+  or the steps of a derivation, an argument or an algorithm put in order. An
+  order card lists its steps shuffled and numbered; the learner taps the
+  numbers in sequence and is graded once the last is placed, all or nothing.
 
 Every wrong option is a real confusion: a neighbouring concept, a reversed
 direction, a condition dropped. Never an absurd option, never a trick (two

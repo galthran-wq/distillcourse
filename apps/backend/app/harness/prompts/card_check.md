@@ -18,5 +18,10 @@ For each card, answer four questions:
 - `main_point` — is it about a main point of its section, rather than a detail
   or the wording?
 
+An `order` card's options are steps and its marked answer is their order.
+`answer_right` asks whether the text sets them out in that order;
+`others_wrong` and `one_answer` whether that order is the only one it allows —
+two steps that could swap, or a step the sequence does not need, fail both.
+
 Be strict. A card you pass goes to a learner with nothing between it and
 them, and a card marked wrong when it is right teaches the wrong thing.

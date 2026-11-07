@@ -34,6 +34,10 @@ if TYPE_CHECKING:
 
 # The `callback_data` prefix of an answer button: `k:<delivery_id>:<option>`.
 TAP = "k"
+# An `order` card's: `o:<delivery_id>:<step>`, and `o:<delivery_id>:r` to start
+# the order over.
+ORDER = "o"
+RESET = "r"
 # The other buttons are `<prefix>:<delivery_id>`. Under a card still open:
 ANOTHER = "a"
 NOT_TODAY = "n"
@@ -104,6 +108,9 @@ async def write(
         if card.kind in writer.KINDS[level]
         and card.section in by_anchor
         and _showable(card, by_anchor[card.section])
+    ]
+    drafts = [
+        writer.shuffled(card) if card.kind == "order" else card for card in drafts
     ]
     kept = (
         await writer.check(session, user_id, material, found, drafts) if drafts else []
@@ -182,15 +189,32 @@ def _button(text: str, prefix: str, delivery_id: uuid.UUID) -> dict[str, str]:
     return {"text": text, "callback_data": f"{prefix}:{delivery_id}"}
 
 
-def _buttons(delivery_id: uuid.UUID, card: ReviewCard) -> api.Keyboard:
+def _answers(
+    delivery_id: uuid.UUID, card: ReviewCard, chosen: list[int]
+) -> api.Keyboard:
+    if card.kind == "order":
+        steps = [
+            {"text": str(step + 1), "callback_data": f"{ORDER}:{delivery_id}:{step}"}
+            for step in range(len(card.options))
+            if step not in chosen
+        ]
+        reset = [{"text": "Reset", "callback_data": f"{ORDER}:{delivery_id}:{RESET}"}]
+        return [steps, reset] if chosen else [steps]
     options = [
         {"text": option, "callback_data": f"{TAP}:{delivery_id}:{index}"}
         for index, option in enumerate(card.options)
     ]
     # Line numbers fit side by side; a worded option needs the whole width.
-    rows = [options] if card.kind == "spot_error" else [[o] for o in options]
+    return [options] if card.kind == "spot_error" else [[o] for o in options]
+
+
+def _buttons(
+    delivery_id: uuid.UUID, card: ReviewCard, chosen: list[int]
+) -> api.Keyboard:
+    """The keyboard of a card not yet answered — the one place it is built,
+    whether the card was just sent or is an `order` card part-way through."""
     return [
-        *rows,
+        *_answers(delivery_id, card, chosen),
         [
             _button("Another question", ANOTHER, delivery_id),
             _button("Not today", NOT_TODAY, delivery_id),
@@ -218,8 +242,23 @@ def follow_ups(sent: CardDelivery, card: ReviewCard) -> api.Keyboard | None:
     return [row for row in shown if row] or None
 
 
-def _question(title: str, card: ReviewCard) -> str:
-    return f"<b>{escape(title, quote=False)}</b>\n\n{card.prompt}"
+def _sequence(steps: list[int]) -> str:
+    return " → ".join(str(step + 1) for step in steps)
+
+
+def _question(title: str, card: ReviewCard, chosen: list[int] | None = None) -> str:
+    """The card as the learner reads it. An `order` card's steps are numbered
+    under the prompt, since its buttons hold only the numbers, followed by the
+    order tapped so far."""
+    text = f"<b>{escape(title, quote=False)}</b>\n\n{card.prompt}"
+    if card.kind != "order":
+        return text
+    steps = "\n".join(
+        f"{number}. {escape(step, quote=False)}"
+        for number, step in enumerate(card.options, start=1)
+    )
+    text = f"{text}\n\n{steps}"
+    return f"{text}\n\nYour order: {_sequence(chosen)}" if chosen else text
 
 
 async def title_of(session: AsyncSession, card: ReviewCard) -> str:
@@ -362,7 +401,9 @@ async def deliver(
     question = _question(await title_of(session, card), card)
     repo = HarnessRepository(session, user_id)
     async with thread.holding(repo, await thread.of(session, user_id)):
-        message_id = await _send(outbox, card, question, _buttons(delivery_id, card))
+        message_id = await _send(
+            outbox, card, question, _buttons(delivery_id, card, [])
+        )
     if message_id is None:
         return None
     delivery = await _record(
@@ -392,7 +433,7 @@ async def replace(
     await outbox.edit_text(
         sent.tg_message_id,
         _question(await title_of(session, card), card),
-        keyboard=_buttons(delivery_id, card),
+        keyboard=_buttons(delivery_id, card, []),
     )
     return await _record(session, delivery_id, user_id, card, sent.tg_message_id)
 
@@ -405,19 +446,27 @@ def _shown(html: str) -> int:
     return len(unescape(re.sub(r"<[^>]*>", "", html)))
 
 
-def _feedback(
-    title: str, section: str, card: ReviewCard, outcome: repository.Tapped
-) -> str:
+def _right(card: ReviewCard) -> str:
+    if card.kind == "order":
+        assert isinstance(card.answer, list)
+        return _sequence(card.answer)
+    assert isinstance(card.answer, int)
     right = card.options[card.answer]
-    answer = (
-        f"line {right}" if card.kind == "spot_error" else escape(right, quote=False)
-    )
+    return f"line {right}" if card.kind == "spot_error" else escape(right, quote=False)
+
+
+def _feedback(title: str, section: str, sent: CardDelivery, card: ReviewCard) -> str:
     link = lesson_url(locator(card))
-    mark = RIGHT if outcome == "correct" else WRONG
+    mark = RIGHT if sent.outcome == "correct" else WRONG
+    chosen = None
+    if card.kind == "order":
+        assert isinstance(sent.chosen, list)
+        chosen = sent.chosen
+    question = _question(title, card, chosen)
 
     def text(explanation: str) -> str:
         return (
-            f"{_question(title, card)}\n\n{mark} {answer}. {escape(explanation, quote=False)} "
+            f"{question}\n\n{mark} {_right(card)}. {escape(explanation, quote=False)} "
             f'<a href="{escape(link)}">{escape(section, quote=False)}</a>'
         )
 
@@ -430,42 +479,120 @@ def _feedback(
     return feedback
 
 
-def _chosen(data: str) -> tuple[uuid.UUID, int] | None:
+def _tapped(data: str) -> tuple[uuid.UUID, str] | None:
+    """`<prefix>:<delivery_id>:<value>`, the one shape every card button's
+    `callback_data` has, as the delivery id and the raw value."""
     _, _, payload = data.partition(":")
-    delivery_id, _, option = payload.partition(":")
+    delivery_id, _, value = payload.partition(":")
     try:
-        return uuid.UUID(delivery_id), int(option)
+        return uuid.UUID(delivery_id), value
     except ValueError:
         return None
+
+
+async def _open(
+    outbox: Outbox, tap: Tap
+) -> tuple[CardDelivery, ReviewCard, str] | None:
+    """The tapped card, if it is this learner's and still open. A card closed
+    any way — tapped, graded in conversation, expired as ignored — is closed:
+    a late tap must not move the ladder for it."""
+    tapped = _tapped(tap.data)
+    if tapped is None:
+        return None
+    delivery_id, value = tapped
+    found = await repository.delivery(outbox.session, outbox.link.user_id, delivery_id)
+    if found is None:
+        return None
+    sent, card = found
+    if sent.answered_at is not None or sent.outcome is not None:
+        return None
+    return sent, card, value
+
+
+async def _grade(
+    outbox: Outbox,
+    sent: CardDelivery,
+    card: ReviewCard,
+    outcome: repository.Tapped,
+    chosen: int | list[int],
+) -> None:
+    await repository.grade(outbox.session, sent, card, outcome, chosen=chosen)
+    await outbox.session.commit()
+    title = await title_of(outbox.session, card)
+    chunk = section_of(await sections(outbox.session, card.lesson), locator(card))
+    section = title if chunk is None else chunk.title
+    await edit(
+        outbox,
+        sent.tg_message_id,
+        card,
+        _feedback(title, section, sent, card),
+        keyboard=follow_ups(sent, card),
+    )
 
 
 async def answer(outbox: Outbox, tap: Tap) -> None:
     """A tapped option, graded against the marked answer and shown in place of
     the buttons. A card answered once is answered: a second tap, or a tap on a
     card already graded in conversation, changes nothing."""
-    session = outbox.session
-    chosen = _chosen(tap.data)
-    if chosen is None:
-        return
-    delivery_id, option = chosen
-    found = await repository.delivery(session, outbox.link.user_id, delivery_id)
+    found = await _open(outbox, tap)
     if found is None:
         return
-    sent, card = found
-    if sent.answered_at is not None or not 0 <= option < len(card.options):
+    sent, card, value = found
+    try:
+        option = int(value)
+    except ValueError:
         return
-    outcome: repository.Tapped = "correct" if option == card.answer else "wrong"
-    await repository.grade(session, sent, card, outcome, chosen=option)
-    await session.commit()
-    title = await title_of(session, card)
-    chunk = section_of(await sections(session, card.lesson), locator(card))
-    section = title if chunk is None else chunk.title
+    if card.kind == "order" or not 0 <= option < len(card.options):
+        return
+    await _grade(
+        outbox, sent, card, "correct" if option == card.answer else "wrong", option
+    )
+
+
+async def arrange(outbox: Outbox, tap: Tap) -> None:
+    """One number tapped on an `order` card, or Reset.
+
+    The order so far is kept on the delivery, not in this process: the bot may
+    restart between two taps. The card is graded on the tap that places the
+    last step, whole or not at all — partial credit would need a rule the
+    learner cannot see. Until then the card is as unanswered as one nobody
+    touched.
+    """
+    found = await _open(outbox, tap)
+    if found is None:
+        return
+    sent, card, value = found
+    if card.kind != "order":
+        return
+    so_far = sent.chosen or []
+    assert isinstance(so_far, list)
+    if value == RESET:
+        if not so_far:
+            return
+        chosen: list[int] = []
+    else:
+        try:
+            placed = int(value)
+        except ValueError:
+            return
+        if not 0 <= placed < len(card.options) or placed in so_far:
+            return
+        chosen = [*so_far, placed]
+    if len(chosen) == len(card.options):
+        await _grade(
+            outbox, sent, card, "correct" if chosen == card.answer else "wrong", chosen
+        )
+        return
+    # Reassigned, never appended to: SQLAlchemy does not see a JSONB value
+    # changed in place.
+    sent.chosen = chosen or None
+    await outbox.session.commit()
     await edit(
         outbox,
         sent.tg_message_id,
         card,
-        _feedback(title, section, card, outcome),
-        keyboard=follow_ups(sent, card),
+        _question(await title_of(outbox.session, card), card, chosen),
+        keyboard=_buttons(sent.id, card, chosen),
     )
 
 
