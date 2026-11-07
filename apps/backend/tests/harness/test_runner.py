@@ -670,7 +670,7 @@ async def test_a_system_run_does_not_spend_the_daily_allowance(
     with tutor.override(
         model=TestModel(custom_output_text="redo exercise 3"), tools=[]
     ):
-        assert await runner.run(repo, chat, "a reminder", run_kind="proactive")
+        assert await runner.run(repo, chat, "a reminder", run_kind="reminder")
         assert await runner.run(repo, chat, "what is entropy?")
         with pytest.raises(LimitExceeded):
             await runner.run(repo, chat, "and cross entropy?")

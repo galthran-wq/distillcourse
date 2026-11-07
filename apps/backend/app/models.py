@@ -292,13 +292,25 @@ class Schedule(Base):
 
     `due_at` is when a `pending` or `deferred` row next fires; `done`,
     `cancelled` and `failed` are where it ends. `payload` carries `note` for a
-    reminder — what the message is about, in words the run is given — and
-    `lesson` and `completed_at` for a review, the lesson its card is drawn from
-    and when the learner finished it, which orders what is due.
+    reminder — what the message is about, in words the run is given — and, for
+    a `coach` wake-up, `reason`, the line the last run left for this one, and
+    `note`, what woke it.
     """
 
     __tablename__ = "schedules"
-    __table_args__ = (Index("ix_schedules_status_due_at", "status", "due_at"),)
+    __table_args__ = (
+        Index("ix_schedules_status_due_at", "status", "due_at"),
+        # One wake-up per learner: two would be two runs deciding the same
+        # day, each unaware of what the other sent.
+        Index(
+            "uq_schedules_live_coach",
+            "user_id",
+            unique=True,
+            postgresql_where=text(
+                "kind = 'coach' AND status IN ('pending', 'deferred')"
+            ),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -449,6 +461,10 @@ class CardDelivery(Base):
     # grades differently: a right answer raises the level, a wrong one changes
     # nothing.
     harder: Mapped[bool] = mapped_column(default=False, server_default="false")
+    # Sent on the platform's own account — by the coach or the weekly floor —
+    # rather than because the learner pressed something. Only these spend the
+    # day's initiation.
+    initiated: Mapped[bool] = mapped_column(default=False, server_default="false")
 
 
 class BackgroundRun(Base):

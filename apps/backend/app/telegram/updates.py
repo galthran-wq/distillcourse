@@ -10,6 +10,7 @@ import logfire
 from pydantic_ai.messages import ModelRequest, UserPromptPart
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.coach import wake
 from app.harness import runner
 from app.harness.limits import LimitExceeded, check_run_allowed
 from app.harness.prompts import ContextBlock
@@ -291,10 +292,17 @@ async def _hear(repo: HarnessRepository, outbox: Outbox, voice: Voice) -> str | 
 
 
 async def _learner(session: AsyncSession, tg_chat_id: int) -> TgLink | None:
+    """The learner behind a message or a tap, which is also them coming back:
+    after a week away, the coach looks again soon rather than at its own
+    time."""
     link = await repository.link_for_chat(session, tg_chat_id)
-    if link is not None and link.status != "active":
+    if link is None:
+        return None
+    if link.status != "active":
         # They are reaching us, so whatever broke the channel is over.
         await repository.set_status(session, link, "active")
+    await wake.returned(session, link.user_id, datetime.now(UTC))
+    await session.commit()
     return link
 
 

@@ -13,6 +13,7 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.coach.agent import coach
 from app.content.locators import LESSON_SECTION
 from app.core.config import settings
 from app.harness.agent import tutor
@@ -23,7 +24,6 @@ from app.models import (
     Incident,
     ReviewCard,
     ReviewState,
-    Schedule,
     TgLink,
     User,
 )
@@ -34,6 +34,7 @@ from app.scheduling import repository as scheduling
 from app.telegram import thread
 from app.telegram.outbox import Outbox
 from app.telegram.updates import TAP_BUSY
+from tests.coach.conftest import deciding
 from tests.conftest import Bot
 from tests.harness.conftest import echoing
 from tests.review.conftest import (
@@ -43,6 +44,7 @@ from tests.review.conftest import (
     echoed,
     grading,
     no_model,
+    send_due,
     stored_card,
     writing,
 )
@@ -90,7 +92,7 @@ async def state_of(session: AsyncSession, user: User, lesson: str) -> ReviewStat
 async def card_out(session: AsyncSession, user: User) -> CardDelivery:
     """One poller cycle, and the card it sent."""
     with no_model():
-        await worker.cycle(session, NOON)
+        await send_due(session, user)
     return (await deliveries(session, user))[-1]
 
 
@@ -198,14 +200,6 @@ async def test_another_question_falls_back_to_the_next_due_lesson(
     await stored_card(session)
     sent = await card_out(session, user)
     await other_lesson(session, user)
-    queued = await scheduling.create(
-        session,
-        user_id=user.id,
-        kind="review",
-        due_at=NOON + timedelta(hours=1),
-        payload={"lesson": OTHER, "completed_at": None},
-        created_by="system",
-    )
 
     with no_model():
         await press(client, f"a:{sent.id}", sent)
@@ -214,9 +208,6 @@ async def test_another_question_falls_back_to_the_next_due_lesson(
     other = await session.get(ReviewCard, swapped.card_id)
     assert other is not None and other.lesson == OTHER
     assert "Is KL divergence symmetric?" in bot.edited[-1][1]
-    # The poller's row for that lesson goes with it, or it would come twice.
-    await session.refresh(queued)
-    assert queued.status == "cancelled"
 
 
 async def test_another_question_with_nothing_written_says_so_and_writes_nothing(
@@ -266,17 +257,16 @@ async def test_not_today_holds_cards_until_tomorrow_and_lets_a_reminder_through(
         created_by="user",
     )
     bot.sent.clear()
-    with tutor.override(model=echoing()):
+    with (
+        tutor.override(model=echoing()),
+        coach.override(model=deciding({"lesson": OTHER})),
+    ):
         await worker.cycle(session, NOON + timedelta(minutes=1))
 
     await session.refresh(reminder)
     assert reminder.status == "done"
     assert bot.sent and all(item.keyboard is None for item in bot.sent)
     assert len(await deliveries(session, user)) == 1
-    held = await session.scalar(
-        select(Schedule).where(Schedule.kind == "review", Schedule.status == "deferred")
-    )
-    assert held is not None and held.due_at == tomorrow
 
 
 # This card is wrong

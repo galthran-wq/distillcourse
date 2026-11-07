@@ -30,7 +30,7 @@ TITLE_SOURCE = "chat-transcript"
 _SPEAKER = {"user": "learner", "agent": "tutor"}
 
 
-def _transcript(rows: Sequence[Message]) -> str:
+def transcript(rows: Sequence[Message]) -> str:
     """The conversation as plain text, for a pass that is about what was talked
     about rather than about continuing it.
 
@@ -89,7 +89,7 @@ async def retitle(
         return
     rows = await repo.live_rows(chat)
     named = await namer.run(
-        untrusted(TITLE_SOURCE, _transcript(rows[-TITLE_WINDOW:])),
+        untrusted(TITLE_SOURCE, transcript(rows[-TITLE_WINDOW:])),
         model=model_for(settings.DEFAULT_CHAT_MODEL),
         instructions=module("title.md"),
         usage=usage,

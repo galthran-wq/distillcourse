@@ -1,20 +1,17 @@
-from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Self
 from zoneinfo import ZoneInfo
 
 from app.core.clock import zone
-from app.models import Schedule, User
+from app.models import User
 
 # A card nobody has answered a day after it was sent is ignored. A day rather
 # than waking hours: a card asks for a tap, whenever the learner next picks the
-# phone up, and nothing else waits on it but the next card.
+# phone up.
 IGNORED_AFTER = timedelta(hours=24)
-# Per user per day: how many times the platform may open the conversation, and
-# how many items one of those messages may carry.
+# Per user per day: how many times the platform may open the conversation.
 DAILY_INITIATIONS = 1
-SESSION_ITEMS = 1
 # How long the platform waits after its last message, by how many in a row went
 # unanswered. The last entry repeats for ever rather than ending in silence:
 # stopping is useless at exactly the moment a learner has drifted away.
@@ -84,25 +81,3 @@ def silence_wait(silence: int) -> timedelta:
 def retry_at(moment: datetime, attempts: int) -> datetime:
     doubling: int = 2 ** (attempts - 1)
     return moment + RETRY_DELAY * doubling
-
-
-def _completed(row: Schedule) -> str:
-    completed = row.payload.get("completed_at")
-    return completed if isinstance(completed, str) else ""
-
-
-def session_items(due: Sequence[Schedule]) -> tuple[list[Schedule], list[Schedule]]:
-    """Split what is due into the one message that goes out now and the rest.
-
-    Reminders lead: the learner asked for those by name and by time. Of the
-    reviews, the lesson finished most recently goes first — it is the one
-    still in their head, and the likeliest to get an answer.
-    """
-    reminders = sorted(
-        (row for row in due if row.kind == "reminder"), key=lambda row: row.due_at
-    )
-    reviews = sorted(
-        (row for row in due if row.kind != "reminder"), key=_completed, reverse=True
-    )
-    ordered = [*reminders, *reviews]
-    return ordered[:SESSION_ITEMS], ordered[SESSION_ITEMS:]

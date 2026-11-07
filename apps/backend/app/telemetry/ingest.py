@@ -1,7 +1,7 @@
 import json
 import logging
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import ValidationError
@@ -10,6 +10,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.coach import wake
 from app.models import Event, LessonProgress, User
 from app.review import repository as review
 from app.telemetry import passes, progress, schemas
@@ -23,6 +24,9 @@ async def record(session: AsyncSession, user: User, batch: EventBatch) -> None:
     if not batch.events:
         return
     await progress.lock(session, user.id, batch.lesson)
+    now = datetime.now(UTC)
+    # Before this flush is stored: it is the reading that ends the absence.
+    await wake.returned(session, user.id, now)
     rows = await _rows(session, user.id, batch)
     if rows:
         await session.execute(
@@ -36,7 +40,12 @@ async def record(session: AsyncSession, user: User, batch: EventBatch) -> None:
         # completion of the same lesson a no-op, and a ladder that failed to
         # open once should be opened by the next flush that sees the
         # completion, not lost with the event that already exists.
-        await review.start(session, user.id, batch.lesson, completed_at)
+        # Only a ladder that opened is a lesson just finished; every later
+        # flush of it derives the same completion again.
+        if await review.start(session, user.id, batch.lesson, completed_at):
+            await wake.pull(
+                session, user.id, now + wake.SOON, wake.finished(batch.lesson)
+            )
     await _credit_reading_day(session, user, batch.lesson)
     await session.commit()
 

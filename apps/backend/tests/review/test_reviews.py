@@ -13,7 +13,6 @@ from app.memory import repository as memory
 from app.models import CardDelivery, ReviewState, User
 from app.review import cards, ladder, subject
 from app.review import repository as review
-from app.scheduling import worker
 from tests.conftest import Bot
 from tests.harness.conftest import echoing
 from tests.review.conftest import (
@@ -22,6 +21,7 @@ from tests.review.conftest import (
     echoed,
     grading,
     no_model,
+    send_due,
     stored_card,
     writing,
 )
@@ -67,7 +67,7 @@ async def state_of(session: AsyncSession, user: User, lesson: str) -> ReviewStat
 async def card_out(session: AsyncSession, user: User) -> CardDelivery:
     """One poller cycle, and the card it sent."""
     with no_model():
-        await worker.cycle(session, NOON)
+        await send_due(session, user)
     sent = await session.scalar(
         select(CardDelivery).where(CardDelivery.user_id == user.id)
     )
@@ -93,7 +93,7 @@ async def test_a_finished_lesson_comes_back_as_a_card_and_a_right_tap_moves_it_o
     state.next_due_at = NOON - timedelta(minutes=1)
     await session.commit()
     with card_models(write=writing(*[_surprise(index) for index in range(3)])):
-        await worker.cycle(session, NOON)
+        await send_due(session, user)
 
     sent = await session.scalar(select(CardDelivery))
     assert sent is not None

@@ -106,13 +106,11 @@ async def _due_card(
     *,
     easy: bool,
 ) -> ReviewCard | None:
-    """A card of the lesson whose review is owed longest, sent out of turn: the
-    poller's row for that lesson goes, or the review would come twice. `easy`
-    is `level_one_only`, asked once by the caller."""
-    for state in await repository.due(session, user_id, now):
+    """A card of the lesson whose review is owed longest. `easy` is
+    `level_one_only`, asked once by the caller."""
+    for state in await repository.due(session, user_id, now, recent_first=False):
         card = await find(session, user_id, state.lesson, 1 if easy else state.level)
         if card is not None:
-            await repository.unqueue(session, user_id, state.lesson)
             return card
     return None
 
