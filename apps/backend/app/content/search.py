@@ -85,6 +85,24 @@ async def search(
     ]
 
 
+class Figure(BaseModel):
+    """A figure a lesson section shows, as the index lists it. `src` is the
+    path the site serves the file at."""
+
+    src: str
+    alt: str
+    caption: str | None
+
+
+def figures(chunks: Sequence[Document]) -> list[Figure]:
+    """The figures of these chunks, in reading order."""
+    return [
+        Figure.model_validate(figure)
+        for chunk in chunks
+        for figure in chunk.meta.get("figures", [])
+    ]
+
+
 async def sections(session: AsyncSession, path: str) -> list[Document]:
     """Every chunk of one document — a locator without its anchor — in reading
     order. A consumer that has them all can answer both "this section" and

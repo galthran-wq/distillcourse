@@ -21,6 +21,7 @@ from pydantic_ai import Agent
 from pydantic_ai.usage import RunUsage
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.content.search import Figure
 from app.core.config import settings
 from app.harness.agent import model_for
 from app.harness.limits import check_cost_ceiling
@@ -30,6 +31,10 @@ from app.review import subject
 
 BATCH = 3
 PROMPT_CHARS = 900
+# A card with an image goes out as a photo, its prompt as the caption, and the
+# feedback is the caption again with the verdict and the explanation added:
+# all of it has to fit Telegram's 1024 characters.
+CAPTION_PROMPT_CHARS = 400
 # What fits on a phone-width button without being cut.
 OPTION_CHARS = 40
 EXPLANATION_CHARS = 400
@@ -58,6 +63,7 @@ class Section:
     title: str
     text: str
     content_hash: str
+    figures: list[Figure]
 
 
 class Draft(BaseModel):
@@ -71,11 +77,20 @@ class Draft(BaseModel):
     ]
     answer: int
     explanation: Annotated[str, Field(min_length=1, max_length=EXPLANATION_CHARS)]
+    # The `src` of one of its section's figures, or one line of LaTeX math.
+    figure: str | None = None
+    formula: str | None = None
 
     @model_validator(mode="after")
     def _answerable(self) -> Self:
         if not 0 <= self.answer < len(self.options):
             raise ValueError("answer is not the index of an option")
+        if self.figure is not None and self.formula is not None:
+            raise ValueError("a card shows a figure or a formula, not both")
+        if (self.figure or self.formula) and len(self.prompt) > CAPTION_PROMPT_CHARS:
+            raise ValueError(
+                f"a card with an image has a prompt of at most {CAPTION_PROMPT_CHARS} characters"
+            )
         if self.kind == "spot_error" and self.options != [
             str(line) for line in range(1, len(self.options) + 1)
         ]:
@@ -112,17 +127,33 @@ def _text(material: subject.Material, sections: list[Section]) -> str:
     parts = [f"# {material.title}", "\n".join(subject.concepts(material))]
     parts += [
         f"## {section.title} — anchor `{section.anchor or ''}`\n\n{section.text}"
+        + _figures(section.figures)
         for section in sections
     ]
     return "\n\n".join(part for part in parts if part)
+
+
+def _figures(figures: list[Figure]) -> str:
+    if not figures:
+        return ""
+    listed = "\n".join(
+        f"- `{figure.src}`: {figure.alt} {figure.caption or ''}".rstrip()
+        for figure in figures
+    )
+    return f"\n\nFigures:\n{listed}"
 
 
 def _card(index: int, draft: Draft) -> str:
     options = "\n".join(
         f"{position}. {option}" for position, option in enumerate(draft.options)
     )
+    shown = ""
+    if draft.figure is not None:
+        shown = f"Shown with the figure `{draft.figure}`\n\n"
+    if draft.formula is not None:
+        shown = f"Shown with the formula `{draft.formula}`\n\n"
     return (
-        f"### Card {index}\n\nSection: `{draft.section}`\n\n{draft.prompt}\n\n"
+        f"### Card {index}\n\nSection: `{draft.section}`\n\n{shown}{draft.prompt}\n\n"
         f"{options}\n\nMarked answer: {draft.answer}\n\n{draft.explanation}"
     )
 

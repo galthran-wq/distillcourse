@@ -7,6 +7,7 @@ model call, and a card once written is reused: shared between learners unless
 it was aimed at one of them, and served until the section it tests changes.
 """
 
+import asyncio
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
@@ -16,12 +17,12 @@ from typing import TYPE_CHECKING
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.content.locators import lesson_url
-from app.content.search import section_of, sections
+from app.content.locators import figure_url, lesson_url
+from app.content.search import figures, section_of, sections
 from app.models import CardDelivery, ReviewCard
 from app.review import repository, subject, writer
 from app.scheduling import policy
-from app.telegram import api
+from app.telegram import api, formula
 from app.telegram.outbox import Outbox
 
 if TYPE_CHECKING:
@@ -42,9 +43,23 @@ async def _sections(session: AsyncSession, lesson: str) -> list[writer.Section]:
             title=chunk.title,
             text=chunk.text,
             content_hash=chunk.content_hash,
+            figures=figures([chunk]),
         )
         for chunk in await sections(session, lesson)
     ]
+
+
+async def _showable(draft: writer.Draft, section: writer.Section) -> bool:
+    """A card's image can be sent: its figure is one its section has, and its
+    formula renders."""
+    if draft.figure is not None:
+        return draft.figure in {figure.src for figure in section.figures}
+    if draft.formula is not None:
+        try:
+            await asyncio.to_thread(formula.render, [draft.formula])
+        except formula.FormulaError:
+            return False
+    return True
 
 
 async def write(
@@ -70,7 +85,9 @@ async def write(
         for card in (
             await writer.draft(session, user_id, material, found, level, focus)
         )[: writer.BATCH]
-        if card.kind in writer.KINDS[level] and card.section in by_anchor
+        if card.kind in writer.KINDS[level]
+        and card.section in by_anchor
+        and await _showable(card, by_anchor[card.section])
     ]
     kept = (
         await writer.check(session, user_id, material, found, drafts) if drafts else []
@@ -85,6 +102,8 @@ async def write(
             options=card.options,
             answer=card.answer,
             explanation=card.explanation,
+            figure=card.figure,
+            formula=card.formula,
             owner_id=None if focus is None else user_id,
             content_hash=by_anchor[card.section].content_hash,
         )
@@ -155,9 +174,13 @@ async def deliver(
     message: its id is what the feedback edits."""
     title = (await subject.materials(session, [card.lesson]))[card.lesson].title
     delivery_id = uuid.uuid7()
-    message_id = await outbox.send(
-        _question(title, card), keyboard=_buttons(delivery_id, card)
-    )
+    question = _question(title, card)
+    keyboard = _buttons(delivery_id, card)
+    photo = await _image(card)
+    if photo is None:
+        message_id = await outbox.send(question, keyboard=keyboard)
+    else:
+        message_id = await outbox.send_photo(photo, caption=question, keyboard=keyboard)
     # A card always has text, so a message always went out.
     assert message_id is not None
     delivery = CardDelivery(
@@ -170,6 +193,14 @@ async def deliver(
     session.add(delivery)
     await session.commit()
     return delivery
+
+
+async def _image(card: ReviewCard) -> str | bytes | None:
+    if card.figure is not None:
+        return figure_url(card.figure)
+    if card.formula is not None:
+        return await asyncio.to_thread(formula.render, [card.formula])
+    return None
 
 
 def _locator(card: ReviewCard) -> str:
@@ -221,7 +252,12 @@ async def answer(outbox: Outbox, tap: Tap) -> None:
     title = (await subject.materials(session, [card.lesson]))[card.lesson].title
     chunk = section_of(await sections(session, card.lesson), _locator(card))
     section = title if chunk is None else chunk.title
-    await outbox.edit_text(sent.tg_message_id, _feedback(title, section, card, outcome))
+    feedback = _feedback(title, section, card, outcome)
+    # A card with an image is a photo, whose text is its caption.
+    if card.figure is None and card.formula is None:
+        await outbox.edit_text(sent.tg_message_id, feedback)
+    else:
+        await outbox.edit_caption(sent.tg_message_id, feedback)
 
 
 async def expire(session: AsyncSession, now: datetime) -> None:

@@ -155,6 +155,8 @@ async def stored_card(
     prompt: str = "Entropy is the ____ of surprisal.",
     content_hash: str | None = None,
     owner: User | None = None,
+    figure: str | None = None,
+    formula: str | None = None,
 ) -> ReviewCard:
     """A card already written and checked, from the section as it stands."""
     card = ReviewCard(
@@ -166,6 +168,8 @@ async def stored_card(
         options=["average", "maximum", "variance"],
         answer=0,
         explanation="Each outcome's surprisal, weighted by how often it happens.",
+        figure=figure,
+        formula=formula,
         owner_id=None if owner is None else owner.id,
         content_hash=content_hash or await section_hash(session),
     )

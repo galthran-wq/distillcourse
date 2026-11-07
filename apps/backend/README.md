@@ -63,7 +63,8 @@ app/
     thread.py        # the one thread, its claim, and the run that speaks into it
     updates.py       # one incoming message or button press, end to end; bot commands
     speech.py        # a voice note as text, via OpenRouter transcription; audio never stored
-    tools.py         # send_message, run by the tutor
+    formula.py       # LaTeX math as a PNG, through matplotlib's mathtext
+    tools.py         # send_message; the telegram toolset: send_figure, send_formula
   labs/
     repository.py    # pairing codes and tokens; challenges, state, submissions
     verify.py        # what a posted checkpoint is worth: comparison and metrics
@@ -292,6 +293,18 @@ so the only chats it can write to are the ones that repository can see.
   nothing has its final answer delivered for it, and one that sent something
   does not get its answer sent on top. On the site the tool says there is
   nothing to send: the answer is the delivery there.
+- `send_figure` / `send_formula` — an image into the Telegram thread: a figure
+  `fetch_content` lists for the passage named (`Passage.figures`, from the
+  index's `metadata.figures`; any other `src` is refused), or 1–6 lines of
+  LaTeX math typeset by `telegram/formula.py` — mathtext with the `cm`
+  fontset, on a thread (`asyncio.to_thread`), at 200 dpi on white. mathtext has
+  no environments: `aligned` and `pmatrix` come back to the model as the
+  parser's message, and an aligned derivation is sent one step per line. An
+  SVG figure goes as its URL on the site's PNG route
+  (`/course-assets-png/<course>/<lesson>/<file>`, which renders it with
+  resvg), a raster as served. A photo is not counted as the delivery: the
+  final answer still follows it. They are a toolset of their own, handed only
+  to a run with an outbox, so no other medium is offered them.
 - `read_memory` / `save_memory` / `delete_memory` — the learner profile below.
 - `report_review_outcome` — the grade of a review card the learner answered
   in writing rather than with a tap, by its delivery id; it moves the ladder.
@@ -475,8 +488,16 @@ nothing is sent. Both calls run on `CARD_MODEL`, and what they cost goes to
 row to the next morning. Cards are shared between learners unless `owner_id`
 names one.
 
+The writer is given each section's figures and may show a card with one —
+`figure`, the `src` of one of its section's, or `formula`, one line of LaTeX
+math — never both; a card whose figure its section does not list, or whose
+formula does not render, is dropped before the check. Such a card's prompt is
+at most 400 characters, so the feedback still fits a caption.
+
 A card goes out as a message with one button per option
-(`k:<delivery_id>:<option>`), recorded in `card_deliveries`. **A tap is
+(`k:<delivery_id>:<option>`), recorded in `card_deliveries`; a card with an
+image goes out as a photo with its prompt as the caption, and its feedback
+edits the caption. **A tap is
 graded by code**: the delivery is locked, the option compared with the
 marked answer, the ladder moved and the message edited into ✓ or ✗, the right
 answer, the explanation and a link to the section — no model is asked. A card

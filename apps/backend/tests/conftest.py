@@ -32,7 +32,9 @@ TG_CHAT_ID = 4242
 def replying(text: str = "entropy is what you owe me") -> Iterator[None]:
     # No tools: what a run does with the tool catalogue is the subject of the
     # tool tests, and TestModel would otherwise call all of them.
-    with tutor.override(model=TestModel(custom_output_text=text), tools=[]):
+    with tutor.override(
+        model=TestModel(custom_output_text=text), tools=[], toolsets=[]
+    ):
         yield
 
 
@@ -60,6 +62,15 @@ class Sent:
     keyboard: api.Keyboard | None = None
 
 
+@dataclass(frozen=True)
+class Photo:
+    tg_chat_id: int
+    # A URL Telegram fetches, or the bytes uploaded.
+    photo: str | bytes
+    caption: str | None
+    keyboard: api.Keyboard | None = None
+
+
 @dataclass
 class Bot:
     """Telegram, recorded instead of called.
@@ -70,9 +81,11 @@ class Bot:
     """
 
     sent: list[Sent] = field(default_factory=list)
+    photos: list[Photo] = field(default_factory=list)
     answered: list[str] = field(default_factory=list)
-    # (message_id, text) of every edit, in order.
+    # (message_id, text) of every edit, in order; a caption's in `captioned`.
     edited: list[tuple[int, str]] = field(default_factory=list)
+    captioned: list[tuple[int, str]] = field(default_factory=list)
     refuse: Exception | None = None
 
     async def send_message(
@@ -87,7 +100,22 @@ class Bot:
             failure, self.refuse = self.refuse, None
             raise failure
         self.sent.append(Sent(tg_chat_id, text, html, keyboard))
-        return len(self.sent)
+        return len(self.sent) + len(self.photos)
+
+    async def send_photo(
+        self,
+        tg_chat_id: int,
+        photo: str | bytes,
+        *,
+        caption: str | None = None,
+        html: bool = True,
+        keyboard: api.Keyboard | None = None,
+    ) -> int:
+        if self.refuse is not None:
+            failure, self.refuse = self.refuse, None
+            raise failure
+        self.photos.append(Photo(tg_chat_id, photo, caption, keyboard))
+        return len(self.sent) + len(self.photos)
 
     async def answer_callback(self, callback_id: str, text: str | None = None) -> None:
         self.answered.append(callback_id)
@@ -103,6 +131,17 @@ class Bot:
     ) -> None:
         self.edited.append((message_id, text))
 
+    async def edit_message_caption(
+        self,
+        tg_chat_id: int,
+        message_id: int,
+        caption: str,
+        *,
+        html: bool = True,
+        keyboard: api.Keyboard | None = None,
+    ) -> None:
+        self.captioned.append((message_id, caption))
+
     @property
     def texts(self) -> list[str]:
         return [item.text for item in self.sent]
@@ -115,6 +154,8 @@ def bot(monkeypatch: pytest.MonkeyPatch) -> Bot:
     monkeypatch.setattr(api, "send_message", stub.send_message)
     monkeypatch.setattr(api, "answer_callback", stub.answer_callback)
     monkeypatch.setattr(api, "edit_message_text", stub.edit_message_text)
+    monkeypatch.setattr(api, "send_photo", stub.send_photo)
+    monkeypatch.setattr(api, "edit_message_caption", stub.edit_message_caption)
     return stub
 
 

@@ -25,7 +25,11 @@ The tutor harness lives in `apps/backend/app/harness/`; everything about
 messages the platform starts by itself — the poller process, quiet hours, the
 open card, the silence backoff — lives in `apps/backend/app/scheduling/`, the Telegram channel
 it delivers over — webhook, pairing, sending, voice notes transcribed to text
-(`speech.py`, `TRANSCRIPTION_MODEL`; the audio is never stored) — in
+(`speech.py`, `TRANSCRIPTION_MODEL`; the audio is never stored), and the
+images it sends: a lesson figure from the index's `metadata.figures` (an SVG
+through the site's `/course-assets-png/` route, which renders it with resvg
+and a vendored Source Sans 3) and a formula typeset by matplotlib's mathtext
+(`formula.py`), as tools only a run with an outbox is given and as cards — in
 `apps/backend/app/telegram/`,
 what the tutor remembers about a learner across every chat and medium in
 `apps/backend/app/memory/`, the spaced-repetition ladder those proactive

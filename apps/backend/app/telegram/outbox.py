@@ -35,10 +35,12 @@ def split(text: str) -> list[str]:
 class Outbox:
     """Where a run's messages to the learner go.
 
-    It counts what it sent because delivery is hybrid: the tutor sends with the
-    `send_message` tool when it wants to, and a run that ends without having
-    sent anything has its final answer delivered for it — a silent bot is worse
-    than a badly formatted one.
+    It counts the text messages it sent because delivery is hybrid: the tutor
+    sends with the `send_message` tool when it wants to, and a run that ends
+    without having sent any has its final answer delivered for it — a silent
+    bot is worse than a badly formatted one. A photo is not counted: a figure
+    or a formula is shown beside an answer, and the sentence it needs is still
+    to come.
     """
 
     session: AsyncSession
@@ -87,7 +89,7 @@ class Outbox:
         caption: str | None = None,
         keyboard: api.Keyboard | None = None,
     ) -> int:
-        message_id = await self._formatted(
+        return await self._formatted(
             partial(
                 api.send_photo,
                 self.link.tg_chat_id,
@@ -96,8 +98,6 @@ class Outbox:
                 keyboard=keyboard,
             )
         )
-        self.sent += 1
-        return message_id
 
     async def edit_text(
         self, message_id: int, html: str, *, keyboard: api.Keyboard | None = None
