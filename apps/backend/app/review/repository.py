@@ -145,7 +145,7 @@ async def grade(
     card: ReviewCard,
     outcome: Tapped | ladder.Outcome,
     *,
-    chosen: int | None = None,
+    chosen: int | list[int] | None = None,
 ) -> ReviewState | None:
     """Record what became of a card and move its ladder; the caller commits.
 

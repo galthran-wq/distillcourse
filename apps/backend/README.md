@@ -484,9 +484,18 @@ answered once is answered: a second tap changes nothing. A card nobody taps
 in a day is `ignored`, and the ladder does not move; the backoff is what
 answers silence.
 
+An **`order` card** (level 3, only for a lesson with a sequence its text
+forces) lists three to five steps numbered under the prompt, in an order code
+shuffled so it is never the answer; its buttons are the numbers
+(`o:<delivery_id>:<step>`, and `o:<delivery_id>:r` to reset). Each tap edits
+the message to show the order so far and drops that number; the order lives
+in `card_deliveries.chosen`, so a restart mid-card loses nothing, and the
+card stays unanswered until the last step is placed. That tap grades it, all
+or nothing, exactly as a single tap grades any other card.
+
 **Levels are per lesson** (`review_state.level`, `level_run`). Level 1 is the
 main point itself, level 2 tells two ideas apart, level 3 spots the error in
-a short argument. Three right answers in a row raise the level, a wrong one
+a short argument or puts the steps of one in order. Three right answers in a row raise the level, a wrong one
 lowers it. A right tap climbs the ladder only up to its level's cap
 (`ladder.STEP_CAP`: rung 1 at level 1, rung 2 at level 2) and at the cap
 re-arms the interval it is on, so only level 3 can finish a ladder. A wrong

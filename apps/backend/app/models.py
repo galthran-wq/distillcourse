@@ -380,7 +380,9 @@ class ReviewCard(Base):
     level: Mapped[int] = mapped_column(SmallInteger)
     prompt: Mapped[str] = mapped_column(Text)
     options: Mapped[list[str]] = mapped_column(JSONB)
-    answer: Mapped[int] = mapped_column(JSONB)
+    # The index of the right option; for an `order` card, the indices of its
+    # steps in their right order.
+    answer: Mapped[int | list[int]] = mapped_column(JSONB)
     explanation: Mapped[str] = mapped_column(Text)
     figure: Mapped[str | None] = mapped_column(Text, default=None)
     formula: Mapped[str | None] = mapped_column(Text, default=None)
@@ -427,7 +429,8 @@ class CardDelivery(Base):
     answered_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), default=None
     )
-    chosen: Mapped[int | None] = mapped_column(JSONB, default=None)
+    # The option tapped; for an `order` card, the steps tapped so far, in order.
+    chosen: Mapped[int | list[int] | None] = mapped_column(JSONB, default=None)
     outcome: Mapped[str | None] = mapped_column(String(16), default=None)
 
 

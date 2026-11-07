@@ -14,7 +14,8 @@ Each card:
   `<i>`, `<code>`; a literal `<`, `>` or `&` is `&lt;`, `&gt;`, `&amp;`. No
   LaTeX: a formula is written in plain unicode (`H(X) = −Σ p log p`);
 - has two to four `options` of at most 40 characters of plain text, exactly
-  one of them right, and `answer`, the index of the right one counted from 0;
+  one of them right, and `answer`, the index of the right one counted from 0
+  — except an `order` card, below;
 - has an `explanation` of one or two sentences of plain text that says why
   the right answer is right — the mechanism, not a restatement of the option.
 
@@ -29,6 +30,14 @@ The kinds:
   lines (`1.`, `2.`, …), exactly one of them wrong; the options are the line
   numbers as `"1"`, `"2"`, …, and the explanation says what the wrong line
   should have said.
+- `order` — the steps of a sequence the lesson sets out, to be put in order:
+  a derivation, an argument, an algorithm. The prompt says what the sequence
+  is and lists no steps; the `options` are three to five steps of plain text,
+  at most 200 characters each, and `answer` is their indices in the right
+  order, counted from 0. Only a sequence whose order the text forces — each
+  step needs the one before it — and never one where two steps could swap.
+  A lesson with no such sequence gets no `order` card; write `spot_error`
+  instead. The explanation says what makes the order the only one.
 
 Wrong options are the confusions a reader of this lesson actually has — the
 neighbouring concept, the reversed direction, the dropped condition. The cards

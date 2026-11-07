@@ -71,8 +71,8 @@ class Bot:
 
     sent: list[Sent] = field(default_factory=list)
     answered: list[str] = field(default_factory=list)
-    # (message_id, text) of every edit, in order.
-    edited: list[tuple[int, str]] = field(default_factory=list)
+    # (message_id, text, keyboard) of every edit, in order.
+    edited: list[tuple[int, str, api.Keyboard | None]] = field(default_factory=list)
     refuse: Exception | None = None
 
     async def send_message(
@@ -101,7 +101,7 @@ class Bot:
         html: bool = True,
         keyboard: api.Keyboard | None = None,
     ) -> None:
-        self.edited.append((message_id, text))
+        self.edited.append((message_id, text, keyboard))
 
     @property
     def texts(self) -> list[str]:

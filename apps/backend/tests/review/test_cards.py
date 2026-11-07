@@ -247,7 +247,7 @@ async def test_a_tap_grades_with_no_model_and_a_second_tap_changes_nothing(
     assert sent.answered_at is not None
     assert (state.step, state.level, state.level_run) == (1, 1, 1)
     assert state.last_outcome == "correct"
-    [(message_id, feedback)] = bot.edited
+    [(message_id, feedback, _)] = bot.edited
     assert message_id == sent.tg_message_id
     assert "✓ average. Each outcome's surprisal" in feedback
     link = (

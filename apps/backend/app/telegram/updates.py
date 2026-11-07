@@ -199,6 +199,7 @@ _COMMANDS: dict[str, Callable[[HarnessRepository, Chat], Awaitable[str]]] = {
 # called with the learner's outbox and the tap; the button is already answered.
 TAP_HANDLERS: dict[str, Callable[[Outbox, Tap], Awaitable[None]]] = {
     cards.TAP: cards.answer,
+    cards.ORDER: cards.arrange,
 }
 
 

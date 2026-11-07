@@ -29,6 +29,10 @@ if TYPE_CHECKING:
 
 # The `callback_data` prefix of an answer button: `k:<delivery_id>:<option>`.
 TAP = "k"
+# An `order` card's: `o:<delivery_id>:<step>`, and `o:<delivery_id>:r` to start
+# the order over.
+ORDER = "o"
+RESET = "r"
 # A card this learner saw more recently than this is not put to them again.
 UNSEEN_FOR = timedelta(days=14)
 RIGHT = "✓"
@@ -71,6 +75,9 @@ async def write(
             await writer.draft(session, user_id, material, found, level, focus)
         )[: writer.BATCH]
         if card.kind in writer.KINDS[level] and card.section in by_anchor
+    ]
+    drafts = [
+        writer.shuffled(card) if card.kind == "order" else card for card in drafts
     ]
     kept = (
         await writer.check(session, user_id, material, found, drafts) if drafts else []
@@ -133,7 +140,21 @@ async def pick(
     return written[0] if written else None
 
 
+def _numbers(
+    delivery_id: uuid.UUID, card: ReviewCard, chosen: list[int]
+) -> api.Keyboard:
+    steps = [
+        {"text": str(step + 1), "callback_data": f"{ORDER}:{delivery_id}:{step}"}
+        for step in range(len(card.options))
+        if step not in chosen
+    ]
+    reset = [{"text": "Reset", "callback_data": f"{ORDER}:{delivery_id}:{RESET}"}]
+    return [steps, reset] if chosen else [steps]
+
+
 def _buttons(delivery_id: uuid.UUID, card: ReviewCard) -> api.Keyboard:
+    if card.kind == "order":
+        return _numbers(delivery_id, card, [])
     buttons = [
         {"text": option, "callback_data": f"{TAP}:{delivery_id}:{index}"}
         for index, option in enumerate(card.options)
@@ -144,8 +165,23 @@ def _buttons(delivery_id: uuid.UUID, card: ReviewCard) -> api.Keyboard:
     return [[button] for button in buttons]
 
 
-def _question(title: str, card: ReviewCard) -> str:
-    return f"<b>{escape(title, quote=False)}</b>\n\n{card.prompt}"
+def _sequence(steps: list[int]) -> str:
+    return " → ".join(str(step + 1) for step in steps)
+
+
+def _question(title: str, card: ReviewCard, chosen: list[int] | None = None) -> str:
+    """The card as the learner reads it. An `order` card's steps are numbered
+    under the prompt, since its buttons hold only the numbers, followed by the
+    order tapped so far."""
+    text = f"<b>{escape(title, quote=False)}</b>\n\n{card.prompt}"
+    if card.kind != "order":
+        return text
+    steps = "\n".join(
+        f"{number}. {escape(step, quote=False)}"
+        for number, step in enumerate(card.options, start=1)
+    )
+    text = f"{text}\n\n{steps}"
+    return f"{text}\n\nYour order: {_sequence(chosen)}" if chosen else text
 
 
 async def deliver(
@@ -176,17 +212,20 @@ def _locator(card: ReviewCard) -> str:
     return card.lesson if card.anchor is None else f"{card.lesson}#{card.anchor}"
 
 
-def _feedback(
-    title: str, section: str, card: ReviewCard, outcome: repository.Tapped
-) -> str:
+def _right(card: ReviewCard) -> str:
+    if isinstance(card.answer, list):
+        return _sequence(card.answer)
     right = card.options[card.answer]
-    answer = (
-        f"line {right}" if card.kind == "spot_error" else escape(right, quote=False)
-    )
+    return f"line {right}" if card.kind == "spot_error" else escape(right, quote=False)
+
+
+def _feedback(title: str, section: str, sent: CardDelivery, card: ReviewCard) -> str:
     link = lesson_url(_locator(card))
-    mark = RIGHT if outcome == "correct" else WRONG
+    mark = RIGHT if sent.outcome == "correct" else WRONG
+    chosen = sent.chosen if isinstance(sent.chosen, list) else None
     return (
-        f"{_question(title, card)}\n\n{mark} {answer}. {escape(card.explanation, quote=False)} "
+        f"{_question(title, card, chosen)}\n\n{mark} {_right(card)}. "
+        f"{escape(card.explanation, quote=False)} "
         f'<a href="{escape(link)}">{escape(section, quote=False)}</a>'
     )
 
@@ -198,6 +237,14 @@ def _chosen(data: str) -> tuple[uuid.UUID, int] | None:
         return uuid.UUID(delivery_id), int(option)
     except ValueError:
         return None
+
+
+async def _show_feedback(outbox: Outbox, sent: CardDelivery, card: ReviewCard) -> None:
+    session = outbox.session
+    title = (await subject.materials(session, [card.lesson]))[card.lesson].title
+    chunk = section_of(await sections(session, card.lesson), _locator(card))
+    section = title if chunk is None else chunk.title
+    await outbox.edit_text(sent.tg_message_id, _feedback(title, section, sent, card))
 
 
 async def answer(outbox: Outbox, tap: Tap) -> None:
@@ -213,15 +260,66 @@ async def answer(outbox: Outbox, tap: Tap) -> None:
     if found is None:
         return
     sent, card = found
-    if sent.answered_at is not None or not 0 <= option < len(card.options):
+    if (
+        sent.answered_at is not None
+        or card.kind == "order"
+        or not 0 <= option < len(card.options)
+    ):
         return
     outcome: repository.Tapped = "correct" if option == card.answer else "wrong"
     await repository.grade(session, sent, card, outcome, chosen=option)
     await session.commit()
+    await _show_feedback(outbox, sent, card)
+
+
+async def arrange(outbox: Outbox, tap: Tap) -> None:
+    """One number tapped on an `order` card, or Reset.
+
+    The order so far is kept on the delivery, not in this process: the bot may
+    restart between two taps. The card is graded on the tap that places the
+    last step, whole or not at all — partial credit would need a rule the
+    learner cannot see. Until then the card is as unanswered as one nobody
+    touched.
+    """
+    session = outbox.session
+    _, _, payload = tap.data.partition(":")
+    raw_id, _, step = payload.partition(":")
+    try:
+        delivery_id = uuid.UUID(raw_id)
+        placed = None if step == RESET else int(step)
+    except ValueError:
+        return
+    found = await repository.delivery(session, outbox.link.user_id, delivery_id)
+    if found is None:
+        return
+    sent, card = found
+    if sent.answered_at is not None or card.kind != "order":
+        return
+    so_far = sent.chosen if isinstance(sent.chosen, list) else []
+    if placed is None:
+        if not so_far:
+            return
+        chosen: list[int] = []
+    elif 0 <= placed < len(card.options) and placed not in so_far:
+        chosen = [*so_far, placed]
+    else:
+        return
+    if len(chosen) == len(card.options):
+        outcome: repository.Tapped = "correct" if chosen == card.answer else "wrong"
+        await repository.grade(session, sent, card, outcome, chosen=chosen)
+        await session.commit()
+        await _show_feedback(outbox, sent, card)
+        return
+    # Reassigned, never appended to: SQLAlchemy does not see a JSONB value
+    # changed in place.
+    sent.chosen = chosen or None
+    await session.commit()
     title = (await subject.materials(session, [card.lesson]))[card.lesson].title
-    chunk = section_of(await sections(session, card.lesson), _locator(card))
-    section = title if chunk is None else chunk.title
-    await outbox.edit_text(sent.tg_message_id, _feedback(title, section, card, outcome))
+    await outbox.edit_text(
+        sent.tg_message_id,
+        _question(title, card, chosen),
+        keyboard=_numbers(sent.id, card, chosen),
+    )
 
 
 async def expire(session: AsyncSession, now: datetime) -> None:
