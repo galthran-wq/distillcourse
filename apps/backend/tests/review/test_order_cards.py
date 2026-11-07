@@ -147,8 +147,12 @@ def test_steps_may_be_long_but_options_may_not() -> None:
     writer.Draft.model_validate(order_draft(options=[long, *STEPS[1:]]))
     with pytest.raises(ValidationError):
         writer.Draft.model_validate(draft(options=[long, "maximum"]))
+
+
+@pytest.mark.parametrize("kind", ["gap", "choice", "tell_apart"])
+def test_a_card_that_is_not_an_order_card_answers_with_one_index(kind: str) -> None:
     with pytest.raises(ValidationError):
-        writer.Draft.model_validate(draft(answer=[0]))
+        writer.Draft.model_validate(draft(kind=kind, answer=[0]))
 
 
 async def test_a_written_order_card_is_stored_shuffled(
@@ -304,3 +308,23 @@ async def test_a_half_answered_card_is_still_an_unanswered_one(
     await cards.expire(session, datetime.now(UTC) + policy.IGNORED_AFTER)
     await session.refresh(sent)
     assert (sent.outcome, sent.chosen, sent.answered_at) == ("ignored", [1, 3], None)
+
+
+async def test_a_lapsed_half_answered_card_cannot_be_finished(
+    client: AsyncClient, session: AsyncSession, user: User, bot: Bot
+) -> None:
+    """Closed as silence is closed: the last step placed a day late must not
+    grade it and move the ladder."""
+    _, sent = await delivered(session, user)
+    taps = Taps(client, sent)
+    with no_model():
+        await taps.press(1, 3)
+    await cards.expire(session, datetime.now(UTC) + policy.IGNORED_AFTER)
+    edits = len(bot.edited)
+
+    with no_model():
+        await taps.press(0, 2)
+
+    await session.refresh(sent)
+    assert (sent.outcome, sent.chosen, sent.answered_at) == ("ignored", [1, 3], None)
+    assert len(bot.edited) == edits

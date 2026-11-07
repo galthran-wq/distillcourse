@@ -70,10 +70,7 @@ class Draft(BaseModel):
     # The anchor of the section the card tests, as the request lists it.
     section: str
     prompt: Annotated[str, Field(min_length=1, max_length=PROMPT_CHARS)]
-    # An `order` card's are its steps; every other card's are its buttons.
     options: list[Annotated[str, Field(min_length=1, max_length=STEP_CHARS)]]
-    # An `order` card's is the steps' indices in their right order; every
-    # other card's is the index of the right option.
     answer: int | list[int]
     explanation: Annotated[str, Field(min_length=1, max_length=EXPLANATION_CHARS)]
 

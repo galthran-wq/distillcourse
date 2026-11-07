@@ -111,10 +111,11 @@ def concepts(material: Material) -> Iterator[str]:
 
 
 def _shown(card: ReviewCard, chosen: int | list[int]) -> str:
-    """An option, or an `order` card's steps in a given order."""
-    if isinstance(chosen, int):
-        return repr(card.options[chosen])
-    return " then ".join(repr(card.options[step]) for step in chosen)
+    if card.kind == "order":
+        assert isinstance(chosen, list)
+        return " then ".join(repr(card.options[step]) for step in chosen)
+    assert isinstance(chosen, int)
+    return repr(card.options[chosen])
 
 
 def _status(delivery: CardDelivery, card: ReviewCard) -> str:
