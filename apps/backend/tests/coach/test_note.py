@@ -10,7 +10,9 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.content.locators import lesson_url
+from app.core.config import settings
 from app.models import CardDelivery, CoachNote, LessonProgress, ReviewCard, TgLink, User
+from app.review import controls
 from app.review import repository as review
 from app.scheduling import gates, policy
 from app.scheduling import repository as scheduling
@@ -214,7 +216,7 @@ async def test_send_it_puts_one_card_on_the_slipping_lesson(
     fresh = await standing(session, user)
     await note(session, user, link)
     stored = await session.scalar(select(CoachNote))
-    assert stored is not None
+    assert stored is not None and stored.tg_message_id is not None
 
     with no_model():
         for update_id in (401, 402):
@@ -234,4 +236,42 @@ async def test_send_it_puts_one_card_on_the_slipping_lesson(
     ).all()
     assert len(out) == 1 and not out[0].initiated
     assert len(bot.sent) == 2
+    assert (stored.tg_message_id, None) in bot.rekeyed
+
+
+async def test_a_press_that_sends_no_card_gives_send_it_back(
+    client: AsyncClient,
+    session: AsyncSession,
+    user: User,
+    link: TgLink,
+    bot: Bot,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fresh = await standing(session, user)
+    await note(session, user, link)
+    stored = await session.scalar(select(CoachNote))
+    assert stored is not None and stored.tg_message_id is not None
+
+    monkeypatch.setattr(settings, "CARDS_PER_DAY", 0)
+    with no_model():
+        await deliver(
+            client,
+            tap(f"s:{stored.id}", update_id=411, message_id=stored.tg_message_id),
+        )
+
+    assert bot.texts[-1] == controls.TODAYS
+    await session.refresh(stored)
+    assert stored.pressed_at is None
+    assert (stored.tg_message_id, None) not in bot.rekeyed
+
+    monkeypatch.setattr(settings, "CARDS_PER_DAY", 5)
+    with no_model():
+        await deliver(
+            client,
+            tap(f"s:{stored.id}", update_id=412, message_id=stored.tg_message_id),
+        )
+
+    assert await session.scalar(
+        select(CardDelivery).where(CardDelivery.card_id == fresh.id)
+    )
     assert (stored.tg_message_id, None) in bot.rekeyed

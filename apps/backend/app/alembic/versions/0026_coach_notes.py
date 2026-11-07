@@ -22,7 +22,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("user_id", sa.Uuid(), nullable=False),
         sa.Column("sent_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("tg_message_id", sa.BigInteger(), nullable=False),
+        sa.Column("tg_message_id", sa.BigInteger(), nullable=True),
         sa.Column("lesson", sa.String(length=168), nullable=True),
         sa.Column("pressed_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),

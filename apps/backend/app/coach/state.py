@@ -106,13 +106,7 @@ async def _answer_hours(
     session: AsyncSession, user: User, now: datetime, hours: policy.Hours
 ) -> ContextBlock:
     since = now - HOURS_OVER
-    taps = await session.scalars(
-        select(CardDelivery.answered_at).where(
-            CardDelivery.user_id == user.id,
-            CardDelivery.outcome.in_(review.ANSWERED),
-            CardDelivery.answered_at >= since,
-        )
-    )
+    taps = await review.answer_times(session, user.id, since)
     messages = await session.scalars(
         select(Message.created_at)
         .join(Chat, Chat.id == Message.chat_id)

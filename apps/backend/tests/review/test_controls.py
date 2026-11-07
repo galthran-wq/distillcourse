@@ -615,11 +615,11 @@ async def test_a_new_card_folds_an_open_one_and_leaves_an_answered_one(
     card = await stored_card(session)
     answered = await tapped(client, session, user)
     outbox = Outbox(session=session, link=link)
-    open_one = await cards.deliver(session, outbox, user.id, card)
+    open_one = await cards.deliver(session, outbox, user.id, card, datetime.now(UTC))
     assert open_one is not None
     edits = len(bot.edited)
 
-    await cards.deliver(session, outbox, user.id, card)
+    await cards.deliver(session, outbox, user.id, card, datetime.now(UTC))
 
     folded = bot.edited[edits:]
     assert [message_id for message_id, _ in folded] == [open_one.tg_message_id]
@@ -631,5 +631,5 @@ async def test_a_new_card_folds_an_open_one_and_leaves_an_answered_one(
 
     # Folded once: the next card leaves it alone.
     edits = len(bot.edited)
-    await cards.deliver(session, outbox, user.id, card)
+    await cards.deliver(session, outbox, user.id, card, datetime.now(UTC))
     assert open_one.tg_message_id not in [m for m, _ in bot.edited[edits:]]

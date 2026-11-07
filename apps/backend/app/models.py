@@ -472,7 +472,9 @@ class CoachNote(Base):
     slipping, and one thing to do next. It spends the day's initiation.
 
     `lesson` is what its Send it button puts a card on, NULL for a note with
-    no button; `pressed_at` spends the button.
+    no button; `pressed_at` spends the button. `tg_message_id` is NULL until
+    Telegram has the message: the row is written first, so a note that went
+    out is never missing from the day's count.
     """
 
     __tablename__ = "coach_notes"
@@ -483,7 +485,7 @@ class CoachNote(Base):
         ForeignKey("users.id", ondelete="CASCADE")
     )
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    tg_message_id: Mapped[int] = mapped_column(BigInteger)
+    tg_message_id: Mapped[int | None] = mapped_column(BigInteger, default=None)
     lesson: Mapped[str | None] = mapped_column(String(LESSON_LENGTH), default=None)
     pressed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), default=None

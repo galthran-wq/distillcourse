@@ -510,14 +510,16 @@ days, at its level, with a card the learner has not seen in two weeks. The
 gates hold for it too. The bot does not get to give up on a learner.
 
 **The weekly note** (`note.py`, `coach_notes`): one line per course with
-`holding/total` — ladders at step 2 or above whose last outcome is not
-`failed` — then `Slipping:` with up to three lessons whose last outcome is
-`failed` or whose last tap was wrong, then `Next:` and the model's
-`next_step` (at most 200 characters, the only text it writes). Under it, a
-*Send it* button (`s:<note_id>`, spent once) that puts a card on the lesson
-slipping most lately — a card the learner asked for, bounded by
-`CARDS_PER_DAY` — or, with nothing slipping, a link to the lesson read last
-and left unfinished. It is a tool, not a timer: the state block says whether
+`holding/total` — ladders at step 2 or above that are not slipping — then
+`Slipping:` with up to three lessons whose last outcome is `failed` or whose
+last tap was wrong, then `Next:` and the model's `next_step` (at most 200
+characters, the only text it writes). The row is written before the message
+goes out and taken back if Telegram refuses it. Under it, a *Send it* button
+(`s:<note_id>`, a review control in `review/controls.py` beside Next) that
+puts a card on the lesson slipping most lately — a card the learner asked
+for, bounded by `CARDS_PER_DAY`; a press that sends none gives the button
+back — or, with nothing slipping, a link to the lesson read last and left
+unfinished. It is a tool, not a timer: the state block says whether
 one is available and what code would write in it, and the run decides. It is
 refused within 7 days of the last, without a tap answered in the last 14, and
 by the gates; once sent it counts in `initiations_today`.

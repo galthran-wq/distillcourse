@@ -1,5 +1,6 @@
 """The buttons under a card besides its options: putting it aside, flagging it,
-and what a learner can ask for once they have answered it.
+and what a learner can ask for once they have answered it — and the one under
+the coach's weekly note, which asks for a card the same way.
 
 Every button is spent once. Under an open card, answering or putting it aside
 spends them all (the delivery's outcome); under the feedback, each is spent by
@@ -9,16 +10,17 @@ does nothing.
 
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager, suppress
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import update
+from sqlalchemy import Update, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.harness.repository import HarnessRepository
-from app.models import CardDelivery, ReviewCard, User
+from app.models import CardDelivery, CoachNote, ReviewCard, User
 from app.review import cards, ladder, repository, subject
 from app.scheduling import policy
 from app.scheduling import repository as scheduling
@@ -68,34 +70,59 @@ async def _tapped(outbox: Outbox, tap: Tap) -> tuple[CardDelivery, ReviewCard] |
     return found
 
 
+@dataclass
+class _Press:
+    # Set when the press did nothing: the button is given back and stays.
+    given_back: bool = False
+
+
 @asynccontextmanager
 async def _pressing(
+    outbox: Outbox,
+    restore: Update,
+    message_id: int,
+    keyboard: Callable[[], api.Keyboard | None],
+) -> AsyncIterator[_Press]:
+    """Act on a button the caller has just marked spent. The mark is committed
+    first, so a second press finds it spent; `restore` gives the button back
+    if the action fails — the learner is told to press it again — or did
+    nothing. Once done, the message's keyboard becomes `keyboard()`."""
+    session = outbox.session
+    await session.commit()
+    press = _Press()
+    try:
+        yield press
+    except Exception:
+        await session.rollback()
+        await session.execute(restore)
+        await session.commit()
+        raise
+    if press.given_back:
+        await session.execute(restore)
+        await session.commit()
+        return
+    with suppress(api.TelegramError):
+        await outbox.edit_keyboard(message_id, keyboard())
+
+
+def _following_up(
     outbox: Outbox,
     sent: CardDelivery,
     card: ReviewCard,
     prefix: str,
     value: str = PRESSED,
-) -> AsyncIterator[None]:
-    """Spend a feedback button before acting on it, so a second press finds it
-    spent, and give it back if the action fails: the learner is told to press
-    it again. Once done, the button leaves the keyboard."""
-    session = outbox.session
-    delivery_id = sent.id
+) -> AbstractAsyncContextManager[_Press]:
+    """A button under the feedback, spent in its delivery's `follow_ups`; it
+    leaves the keyboard once done."""
     sent.follow_ups = {**sent.follow_ups, prefix: value}
-    await session.commit()
-    try:
-        yield
-    except Exception:
-        await session.rollback()
-        await session.execute(
-            update(CardDelivery)
-            .where(CardDelivery.id == delivery_id)
-            .values(follow_ups=CardDelivery.follow_ups.op("-")(prefix))
-        )
-        await session.commit()
-        raise
-    with suppress(api.TelegramError):
-        await outbox.edit_keyboard(sent.tg_message_id, cards.follow_ups(sent, card))
+    restore = (
+        update(CardDelivery)
+        .where(CardDelivery.id == sent.id)
+        .values(follow_ups=CardDelivery.follow_ups.op("-")(prefix))
+    )
+    return _pressing(
+        outbox, restore, sent.tg_message_id, lambda: cards.follow_ups(sent, card)
+    )
 
 
 async def _due_card(
@@ -139,7 +166,7 @@ async def _swap(outbox: Outbox, sent: CardDelivery, card: ReviewCard) -> None:
         )
         await session.commit()
         return
-    await cards.replace(session, outbox, user_id, replacement, sent, card)
+    await cards.replace(session, outbox, user_id, replacement, sent, card, now)
 
 
 async def another(outbox: Outbox, tap: Tap) -> None:
@@ -194,9 +221,9 @@ async def wrong_card(outbox: Outbox, tap: Tap) -> None:
     )
 
 
-async def capped(session: AsyncSession, user_id: uuid.UUID, now: datetime) -> bool:
+async def _capped(session: AsyncSession, user_id: uuid.UUID, now: datetime) -> bool:
     """Whether the day's cards are spent, those the learner asked for
-    included: what bounds a button that sends one."""
+    included."""
     user = await session.get(User, user_id)
     assert user is not None
     since = policy.day_start(now, policy.Hours.of(user))
@@ -205,31 +232,79 @@ async def capped(session: AsyncSession, user_id: uuid.UUID, now: datetime) -> bo
     )
 
 
+async def _asked(
+    outbox: Outbox, now: datetime, send: Callable[[], Awaitable[bool]]
+) -> bool:
+    """A card the learner pressed for: it spends no initiation, so the day's
+    cap is what bounds it, and they are told when there is none to send.
+    Whether `send` put one out."""
+    if await _capped(outbox.session, outbox.link.user_id, now):
+        await outbox.send(TODAYS)
+        return False
+    async with thread.typing(outbox.link.tg_chat_id):
+        sent = await send()
+    if not sent:
+        await outbox.send(NOTHING_ELSE)
+    return sent
+
+
 async def next_card(outbox: Outbox, tap: Tap) -> None:
-    """The next due card, now. The learner asked, so it spends no initiation;
-    the day's cap is what bounds it."""
+    """The next due card, now."""
     found = await _tapped(outbox, tap)
     if found is None:
         return
     sent, card = found
     session, user_id = outbox.session, outbox.link.user_id
     now = datetime.now(UTC)
-    async with _pressing(outbox, sent, card, cards.NEXT):
-        if await capped(session, user_id, now):
-            await outbox.send(TODAYS)
-            return
-        async with thread.typing(outbox.link.tg_chat_id):
-            following = await _due_card(
-                session,
-                user_id,
-                now,
-                cards.pick,
-                easy=await repository.level_one_only(session, user_id, now),
-            )
-        if following is None:
-            await outbox.send(NOTHING_ELSE)
-            return
-        await cards.deliver(session, outbox, user_id, following)
+
+    async def following() -> bool:
+        easy = await repository.level_one_only(session, user_id, now)
+        due = await _due_card(session, user_id, now, cards.pick, easy=easy)
+        return (
+            due is not None
+            and await cards.deliver(session, outbox, user_id, due, now) is not None
+        )
+
+    async with _following_up(outbox, sent, card, cards.NEXT):
+        await _asked(outbox, now, following)
+
+
+async def send_it(outbox: Outbox, tap: Tap) -> None:
+    """A card on the lesson the coach's weekly note found slipping, now. A
+    press that sends none — the day's cards spent, none on the lesson — gives
+    the button back: it is the note's one action."""
+    try:
+        note_id = uuid.UUID(tap.data.partition(":")[2])
+    except ValueError:
+        return
+    session, user_id = outbox.session, outbox.link.user_id
+    note = await session.scalar(
+        select(CoachNote)
+        .where(CoachNote.id == note_id, CoachNote.user_id == user_id)
+        .with_for_update()
+    )
+    if (
+        note is None
+        or note.lesson is None
+        or note.tg_message_id is None
+        or note.pressed_at is not None
+    ):
+        return
+    lesson = note.lesson
+    now = datetime.now(UTC)
+
+    async def on_lesson() -> bool:
+        state = await repository.state_of(session, user_id, lesson)
+        return (
+            state is not None
+            and await cards.offer(session, outbox, state, None, now, asked=True)
+            is not None
+        )
+
+    note.pressed_at = now
+    restore = update(CoachNote).where(CoachNote.id == note_id).values(pressed_at=None)
+    async with _pressing(outbox, restore, note.tg_message_id, lambda: None) as press:
+        press.given_back = not await _asked(outbox, now, on_lesson)
 
 
 async def harder(outbox: Outbox, tap: Tap) -> None:
@@ -240,13 +315,15 @@ async def harder(outbox: Outbox, tap: Tap) -> None:
         return
     sent, card = found
     session, user_id = outbox.session, outbox.link.user_id
-    async with _pressing(outbox, sent, card, cards.HARDER):
+    async with _following_up(outbox, sent, card, cards.HARDER):
         async with thread.typing(outbox.link.tg_chat_id):
             up = await cards.pick(session, user_id, card.lesson, card.level + 1)
         if up is None:
             await outbox.send(NOTHING_ELSE)
             return
-        await cards.deliver(session, outbox, user_id, up, harder=True)
+        await cards.deliver(
+            session, outbox, user_id, up, datetime.now(UTC), harder=True
+        )
 
 
 async def _converse(
@@ -271,7 +348,7 @@ async def explain(outbox: Outbox, tap: Tap) -> None:
     if found is None:
         return
     sent, card = found
-    async with _pressing(outbox, sent, card, cards.EXPLAIN):
+    async with _following_up(outbox, sent, card, cards.EXPLAIN):
         await _converse(outbox, sent, card, EXPLAIN_PROMPT)
 
 
@@ -282,5 +359,7 @@ async def own_words(outbox: Outbox, tap: Tap) -> None:
     if found is None:
         return
     sent, card = found
-    async with _pressing(outbox, sent, card, cards.OWN_WORDS, value=repository.ASKED):
+    async with _following_up(
+        outbox, sent, card, cards.OWN_WORDS, value=repository.ASKED
+    ):
         await _converse(outbox, sent, card, OWN_WORDS_PROMPT)

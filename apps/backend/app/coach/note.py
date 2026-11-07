@@ -9,13 +9,11 @@ they get a card instead.
 """
 
 import uuid
-from contextlib import suppress
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from html import escape
-from typing import TYPE_CHECKING
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.content.locators import course_of, lesson_url
@@ -23,13 +21,10 @@ from app.content.structure import structure
 from app.harness.prompts import ContextBlock
 from app.harness.repository import HarnessRepository
 from app.models import CardDelivery, CoachNote, LessonProgress, ReviewCard, ReviewState
-from app.review import cards, controls, subject
+from app.review import cards, subject
 from app.review import repository as review
 from app.telegram import api, thread
 from app.telegram.outbox import Outbox
-
-if TYPE_CHECKING:
-    from app.telegram.updates import Tap
 
 EVERY = timedelta(days=7)
 ANSWERED_WITHIN = timedelta(days=14)
@@ -37,8 +32,6 @@ ANSWERED_WITHIN = timedelta(days=14)
 # twice: the lesson is holding rather than merely started.
 HOLDING_STEP = 2
 SLIPPING_SHOWN = 3
-# The `callback_data` prefix of the Send it button: `s:<note_id>`.
-SEND_IT = "s"
 
 
 @dataclass(frozen=True)
@@ -59,14 +52,13 @@ async def unavailable(
     )
     if last is not None and now - last < EVERY:
         return f"a weekly note went out {(now - last).days} days ago, one a week"
-    answered = await review.answer_times(session, user_id)
-    if not answered or now - max(answered) > ANSWERED_WITHIN:
+    answered = await review.last_answer(session, user_id)
+    if answered is None or now - answered > ANSWERED_WITHIN:
         return "no card answered in two weeks; a quiet learner gets a card"
     return None
 
 
 async def _last_answers(session: AsyncSession, user_id: uuid.UUID) -> dict[str, str]:
-    """Each lesson's last tapped answer, right or wrong."""
     rows = await session.execute(
         select(ReviewCard.lesson, CardDelivery.outcome)
         .join(ReviewCard, ReviewCard.id == CardDelivery.card_id)
@@ -115,7 +107,7 @@ async def report(session: AsyncSession, user_id: uuid.UUID) -> Report:
     for slug, ladders in sorted(courses.items()):
         spine = await structure(session, slug)
         holding = sum(
-            state.step >= HOLDING_STEP and state.last_outcome != "failed"
+            state.step >= HOLDING_STEP and state.lesson not in slipping
             for state in ladders
         )
         name = spine[0].title if spine else slug
@@ -176,71 +168,26 @@ async def send(
     next_step: str,
 ) -> None:
     """Holding the thread, as a card does, so it does not land in the middle
-    of a run."""
+    of a run. Recorded before it goes out, so no note is sent that the next
+    run's limits cannot see; taken back if Telegram refuses it."""
     found = await report(session, user_id)
-    note_id = uuid.uuid7()
+    note = CoachNote(user_id=user_id, sent_at=now, lesson=found.card)
+    session.add(note)
+    await session.commit()
     keyboard: api.Keyboard | None = None
     if found.card is not None:
-        keyboard = [[{"text": "Send it", "callback_data": f"{SEND_IT}:{note_id}"}]]
+        keyboard = [
+            [{"text": "Send it", "callback_data": f"{cards.SEND_IT}:{note.id}"}]
+        ]
     repo = HarnessRepository(session, user_id)
-    async with thread.holding(repo, await thread.of(session, user_id)):
-        message_id = await outbox.send(_text(found, next_step), keyboard=keyboard)
-    assert message_id is not None
-    session.add(
-        CoachNote(
-            id=note_id,
-            user_id=user_id,
-            sent_at=now,
-            tg_message_id=message_id,
-            lesson=found.card,
-        )
-    )
-    await session.commit()
-
-
-async def send_it(outbox: Outbox, tap: Tap) -> None:
-    """A card on the note's lesson, now. The learner asked, so it spends no
-    initiation; the day's cap on cards is what bounds it. Spent before it
-    acts, so a second press finds it spent, and given back if the card fails
-    to go out."""
     try:
-        note_id = uuid.UUID(tap.data.partition(":")[2])
-    except ValueError:
-        return
-    session, user_id = outbox.session, outbox.link.user_id
-    note = await session.scalar(
-        select(CoachNote)
-        .where(CoachNote.id == note_id, CoachNote.user_id == user_id)
-        .with_for_update()
-    )
-    if note is None or note.lesson is None or note.pressed_at is not None:
-        return
-    lesson, message_id = note.lesson, note.tg_message_id
-    now = datetime.now(UTC)
-    note.pressed_at = now
-    await session.commit()
-    try:
-        await _card_on(outbox, lesson, now)
+        async with thread.holding(repo, await thread.of(session, user_id)):
+            message_id = await outbox.send(_text(found, next_step), keyboard=keyboard)
     except Exception:
         await session.rollback()
-        await session.execute(
-            update(CoachNote).where(CoachNote.id == note_id).values(pressed_at=None)
-        )
+        await session.execute(delete(CoachNote).where(CoachNote.id == note.id))
         await session.commit()
         raise
-    with suppress(api.TelegramError):
-        await outbox.edit_keyboard(message_id, None)
-
-
-async def _card_on(outbox: Outbox, lesson: str, now: datetime) -> None:
-    session, user_id = outbox.session, outbox.link.user_id
-    if await controls.capped(session, user_id, now):
-        await outbox.send(controls.TODAYS)
-        return
-    state = await review.state_of(session, user_id, lesson)
-    sent = None
-    if state is not None:
-        async with thread.typing(outbox.link.tg_chat_id):
-            sent = await cards.offer(session, outbox, state, None, now, asked=True)
-    if sent is None:
-        await outbox.send(controls.NOTHING_ELSE)
+    assert message_id is not None
+    note.tg_message_id = message_id
+    await session.commit()

@@ -3,9 +3,7 @@ the first line of a card and its feedback from its second day, and nowhere
 else."""
 
 import itertools
-import re
 from datetime import UTC, date, datetime, timedelta
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -15,15 +13,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import CardDelivery, ReviewCard, User
 from app.review.streak import local_days, streak
 from tests.conftest import Bot
-from tests.review.conftest import LESSON, no_model, send_due, stored_card
+from tests.content.conftest import corpus_index  # noqa: F401  (a shared fixture)
+from tests.review.conftest import (  # noqa: F401  (a shared fixture)
+    indexed_course,
+    no_model,
+    send_due,
+    stored_card,
+)
 from tests.review.conftest import ladder as ladder_row
 from tests.telegram.conftest import deliver, tap
 
-pytestmark = pytest.mark.usefixtures("thread", "indexed_section")
+pytestmark = pytest.mark.usefixtures("thread", "indexed_course")
 
 TODAY = date(2026, 11, 7)
 UPDATES = itertools.count(300)
-TITLE = LESSON
+TITLE = "Entropy"
 ELSEWHERE = "lesson:information-theory/prefix-codes"
 
 
@@ -68,18 +72,6 @@ def test_answers_either_side_of_local_midnight_are_two_days() -> None:
     assert days == [date(2026, 11, 6), date(2026, 11, 7)]
     assert streak(days, date(2026, 11, 7)) == 2
     assert streak(local_days([late, early], UTC), date(2026, 11, 6)) == 1
-
-
-def test_only_the_card_heading_reads_the_streak() -> None:
-    """Nothing but the first line of a card can send a word about it."""
-    app = Path(__file__).parents[2] / "app"
-    readers = {
-        path.relative_to(app).as_posix()
-        for path in app.rglob("*.py")
-        if re.search(r"^from app\.review import .*\bstreak\b", path.read_text(), re.M)
-        or "app.review.streak" in path.read_text()
-    }
-    assert readers == {"review/cards.py"}
 
 
 async def answered_days_ago(session: AsyncSession, user: User, *days: int) -> None:

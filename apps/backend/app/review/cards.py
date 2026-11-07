@@ -49,6 +49,8 @@ HARDER = "h"
 EXPLAIN = "e"
 # Kept in the data layer, which subject and tools read it from.
 OWN_WORDS = repository.OWN_WORDS
+# Under the coach's weekly note, `s:<note_id>`:
+SEND_IT = "s"
 # A card this learner saw more recently than this is not put to them again.
 UNSEEN_FOR = timedelta(days=14)
 RIGHT = "✓"
@@ -266,7 +268,9 @@ async def title_of(session: AsyncSession, card: ReviewCard) -> str:
     return (await subject.materials(session, [card.lesson]))[card.lesson].title
 
 
-async def heading(session: AsyncSession, user_id: uuid.UUID, card: ReviewCard) -> str:
+async def heading(
+    session: AsyncSession, user_id: uuid.UUID, title: str, now: datetime
+) -> str:
     """The first line of a card and of its feedback, the one place the streak
     is shown: read when the line is written, so the feedback on today's first
     answer already counts it."""
@@ -274,8 +278,8 @@ async def heading(session: AsyncSession, user_id: uuid.UUID, card: ReviewCard) -
     assert user is not None
     tz = zone(user.timezone)
     days = streak.local_days(await repository.answer_times(session, user_id), tz)
-    count = streak.streak(days, datetime.now(tz).date())
-    return streak.line(count, await title_of(session, card))
+    count = streak.streak(days, now.astimezone(tz).date())
+    return streak.line(count, title)
 
 
 def skipped(title: str) -> str:
@@ -405,6 +409,7 @@ async def deliver(
     outbox: Outbox,
     user_id: uuid.UUID,
     card: ReviewCard,
+    now: datetime,
     *,
     harder: bool = False,
     initiated: bool = False,
@@ -414,7 +419,8 @@ async def deliver(
     is what the feedback edits. None when Telegram would not take the card's
     image, which retires the card."""
     delivery_id = uuid.uuid7()
-    question = _question(await heading(session, user_id, card), card)
+    head = await heading(session, user_id, await title_of(session, card), now)
+    question = _question(head, card)
     repo = HarnessRepository(session, user_id)
     async with thread.holding(repo, await thread.of(session, user_id)):
         message_id = await _send(
@@ -464,7 +470,9 @@ async def offer(
         level = state.level
     if focus is not None:
         for card in await write(session, user_id, lesson, level, focus=focus):
-            sent = await deliver(session, outbox, user_id, card, initiated=not asked)
+            sent = await deliver(
+                session, outbox, user_id, card, now, initiated=not asked
+            )
             if sent is not None:
                 return sent
         return None
@@ -472,7 +480,7 @@ async def offer(
         picked = await pick(session, user_id, lesson, level)
         if picked is None:
             return None
-        sent = await deliver(session, outbox, user_id, picked, initiated=not asked)
+        sent = await deliver(session, outbox, user_id, picked, now, initiated=not asked)
         if sent is not None:
             return sent
     return None
@@ -485,6 +493,7 @@ async def replace(
     card: ReviewCard,
     sent: CardDelivery,
     old: ReviewCard,
+    now: datetime,
 ) -> CardDelivery | None:
     """Put a card in place of another in the message that carried it. Telegram
     turns no text into a photo nor a photo into text, so where either card has
@@ -493,11 +502,12 @@ async def replace(
         await edit(
             outbox, sent.tg_message_id, old, skipped(await title_of(session, old))
         )
-        return await deliver(session, outbox, user_id, card)
+        return await deliver(session, outbox, user_id, card, now)
     delivery_id = uuid.uuid7()
+    head = await heading(session, user_id, await title_of(session, card), now)
     await outbox.edit_text(
         sent.tg_message_id,
-        _question(await heading(session, user_id, card), card),
+        _question(head, card),
         keyboard=_buttons(delivery_id, card, []),
     )
     return await _record(session, delivery_id, user_id, card, sent.tg_message_id)
@@ -584,13 +594,15 @@ async def _grade(
     session = outbox.session
     await repository.grade(session, sent, card, outcome, chosen=chosen)
     await session.commit()
+    title = await title_of(session, card)
     chunk = section_of(await sections(session, card.lesson), locator(card))
-    section = await title_of(session, card) if chunk is None else chunk.title
+    section = title if chunk is None else chunk.title
+    head = await heading(session, sent.user_id, title, datetime.now(UTC))
     await edit(
         outbox,
         sent.tg_message_id,
         card,
-        _feedback(await heading(session, sent.user_id, card), section, sent, card),
+        _feedback(head, section, sent, card),
         keyboard=follow_ups(sent, card),
     )
 
@@ -652,11 +664,13 @@ async def arrange(outbox: Outbox, tap: Tap) -> None:
     # changed in place.
     sent.chosen = chosen or None
     await outbox.session.commit()
+    title = await title_of(outbox.session, card)
+    head = await heading(outbox.session, sent.user_id, title, datetime.now(UTC))
     await edit(
         outbox,
         sent.tg_message_id,
         card,
-        _question(await heading(outbox.session, sent.user_id, card), card, chosen),
+        _question(head, card, chosen),
         keyboard=_buttons(sent.id, card, chosen),
     )
 
