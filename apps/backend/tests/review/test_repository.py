@@ -8,11 +8,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import cli
-from app.models import ReviewState, Schedule, TgLink, User
+from app.models import CardDelivery, LessonProgress, ReviewState, TgLink, User
 from app.review import ladder
 from app.review import repository as review
-from app.scheduling import repository as scheduling
-from tests.review.conftest import LESSON, reviews
+from tests.review.conftest import LESSON, reviews, stored_card
 from tests.review.conftest import ladder as ladder_row
 from tests.scheduling.conftest import NOON
 from tests.telemetry.conftest import (
@@ -29,6 +28,15 @@ NOW = datetime.now(UTC)
 
 async def ladders(session: AsyncSession) -> int:
     return (await session.scalars(select(func.count()).select_from(ReviewState))).one()
+
+
+async def climbed_once(session: AsyncSession, user: User, lesson: str) -> ReviewState:
+    state = await review.state_of(session, user.id, lesson)
+    assert state is not None
+    to = ladder.advance(review.rung(state), "passed", NOW)
+    await review.move(session, state, to, outcome="passed", now=NOW)
+    await session.commit()
+    return state
 
 
 @pytest.mark.usefixtures("indexed_lesson")
@@ -55,8 +63,7 @@ async def test_rebuilding_progress_creates_no_second_ladder(
     it even if it did: a learner who has already been reviewed twice must not
     be put back on the first rung by an operator command."""
     await read(signed_in, session, heartbeats=HEARTBEATS_TO_COMPLETE, depth=90)
-    state = await review.apply(session, user.id, READ_LESSON, "passed", NOW)
-    assert state is not None
+    state = await climbed_once(session, user, READ_LESSON)
     climbed = (state.step, state.next_due_at)
 
     await cli.rebuild_progress(session)
@@ -70,7 +77,7 @@ async def test_a_second_completion_of_the_same_lesson_changes_nothing(
     session: AsyncSession, user: User
 ) -> None:
     await review.start(session, user.id, LESSON, NOW)
-    await review.apply(session, user.id, LESSON, "passed", NOW)
+    await climbed_once(session, user, LESSON)
 
     await review.start(session, user.id, LESSON, NOW + timedelta(days=30))
 
@@ -91,9 +98,7 @@ async def test_a_due_ladder_becomes_exactly_one_delivery(
 
     rows = await reviews(session, user)
     assert len(rows) == 1
-    assert rows[0].payload["lesson"] == LESSON
-    assert rows[0].payload["topic"] == "information-theory"
-    assert rows[0].payload["step"] == state.step
+    assert rows[0].payload == {"lesson": LESSON, "completed_at": None}
     assert (rows[0].status, rows[0].due_at) == ("pending", state.next_due_at)
 
 
@@ -150,67 +155,67 @@ async def test_a_broken_channel_materialises_nothing(
     assert await reviews(session, user) == []
 
 
-async def delivered(
-    session: AsyncSession, user: User, *, outcome: str
-) -> tuple[ReviewState, Schedule]:
-    """A review that went out and whose session is over, one way or the other."""
-    state = await ladder_row(session, user, step=1)
-    row = (await review.materialize(session, NOON))[0]
-    row.claimed_at = NOON
-    row.status = "done"
-    row.outcome = outcome
+@pytest.mark.usefixtures("link", "indexed_section")
+async def test_a_lesson_a_card_was_sent_for_rests_for_three_days(
+    session: AsyncSession, user: User
+) -> None:
+    """A card left unanswered leaves its ladder due. The lesson does not come
+    straight back as the next message; it waits out the rest, and then it does.
+    """
+    await ladder_row(session, user)
+    card = await stored_card(session)
+    session.add(
+        CardDelivery(
+            user_id=user.id,
+            card_id=card.id,
+            tg_message_id=1,
+            sent_at=NOON - review.REST + timedelta(hours=1),
+        )
+    )
     await session.commit()
-    return state, row
+
+    await review.materialize(session, NOON)
+    assert await reviews(session, user) == []
+
+    await review.materialize(session, NOON + timedelta(hours=1))
+    assert len(await reviews(session, user)) == 1
 
 
 @pytest.mark.usefixtures("link")
-async def test_a_session_nobody_answered_is_an_ignore(
+async def test_a_review_carries_when_its_lesson_was_finished(
     session: AsyncSession, user: User
 ) -> None:
-    state, row = await delivered(session, user, outcome="ignored")
+    """What the poller ranks one learner's due reviews by."""
+    await ladder_row(session, user)
+    finished = NOON - timedelta(days=2)
+    session.add(
+        LessonProgress(
+            user_id=user.id,
+            lesson=LESSON,
+            active_seconds=600,
+            max_scroll_pct=100,
+            proofs_opened=0,
+            solutions_opened=0,
+            demos_touched=0,
+            first_seen=finished,
+            last_seen=finished,
+            completed_at=finished,
+        )
+    )
+    await session.commit()
 
-    await review.settle(session, NOON)
+    [row] = await review.materialize(session, NOON)
 
-    await session.refresh(state)
-    assert (state.step, state.last_outcome) == (1, "ignored")
-    assert state.next_due_at == NOON + ladder.STEPS[1]
-    assert row.payload["outcome"] == "ignored"
-
-
-@pytest.mark.usefixtures("link")
-async def test_an_answered_session_defers_what_it_never_reached(
-    session: AsyncSession, user: User
-) -> None:
-    """They replied, so this item was not ignored — the tutor simply never got
-    to it. It waits a day and the rung does not move."""
-    state, row = await delivered(session, user, outcome="answered")
-
-    await review.settle(session, NOON)
-
-    await session.refresh(state)
-    assert (state.step, state.last_outcome) == (1, "deferred")
-    assert state.next_due_at == NOON + ladder.DEFERRAL
-    assert row.payload["outcome"] == "deferred"
-
-
-@pytest.mark.usefixtures("link")
-async def test_a_session_is_settled_once(session: AsyncSession, user: User) -> None:
-    state, _ = await delivered(session, user, outcome="ignored")
-
-    await review.settle(session, NOON)
-    await review.settle(session, NOON + timedelta(hours=1))
-
-    await session.refresh(state)
-    assert state.next_due_at == NOON + ladder.STEPS[1]
+    assert row.payload["completed_at"] == finished.isoformat()
 
 
 @pytest.mark.usefixtures("link")
 async def test_a_delivery_out_of_attempts_is_settled_rather_than_queued_forever(
     session: AsyncSession, user: User
 ) -> None:
-    """`failed` is neither live nor settled by the answered path, and the ladder
-    behind it stays due in the past: unaccounted for, every cycle makes the same
-    review again. Our outage says nothing about the learner, so it is a deferral.
+    """A failed row is not live, and the ladder behind it stays due in the
+    past: unaccounted for, every cycle makes the same review again. Our outage
+    says nothing about the learner, so it is a deferral.
     """
     state = await ladder_row(session, user, step=1)
     row = (await review.materialize(session, NOON))[0]
@@ -228,35 +233,16 @@ async def test_a_delivery_out_of_attempts_is_settled_rather_than_queued_forever(
 
 
 @pytest.mark.usefixtures("link")
-async def test_a_cancelled_delivery_is_not_swept_back_into_the_queue(
+async def test_a_failed_delivery_is_settled_once(
     session: AsyncSession, user: User
 ) -> None:
-    """Cancelling clears the lease, as every other transition does. A row that
-    kept one is a row `sweep_leases` hands back as if its worker had died."""
-    await ladder_row(session, user)
-    await review.materialize(session, NOON)
-    row = (await scheduling.claim_due(session, NOON))[0]
-
-    await review.cancel_deliveries(session, user.id, LESSON)
-    await scheduling.sweep_leases(
-        session, NOON + scheduling.LEASE + timedelta(minutes=1)
-    )
-
-    await session.refresh(row)
-    assert (row.status, row.lease_until) == ("cancelled", None)
-
-
-@pytest.mark.usefixtures("link")
-async def test_a_graded_session_is_not_settled_over(
-    session: AsyncSession, user: User
-) -> None:
-    """What the tutor reported stands: the sweep accounts for the ungraded and
-    leaves everything else where the grade put it."""
-    state, row = await delivered(session, user, outcome="answered")
-    await review.apply(session, user.id, LESSON, "passed", NOON)
-    await review.mark(session, row, "passed")
+    state = await ladder_row(session, user, step=1)
+    row = (await review.materialize(session, NOON))[0]
+    row.status = "failed"
+    await session.commit()
 
     await review.settle(session, NOON)
+    await review.settle(session, NOON + timedelta(hours=1))
 
     await session.refresh(state)
-    assert (state.step, state.last_outcome) == (2, "passed")
+    assert state.next_due_at == NOON + ladder.DEFERRAL

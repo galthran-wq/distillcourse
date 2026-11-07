@@ -8,30 +8,9 @@ from app.models import TgLink
 from app.telegram import api, repository, updates
 from app.telegram.outbox import Outbox
 from tests.conftest import TG_CHAT_ID, Bot
-from tests.telegram.conftest import deliver, message
+from tests.telegram.conftest import deliver, message, tap
 
 PRIVATE = {"id": TG_CHAT_ID, "type": "private"}
-
-
-def tap(
-    data: str,
-    *,
-    update_id: int = 1,
-    chat_type: str = "private",
-    callback_id: str = "cb-1",
-) -> dict[str, Any]:
-    return {
-        "update_id": update_id,
-        "callback_query": {
-            "id": callback_id,
-            "from": {"id": TG_CHAT_ID},
-            "message": {
-                "message_id": 55,
-                "chat": {"id": TG_CHAT_ID, "type": chat_type},
-            },
-            "data": data,
-        },
-    }
 
 
 @pytest.fixture

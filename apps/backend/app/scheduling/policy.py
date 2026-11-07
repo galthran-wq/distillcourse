@@ -7,7 +7,10 @@ from zoneinfo import ZoneInfo
 from app.core.clock import zone
 from app.models import Schedule, User
 
-SLOT_TIMEOUT = timedelta(hours=4)
+# A card nobody has answered a day after it was sent is ignored. A day rather
+# than waking hours: a card asks for a tap, whenever the learner next picks the
+# phone up, and nothing else waits on it but the next card.
+IGNORED_AFTER = timedelta(hours=24)
 # Per user per day: how many times the platform may open the conversation, and
 # how many items one of those messages may carry.
 DAILY_INITIATIONS = 1
@@ -33,9 +36,7 @@ class Hours:
     """The learner's waking day: their clock and the two ends of the window.
 
     Every decision about *when* is made in these terms, and both ends are the
-    learner's to move. The window is also the clock the slot timeout runs on,
-    so a message sent late in the evening is not counted as ignored while they
-    sleep.
+    learner's to move.
     """
 
     tz: ZoneInfo
@@ -48,9 +49,6 @@ class Hours:
 
     def open_at(self, day: date) -> datetime:
         return datetime.combine(day, self.opens, self.tz)
-
-    def close_at(self, day: date) -> datetime:
-        return datetime.combine(day, self.closes, self.tz)
 
 
 def in_window(moment: datetime, hours: Hours) -> bool:
@@ -77,19 +75,6 @@ def day_start(moment: datetime, hours: Hours) -> datetime:
     return datetime.combine(moment.astimezone(hours.tz).date(), time(), hours.tz)
 
 
-def slot_deadline(sent_at: datetime, hours: Hours) -> datetime:
-    """When an unanswered message counts as ignored: `SLOT_TIMEOUT` of waking
-    hours after it was sent, carried over the night if it runs out of day."""
-    remaining = SLOT_TIMEOUT
-    cursor = next_open(sent_at, hours)
-    while True:
-        closes = hours.close_at(cursor.astimezone(hours.tz).date())
-        if closes - cursor >= remaining:
-            return cursor + remaining
-        remaining -= closes - cursor
-        cursor = next_open(closes, hours)
-
-
 def silence_wait(silence: int) -> timedelta:
     if silence == 0:
         return timedelta(0)
@@ -101,25 +86,23 @@ def retry_at(moment: datetime, attempts: int) -> datetime:
     return moment + RETRY_DELAY * doubling
 
 
-def topic(row: Schedule) -> str | None:
-    subject = row.payload.get("topic")
-    return subject if isinstance(subject, str) else None
+def _completed(row: Schedule) -> str:
+    completed = row.payload.get("completed_at")
+    return completed if isinstance(completed, str) else ""
 
 
-def session_items(
-    due: Sequence[Schedule], *, avoid: str | None
-) -> tuple[list[Schedule], list[Schedule]]:
+def session_items(due: Sequence[Schedule]) -> tuple[list[Schedule], list[Schedule]]:
     """Split what is due into the one message that goes out now and the rest.
 
-    Reminders lead: the learner asked for those by name and by time. After an
-    ignored message, whatever shares its topic goes to the back.
+    Reminders lead: the learner asked for those by name and by time. Of the
+    reviews, the lesson finished most recently goes first — it is the one
+    still in their head, and the likeliest to get an answer.
     """
-    ordered = sorted(
-        due,
-        key=lambda row: (
-            row.kind != "reminder",
-            avoid is not None and topic(row) == avoid,
-            row.due_at,
-        ),
+    reminders = sorted(
+        (row for row in due if row.kind == "reminder"), key=lambda row: row.due_at
     )
+    reviews = sorted(
+        (row for row in due if row.kind != "reminder"), key=_completed, reverse=True
+    )
+    ordered = [*reminders, *reviews]
     return ordered[:SESSION_ITEMS], ordered[SESSION_ITEMS:]

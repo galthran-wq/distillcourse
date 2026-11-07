@@ -17,13 +17,16 @@ def moment(hour: int, minute: int = 0, *, day: int = 5) -> datetime:
 
 
 def schedule(
-    *, kind: str = "review", topic: str | None = None, due_hour: int = 9
+    *, kind: str = "review", completed: datetime | None = None, due_hour: int = 9
 ) -> Schedule:
     return Schedule(
         id=uuid.uuid4(),
         kind=kind,
         due_at=moment(due_hour),
-        payload={"note": "a note"} | ({"topic": topic} if topic else {}),
+        payload={
+            "note": "a note",
+            "completed_at": None if completed is None else completed.isoformat(),
+        },
     )
 
 
@@ -68,16 +71,6 @@ def test_tomorrow_is_the_next_morning_wherever_the_learner_is() -> None:
     assert policy.day_start(moment(23), WAKING) == moment(0)
 
 
-def test_the_slot_times_out_after_four_waking_hours() -> None:
-    assert policy.slot_deadline(moment(10), WAKING) == moment(14)
-
-
-def test_the_night_does_not_count_against_the_slot() -> None:
-    """Sent at 21:00, one hour of the day is left; the other three are the next
-    morning's, so an unanswered message is not ignored at 01:00."""
-    assert policy.slot_deadline(moment(21), WAKING) == moment(12, day=6)
-
-
 def test_retries_back_off() -> None:
     start = moment(10)
 
@@ -86,9 +79,9 @@ def test_retries_back_off() -> None:
 
 
 def test_one_message_carries_one_item_and_the_rest_wait() -> None:
-    due = [schedule(topic=f"course-{index}") for index in range(5)]
+    due = [schedule() for _ in range(5)]
 
-    now, later = policy.session_items(due, avoid=None)
+    now, later = policy.session_items(due)
 
     assert len(now) == 1
     assert len(later) == 4
@@ -105,15 +98,19 @@ def test_silence_backs_off_but_never_stops(silence: int, days: int) -> None:
 def test_a_reminder_is_delivered_before_a_review() -> None:
     due = [schedule(due_hour=9), schedule(kind="reminder", due_hour=10)]
 
-    now, _ = policy.session_items(due, avoid=None)
+    now, _ = policy.session_items(due)
 
     assert now[0].kind == "reminder"
 
 
-def test_after_an_ignored_message_another_topic_leads() -> None:
-    ignored = schedule(topic="information-theory", due_hour=9)
-    other = schedule(topic="classical-ml", due_hour=10)
+def test_the_lesson_finished_last_is_reviewed_first() -> None:
+    """The one still in their head is the likeliest to get an answer. A lab's
+    ladder has no reading behind it and goes last."""
+    lab = schedule(due_hour=8)
+    older = schedule(completed=moment(10, day=1))
+    newer = schedule(completed=moment(10, day=3))
 
-    now, _ = policy.session_items([ignored, other], avoid="information-theory")
+    now, later = policy.session_items([lab, older, newer])
 
-    assert [policy.topic(row) for row in now] == ["classical-ml"]
+    assert now == [newer]
+    assert later == [older, lab]

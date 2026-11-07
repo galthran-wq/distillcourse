@@ -4,17 +4,15 @@ from datetime import datetime, timedelta
 from typing import Any, Literal
 
 import logfire
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import ScalarSelect, func, or_, select, true, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased
 
 from app.core.config import settings
-from app.models import Chat, Message, Schedule, TgLink, User
+from app.models import CardDelivery, Chat, Message, Schedule, TgLink, User
 from app.scheduling import policy
 
 ScheduleKind = Literal["review", "reminder"]
 CreatedBy = Literal["system", "user"]
-Outcome = Literal["answered", "ignored"]
 
 # How long a claimed row stays off limits to other workers. A process that
 # dies mid-run leaves nothing waiting longer than this. It has to outlast the
@@ -143,23 +141,11 @@ async def retry(
     await session.commit()
 
 
-async def open_slot(
-    session: AsyncSession, rows: Sequence[Schedule], *, deadline: datetime
-) -> None:
-    """The message went out: `due_at` now means the moment it counts as ignored."""
-    for row in rows:
-        row.status = "awaiting_reply"
-        row.due_at = deadline
-        row.lease_until = None
-    await session.commit()
-
-
 async def deliver(session: AsyncSession, rows: Sequence[Schedule]) -> None:
-    """Rows that are finished the moment they are sent.
-
-    A reminder is one: it asked for nothing, so there is no reply to wait for
-    and no outcome to record. It still counts as a message the platform sent,
-    which is what `initiations_today` reads it as.
+    """Rows that are finished the moment they are sent: every row is, since
+    what a card asks for is recorded on its delivery, not here. A sent row
+    counts as a message the platform sent, which is what `initiations_today`
+    reads it as.
     """
     for row in rows:
         row.status = "done"
@@ -183,53 +169,6 @@ async def sweep_leases(session: AsyncSession, now: datetime) -> None:
         )
 
 
-async def close_answered(session: AsyncSession) -> None:
-    """Close the slots the learner replied to.
-
-    A reply is any message of theirs in the thread after the platform opened
-    it; the poller reads it from the thread rather than being told, so the
-    bookkeeping holds whichever way a message arrived.
-    """
-    replied = (
-        select(Message.id)
-        .join(Chat, Chat.id == Message.chat_id)
-        .where(
-            Chat.user_id == Schedule.user_id,
-            Chat.kind == "telegram",
-            Message.role == "user",
-            Message.created_at > Schedule.claimed_at,
-        )
-        .correlate(Schedule)
-        .exists()
-    )
-    await session.execute(
-        update(Schedule)
-        .where(Schedule.status == "awaiting_reply", replied)
-        .values(status="done", outcome="answered")
-    )
-    await session.commit()
-
-
-async def expire_slots(session: AsyncSession, now: datetime) -> None:
-    await session.execute(
-        update(Schedule)
-        .where(Schedule.status == "awaiting_reply", Schedule.due_at <= now)
-        .values(status="done", outcome="ignored")
-    )
-    await session.commit()
-
-
-async def open_slot_deadline(
-    session: AsyncSession, user_id: uuid.UUID
-) -> datetime | None:
-    deadline: datetime | None = await session.scalar(
-        select(func.min(Schedule.due_at)).where(
-            Schedule.user_id == user_id, Schedule.status == "awaiting_reply"
-        )
-    )
-    return deadline
-
-
 async def initiations_today(
     session: AsyncSession, user_id: uuid.UUID, since: datetime
 ) -> int:
@@ -242,33 +181,53 @@ async def initiations_today(
         select(func.count(func.distinct(Schedule.claimed_at))).where(
             Schedule.user_id == user_id,
             Schedule.claimed_at >= since,
-            Schedule.status.in_(("awaiting_reply", "done")),
+            Schedule.status == "done",
         )
     )
     return int(total or 0)
 
 
-async def silence(session: AsyncSession, user_id: uuid.UUID) -> int:
-    """How many review messages in a row the learner has let time out: those
-    sent since the last thing they wrote in the thread. Read back from the
-    thread and the queue rather than stored, so it cannot drift from either.
-    """
-    last_reply = (
+def _last_message(user_id: object) -> ScalarSelect[datetime]:
+    """When the learner last wrote in the Telegram thread. `user_id` is a value
+    or a column, which is what lets the same subquery be correlated."""
+    return (
         select(func.max(Message.created_at))
         .join(Chat, Chat.id == Message.chat_id)
-        .where(
-            Chat.user_id == user_id,
-            Chat.kind == "telegram",
-            Message.role == "user",
-        )
+        .where(Chat.user_id == user_id, Chat.kind == "telegram", Message.role == "user")
         .scalar_subquery()
     )
+
+
+async def open_card_deadline(
+    session: AsyncSession, user_id: uuid.UUID
+) -> datetime | None:
+    """When the card still waiting for a tap counts as ignored, if one is."""
+    sent: datetime | None = await session.scalar(
+        select(func.max(CardDelivery.sent_at)).where(
+            CardDelivery.user_id == user_id, CardDelivery.outcome.is_(None)
+        )
+    )
+    return None if sent is None else sent + policy.IGNORED_AFTER
+
+
+async def silence(session: AsyncSession, user_id: uuid.UUID) -> int:
+    """How many cards in a row the learner has let go unanswered: those sent
+    since the last thing they wrote in the thread or tapped. Read back from the
+    thread and the deliveries rather than stored, so it cannot drift from
+    either.
+    """
+    last_answer = (
+        select(func.max(CardDelivery.answered_at))
+        .where(CardDelivery.user_id == user_id)
+        .scalar_subquery()
+    )
+    # greatest() skips NULLs, so either one alone is enough to count from.
+    since = func.greatest(_last_message(user_id), last_answer)
     total = await session.scalar(
-        select(func.count(func.distinct(Schedule.claimed_at))).where(
-            Schedule.user_id == user_id,
-            Schedule.kind == "review",
-            Schedule.outcome == "ignored",
-            or_(last_reply.is_(None), Schedule.claimed_at > last_reply),
+        select(func.count()).where(
+            CardDelivery.user_id == user_id,
+            CardDelivery.outcome == "ignored",
+            or_(since.is_(None), CardDelivery.sent_at > since),
         )
     )
     return int(total or 0)
@@ -279,80 +238,39 @@ async def last_initiation(session: AsyncSession, user_id: uuid.UUID) -> datetime
     reminder is the learner's appointment, not ours, so it does not count. The
     same messages `silence` counts, so the wait runs from the last of them."""
     moment: datetime | None = await session.scalar(
-        select(func.max(Schedule.claimed_at)).where(
-            Schedule.user_id == user_id,
-            Schedule.kind == "review",
-            Schedule.status.in_(("awaiting_reply", "done")),
-        )
+        select(func.max(CardDelivery.sent_at)).where(CardDelivery.user_id == user_id)
     )
     return moment
 
 
 async def held_past_a_reply(session: AsyncSession, now: datetime) -> Sequence[Schedule]:
     """Reviews still held for a learner who has written since the platform's
-    last message went unanswered.
+    last card went unanswered.
 
     The silence that held them is over the moment the learner writes, but a
     deferred row is not looked at again until its `due_at`, which a wait put
     days out.
     """
-    opened = aliased(Schedule)
-    last_opened = (
-        select(func.max(opened.claimed_at))
-        .where(
-            opened.user_id == Schedule.user_id,
-            opened.kind == "review",
-            opened.status.in_(("awaiting_reply", "done")),
-        )
+    latest = (
+        select(CardDelivery.sent_at, CardDelivery.outcome)
+        .where(CardDelivery.user_id == Schedule.user_id)
+        .order_by(CardDelivery.sent_at.desc())
+        .limit(1)
         .correlate(Schedule)
-        .scalar_subquery()
-    )
-    last_ignored = (
-        select(func.max(opened.claimed_at))
-        .where(
-            opened.user_id == Schedule.user_id,
-            opened.kind == "review",
-            opened.outcome == "ignored",
-        )
-        .correlate(Schedule)
-        .scalar_subquery()
-    )
-    replied = (
-        select(Message.id)
-        .join(Chat, Chat.id == Message.chat_id)
-        .where(
-            Chat.user_id == Schedule.user_id,
-            Chat.kind == "telegram",
-            Message.role == "user",
-            Message.created_at > last_ignored,
-        )
-        .correlate(Schedule)
-        .exists()
+        .lateral()
     )
     rows = await session.scalars(
-        select(Schedule).where(
+        select(Schedule)
+        .join(latest, true())
+        .where(
             Schedule.status == "deferred",
             Schedule.kind == "review",
             Schedule.due_at > now,
-            last_ignored == last_opened,
-            replied,
+            latest.c.outcome == "ignored",
+            _last_message(Schedule.user_id) > latest.c.sent_at,
         )
     )
     return rows.all()
-
-
-async def ignored_topic(session: AsyncSession, user_id: uuid.UUID) -> str | None:
-    """The topic to lead away from: the one the last message was about, if the
-    learner let that message time out."""
-    row = await session.scalar(
-        select(Schedule)
-        .where(Schedule.user_id == user_id, Schedule.outcome.is_not(None))
-        .order_by(Schedule.claimed_at.desc())
-        .limit(1)
-    )
-    if row is None or row.outcome != "ignored":
-        return None
-    return policy.topic(row)
 
 
 async def users_by_id(

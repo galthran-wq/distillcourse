@@ -151,7 +151,7 @@ async def test_a_platform_run_bills_the_default_model_whatever_the_chat_uses(
     await repo.set_model(chat, other)
 
     with tutor.override(model=echoing(), tools=[]):
-        await runner.run(repo, chat, "what is due?", run_kind="review")
+        await runner.run(repo, chat, "what is due?", run_kind="proactive")
         await runner.run(repo, chat, "what is entropy?", run_kind="chat")
 
     assert asked == [settings.DEFAULT_CHAT_MODEL, other]
