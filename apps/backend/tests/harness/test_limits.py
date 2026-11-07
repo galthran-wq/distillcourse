@@ -6,7 +6,7 @@ from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserProm
 from app.core.config import settings
 from app.harness.limits import LimitExceeded, check_run_allowed
 from app.harness.repository import HarnessRepository
-from app.models import Chat, LabSubmission, User
+from app.models import BackgroundRun, Chat, LabSubmission, User
 
 QUESTION = ModelRequest(parts=[UserPromptPart(content="what is entropy?")])
 ANSWER = ModelResponse(parts=[TextPart(content="expected surprise")])
@@ -60,6 +60,22 @@ async def test_the_ceiling_counts_what_a_labs_judge_spent(
             lesson="lesson:information-theory/surprisal-lab",
             checkpoint="why-uniform",
             verdict={"passed": True, "hint": None, "score": None, "pending": False},
+            usage={"cost_usd": settings.MONTHLY_COST_CEILING_USD, "requests": 1},
+        )
+    )
+    await repo.session.commit()
+
+    with pytest.raises(LimitExceeded, match="monthly budget"):
+        await check_run_allowed(repo)
+
+
+async def test_the_ceiling_counts_what_the_platform_spent_for_itself(
+    repo: HarnessRepository, user: User
+) -> None:
+    repo.session.add(
+        BackgroundRun(
+            user_id=user.id,
+            kind="transcribe",
             usage={"cost_usd": settings.MONTHLY_COST_CEILING_USD, "requests": 1},
         )
     )

@@ -616,6 +616,24 @@ class LabSubmission(Base):
     source: Mapped[str | None] = mapped_column(Text, default=None)
 
 
+class BackgroundRun(Base):
+    """Model spend with no message to hang it on: a call the platform makes for
+    itself rather than a turn of a chat. Kept so the monthly ceiling sees it."""
+
+    __tablename__ = "background_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid7)
+    # Kept when the learner goes: the money was spent either way.
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), default=None
+    )
+    kind: Mapped[str] = mapped_column(String(16))
+    usage: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 # Rating and bookmark are keyed by the same `lesson:` locator `events` and
 # `lesson_progress` carry, so a reader's votes, their reading and the corpus
 # all name a lesson with one string.
