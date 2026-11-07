@@ -93,11 +93,16 @@ async def _pressing(
 
 
 async def _due_card(
-    session: AsyncSession, user_id: uuid.UUID, now: datetime, find: Finder
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    now: datetime,
+    find: Finder,
+    *,
+    easy: bool,
 ) -> ReviewCard | None:
     """A card of the lesson whose review is owed longest, sent out of turn: the
-    poller's row for that lesson goes, or the review would come twice."""
-    easy = await repository.level_one_only(session, user_id, now)
+    poller's row for that lesson goes, or the review would come twice. `easy`
+    is `level_one_only`, asked once by the caller."""
     for state in await repository.due(session, user_id, now):
         card = await find(session, user_id, state.lesson, 1 if easy else state.level)
         if card is not None:
@@ -109,19 +114,23 @@ async def _due_card(
 async def _swap(outbox: Outbox, sent: CardDelivery, card: ReviewCard) -> None:
     """Another card in the same message: one level lower on the same lesson,
     else the next due lesson's, else nothing. Only cards already written — the
-    learner is waiting on a tap, not on a model."""
+    learner is waiting on a tap, not on a model.
+
+    What put the card aside commits with the edit and not before it: a failed
+    edit leaves the old buttons on the message, and they must still work."""
     session, user_id = outbox.session, outbox.link.user_id
     now = datetime.now(UTC)
     easy = await repository.level_one_only(session, user_id, now)
     level = 1 if easy else max(card.level - 1, 1)
     replacement = await cards.existing(session, user_id, card.lesson, level)
     if replacement is None:
-        replacement = await _due_card(session, user_id, now, cards.existing)
+        replacement = await _due_card(session, user_id, now, cards.existing, easy=easy)
     if replacement is None:
         title = await cards.title_of(session, card)
         await outbox.edit_text(
             sent.tg_message_id, f"{cards.skipped(title)}\n\n{NOTHING_ELSE}"
         )
+        await session.commit()
         return
     await cards.replace(session, outbox, user_id, replacement, sent.tg_message_id)
 
@@ -133,7 +142,6 @@ async def another(outbox: Outbox, tap: Tap) -> None:
         return
     sent, card = found
     repository.skip(sent, datetime.now(UTC))
-    await outbox.session.commit()
     await _swap(outbox, sent, card)
 
 
@@ -150,13 +158,16 @@ async def not_today(outbox: Outbox, tap: Tap) -> None:
     await scheduling.pause_cards(
         session, user.id, until=policy.tomorrow_open(now, policy.Hours.of(user))
     )
+    # Committed only once the buttons are gone, so a failed edit leaves them
+    # working.
     await outbox.edit_keyboard(sent.tg_message_id, None)
+    await session.commit()
 
 
 async def wrong_card(outbox: Outbox, tap: Tap) -> None:
     """Retired on the first report — with one learner, waiting for a second
-    means never — and filed for a human, then put aside as Another question
-    would."""
+    means never — put aside as Another question would, then filed for a human
+    once the swap has committed the retirement."""
     found = await _open(outbox, tap)
     if found is None:
         return
@@ -164,7 +175,7 @@ async def wrong_card(outbox: Outbox, tap: Tap) -> None:
     session, user_id = outbox.session, outbox.link.user_id
     card.status = "retired"
     repository.skip(sent, datetime.now(UTC))
-    await session.commit()
+    await _swap(outbox, sent, card)
     await HarnessRepository(session, user_id).file_incident(
         await thread.of(session, user_id),
         locator=cards.locator(card),
@@ -174,7 +185,6 @@ async def wrong_card(outbox: Outbox, tap: Tap) -> None:
             f"retired. Its prompt: {card.prompt}"
         ),
     )
-    await _swap(outbox, sent, card)
 
 
 async def next_card(outbox: Outbox, tap: Tap) -> None:
@@ -196,7 +206,13 @@ async def next_card(outbox: Outbox, tap: Tap) -> None:
             await outbox.send(TODAYS)
             return
         async with thread.typing(outbox.link.tg_chat_id):
-            following = await _due_card(session, user_id, now, cards.pick)
+            following = await _due_card(
+                session,
+                user_id,
+                now,
+                cards.pick,
+                easy=await repository.level_one_only(session, user_id, now),
+            )
         if following is None:
             await outbox.send(NOTHING_ELSE)
             return
@@ -253,7 +269,5 @@ async def own_words(outbox: Outbox, tap: Tap) -> None:
     if found is None:
         return
     sent, card = found
-    async with _pressing(
-        outbox, sent, card, repository.OWN_WORDS, value=repository.ASKED
-    ):
+    async with _pressing(outbox, sent, card, cards.OWN_WORDS, value=repository.ASKED):
         await _converse(outbox, sent, card, OWN_WORDS_PROMPT)

@@ -181,6 +181,10 @@ async def test_another_question_is_a_lower_card_in_the_same_message(
     state = await state_of(session, user, LESSON)
     assert (state.step, state.next_due_at, state.level, state.level_run) == before
 
+    # A swap reuses the message: one card sent today, not two.
+    since = sent.sent_at - timedelta(minutes=1)
+    assert await review.cards_today(session, user.id, since) == 1
+
     with no_model():
         await press(client, f"k:{swapped.id}:0", swapped)
     await session.refresh(swapped)
@@ -406,6 +410,28 @@ async def test_a_harder_card_is_written_and_a_right_answer_raises_the_level(
     assert (state.step, state.next_due_at) == rung
 
 
+async def test_a_harder_card_at_the_level_already_held_keeps_the_run(
+    client: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    """A level 1 card served under a level 2 ladder (the hold, an Another):
+    Harder and right is no reason to lose the run of two."""
+    await ladder_row(session, user)
+    await stored_card(session)
+    await stored_card(session, level=2, prompt="Harder: ____")
+    sent = await tapped(client, session, user)
+    state = await state_of(session, user, LESSON)
+    state.level, state.level_run = 2, 2
+    await session.commit()
+
+    with no_model():
+        await press(client, f"h:{sent.id}", sent)
+        _, up = await deliveries(session, user)
+        await press(client, f"k:{up.id}:0", up)
+
+    state = await state_of(session, user, LESSON)
+    assert (state.level, state.level_run) == (2, 2)
+
+
 async def test_a_wrong_answer_to_a_harder_card_changes_nothing(
     client: AsyncClient, session: AsyncSession, user: User
 ) -> None:
@@ -609,3 +635,10 @@ async def test_a_new_card_folds_an_open_one_and_leaves_an_answered_one(
     assert folded[0][1] == cards.skipped(await cards.title_of(session, card))
     assert bot.rekeyed[-1] == (open_one.tg_message_id, None)
     assert answered.tg_message_id not in [message_id for message_id, _ in folded]
+    await session.refresh(open_one)
+    assert open_one.outcome == "skipped"
+
+    # Folded once: the next card leaves it alone.
+    edits = len(bot.edited)
+    await cards.deliver(session, outbox, user.id, card)
+    assert open_one.tg_message_id not in [m for m, _ in bot.edited[edits:]]

@@ -185,10 +185,7 @@ async def grade(
     if state is None:
         return None
     if sent.harder:
-        # Volunteered: a right answer earns the level it was asked at, never
-        # lowers one, and a wrong one is not held against them.
-        if outcome in ("correct", "passed"):
-            state.level, state.level_run = max(state.level, card.level), 0
+        _volunteered(state, card, outcome)
         await session.flush()
         return state
     at = rung(state)
@@ -204,6 +201,16 @@ async def grade(
     return state
 
 
+def _volunteered(
+    state: ReviewState, card: ReviewCard, outcome: Tapped | ladder.Outcome
+) -> None:
+    """A harder card the learner asked for: a right answer earns the level it
+    was asked at and starts a run there, never lowers one nor costs the run at
+    the level already held, and a wrong one is not held against them."""
+    if outcome in ("correct", "passed") and card.level > state.level:
+        state.level, state.level_run = card.level, 0
+
+
 def skip(sent: CardDelivery, now: datetime) -> None:
     """A card put aside unanswered. Nothing is learned from it, so nothing
     else moves; answering it now is no longer possible."""
@@ -217,10 +224,13 @@ async def recall(
     """Grade the learner's own words on a card they already tapped; the caller
     commits. `passed` is real recall: it counts as a right answer at the level
     and climbs past the level's cap. Anything less leaves the ladder where the
-    tap put it — they offered, and were not asked."""
+    tap put it — they offered, and were not asked. On a harder card, which
+    moves only the level, it moves only the level."""
     sent.follow_ups = {**sent.follow_ups, OWN_WORDS: outcome}
     state = await state_of(session, sent.user_id, card.lesson)
-    if state is None or outcome != "passed":
+    if state is not None and sent.harder:
+        _volunteered(state, card, outcome)
+    if state is None or sent.harder or outcome != "passed":
         await session.flush()
         return state
     now = datetime.now(UTC)
@@ -300,8 +310,10 @@ async def unqueue(session: AsyncSession, user_id: uuid.UUID, lesson: str) -> Non
 async def cards_today(
     session: AsyncSession, user_id: uuid.UUID, since: datetime
 ) -> int:
+    """Messages, not deliveries: a card swapped in by Another question or
+    Wrong card reuses the message of the one it replaced."""
     total = await session.scalar(
-        select(func.count()).where(
+        select(func.count(func.distinct(CardDelivery.tg_message_id))).where(
             CardDelivery.user_id == user_id, CardDelivery.sent_at >= since
         )
     )

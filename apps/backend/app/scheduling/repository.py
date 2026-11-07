@@ -292,10 +292,11 @@ async def mute(
 async def pause_cards(
     session: AsyncSession, user_id: uuid.UUID, *, until: datetime
 ) -> None:
+    """Leaves the commit to the caller, which commits it with the card it
+    put aside."""
     await session.execute(
         update(User).where(User.id == user_id).values(cards_paused_until=until)
     )
-    await session.commit()
 
 
 async def pending_reminders(

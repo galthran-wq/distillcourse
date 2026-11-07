@@ -16,7 +16,6 @@ from app.harness.prompts import ContextBlock
 from app.harness.repository import HarnessRepository
 from app.models import BackgroundRun, Chat, TgLink
 from app.review import cards, controls, subject
-from app.review.repository import OWN_WORDS
 from app.scheduling import policy
 from app.scheduling import repository as scheduling
 from app.telegram import api, repository, speech, thread
@@ -207,7 +206,7 @@ TAP_HANDLERS: dict[str, Callable[[Outbox, Tap], Awaitable[None]]] = {
     cards.NEXT: controls.next_card,
     cards.HARDER: controls.harder,
     cards.EXPLAIN: controls.explain,
-    OWN_WORDS: controls.own_words,
+    cards.OWN_WORDS: controls.own_words,
 }
 
 

@@ -39,6 +39,8 @@ WRONG_CARD = "w"
 NEXT = "x"
 HARDER = "h"
 EXPLAIN = "e"
+# Kept in the data layer, which subject and tools read it from.
+OWN_WORDS = repository.OWN_WORDS
 # A card this learner saw more recently than this is not put to them again.
 UNSEEN_FOR = timedelta(days=14)
 RIGHT = "✓"
@@ -179,7 +181,7 @@ def follow_ups(sent: CardDelivery, card: ReviewCard) -> api.Keyboard | None:
     no harder card than level 3."""
     rows = [
         [("Next", NEXT), ("Harder one", HARDER)],
-        [("Explain", EXPLAIN), ("In my own words", repository.OWN_WORDS)],
+        [("Explain", EXPLAIN), ("In my own words", OWN_WORDS)],
     ]
     shown = [
         [
@@ -229,16 +231,39 @@ async def _record(
 
 async def _tidy(session: AsyncSession, outbox: Outbox, sent: CardDelivery) -> None:
     """Fold the cards still open from before this one into a line each: the
-    thread must not become a wall of unanswered questions. A card that cannot
-    be edited any more is left as it is."""
-    for delivery, card in await recent(
-        session, sent.user_id, sent.sent_at - policy.IGNORED_AFTER
-    ):
-        if delivery.outcome is None and delivery.tg_message_id != sent.tg_message_id:
-            with suppress(api.TelegramError):
-                await outbox.edit_text(
-                    delivery.tg_message_id, skipped(await title_of(session, card))
+    thread must not become a wall of unanswered questions. A folded card is
+    skipped, whether or not its message could still be edited — the learner
+    can no longer be held to it either way."""
+    folded = (
+        (
+            await session.execute(
+                select(CardDelivery, ReviewCard)
+                .join(ReviewCard, ReviewCard.id == CardDelivery.card_id)
+                .where(
+                    CardDelivery.user_id == sent.user_id,
+                    CardDelivery.outcome.is_(None),
+                    CardDelivery.sent_at >= sent.sent_at - policy.IGNORED_AFTER,
+                    CardDelivery.id != sent.id,
                 )
+                # A tap on one of them grades it under the same lock; whichever
+                # comes second finds it answered.
+                .with_for_update(of=CardDelivery)
+            )
+        )
+        .tuples()
+        .all()
+    )
+    if not folded:
+        return
+    for delivery, _ in folded:
+        repository.skip(delivery, sent.sent_at)
+    await session.commit()
+    titles = await subject.materials(session, {card.lesson for _, card in folded})
+    for delivery, card in folded:
+        with suppress(api.TelegramError):
+            await outbox.edit_text(
+                delivery.tg_message_id, skipped(titles[card.lesson].title)
+            )
 
 
 async def deliver(
