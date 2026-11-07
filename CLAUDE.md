@@ -229,8 +229,11 @@ Rules that override defaults:
   concludes the material itself is at fault it calls
   `report_content_incident`, which writes a row to `incidents` in the
   production database (locator `lesson:<course>/<slug>#<anchor>`, kind
-  `error|unclear|other`, a one-paragraph summary). Nothing in the app reads
-  that table; it is triaged by hand. When asked about "an issue from the
+  `error|unclear|other`, a one-paragraph summary). The second source is the
+  bot: a learner who presses "This card is wrong" under a review card
+  retires that card and files an `error` row against its section, its
+  summary naming the card id and prompt (`app/review/controls.py`). Nothing
+  in the app reads that table; it is triaged by hand. When asked about "an issue from the
   agent" or reader feedback, read the open ones on the deploy host:
   `docker compose exec -T db psql -U postgres -d distillcourse -x -c
   "SELECT id, locator, kind, summary, created_at FROM incidents WHERE

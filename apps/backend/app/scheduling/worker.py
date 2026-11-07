@@ -50,13 +50,17 @@ async def _initiations_allowed(
 ) -> list[Schedule]:
     """What the platform may say on its own account, of what is due.
 
-    The open card, the daily budget and the silence backoff govern messages the
-    platform starts. A reminder is the learner's own appointment, set for a
+    "Not today", the open card, the daily budget and the silence backoff
+    govern messages the platform starts. A reminder is the learner's own appointment, set for a
     time they named, so none of them holds it back ("remind me on Friday"
     arrives on Friday). It is still a message: delivering one spends the day's
     budget for the reviews that come after it.
     """
     hours = policy.Hours.of(user)
+    if user.cards_paused_until is not None and now < user.cards_paused_until:
+        # "Not today": a card's own button, so it holds cards and nothing else.
+        await repository.defer(session, rows, due_at=user.cards_paused_until)
+        return []
     deadline = await repository.open_card_deadline(session, user.id)
     if deadline is not None:
         # One card at a time: what else is due waits for the open one to be
@@ -147,7 +151,9 @@ async def _fire(
                 _prompt(reminders),
                 run_kind="proactive",
             )
-        unsent = [row for row in reviews if not await _send_card(session, outbox, row)]
+        unsent = [
+            row for row in reviews if not await _send_card(session, outbox, row, now)
+        ]
     except runner.RunBusy:
         await repository.defer(session, due, due_at=now + BUSY_RETRY)
         return
@@ -185,14 +191,17 @@ async def _fire(
     await repository.deliver(session, [row for row in now_items if row not in unsent])
 
 
-async def _send_card(session: AsyncSession, outbox: Outbox, row: Schedule) -> bool:
+async def _send_card(
+    session: AsyncSession, outbox: Outbox, row: Schedule, now: datetime
+) -> bool:
     """Whether a card went out for this review. A card is picked, or written
     when the learner has seen every card there is, at the level the ladder is
     on."""
     lesson: str = row.payload["lesson"]
     state = await review.state_of(session, row.user_id, lesson)
     level = 1 if state is None else state.level
-    repo = HarnessRepository(session, row.user_id)
+    if await review.level_one_only(session, row.user_id, now):
+        level = 1
     # A card whose image Telegram refused is retired by `deliver`, and the
     # next one in line is tried in its place — once, so an outage of the
     # site's figures cannot retire a whole lesson's cards in one cycle.
@@ -205,9 +214,8 @@ async def _send_card(session: AsyncSession, outbox: Outbox, row: Schedule) -> bo
                 level=level,
             )
             return False
-        async with thread.holding(repo, await thread.of(session, row.user_id)):
-            if await cards.deliver(session, outbox, row.user_id, card) is not None:
-                return True
+        if await cards.deliver(session, outbox, row.user_id, card) is not None:
+            return True
     return False
 
 

@@ -12,6 +12,7 @@ from app.telegram import api
 from app.telegram.api import (
     answer_callback,
     edit_message_caption,
+    edit_message_keyboard,
     edit_message_text,
     send_message,
     send_photo,
@@ -211,7 +212,7 @@ async def test_a_keyboard_edit_to_none_takes_the_buttons_off(
 ) -> None:
     posted = answering(monkeypatch, result={"message_id": 17})
 
-    await api.edit_message_keyboard(4242, 17, None)
+    await edit_message_keyboard(4242, 17, None)
 
     assert posted.method == "editMessageReplyMarkup"
     assert posted.json == {"chat_id": 4242, "message_id": 17}
@@ -222,7 +223,7 @@ async def test_a_keyboard_edit_sends_the_new_buttons(
 ) -> None:
     posted = answering(monkeypatch, result={"message_id": 17})
 
-    await api.edit_message_keyboard(4242, 17, KEYBOARD)
+    await edit_message_keyboard(4242, 17, KEYBOARD)
 
     assert posted.json == {"chat_id": 4242, "message_id": 17, "reply_markup": MARKUP}
 
