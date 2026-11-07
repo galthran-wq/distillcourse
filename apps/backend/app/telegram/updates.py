@@ -1,4 +1,5 @@
 import asyncio
+import html
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager, suppress
@@ -11,15 +12,15 @@ from pydantic_ai.messages import ModelRequest, UserPromptPart
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.harness import runner
-from app.harness.limits import LimitExceeded
+from app.harness.limits import LimitExceeded, check_cost_ceiling
 from app.harness.prompts import ContextBlock
 from app.harness.repository import HarnessRepository
-from app.models import Chat, TgLink
+from app.models import BackgroundRun, Chat, TgLink
 from app.review import repository as review
 from app.review import subject
 from app.scheduling import policy
 from app.scheduling import repository as scheduling
-from app.telegram import api, repository, thread
+from app.telegram import api, repository, speech, thread
 from app.telegram.outbox import Outbox
 
 # The thread is the queue: one run holds it at a time, whichever process
@@ -49,14 +50,31 @@ PAIRED = (
 BUSY = "Still finishing the previous message. Send that again in a minute."
 FAILED = "Something went wrong on my side. Send that again in a minute."
 TAP_FAILED = "Something went wrong on my side. Press that again in a minute."
+TOO_LONG = "Too long. Keep it under two minutes."
+UNHEARD = "Couldn't make that out. Send it as text?"
+# Checked on what Telegram reports, before anything is downloaded.
+VOICE_SECONDS = 120
+# The learner sees what was heard, because that is what gets graded; a long
+# answer is recognisable from its start.
+HEARD_CHARS = 200
 CLEARED = "The learner cleared the thread; nothing before this point is yours."
 
 
 @dataclass(frozen=True)
+class Voice:
+    file_id: str
+    duration: int
+
+
+@dataclass(frozen=True)
 class Update:
+    """A message. `text` is empty when it is a `voice`, whose transcript stands
+    in for it."""
+
     update_id: int
     tg_chat_id: int
     text: str
+    voice: Voice | None = None
 
 
 @dataclass(frozen=True)
@@ -103,10 +121,11 @@ def _tap(update_id: int, query: dict[str, Any]) -> Tap | None:
 def parse(payload: dict[str, Any]) -> Update | Tap | None:
     """The fields this bot acts on, or nothing.
 
-    A sticker, a photo, an edit: shapes that carry no text for the tutor to
-    read, all answered with the same silence. So is anything outside a private
-    chat — a pairing code redeemed in a group would hand that group the
-    learner's own thread, and a button pressed there would act on it.
+    A sticker, a photo, an edit, an audio file, a video note: shapes that
+    carry nothing for the tutor to read, all answered with the same silence. So
+    is anything outside a private chat — a pairing code redeemed in a group
+    would hand that group the learner's own thread, and a button pressed there
+    would act on it. A voice message is kept, to be read once transcribed.
     """
     update_id = payload.get("update_id")
     if not isinstance(update_id, int):
@@ -115,8 +134,19 @@ def parse(payload: dict[str, Any]) -> Update | Tap | None:
         return _tap(update_id, payload["callback_query"] or {})
     message = payload.get("message") or {}
     tg_chat_id = _private_chat(message)
+    if tg_chat_id is None:
+        return None
+    voice = message.get("voice") or {}
+    file_id, duration = voice.get("file_id"), voice.get("duration")
+    if isinstance(file_id, str) and isinstance(duration, int):
+        return Update(
+            update_id=update_id,
+            tg_chat_id=tg_chat_id,
+            text="",
+            voice=Voice(file_id=file_id, duration=duration),
+        )
     text = message.get("text")
-    if tg_chat_id is None or not isinstance(text, str) or not text.strip():
+    if not isinstance(text, str) or not text.strip():
         return None
     return Update(update_id=update_id, tg_chat_id=tg_chat_id, text=text.strip())
 
@@ -241,6 +271,36 @@ async def _answer(
             await asyncio.sleep(RUN_WAIT_SECONDS)
 
 
+async def _hear(session: AsyncSession, outbox: Outbox, voice: Voice) -> str | None:
+    """The voice message as text, or None once the learner has been told why
+    there is none. A guess is never passed on as what they said."""
+    if voice.duration > VOICE_SECONDS:
+        await outbox.send(TOO_LONG)
+        return None
+    await check_cost_ceiling(session)
+    try:
+        audio = await api.download_file(voice.file_id)
+        text, usage = await speech.transcribe(audio)
+    except api.TelegramError, speech.TranscriptionFailed:
+        logfire.exception("a telegram voice message was not transcribed")
+        await outbox.send(UNHEARD)
+        return None
+    session.add(
+        BackgroundRun(user_id=outbox.link.user_id, kind="transcribe", usage=usage)
+    )
+    await session.commit()
+    if not text:
+        await outbox.send(UNHEARD)
+        return None
+    heard = text if len(text) <= HEARD_CHARS else text[:HEARD_CHARS] + "…"
+    # Its own outbox: this line is not the answer, and counted as one it would
+    # keep the run's answer from being delivered.
+    await Outbox(session=session, link=outbox.link).send(
+        f"<i>Heard:</i> {html.escape(heard)}"
+    )
+    return text
+
+
 async def _learner(session: AsyncSession, tg_chat_id: int) -> TgLink | None:
     link = await repository.link_for_chat(session, tg_chat_id)
     if link is not None and link.status != "active":
@@ -290,7 +350,11 @@ async def handle(
             # Nested so the guard covers the answers below as well.
             async with _guarded(outbox, FAILED, "telegram update failed"):
                 try:
-                    if handler is None:
+                    if update.voice is not None:
+                        text = await _hear(session, outbox, update.voice)
+                        if text is not None:
+                            await _answer(repo, chat, outbox, text)
+                    elif handler is None:
                         await _answer(repo, chat, outbox, update.text)
                     else:
                         await outbox.send(await handler(repo, chat))

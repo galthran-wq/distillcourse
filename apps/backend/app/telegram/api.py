@@ -177,6 +177,24 @@ async def answer_callback(callback_id: str, text: str | None = None) -> None:
     await _call("answerCallbackQuery", payload)
 
 
+async def download_file(file_id: str) -> bytes:
+    """The bytes behind a `file_id`: `getFile` names the path, then the file is
+    fetched from it. The token is in both URLs, so neither goes in an error."""
+    found = await _call("getFile", {"file_id": file_id})
+    path = found.get("file_path")
+    if not isinstance(path, str):
+        raise TelegramError("getFile named no file")
+    url = f"{API_URL}/file/bot{settings.TELEGRAM_BOT_TOKEN}/{path}"
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
+            response = await client.get(url)
+    except httpx.HTTPError as exc:
+        raise TelegramError(f"the file download did not reach telegram: {exc!r}")
+    if not response.is_success:
+        raise TelegramError(f"the file download failed: {response.status_code}")
+    return response.content
+
+
 async def set_webhook(url: str, secret: str) -> None:
     await _call(
         "setWebhook",

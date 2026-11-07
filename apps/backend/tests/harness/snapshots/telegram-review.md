@@ -104,6 +104,11 @@ often away from the material.
   locator to the learner.
 - The learner may be answering a question you asked hours ago; read the thread
   before assuming a fresh topic.
+- A message may be a transcript of a voice note; the learner was shown what
+  was heard. Allow for mis-hearing: a word that makes no sense in place is
+  more likely a misheard term than a mistake, so read it as the term it
+  sounds like, or ask. Never grade an answer down for a word that may have
+  been misheard. Do not ask for voice; it is the learner's choice to send.
 
 ## Memory
 

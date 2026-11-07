@@ -25,7 +25,13 @@ from tests.review.conftest import (
     ladder as ladder_row,
 )
 from tests.scheduling.conftest import NOON
-from tests.telegram.conftest import deliver, message
+from tests.telegram.conftest import (  # noqa: F401  (a shared fixture)
+    Ears,
+    deliver,
+    ears,
+    message,
+    voice,
+)
 from tests.telemetry.conftest import (
     HEARTBEATS_TO_COMPLETE,
     aggregate,
@@ -207,6 +213,29 @@ async def test_a_learner_who_writes_mid_review_is_handed_it_to_close(
     assert subject.OPEN in prompt
     assert str(row.id) in prompt
     assert "report_review_outcome" in prompt
+
+
+async def test_a_spoken_answer_is_handed_the_open_review_like_a_typed_one(
+    client: AsyncClient,
+    session: AsyncSession,
+    user: User,
+    bot: Bot,
+    ears: Ears,  # noqa: F811
+) -> None:
+    """Voice is transport: the transcript takes the typed answer's path, open
+    review and all."""
+    await ladder_row(session, user)
+    await ask(session)
+    row = (await reviews(session, user))[0]
+    ears.heard = "the average surprisal of the source"
+
+    with tutor.override(model=echoing()):
+        await deliver(client, voice())
+
+    assert "<i>Heard:</i> the average surprisal of the source" in bot.texts
+    prompt = echoed(bot)
+    assert subject.OPEN in prompt
+    assert str(row.id) in prompt
 
 
 async def test_the_run_that_answers_a_review_is_told_how_to_conduct_one(
