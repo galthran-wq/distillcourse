@@ -14,7 +14,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field
 from pydantic_ai import RunContext, ToolFailed
 
-from app.content.search import search, section_of, sections, suggest
+from app.content.search import Figure, figures, passage, search, sections, suggest
 from app.content.structure import CourseStructure, structure
 from app.harness import web_search as web
 from app.harness.agent import tutor
@@ -50,6 +50,9 @@ class Passage(BaseModel):
     title: str
     breadcrumb: str
     text: str
+    # What of the passage exists as an image; in Telegram, `send_figure` sends
+    # one of these and nothing else.
+    figures: list[Figure] = []
     prev: str | None = None
     next: str | None = None
 
@@ -116,7 +119,8 @@ async def fetch_content(
     session = ctx.deps.repo.session
     path, _, anchor = locator.partition("#")
     chunks = await sections(session, path)
-    if not chunks:
+    named = passage(chunks, locator)
+    if not named:
         return NotFound(did_you_mean=await _suggestions(ctx, locator))
 
     if anchor == "":
@@ -126,17 +130,17 @@ async def fetch_content(
             title=whole.title,
             breadcrumb=whole.breadcrumb,
             text="\n\n".join(chunk.text for chunk in chunks),
+            figures=figures(chunks),
         )
 
-    chunk = section_of(chunks, locator)
-    if chunk is None:
-        return NotFound(did_you_mean=await _suggestions(ctx, locator))
+    [chunk] = named
     position = chunks.index(chunk)
     return Passage(
         locator=chunk.locator,
         title=chunk.title,
         breadcrumb=chunk.breadcrumb,
         text=chunk.text,
+        figures=figures([chunk]),
         prev=chunks[position - 1].locator if position > 0 else None,
         next=chunks[position + 1].locator if position + 1 < len(chunks) else None,
     )

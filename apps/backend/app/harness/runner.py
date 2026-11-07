@@ -47,6 +47,7 @@ from app.labs import tools as lab_tools
 from app.memory import repository as memory
 from app.memory.repository import Recollection
 from app.models import Chat
+from app.telegram import tools as telegram_tools
 from app.telegram.outbox import Outbox
 
 
@@ -432,6 +433,7 @@ async def run(
                 medium, run_kind, await context.blocks(repo, extra=blocks)
             ),
             run_id=str(run_id),
+            toolsets=[telegram_tools.toolset] if outbox is not None else None,
         )
         await _close_run(
             repo, chat, run_id, result=result, unfinished=(), usage=None, failure=None

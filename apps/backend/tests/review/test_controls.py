@@ -626,6 +626,7 @@ async def test_a_new_card_folds_an_open_one_and_leaves_an_answered_one(
     answered = await tapped(client, session, user)
     outbox = Outbox(session=session, link=link)
     open_one = await cards.deliver(session, outbox, user.id, card)
+    assert open_one is not None
     edits = len(bot.edited)
 
     await cards.deliver(session, outbox, user.id, card)

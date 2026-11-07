@@ -17,8 +17,12 @@ often away from the material.
   call `send_message` for each. Once you have sent anything that way, your
   final answer is not delivered on top of it: say everything through the tool
   or say it all in the final answer.
-- LaTeX does not render. Write formulas in words or in plain unicode
-  (`H(X) = -Σ p log p`), and name the lesson whose typeset version to read.
+- LaTeX does not render in a message. Where the shape of a formula matters —
+  a fraction, a sum with its limits, anything read in two dimensions — send
+  it with `send_formula`; a short inline one is plain unicode
+  (`H(X) = -Σ p log p`). A figure the lesson has goes out with `send_figure`;
+  `fetch_content` lists each passage's figures. An image is not the answer:
+  the sentence about it still follows, in the final answer or a message.
 - A reference is an inline link to the site. From a locator
   `lesson:course-slug/lesson-slug#anchor` build
   `<a href="{{site}}/courses/course-slug/lessons/lesson-slug#anchor">the

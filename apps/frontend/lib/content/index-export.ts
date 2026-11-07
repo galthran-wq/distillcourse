@@ -10,6 +10,7 @@ import rehypeSlug from "rehype-slug";
 import { visit } from "unist-util-visit";
 import type { Root, RootContent, Element } from "hast";
 import { rawUrlBase } from "../labs/mirror";
+import { assetUrl, sequenceFrames } from "./images";
 import type { LoadedCourse, LoadedLesson } from "./load";
 import { CONCLUSION_ANCHOR, lessonKey, type Corpus } from "./locator";
 import { isMdxJsxNode, stringAttr, type MdxJsxNode } from "./mdx-jsx";
@@ -39,6 +40,14 @@ export interface IndexDocument {
   anchors: string[];
   position: number;
   metadata: Record<string, unknown>;
+}
+
+/** A figure a chunk shows, as the Telegram bot can send it: one image file. */
+export interface IndexFigure {
+  /** The URL path the site serves the file at (`assetUrl`). */
+  src: string;
+  alt: string;
+  caption: string | null;
 }
 
 export interface ContentIndex {
@@ -297,6 +306,31 @@ function countJsx(nodes: RootContent[], name: string): number {
 }
 
 /**
+ * The figures of a chunk that exist as a file. A sequence is its last frame,
+ * the complete state in one image; a component figure needs a browser to
+ * become an image at all, so it is left out.
+ */
+function figuresIn(nodes: RootContent[], courseSlug: string, entry: LoadedLesson): IndexFigure[] {
+  const found: IndexFigure[] = [];
+  visit(treeOf(nodes), (node: unknown) => {
+    if (!isMdxJsxNode(node)) return;
+    const file =
+      node.name === "Figure"
+        ? stringAttr(node, "src")
+        : node.name === "FigureSequence"
+          ? sequenceFrames(entry.dir, stringAttr(node, "name") ?? "").at(-1)
+          : undefined;
+    if (file === undefined) return;
+    found.push({
+      src: assetUrl(courseSlug, entry.lesson.slug, file),
+      alt: stringAttr(node, "alt") ?? "",
+      caption: stringAttr(node, "caption") ?? null,
+    });
+  });
+  return found;
+}
+
+/**
  * Where the lab's data files can be fetched from, absolute. The build copies
  * `data/` to the mirror verbatim, so the directory is the list; the URL scheme
  * is the mirror's own (lib/labs/mirror) and is stated in one place only.
@@ -373,6 +407,7 @@ function lessonDocuments(course: LoadedCourse, entry: LoadedLesson): IndexDocume
       document_word_count: documentWords,
       solutions_total: solutions,
       concepts,
+      figures: figuresIn(c.nodes, course.course.slug, entry),
       ...(lab !== undefined ? { lab } : {}),
     },
   }));

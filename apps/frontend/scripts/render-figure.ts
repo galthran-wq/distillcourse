@@ -13,6 +13,7 @@ import { basename, join, resolve } from "node:path";
 import { createElement, type ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { figures } from "../components/figures";
+import { LIGHT } from "../lib/figure-png/render";
 import { restoreInvocationDir } from "./invocation-dir";
 import { appRoot } from "./paths";
 
@@ -21,6 +22,11 @@ restoreInvocationDir();
 const args = process.argv.slice(2).filter((a) => a !== "--dark");
 const dark = process.argv.includes("--dark");
 const [target, frameArg] = args;
+// The dark theme's tokens (app/globals.css); the light ones are the PNG
+// route's.
+const palette = dark
+  ? { paper: "#0f1012", panel: "#1a1c20", ink: "#eef0f2", line: "#33373d" }
+  : LIGHT;
 
 let name: string;
 let component: ComponentType<{ frame?: number }>;
@@ -35,9 +41,7 @@ if (target !== undefined && target in figures) {
   // so the theme's text colour is injected on the root element.
   const svgPath = resolve(target);
   const src = readFileSync(svgPath, "utf8");
-  const ink = dark ? "#eef0f2" : "#15171a";
-  const paper = dark ? "#0f1012" : "#ffffff";
-  const themed = src.replace(/<svg\b/, `<svg style="color:${ink}"`);
+  const themed = src.replace(/<svg\b/, `<svg style="color:${palette.ink}"`);
   const outDir = join(appRoot, ".preview");
   mkdirSync(outDir, { recursive: true });
   const tmp = join(outDir, `.themed-${basename(svgPath)}`);
@@ -48,7 +52,7 @@ if (target !== undefined && target in figures) {
   writeFileSync(tmp, themed);
   execFileSync(
     "rsvg-convert",
-    ["-w", "1200", "-b", paper, tmp, "-o", png],
+    ["-w", "1200", "-b", palette.paper, tmp, "-o", png],
     { timeout: 30_000, killSignal: "SIGKILL" },
   );
   console.log(png);
@@ -83,9 +87,9 @@ const markup = renderToStaticMarkup(createElement(component, { frame }));
 // never loaded, `.katex-mathml` was left visible, and every formula rendered
 // twice — a defect of the harness that reviewers saw as a defect of the figure.
 const katexCss = require.resolve("katex/dist/katex.min.css");
-const tokens = dark
-  ? "--paper:#0f1012;--panel:#1a1c20;--ink:#eef0f2;--line:#33373d;"
-  : "--paper:#ffffff;--panel:#f2f3f5;--ink:#15171a;--line:#d5d8dc;";
+const tokens = Object.entries(palette)
+  .map(([name, value]) => `--${name}:${value};`)
+  .join("");
 
 const html = `<!doctype html>
 <html><head><meta charset="utf-8">

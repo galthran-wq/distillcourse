@@ -269,6 +269,12 @@ backend as `metadata.lab` (`est_hours`, each checkpoint with its `order`, and
 them from) on every exported chunk of the lesson, mirrored like
 `solutions_total`.
 
+Every lesson chunk also carries `metadata.figures`: `{src, alt, caption}` for
+each figure in that section that exists as a file — a `<Figure src>` at its
+`assetUrl`, a file `<FigureSequence>` by its last frame. Component figures are
+not listed: they need a browser to become an image. It is what the Telegram
+bot may send (`/course-assets-png/…` renders an SVG one as a PNG).
+
 ## Validation
 
 - `npm run validate [course [lesson]]` — CLI, prints per-file pass/fail with

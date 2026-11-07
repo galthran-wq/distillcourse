@@ -12,11 +12,17 @@ Each card:
 - is of a kind the level allows, which the request names;
 - has a `prompt` of at most 900 characters in Telegram HTML — only `<b>`,
   `<i>`, `<code>`; a literal `<`, `>` or `&` is `&lt;`, `&gt;`, `&amp;`. No
-  LaTeX: a formula is written in plain unicode (`H(X) = −Σ p log p`);
+  LaTeX in it: a formula in the text is plain unicode (`H(X) = −Σ p log p`),
+  and one whose shape matters is the card's `formula`;
 - has two to four `options` of at most 40 characters of plain text, exactly
   one of them right, and `answer`, the index of the right one counted from 0;
 - has an `explanation` of one or two sentences of plain text that says why
-  the right answer is right — the mechanism, not a restatement of the option.
+  the right answer is right — the mechanism, not a restatement of the option;
+- may be shown with an image, where the question is about it: `figure`, the
+  `src` of one of its section's figures as listed, or `formula`, one line of
+  LaTeX math without `$` and without environments (no `aligned`, no
+  `pmatrix`) — never both. Such a card's `prompt` is at most 400 characters
+  and refers to the image rather than restating it.
 
 The kinds:
 

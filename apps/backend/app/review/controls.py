@@ -127,12 +127,15 @@ async def _swap(outbox: Outbox, sent: CardDelivery, card: ReviewCard) -> None:
         replacement = await _due_card(session, user_id, now, cards.existing, easy=easy)
     if replacement is None:
         title = await cards.title_of(session, card)
-        await outbox.edit_text(
-            sent.tg_message_id, f"{cards.skipped(title)}\n\n{NOTHING_ELSE}"
+        await cards.edit(
+            outbox,
+            sent.tg_message_id,
+            card,
+            f"{cards.skipped(title)}\n\n{NOTHING_ELSE}",
         )
         await session.commit()
         return
-    await cards.replace(session, outbox, user_id, replacement, sent.tg_message_id)
+    await cards.replace(session, outbox, user_id, replacement, sent, card)
 
 
 async def another(outbox: Outbox, tap: Tap) -> None:

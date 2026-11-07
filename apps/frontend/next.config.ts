@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
   // is drawn from them in globals.css. Experimental, and nothing depends on
   // it — a browser without the View Transitions API cuts, as the site did.
   experimental: { viewTransition: true },
+  // A native addon, loaded from node_modules rather than bundled; the
+  // production image puts the musl build there (Dockerfile).
+  serverExternalPackages: ["@resvg/resvg-js"],
+  // Read by path at request time, which the tracer cannot follow.
+  outputFileTracingIncludes: {
+    "/course-assets-png/*": ["./lib/figure-png/fonts/*.ttf"],
+  },
   // Pin the project root to this directory. Without it, Turbopack infers the
   // root from lockfile locations and picks the MAIN checkout when running
   // from a git worktree (two package-lock.json files) — client chunks then

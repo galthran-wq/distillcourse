@@ -202,16 +202,21 @@ async def _send_card(
     level = 1 if state is None else state.level
     if await review.level_one_only(session, row.user_id, now):
         level = 1
-    card = await cards.pick(session, row.user_id, lesson, level)
-    if card is None:
-        logfire.warn(
-            "no card to send: the review is put off a day",
-            lesson=lesson,
-            level=level,
-        )
-        return False
-    await cards.deliver(session, outbox, row.user_id, card)
-    return True
+    # A card whose image Telegram refused is retired by `deliver`, and the
+    # next one in line is tried in its place — once, so an outage of the
+    # site's figures cannot retire a whole lesson's cards in one cycle.
+    for _ in range(2):
+        card = await cards.pick(session, row.user_id, lesson, level)
+        if card is None:
+            logfire.warn(
+                "no card to send: the review is put off a day",
+                lesson=lesson,
+                level=level,
+            )
+            return False
+        if await cards.deliver(session, outbox, row.user_id, card) is not None:
+            return True
+    return False
 
 
 async def cycle(session: AsyncSession, now: datetime) -> None:
