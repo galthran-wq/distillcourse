@@ -11,14 +11,20 @@ import {
   type ToggleKind,
 } from "@/lib/telemetry/tracker";
 
-/** Starts watching the current document; the teardown is the last flush. */
-export function watch(tracker: ReadingTracker): () => void {
+/**
+ * Starts watching the current document; the teardown is the last flush.
+ * `anchor` is asked on every beat for the section the reader is in.
+ */
+export function watch(
+  tracker: ReadingTracker,
+  anchor: () => string | null = () => null,
+): () => void {
   tracker.opened(document.referrer || undefined);
   // A lesson short enough to fit on one screen is already read to the end.
   tracker.scrolled(readingDepth());
 
   const beat = window.setInterval(
-    () => tracker.tick(document.visibilityState === "visible"),
+    () => tracker.tick(document.visibilityState === "visible", anchor()),
     HEARTBEAT_SECONDS * 1000,
   );
   const onActivity = () => tracker.activity();

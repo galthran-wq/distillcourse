@@ -33,9 +33,9 @@ class User(Base):
     __tablename__ = "users"
     # The waking window is same-day: `opens <= t < closes`, so it must open
     # before it closes and 18:00–02:00 cannot be expressed. Everything that
-    # counts waking hours reads it as one interval inside a date — the slot
-    # timeout that carries over the night, the budget that resets at local
-    # midnight — and wrapping the window is a change to all of that rather than
+    # counts waking hours reads it as one interval inside a date — the budget
+    # that resets at local midnight, the morning a deferred row opens on — and
+    # wrapping the window is a change to all of that rather than
     # to this constraint. The settings page says so where a learner sets it.
     __table_args__ = (
         CheckConstraint("quiet_start < quiet_end", name="ck_users_quiet_hours"),
@@ -64,6 +64,12 @@ class User(Base):
     # NULL is "not muted": until this moment the platform answers but never
     # opens the conversation itself.
     muted_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    # "Not today" under a card: no card goes out until this moment. Not
+    # `muted_until`, which holds a learner's reminders too — putting the cards
+    # off must not cancel an appointment they made.
+    cards_paused_until: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), default=None
     )
     # Set False by `python -m app.cli deactivate-user`: the session check and
@@ -228,6 +234,9 @@ class LessonProgress(Base):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), default=None
     )
+    # The section the latest heartbeat that named one was sent from: where to
+    # send the reader back to, which no scroll depth can name.
+    last_anchor: Mapped[str | None] = mapped_column(Text, default=None)
 
 
 class LessonPass(Base):
@@ -256,8 +265,9 @@ class LessonPass(Base):
 class Incident(Base):
     """A problem the tutor concluded is in the material, not in the learner.
 
-    Filed by `report_content_incident`; triage is manual (psql) and nothing in
-    the application reads this table.
+    Filed by `report_content_incident`, and by a learner flagging a review
+    card as wrong; triage is manual (psql) and nothing in the application
+    reads this table.
     """
 
     __tablename__ = "incidents"
@@ -283,15 +293,30 @@ class Incident(Base):
 class Schedule(Base):
     """One thing the platform intends to say to a learner on its own.
 
-    `due_at` is when the row next needs attention and its status says what
-    that attention is: a `pending` row fires, an `awaiting_reply` row counts
-    as ignored. `payload` carries `note` — what the message is about, in
-    words the run is given — and `topic`, the course or subject the rotation
-    steers away from after an ignored message.
+    `due_at` is when a `pending` or `deferred` row next fires; `done`,
+    `cancelled` and `failed` are where it ends. `payload` carries `note` for a
+    reminder — what the message is about, in words the run is given — and, for
+    a `coach` wake-up, `reason`, the line the last run left for this one, and
+    `note`, what woke it. A `nudge` is born `done`, `due_at` the moment it was
+    sent: the record of a reading nudge, whose id its Quick check button
+    carries, and `payload` its `nudge` kind, `lesson`, `anchor` and, once the
+    button is spent, `quick`.
     """
 
     __tablename__ = "schedules"
-    __table_args__ = (Index("ix_schedules_status_due_at", "status", "due_at"),)
+    __table_args__ = (
+        Index("ix_schedules_status_due_at", "status", "due_at"),
+        # One wake-up per learner: two would be two runs deciding the same
+        # day, each unaware of what the other sent.
+        Index(
+            "uq_schedules_live_coach",
+            "user_id",
+            unique=True,
+            postgresql_where=text(
+                "kind = 'coach' AND status IN ('pending', 'deferred')"
+            ),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -311,8 +336,9 @@ class Schedule(Base):
     )
     created_by: Mapped[str] = mapped_column(String(8))
     attempts: Mapped[int] = mapped_column(default=0)
-    # How a delivered message ended. Kept because the engagement machine that
-    # reads it is designed from real ignore data, not guessed at now.
+    # Historical: how a delivered message ended under the old slot model.
+    # Nothing writes it now; whether a card was ignored is
+    # `card_deliveries.outcome`.
     outcome: Mapped[str | None] = mapped_column(String(16), default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -345,7 +371,147 @@ class ReviewState(Base):
     next_due_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), default=None
     )
+    # How hard the cards of this lesson are for this learner, and how many in a
+    # row they have answered right at it. Per lesson: knowing one lesson says
+    # nothing about another.
+    level: Mapped[int] = mapped_column(SmallInteger, default=1, server_default="1")
+    level_run: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
     updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class ReviewCard(Base):
+    """One tap question about one section of a lesson, written by a model on
+    first need and checked against the same text before it is kept.
+
+    Shared between learners unless `owner_id` names one. `content_hash` is the
+    hash of the section it was written from; once the section changes, the
+    card is no longer served.
+    """
+
+    __tablename__ = "review_cards"
+    __table_args__ = (
+        Index("ix_review_cards_lesson_level", "lesson", "level", "status"),
+        CheckConstraint("level BETWEEN 1 AND 3", name="ck_review_cards_level"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid7)
+    lesson: Mapped[str] = mapped_column(String(LESSON_LENGTH))
+    # The h2 anchor of the section the card tests; NULL for a lesson indexed as
+    # one chunk.
+    anchor: Mapped[str | None] = mapped_column(Text, default=None)
+    kind: Mapped[str] = mapped_column(String(16))
+    level: Mapped[int] = mapped_column(SmallInteger)
+    prompt: Mapped[str] = mapped_column(Text)
+    options: Mapped[list[str]] = mapped_column(JSONB)
+    # The index of the right option; for an `order` card, the indices of its
+    # steps in their right order.
+    answer: Mapped[int | list[int]] = mapped_column(JSONB)
+    explanation: Mapped[str] = mapped_column(Text)
+    figure: Mapped[str | None] = mapped_column(Text, default=None)
+    formula: Mapped[str | None] = mapped_column(Text, default=None)
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), default=None
+    )
+    content_hash: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(
+        String(16), default="active", server_default="active"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class CardDelivery(Base):
+    """One card sent to one learner, and what became of it.
+
+    `outcome` stays NULL until a tap grades it, the tutor grades a written
+    answer to it, or a day passes without either (`ignored`).
+    """
+
+    __tablename__ = "card_deliveries"
+    __table_args__ = (
+        Index("ix_card_deliveries_user_sent", "user_id", "sent_at"),
+        # What `expire` scans every cycle: the open deliveries, a small set in a
+        # table that is never pruned.
+        Index(
+            "ix_card_deliveries_open",
+            "sent_at",
+            postgresql_where=text("outcome IS NULL"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid7)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE")
+    )
+    card_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("review_cards.id", ondelete="CASCADE")
+    )
+    tg_message_id: Mapped[int] = mapped_column(BigInteger)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    answered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    # The option tapped; for an `order` card, the steps tapped so far, in order.
+    chosen: Mapped[int | list[int] | None] = mapped_column(JSONB, default=None)
+    outcome: Mapped[str | None] = mapped_column(String(16), default=None)
+    # The buttons under the feedback the learner has pressed, by prefix, so a
+    # second press of one does nothing. "In my own words" holds what became of
+    # it: asked for, then the grade of the answer.
+    follow_ups: Mapped[dict[str, str]] = mapped_column(
+        JSONB, default=dict, server_default=text("'{}'::jsonb")
+    )
+    # Sent because the learner asked for a harder card. Volunteered, so it
+    # grades differently: a right answer raises the level, a wrong one changes
+    # nothing.
+    harder: Mapped[bool] = mapped_column(default=False, server_default="false")
+    # Sent on the platform's own account — by the coach or the weekly floor —
+    # rather than because the learner pressed something. Only these spend the
+    # day's initiation.
+    initiated: Mapped[bool] = mapped_column(default=False, server_default="false")
+
+
+class CoachNote(Base):
+    """A weekly note the coach sent: how each course is holding, what is
+    slipping, and one thing to do next. It spends the day's initiation.
+
+    `lesson` is what its Send it button puts a card on, NULL for a note with
+    no button; `pressed_at` spends the button. `tg_message_id` is NULL until
+    Telegram has the message: the row is written first, so a note that went
+    out is never missing from the day's count.
+    """
+
+    __tablename__ = "coach_notes"
+    __table_args__ = (Index("ix_coach_notes_user_sent", "user_id", "sent_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid7)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE")
+    )
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    tg_message_id: Mapped[int | None] = mapped_column(BigInteger, default=None)
+    lesson: Mapped[str | None] = mapped_column(String(LESSON_LENGTH), default=None)
+    pressed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
+
+class BackgroundRun(Base):
+    """Model spend with no message to hang it on: a card written or checked
+    in the poller, a voice note transcribed. The monthly ceiling sums `usage`
+    here as it does on `messages` and `lab_submissions`."""
+
+    __tablename__ = "background_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid7)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), default=None
+    )
+    kind: Mapped[str] = mapped_column(String(16))
+    usage: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 

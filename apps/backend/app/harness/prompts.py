@@ -19,12 +19,11 @@ QUOTE_SOURCE = "learner-quote"
 ATTACHMENT_SOURCE = "learner-attachment"
 
 Medium = Literal["web", "telegram", "notebook"]
-RunKind = Literal["chat", "review", "proactive", "compact"]
+RunKind = Literal["chat", "reminder", "compact"]
 
 _MODULES: dict[RunKind, tuple[str, ...]] = {
     "chat": ("memory.md", "courses.md"),
-    "review": ("memory.md", "courses.md", "review.md"),
-    "proactive": ("memory.md", "courses.md", "proactive.md"),
+    "reminder": ("memory.md", "courses.md", "reminder.md"),
     # A compaction returns memory candidates, so it is held to the same rules
     # about them as a dialogue is.
     "compact": ("memory.md", "compact.md"),
@@ -112,7 +111,7 @@ def learner_attachment(name: str, kind: str, text: str) -> str:
     )
 
 
-def _render(block: ContextBlock) -> str:
+def render(block: ContextBlock) -> str:
     if block.untrusted_source is None:
         return f"## {block.title}\n\n{block.body}"
     return f"## {block.title}\n\n{untrusted(block.untrusted_source, block.body)}"
@@ -122,4 +121,4 @@ def assemble(
     medium: Medium, run_kind: RunKind, blocks: tuple[ContextBlock, ...] = ()
 ) -> str:
     modules = ["base.md", f"medium/{medium}.md", *_MODULES[run_kind]]
-    return "\n\n".join([*(module(name) for name in modules), *map(_render, blocks)])
+    return "\n\n".join([*(module(name) for name in modules), *map(render, blocks)])

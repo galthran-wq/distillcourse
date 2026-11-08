@@ -86,7 +86,10 @@ nothing is ever sent.
 2. Put any long random string in `TELEGRAM_WEBHOOK_SECRET` — Telegram echoes it
    back in a header on every call, and that header is the only thing that says
    a request is Telegram's.
-3. Register the URL once, after the stack is up and reachable over TLS:
+3. Register the URL. `make deploy` does it on every deploy (`make webhook`),
+   at `$FRONTEND_HOST/api/tg/webhook`: Telegram keeps the URL and the update
+   kinds it posts (`allowed_updates` in `app/telegram/api.py`) from the last
+   call, so a release that changes either needs it again. By hand:
 
 ```bash
 docker compose exec backend python -m app.cli set-webhook \

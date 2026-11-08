@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.harness.repository import HarnessRepository
 from app.harness.usage import COST_USD, WEB_SEARCH_CALLS
-from app.models import LabSubmission, Message
+from app.models import BackgroundRun, LabSubmission, Message
 
 MEMORY_WRITES = "memory_writes"
 
@@ -16,22 +16,21 @@ class LimitExceeded(Exception):
 
 async def check_cost_ceiling(session: AsyncSession) -> None:
     # Instance-wide, not per user: this ceiling protects the budget of the
-    # deployment, and every run spends from the same OpenRouter key. Both
-    # tables that hold a usage row are counted — a lab's judge spends that key
-    # too, and a ceiling that only saw the chats would stop being the budget.
+    # deployment, and every run spends from the same OpenRouter key. Every
+    # table that holds a usage row is counted — a lab's judge and the card
+    # writer spend that key too, and a ceiling that only saw the chats would
+    # stop being the budget.
     month = func.date_trunc("month", func.now())
-    chats = select(func.sum(Message.usage[COST_USD].as_float())).where(
-        Message.created_at >= month
-    )
-    judged = select(func.sum(LabSubmission.usage[COST_USD].as_float())).where(
-        LabSubmission.created_at >= month
-    )
-    spent = await session.scalar(
-        select(
-            func.coalesce(chats.scalar_subquery(), 0.0)
-            + func.coalesce(judged.scalar_subquery(), 0.0)
+    chats, judged, background = (
+        func.coalesce(
+            select(func.sum(table.usage[COST_USD].as_float()))
+            .where(table.created_at >= month)
+            .scalar_subquery(),
+            0.0,
         )
+        for table in (Message, LabSubmission, BackgroundRun)
     )
+    spent = await session.scalar(select(chats + judged + background))
     if float(spent or 0.0) >= settings.MONTHLY_COST_CEILING_USD:
         raise LimitExceeded(
             f"monthly budget of ${settings.MONTHLY_COST_CEILING_USD:.2f} is spent"

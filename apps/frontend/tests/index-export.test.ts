@@ -340,6 +340,37 @@ describe("courseDocuments", () => {
     });
   });
 
+  it("lists each section's file figures; a sequence by its last frame, no component figures", () => {
+    vi.stubEnv("CONTENT_PREVIEW", "1");
+    const mdx = [
+      "Lead.",
+      "",
+      '<Figure src="./figures/plot.png" alt="a plot" />',
+      "",
+      "## Steps",
+      "",
+      '<FigureSequence name="steps" alt="the steps" caption="Step by step." />',
+      "",
+      '<Figure name="Drawn" alt="a component" caption="Needs a browser." />',
+      "",
+      '<FigureSequence name="Pascal" alt="frames" />',
+    ].join("\n");
+    const figured = loadedLesson("figured", "Figured", "drafted", mdx, 0);
+    const [lead, steps] = lessonChunks(courseDocuments(course([figured])), "figured");
+
+    expect(lead.metadata.figures).toEqual([
+      { src: "/course-assets/demo-course/figured/plot.png", alt: "a plot", caption: null },
+    ]);
+    // Frame 10 is the last: the order is numeric, not by name.
+    expect(steps.metadata.figures).toEqual([
+      {
+        src: "/course-assets/demo-course/figured/steps-10.svg",
+        alt: "the steps",
+        caption: "Step by step.",
+      },
+    ]);
+  });
+
   it("indexes research per file and concepts per entry, whatever the statuses", () => {
     const docs = courseDocuments(course([]));
 

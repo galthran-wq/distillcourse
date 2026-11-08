@@ -5,6 +5,7 @@
  */
 
 import { API } from "@/lib/api-base";
+import { ANCHOR_SOURCE } from "@/lib/content/locator";
 
 export const ENDPOINT = `${API}/telemetry/events`;
 export const HEARTBEAT_SECONDS = 10;
@@ -16,6 +17,9 @@ export const SCROLL_MARKS = [25, 50, 75, 90, 100];
 // would cost the whole event, and where the reader came from is worth less
 // than knowing they arrived.
 export const MAX_REFERRER = 200;
+// An anchor app/content/locators.py would refuse costs the whole heartbeat, so
+// such a beat goes out without one.
+const ANCHOR = new RegExp(`^${ANCHOR_SOURCE}$`);
 
 export type ToggleKind = "proof" | "solution" | "aside";
 
@@ -79,8 +83,11 @@ export class ReadingTracker {
     this.lastActivity = this.now();
   }
 
-  /** One beat of the heartbeat interval; `visible` is the tab's own state. */
-  tick(visible: boolean): void {
+  /**
+   * One beat of the heartbeat interval; `visible` is the tab's own state, and
+   * `anchor` the section the reader is in — where a link back sends them.
+   */
+  tick(visible: boolean, anchor: string | null = null): void {
     const now = this.now();
     const seconds = Math.min(
       Math.round((now - this.lastTick) / 1000),
@@ -89,7 +96,10 @@ export class ReadingTracker {
     // Measured rather than assumed: a browser that throttled this timer must
     // not buy the reader seconds they did not spend.
     if (visible && now - this.lastActivity < IDLE_MS && seconds >= 1) {
-      this.push("heartbeat", { seconds });
+      this.push(
+        "heartbeat",
+        anchor !== null && ANCHOR.test(anchor) ? { seconds, anchor } : { seconds },
+      );
     }
     this.lastTick = now;
     this.flush();

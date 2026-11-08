@@ -1,5 +1,5 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -7,6 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.labs import DAY, _daily_budgets
+from app.coach import wake
 from app.core.rate_limit import FixedWindow
 from app.labs import judge, repository
 from app.models import (
@@ -16,6 +17,7 @@ from app.models import (
     ReviewState,
     User,
 )
+from app.scheduling import repository as scheduling
 from tests.labs.conftest import (
     DIGEST,
     FAILING,
@@ -225,6 +227,26 @@ async def test_the_required_checkpoints_finish_the_lesson_exactly_once(
     await post(notebook, "surprisal", SURPRISAL)
 
     assert await completions(session, user) == 1
+
+
+async def test_finishing_a_lab_pulls_the_coachs_next_look_forward(
+    notebook: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    far = datetime.now(UTC) + timedelta(days=5)
+    row = await scheduling.create(
+        session,
+        user_id=user.id,
+        kind=wake.KIND,
+        due_at=far,
+        payload={"reason": "", "note": wake.OWN},
+        created_by="system",
+    )
+
+    await pass_all_required(notebook)
+
+    await session.refresh(row)
+    assert row.payload["note"] == wake.finished(LESSON)
+    assert row.due_at < far
 
 
 async def test_a_lab_finished_by_its_checkpoints_reads_as_a_finished_lesson(
