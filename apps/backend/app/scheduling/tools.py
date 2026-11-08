@@ -71,9 +71,7 @@ async def cancel_reminder(ctx: RunContext[HarnessDeps], reminder_id: uuid.UUID) 
     return "no reminder of the learner's is waiting under that id"
 
 
-async def mute_proactive(
-    ctx: RunContext[HarnessDeps], until: datetime | None = None
-) -> str:
+async def mute_bot(ctx: RunContext[HarnessDeps], until: datetime | None = None) -> str:
     """Stop the platform from opening the conversation on its own.
 
     Answers to what the learner writes are unaffected; only messages the
@@ -89,12 +87,12 @@ async def mute_proactive(
     )
     await repository.mute(repo.session, repo.user_id, until=resumes)
     if until is None:
-        return "proactive messages are off until the learner turns them back on"
-    return f"proactive messages are off until {resumes.isoformat()}"
+        return "messages the bot starts are off until the learner turns them back on"
+    return f"messages the bot starts are off until {resumes.isoformat()}"
 
 
-async def unmute_proactive(ctx: RunContext[HarnessDeps]) -> str:
+async def unmute_bot(ctx: RunContext[HarnessDeps]) -> str:
     """Let the platform open the conversation again."""
     repo = ctx.deps.repo
     await repository.mute(repo.session, repo.user_id, until=None)
-    return "proactive messages are on again"
+    return "messages the bot starts are on again"

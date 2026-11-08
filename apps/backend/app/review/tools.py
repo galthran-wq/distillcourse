@@ -1,4 +1,5 @@
 import uuid
+from contextlib import suppress
 from datetime import UTC, datetime
 
 from pydantic_ai import RunContext
@@ -9,6 +10,7 @@ from app.memory import repository as memory
 from app.models import MEMORY_SLUG_LENGTH
 from app.review import repository
 from app.review.ladder import Outcome
+from app.telegram import api
 
 # The sore spot of one lesson, kept under a handle derived from that lesson, so
 # the next review of it replaces what the last one found rather than adding a
@@ -47,54 +49,54 @@ async def _remember(ctx: RunContext[HarnessDeps], lesson: str, notes: str) -> st
 
 async def report_review_outcome(
     ctx: RunContext[HarnessDeps],
-    schedule_id: uuid.UUID,
+    delivery_id: uuid.UUID,
     outcome: Outcome,
     notes: memory.Content | None = None,
 ) -> str:
-    """Record how the learner did on one review, and when it should come back.
+    """Grade a review card the learner answered in their own words.
 
-    Call it once per review item you got an answer on, as soon as you have
-    judged that answer. An item you never got to is left alone: it comes back
-    another day, and reporting an outcome you did not observe corrupts the
-    schedule for that lesson.
+    Call it once, as soon as you have judged the answer. A card they tapped is
+    graded already, unless they asked to answer it in their own words — then
+    grade those. A card they never answered is left alone: reporting an
+    outcome you did not observe corrupts the schedule for that lesson.
 
     Args:
-        schedule_id: the id given beside the review in your context.
-        outcome: `passed` if they produced the thing asked for, `partial` if
-            they had part of it or needed the answer pulled out of them,
-            `failed` if they could not or got it wrong.
+        delivery_id: the delivery id given beside the card in your context.
+        outcome: `passed` if they stated the right idea, `partial` if they had
+            part of it, `failed` if they could not or got it wrong.
         notes: what to carry into the next review of this lesson — the specific
             confusion, in one line ("reverses the direction of KL"). Omit it
             when there is nothing to carry.
     """
     repo = ctx.deps.repo
-    row = await repository.delivery(repo.session, repo.user_id, schedule_id)
-    if row is None:
-        return "no review of this learner's is on record under that id"
-    graded = row.payload.get(repository.OUTCOME)
-    if graded in repository.GRADES:
-        # One delivery moves the ladder once. Two runs can hold the same item —
-        # a learner's answer split across two messages gives the second run a
-        # context block assembled before the first one graded it — and a second
-        # move would skip a rung the learner never sat.
-        return f"that review is already recorded as {graded}"
-    lesson: str = row.payload["lesson"]
-    now = datetime.now(UTC)
-    state = await repository.apply(repo.session, repo.user_id, lesson, outcome, now)
-    if state is None:
-        return f"there is no review ladder for {lesson}"
-    await repository.mark(repo.session, row, outcome)
-    # A review the platform had given up on and queued again is asking about a
-    # rung the learner has just moved off.
-    await repository.cancel_deliveries(repo.session, repo.user_id, lesson)
-    # One transaction for the three of them: a ladder moved without its
-    # delivery marked is settled a second time by the next poller cycle, which
-    # rewrites the interval this call just set.
+    found = await repository.delivery(repo.session, repo.user_id, delivery_id)
+    if found is None:
+        return "no card of this learner's was sent under that id"
+    sent, card = found
+    own = sent.follow_ups.get(repository.OWN_WORDS)
+    if own is not None and own != repository.ASKED:
+        return f"their own words on that card are already graded as {own}"
+    if own is None and not repository.is_open(sent):
+        # One card moves the ladder once: a tap and a written answer, or an
+        # answer split across two messages, can both reach here.
+        return f"that card is already closed as {sent.outcome}"
+    now = ctx.deps.now or datetime.now(UTC)
+    if own == repository.ASKED:
+        state = await repository.recall(repo.session, sent, card, outcome, now)
+    else:
+        state = await repository.grade(repo.session, sent, card, outcome, now)
     await repo.session.commit()
-    kept = "" if notes is None else await _remember(ctx, lesson, notes)
+    if own is None and ctx.deps.outbox is not None:
+        # Answered in words, the card is closed: its buttons would only do
+        # nothing when pressed.
+        with suppress(api.TelegramError):
+            await ctx.deps.outbox.edit_keyboard(sent.tg_message_id, None)
+    kept = "" if notes is None else await _remember(ctx, card.lesson, notes)
+    if state is None:
+        return f"recorded as {outcome}; there is no review ladder for {card.lesson}"
     if state.next_due_at is None:
-        return f"recorded as {outcome}; the ladder for {lesson} is finished.{kept}"
+        return f"recorded as {outcome}; the ladder for {card.lesson} is finished.{kept}"
     return (
-        f"recorded as {outcome}; {lesson} comes back "
+        f"recorded as {outcome}; {card.lesson} comes back "
         f"{state.next_due_at:%Y-%m-%d}.{kept}"
     )

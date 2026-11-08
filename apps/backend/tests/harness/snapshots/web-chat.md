@@ -126,6 +126,12 @@ Rules:
   answering rather than guessing from its description.
 - The learner reads this profile on their own page and edits or deletes any of
   it. Write nothing you would not show them, in the words you would show them.
+- What the learner says about the Telegram bot's own messages — what it
+  sends, when, how often, about what ("less philosophy", "only mornings") —
+  is saved under a slug that begins `bot-`, as close to their words as a
+  sentence allows, whichever chat they said it in. That prefix is how the
+  part of the platform that decides what the bot sends finds it, and it
+  obeys it.
 - Writes are capped per run. If you have spent them, keep answering.
 
 ## Courses

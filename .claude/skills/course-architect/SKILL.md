@@ -101,8 +101,17 @@ fable`, a general-purpose agent):
   summaries replaced by the path of that file, and the not-fully-read list
   corrected — as a file too; a prompt that size does not belong inline.
 - A handful of new sources can be read by the synthesis agent itself
-  (name them, with where they are cached); a large batch goes through a
-  `phase: structure, until: read` run first.
+  (name them, with where they are cached). A larger batch — books the human
+  staged after the first run, primary texts the canon scout passed over for
+  surveys, the reading behind a planned extension — goes through the
+  `read-sources` workflow first: Workflow `{name: "read-sources", args:
+  {slug, root, sources: [{title, author, kind, url?}], brief?}}`. It runs
+  only the Read phase of `course-factory.js` over exactly those sources (a
+  staged file in `research/texts/` with its sidecar is found on disk before
+  the web is searched) and returns `{summaries, accessLog, not_fully_read}`;
+  the synthesis agent then gets the old summaries from the earlier journal
+  and the new ones from this result. Report `not_fully_read` to the human
+  as the list of books to obtain.
 
 Report exactly as step 4 says; the result is the same artefacts the
 workflow would have written.

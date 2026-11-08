@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { basename, join, normalize } from "node:path";
 import { unified } from "unified";
 import { compileSync, evaluateSync } from "@mdx-js/mdx";
@@ -28,10 +28,10 @@ import {
 import {
   MAX_FIGURE_BYTES,
   MIN_FIGURE_WIDTH,
-  RASTER_EXTENSIONS,
   isProbeError,
   isRasterFile,
   probeImageFile,
+  sequenceFrames,
 } from "./images";
 import { collectJsx, stringAttr } from "./mdx-jsx";
 import { GRADED, isGraded } from "./graded";
@@ -478,19 +478,11 @@ function lintLessonMdx(
       continue;
     }
 
-    let frameCount = 0;
-    if (name !== undefined && /^[a-z0-9-]+$/.test(name)) {
-      const figuresDir = join(entry.dir, "figures");
-      if (existsSync(figuresDir)) {
-        const exts = ["svg", ...RASTER_EXTENSIONS.map((e) => e.slice(1))].join("|");
-        const re = new RegExp(`^${name}-\\d+\\.(${exts})$`);
-        const frames = readdirSync(figuresDir).filter((f) => re.test(f));
-        frameCount = frames.length;
-        for (const frame of frames) {
-          checkImageFile(join("figures", frame), `<FigureSequence name="${name}"> frame ${frame}`);
-        }
-      }
+    const frames = name === undefined ? [] : sequenceFrames(entry.dir, name);
+    for (const frame of frames) {
+      checkImageFile(join("figures", frame), `<FigureSequence name="${name}"> frame ${frame}`);
     }
+    const frameCount = frames.length;
     if (frameCount < 2) {
       diags.push({
         level: "warn",

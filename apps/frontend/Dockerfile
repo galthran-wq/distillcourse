@@ -25,6 +25,15 @@ COPY content /app/content
 # host before this build starts, so the image needs no uv.
 RUN npm run validate -- --no-labs && npm run build
 
+# The figure-to-PNG route (app/course-assets-png) loads resvg's native addon.
+# The build stage installed the glibc build; the runtime is musl, so its build
+# is installed on alpine at the version package.json pins.
+FROM node:22-alpine AS resvg
+WORKDIR /resvg
+COPY apps/frontend/package.json /tmp/frontend-package.json
+RUN echo '{}' > package.json && npm install --no-save \
+  "@resvg/resvg-js@$(node -p "require('/tmp/frontend-package.json').dependencies['@resvg/resvg-js']")"
+
 FROM node:22-alpine AS run
 # The repo layout is preserved inside the image (app under /app/apps/frontend,
 # content at /app/content): the app resolves content/ two levels above its own
@@ -38,6 +47,7 @@ ENV CONTENT_PREVIEW=$CONTENT_PREVIEW
 COPY --from=build /app/apps/frontend/.next/standalone ./
 COPY --from=build /app/apps/frontend/.next/static ./.next/static
 COPY --from=build /app/apps/frontend/public ./public
+COPY --from=resvg /resvg/node_modules/@resvg ./node_modules/@resvg
 # Safety fallback only: all pages are statically generated at build time and
 # nothing reads content/ at runtime today.
 COPY --from=build /app/content /app/content

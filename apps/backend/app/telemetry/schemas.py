@@ -45,6 +45,10 @@ class Heartbeat(BaseModel):
     # The client sends one every ten seconds of attention; what is stored is
     # whatever of it `ingest` could back with elapsed server time.
     seconds: Annotated[int, Field(ge=1, le=MAX_HEARTBEAT_SECONDS)]
+    # The section the reader is in. On the heartbeat rather than an event of
+    # its own: a heartbeat is sent only while the reader is attending, so the
+    # last one names where they stopped rather than where a tab was left.
+    anchor: Annotated[str, Field(pattern=rf"^{locators.ANCHOR}$")] | None = None
 
 
 class Scroll(BaseModel):

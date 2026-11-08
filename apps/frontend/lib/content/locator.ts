@@ -45,8 +45,9 @@ export function sectionKey(
 // the tutor writes into an answer is matched against this before it becomes a
 // link, so widening it here widens what a message can point the reader at.
 const SLUG = "[a-z0-9-]{1,80}";
+export const ANCHOR_SOURCE = "[^\\s#]{1,200}";
 const LESSON_SECTION = new RegExp(
-  `^${LESSON_PREFIX}(${SLUG})/(${SLUG})(?:#([^\\s#]{1,200}))?$`,
+  `^${LESSON_PREFIX}(${SLUG})/(${SLUG})(?:#(${ANCHOR_SOURCE}))?$`,
 );
 
 const COURSE = new RegExp(`^course:(${SLUG})$`);

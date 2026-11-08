@@ -18,8 +18,8 @@ from app.scheduling.tools import (
     cancel_reminder,
     create_reminder,
     list_reminders,
-    mute_proactive,
-    unmute_proactive,
+    mute_bot,
+    unmute_bot,
 )
 from app.telegram.tools import send_message
 
@@ -34,8 +34,8 @@ _BARRIERS = (
     create_reminder,
     list_reminders,
     cancel_reminder,
-    mute_proactive,
-    unmute_proactive,
+    mute_bot,
+    unmute_bot,
     send_message,
     read_memory,
     save_memory,
@@ -89,7 +89,7 @@ def model_for(openrouter_id: str, *, reasoning: bool = False) -> OpenRouterModel
     )
     # Only where the model has a reasoning trace AND the caller has a place to
     # show it: the web streaming chat, whose client renders the trace in a
-    # dropdown. Never for a title, a compaction, a proactive message or a
+    # dropdown. Never for a title, a compaction, a reminder or a
     # Telegram turn — none of them surface it, and the tokens would be billed
     # against the monthly ceiling for nothing. Low effort: it is a UX affordance,
     # not a quality lever. `exclude` defaults False, so the trace is returned.

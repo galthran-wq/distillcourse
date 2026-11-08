@@ -10,6 +10,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from app.coach import wake
 from app.content import search
 from app.core.sessions import token_hash
 from app.labs import judge, verify
@@ -489,7 +490,10 @@ async def submit(
         # above only counts once it has been re-derived. Here rather than in a
         # later flush, because a lab nobody read has no later flush.
         await progress.recompute(session, user_id, posted.lesson)
-        await review.start(session, user_id, posted.lesson, now)
+        if await review.start(session, user_id, posted.lesson, now):
+            await wake.pull(
+                session, user_id, now + wake.SOON, wake.finished(posted.lesson)
+            )
     await session.commit()
     return SubmissionResult(**asdict(verdict), progress=completion)
 
