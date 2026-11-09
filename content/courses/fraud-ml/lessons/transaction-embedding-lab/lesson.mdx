@@ -1,0 +1,78 @@
+The lab builds the encoder the module described, on real anonymised bank histories with product-purchase targets and no fraud label: slices and a margin loss trained on CPU in minutes, an embedding read for every client at every month's cut without a later event, aggregates by prefix sums as the opponent, and a bootstrap that says whether the two differ — at all the labels and at a tenth of them.
+
+The last four lessons described the contrastive task, the loss, the fusion of a
+learned vector with hand-built features and the questions to ask of any claim
+that one beats the other. Each of those claims rests on code that can be wrong
+without raising an error: a slice that runs past its history, a row paired
+with itself, a state read one event after the cut, a bootstrap that treats a
+client's four months as four witnesses. A wrong line still prints a plausible
+ROC-AUC, and the leak at the cut prints a better one.
+
+So you write the pipeline and check each part: a seeded slice sampler; the
+margin loss on a batch of unit vectors, and the same loss restricted to each
+slice's hard negatives; the forward pass of a GRU encoder over packed
+sequences; the embedding of every client at every month's cut from one pass
+over its history; the windowed aggregates over 30 days, 90 days and the whole
+history by prefix sums; a paired bootstrap of the difference in ROC-AUC that
+resamples clients, not rows; the set of clients and events the encoder may
+train on; and the training loop. Then your encoder is trained on about 5,700
+clients' histories and judged against your aggregates on clients and months
+it has never seen.
+
+Every definition comes from an earlier lesson. Slices, the margin loss, hard
+negatives and the identity shortcut come from
+<Ref lesson="contrastive-event-embeddings" />; the next-event model with public
+weights from <Ref lesson="generative-pretraining-and-tokenisation" />; the rank
+average from <Ref lesson="transaction-foundation-models" />; the checklist from
+<Ref lesson="reading-foundation-model-claims" />; windowed aggregates and the
+point-in-time cut from <Ref lesson="transaction-aggregates" /> and
+<Ref lesson="point-in-time-features" />, built once already in
+<Ref lesson="point-in-time-feature-lab" />. PyTorch is used at the level of
+`nn.Embedding`, `nn.GRU` and an optimiser step; no sequence library.
+
+The data is a cut of the public Multimodal Banking Dataset: 11,837 clients,
+4.7 million card events from July 2021 to December 2022, and for each client
+and month whether they bought each of four products. It has no fraud label,
+its dates carry noise within the day, and half its clients were chosen for
+having bought something, so its scores are neither fraud results nor
+comparable with the benchmark's published ones. The notebook says this where
+the numbers appear.
+
+The lab runs as a Jupyter notebook — open it in Colab with the button above, or
+in any Jupyter. It needs no GPU and downloads about 21 MB of data. The
+pretraining takes about four minutes on four CPU threads and ten to fifteen on
+a two-core Colab machine; the whole notebook, about eight minutes on the former.
+Pair the notebook with the code from this page; each checkpoint submits your
+function's outputs for verification, and the checklist above tracks what
+stands. The nine exact checkpoints are the required set. When a check goes
+red, the verdict often names the bug — a length clipped instead of drawn, the
+diagonal paired, a same-client slice taken as a hard negative, the padding
+read as the final state, the state after the cut, a prefix array without its
+zero row, rows resampled instead of clients, a test client in the pretraining
+set, gradients never cleared — so read it before rereading your code.
+
+The written answer (what your three intervals license and forbid) and the
+open task are optional. The open task scores the graded fold's four months
+for all four products with labels of only a tenth of the training clients,
+to a stacked ROC-AUC above 0.654. The boosted tree on the aggregates reaches
+0.630 there, the logistic regression on the embedding 0.626, and their rank
+average 0.650, just short of the bar: clearing it takes a change that buys
+something, and a plot of your scores beside those three, product by product,
+shows what each change bought. In the reference run the embedding did not beat the aggregates
+with all labels, the interval for the rank average spanned zero, and at a
+tenth of the labels both intervals cleared it; at 3% they cleared it with one
+pretraining seed and spanned it with another. An optional last
+section sets out how to bring the released next-event weights and a
+synthetic card set with a fraud label into the same comparison.
+
+The embedding is one more feature computed as of a cut. How such features are
+computed, stored and served inside a payment's deadline is the subject of
+<Ref lesson="real-time-scoring-architecture" />.
+
+<References>
+1. D. Babaev, N. Ovsov, I. Kireev, M. Ivanova, G. Gusev, I. Nazarov, A. Tuzhilin, "CoLES: Contrastive Learning for Event Sequences with Self-Supervision," *Proceedings of SIGMOD 2022* (arXiv:2002.08232) — Algorithm 1 (random slices), Sec. 3.3 (the margin loss on unit vectors and the batch distance matrix), Sec. 3.4 (the GRU encoder), Table 5 (hard negatives), Sec. 4.0.4 (batch sizes).
+2. pytorch-lifestream, https://github.com/pytorch-lifestream/pytorch-lifestream — the tutorial notebooks `coles-emb.ipynb` and `coles-catboost.ipynb` (pretrain an encoder, freeze it, feed its embeddings to a boosted tree), the two-step shape this lab is modelled on. The lab writes the sampler, the loss, the hard-negative selector and the encoder itself instead of calling the library, and adds what the tutorials do not have: the point-in-time cut, the aggregates as opponent, the paired client bootstrap and the reduced label budgets. Also `docs/sequential_data_definition.md` and `docs/feature_naming.md` (per-client arrays, and why a per-client value is kept apart from them).
+3. D. Mollaev, I. Kireev, M. Postnova et al., "Multimodal Banking Dataset: Understanding Client Needs through Event Sequences," arXiv:2409.17587, 2024 — Sec. 3.2 (the four targets and the events before the month), Sec. 3.3 (noise on dates and amounts), Sec. 4.2.1 and Table 2 (the aggregation baseline and the published scores). MBD-mini under CC BY 4.0: https://huggingface.co/datasets/ai-lab/MBD-mini
+4. D. Burakov, "EventGPT: Next-Event Pretraining on Banking Customer Histories," arXiv:2611.03302, 2026, and the weights `deburky/EventGPT` (CC BY 4.0) — the embedding call, client-clustered uncertainty, the measured cost of pretraining on the label period; the lab's optional section.
+5. NVIDIA, "Build Your Own Transaction Foundation Model," developer example, notebooks 01, 04 and 05 (baseline, last-token embeddings, raw and embedding features through a boosted tree), with the IBM TabFormer repository's synthetic card data — the optional fraud step.
+</References>

@@ -1,0 +1,374 @@
+Fifteen windowed aggregates per card took a module to design, and they were designed for one task on one issuer's data. A second issuer has different fields, a laundering team needs a different grouping key, and for a new product line there are forty labelled cases. Each time, someone writes new features by hand. A customer's history is already a record of their behaviour; could a model learn what to summarise from the events themselves, before any label exists, and when would such a learned summary beat the hand-built one?
+
+The course has already tried twice to let a model learn the summary, and both times the hand-built one held. An LSTM reading a card's last payments beat a forest on raw fields on card-present payments, and the gap closed once <Ref lesson="sequence-models-for-transactions" id="why-aggregates-close-the-gap-when-they-discard-the-order">the forest was given aggregates</Ref>. On the Elliptic graph a forest given 72 hand-built neighbour aggregates beside the 94 local features beat <Ref lesson="graph-neural-networks" id="when-a-graph-network-beats-hand-built-neighbour-features">a graph convolutional network</Ref> that learned its own. In both cases the summary was learned from the task's labels, end to end. That is exactly what the opening's three cases lack: a new issuer has no labelled history yet, a laundering team's labels arrive late or never, and forty positives cannot train a network of tens of thousands of weights.
+
+What every one of those cases does have is the events.
+
+## What a hand-built feature set costs
+
+The fifteen inputs that every detector since the metrics module has used look like one recipe. Taken apart, they are a stack of separate decisions.
+
+### Fifteen inputs, each a decision
+
+<Figure
+  src="./figures/ledger.svg"
+  alt="A table of the seven groups of inputs that make up the fifteen: amount, weekend flag, night flag, card count, card mean amount, terminal count, terminal fraud rate. Columns: entity, windows, statistic, rule, label delay. Highlighted as choices: the night cut-off at 06:00, the card and terminal as keys, the 1, 7 and 30-day windows, the mean as statistic, the strictly-earlier rule, the fraud share, the labels-arrived rule and the 7-day delay."
+  caption="Every highlighted cell was decided by a person, for card fraud, on the simulator's fields."
+/>
+
+Each highlighted cell in the ledger is a choice someone made and could have made otherwise. The <Ref lesson="transaction-aggregates" id="the-terminals-past-and-the-fifteen-inputs">aggregates lesson</Ref> picked the card and the terminal as entities, and 1, 7 and 30 days as windows, with no agreed lengths behind them. It also chose a count and a mean among many possible statistics, and 06:00 as the end of the night. The <Ref lesson="point-in-time-features" id="two-ways-a-training-row-can-know-too-much">point-in-time lesson</Ref> then set the terminal's fraud rate to read only labels that had arrived, seven days late. A real processor's grid of eight windows and five conditions <Ref lesson="transaction-aggregates" id="how-fast-the-grid-grows">reached 280 aggregated features</Ref>, each one the same kind of decision.
+
+### What changes with the issuer, the task and the label count
+
+The decisions were right for one problem. Change the problem and they have to be made again.
+
+- **A second issuer** sends different fields. If its records carry no entry mode, every feature conditioned on entry mode is gone. If they carry a merchant field the first issuer lacked, the useful windows over it exist only once someone writes them.
+- **A laundering team** scores accounts, not cards, and its unit is often a pair of accounts that pay each other. A transfer has a sender and a receiver, and the <Ref lesson="fraud-as-a-graph" id="money-that-returns-a-cycle-in-time-order">cycle of the graph module</Ref> belonged to no single account's rows. Which entity the windows should run over is no longer obvious.
+- **A new product line** with forty labelled cases leaves too few positives to choose a window or a condition on validation folds. A window length is a hyperparameter like a tree's depth, and forty positives split over folds cannot separate two candidates.
+
+### The upkeep: correct forever
+
+Writing a feature is the start of its cost. Each one has to be computed from strictly earlier rows, read labels only once they have arrived, and give the same value in training and in serving, which is what <Ref lesson="point-in-time-features" id="the-parity-check">the parity check</Ref> replays row by row. A feature set of 280 columns is 280 such obligations, and they are re-checked whenever the source fields change.
+
+Call the sum of these costs *feature-engineering debt*: the windows, keys and conditions chosen by hand for each task and each issuer, and maintained for as long as the model runs. It grows with the number of tasks and data sources, not with the amount of data.
+
+## A summary learned from the events alone
+
+The two earlier learned summaries, the LSTM's final state and the graph network's node vector, were trained by the loss on the task's labels. The labels decided what the summary kept. Take that away and something else has to tell the network what to keep.
+
+### A task the events grade themselves
+
+A history can be turned into training targets without anyone labelling it. Hide the next event and ask the network to predict it from the events before. Or cut two stretches out of histories and ask whether they come from the same customer. Each question has an answer written in the data, so the network can be trained on it by the usual loss and gradient steps. Training on a target the data supplies itself, once, before and independently of any downstream task, is *pretraining*.
+
+<Example title="targets graded by the events, against labelled cases">
+The public bank dataset used below holds about 950 million transactions of about two million clients over two years. Every transaction after a client's first is the answer to "what came next?" for the history before it, so the events grade about 950 − 2 = 948 million predictions.
+
+The new product line has forty labelled positives. An LSTM layer with a 100-dimensional state on fifteen inputs has <Ref lesson="sequence-models-for-transactions" id="the-lstm-a-path-the-gradient-can-survive">46,400 parameters</Ref>. Fitted to the product label alone, that is 1,160 parameters per positive, where <Ref lesson="neural-tabular-detectors" id="what-the-two-curves-say">the first fraud network</Ref> had 28 per training fraud. Fitted to the next-event targets of a bank with a history this large, it has about 20,000 targets per parameter.
+</Example>
+
+Predicting the next event is only possible to the extent that behaviour has structure: a client who pays rent on the first of the month will do so again, and certain merchants are visited together. A network trained on hundreds of millions of such predictions has to represent that structure somewhere in its state. A later task that depends on the same structure can start from that representation, and its forty labels only have to fit the last, small step.
+
+### The vector, read as of a time
+
+Once pretrained, the encoder's weights are frozen. For each customer and each cut-off time $t$ it reads the events before $t$ and returns its state, a vector of fixed length. That vector goes to the downstream model as if it were a block of aggregates.
+
+<Definition title="event-sequence representation">
+An *encoder* is a network that reads an entity's events in time order and returns a vector of fixed length $d$. The *event-sequence representation* of entity $e$ at time $t$ is the encoder's output on $e$'s events strictly before $t$, with the encoder's weights fitted beforehand by pretraining and then frozen. The vector is used as $d$ input columns of a downstream model, beside or instead of hand-built aggregates.
+</Definition>
+
+<Figure
+  src="./figures/two-pipelines.svg"
+  alt="An event table with no label column feeds two branches. Left, grey: a person chooses keys, windows, statistics, conditions and label delays, giving 15 columns per payment. Right, amber: an encoder trained on a task the events grade, such as what came next or same customer, giving d numbers per customer read as of t with the weights frozen. Both feed one boosted tree; labels, in blue, enter only at the tree."
+  caption="Two ways to fill the columns in front of the same tree. Labels touch neither summary."
+/>
+
+This is not the <Ref lesson="neural-tabular-detectors" id="an-embedding-is-a-linear-layer-on-the-one-hot-input">embedding of the network lesson</Ref>, which was one trained row per value of a categorical field: terminal 9023 had one vector, whatever it did next. The vector here is recomputed from the history at every $t$, so it moves when the customer's behaviour moves, and two customers who behave alike get nearby vectors whatever their identifiers. "Embedding" below means this vector.
+
+The definition keeps two properties of the aggregates. The vector at $t$ reads only events before $t$, the same strictly-earlier rule as a window. And the encoder never reads a label, so its training is not bound by the label clock: it can be pretrained on yesterday's events. Only the downstream model waits for labels a delay old.
+
+## The opponent: aggregates over the whole history
+
+A learned vector has to beat something before it earns its cost. The fifteen inputs are the wrong opponent here: they were designed for one task, and the vector is meant to serve every task. The fair opponent is a summary that also needs no task-specific design, built mechanically from the schema.
+
+### A recipe from the schema
+
+Count the customer's events, and for every numerical field compute the sum, mean and standard deviation over the whole history. For every categorical field, group the events by each value and compute the count and the mean of each numerical field within the group. No window, no condition and no label is chosen per task. This is the aggregation baseline of the benchmark below and of the public tasks later in this lesson, and its output goes into a boosted tree.
+
+<Example title="the baseline on six events">
+A client's history: card 20, card 35, transfer 500, card 15, transfer 300, card 30 (event type and amount).
+
+- Over all six: count 6, sum 900, mean 150, standard deviation 204 (sample, divisor 5).
+- Grouped by type: card count 4, card mean 25; transfer count 2, transfer mean 400.
+
+The overall mean of 150 describes no event this client made. Split by type, two habits appear: small card payments around 25 and transfers of a few hundred. The split is what the categorical part of the recipe buys.
+</Example>
+
+<Exercise>
+(a) A seventh event arrives: a transfer of 2,000. Recompute the eight columns of the example. Which column moved the most, and would the baseline notice a card stolen yesterday that made three payments of 25? (b) A schema has one numerical field and a merchant-category field with 400 values. How many columns does the recipe produce, and how many with three windows (all history, last 90 days, last 30 days) in place of one?
+
+<Solution>
+(a) Count 7, sum 2,900, mean 414, standard deviation 724; card count 4, card mean 25; transfer count 3, transfer mean 933. The transfer mean more than doubled and the overall standard deviation more than tripled. A card stolen yesterday that pays three times 25 moves the card count from 4 to 7 and leaves the card mean at 25: over a whole history the baseline cannot say when the payments happened, the flaw of <Ref lesson="transaction-aggregates" id="why-not-the-lifetime-average">the lifetime average</Ref>. The recipe is cheap and blind to recency.
+
+(b) One column for the event count, three for the numerical field, and two per category value, $2 \times 400 = 800$: $1 + 3 + 800 = 804$ columns. With three windows, $3 \times 804 = 2{,}412$. The width grows with the number of category values, which is why implementations merge rare values into one, and every merge rule is another choice. An encoder's vector has the same $d$ however many values a field has.
+</Solution>
+</Exercise>
+
+The recipe is weak on fraud, which turns on recency, and cheap everywhere. If a learned vector cannot beat a summary this cheap on a task, nothing justifies training it for that task.
+
+## Two million clients, every one labelled
+
+Whether the learned vector beats that baseline is a measurement, and the largest public one is on the [MBD dataset](https://huggingface.co/datasets/ai-lab/MBD), released by a bank for this purpose.
+
+### The benchmark
+
+- **Data.** About two million corporate clients of one large bank and about 950 million of their transactions over 2021 and 2022: an amount, a timestamp, and coded types of the event and of the counterparty. Identifiers are hashed, categories re-coded, and noise added to amounts and dates, keeping each date's hour. The dataset is public under a CC BY 4.0 licence.
+- **Task.** For each month of 2022 and each of four bank products: does the client take the product that month? Inputs are events strictly before the month's first day. Most clients take nothing: 81% have no purchase in the data, so about one client in five buys anything.
+- **Split and score.** Clients are split into five folds, trained on four and tested on the fifth, so the split runs across clients, not forward in time as in <Ref lesson="delayed-labels-prequential" id="the-label-clock">the delayed-labels lesson</Ref>. The score is ROC-AUC per product, averaged over the four products and twelve months, reported as mean ± standard deviation over folds.
+- **Two new network types.** A *GRU* is a gated recurrent layer like <Ref lesson="sequence-models-for-transactions" id="the-lstm-a-path-the-gradient-can-survive">the LSTM</Ref>, with fewer gates and no separate cell: it carries one state forward and updates it at each event. A *transformer* is a stack of attention layers like <Ref lesson="sequence-models-for-transactions" id="which-payment-did-the-model-lean-on-attention">the one of the sequence lesson</Ref>: in each layer, every event's vector is replaced by a softmax-weighted mix of the vectors of the events it may look at, so the network reads the events together rather than one after another.
+- **Five rows.** The aggregation baseline into a boosted tree. Three pretrained encoders, frozen, each feeding the same boosted tree: a *contrastive* one, a GRU trained to tell whether two stretches of history belong to the same client; a *masked* one, a transformer trained to fill in hidden fields of events; a *generative* one, a transformer trained to predict the next event's fields. The fifth row is a *supervised GRU* with a 32-dimensional state, trained end to end on the four labels with cross-entropy and no pretraining: a recurrent network fitted to the labels, as the sequence lesson's LSTM was.
+
+### The ranking
+
+| Mean ROC-AUC | Supervised GRU | Generative | Aggregates | Contrastive | Masked |
+|---|---|---|---|---|---|
+| ≈2 million clients | **0.819** ± 0.002 | 0.802 ± 0.002 | 0.783 ± 0.002 | 0.773 ± 0.002 | 0.762 ± 0.004 |
+
+With every client labelled, the model that learned its summary from the labels is first, 0.036 above the aggregates, about eighteen fold standard deviations. Of the three label-free encoders, one beats the aggregates by 0.019 and two fall below them, by 0.010 and 0.021. Pretraining is no guarantee of beating a recipe that needs no training at all.
+
+The order follows from what each summary was trained to keep. A frozen vector of 256 to 1,024 numbers summarises a client's history, about 475 transactions on average, and the pretraining task decided which distinctions survive. Whatever the product decision needs and the pretraining task did not reward can be lost. The supervised GRU's state was trained by the purchase label itself, so it keeps what the label rewards. With two million labelled clients there is enough signal to do that directly, and a proxy loses to the target.
+
+Two limits on carrying these numbers into fraud. The first is not rarity. A scored row is one client in one month for one product, and on the public 100,000-client cut of the same data between about one such row in 230 and one in 1,800 is positive, depending on the product: as rare as fraud among payments. What differs is the unit, a client's month rather than a payment; the absence of anyone trying to be missed; and the label, a purchase rather than a fraud. The second is the score. ROC-AUC averages over every cut of the list, which <Ref lesson="alert-budget-metrics" id="how-much-of-the-curve-a-hundred-alerts-can-reach">at fraud's base rates</Ref> are mostly cuts an alert budget never reaches.
+
+## Fewer labels: the ranking turns over
+
+The supervised GRU's lead was bought with labels. Remove most of them and the lead should go.
+
+### Sixty-nine thousand clients
+
+The same five methods were also run on a subset of 69,474 clients. It keeps every client who took a product in the last month and adds about ten clients who never bought anything for each of them, so roughly 6,300 recent buyers and 63,000 non-buyers. Against the full data, the subset has enriched the share of buyers and cut the client count about thirty-fold.
+
+<FigureSequence
+  name="mbd"
+  alt="Two frames of a dot plot on a ROC-AUC axis from 0.73 to 0.83. Frame 1, about two million clients: masked 0.762, contrastive 0.773, aggregates 0.783 in blue, generative 0.802, supervised GRU 0.819 in amber; a second row for 69 thousand clients is empty. Frame 2 fills the second row: supervised GRU 0.745 in amber, and the four label-free rows between 0.779 and 0.785; an amber arrow labelled minus 0.074 joins the two supervised GRU points."
+  caption="The supervised GRU goes from first to last; the four label-free rows hardly move."
+/>
+
+<Task>
+Before stepping to frame 2, predict which row moves most when the client count falls about thirty-fold, and in which direction. Then check: the supervised GRU falls 0.074 to last place, and the other four end within 0.006 of one another.
+</Task>
+
+| Mean ROC-AUC | Supervised GRU | Generative | Aggregates | Contrastive | Masked |
+|---|---|---|---|---|---|
+| ≈2 million clients | **0.819** ± 0.002 | 0.802 ± 0.002 | 0.783 ± 0.002 | 0.773 ± 0.002 | 0.762 ± 0.004 |
+| 69,474 clients | 0.745 ± 0.004 | 0.779 ± 0.007 | 0.781 ± 0.009 | **0.785** ± 0.006 | 0.781 ± 0.003 |
+
+The four label-free rows moved by at most 0.023 and now sit within about one standard deviation of one another. The subset is not a clean experiment on labels alone. It shrank the histories available for pretraining by the same factor and enriched the share of buyers, so it changed three things at once. What it does show is where the fall lands: on the one model whose summary depended on the labels.
+
+### How many labels a label-free score is worth
+
+A cleaner way to price the labels is to fix a score that used none and count how many labels a feature-based model needs to match it. On the public 100,000-client cut met above, a transformer was pretrained to predict each next event, with no label. For a target of the form "the client makes a transaction of a given kind for the first time next month", its score is the probability it assigns to that kind coming next. The opponent is a boosted tree on 114 engineered features (counts, amounts and recencies over the whole history, the last month and the last three months, plus profile fields), fitted on $n$ randomly drawn labelled client-months of the pretraining clients. The clients are split into five folds as in the benchmark; four feed the pretraining and the tree's draws, and both scores are computed on the same fifth, a test fold of clients whose events the transformer never read, the same fold for every $n$.
+
+<Figure
+  src="./figures/labels-needed.svg"
+  alt="Two panels of ROC-AUC against labelled client-months on a log axis from 1,000 to 300,000. Left, a common kind: the zero-label score is a flat amber line at 0.905; the boosted tree's blue curve rises from 0.746 at 1,000 rows to 0.854 at 10,000 and crosses the line before 30,000, where it reads 0.921 with 95 positives. Right, a rarer kind: the line is at 0.787; the curve wanders from 0.739 down to 0.668 and up to 0.771 at 100,000 rows with 134 positives, and crosses only by 300,000 rows, at 0.826 with 394 positives."
+  caption="A boosted tree on 114 features against a score that used no labels: tens of thousands of labelled rows before it catches up."
+/>
+
+On the most common kind the tree passes the zero-label score between 10,000 and 30,000 labelled rows; on three others between 30,000 and 300,000; on the fifth it is still below at 300,000. Counted in positives, the crossing lies between 34 and 95 on the common kind and between 134 and 394 on the rarer kind plotted. On the fifth the tree needs more than 260 positives and passes only when fitted on every positive of the four folds plus 60,000 negatives, so for that kind only a lower bound is known. A score that used no label is worth somewhere from a few dozen to a few hundred labelled positives, and on one kind more. This is the most favourable case for pretraining, since the target is the pretraining task's own question.
+
+<Aside>
+**Part of the zero-label score is activity.** A first-order Markov chain over event kinds, fitted on the same unlabelled streams, gives the probability that the next event is of the target kind. Multiplied by the client's number of transactions in the last 30 days, it estimates how many such events the next month will hold, and it scores 0.79 to 0.88 on the same five targets with no trained network. The pretrained model is higher on two of the five and level on three; over 74 kinds it is higher by a median of 0.04. Some of what a label-free score is worth comes from counting, which a hand-built feature can also do.
+</Aside>
+
+A third measurement varies the labels alone, and against the aggregates. On four public event-sequence tasks (age group and churn from card transactions, a children's game assessment, age group from retail purchases), a contrastive recurrent encoder was pretrained on every history, labelled or not, and then trained further on a random fraction of the labelled examples, from all of them down to a few hundred. Two opponents were fitted on the same fraction: the same network trained from scratch, and a boosted tree on this lesson's whole-history recipe. All three are scored on the same held-out tenth of the labelled examples, by accuracy on the two age tasks and the assessment and by ROC-AUC on churn. The counts below are labelled examples, not positives, and the scores are read off published curves, so they are good to about 0.005.
+
+| Task | Fewest labels | Pretrained | Tree on the recipe | From scratch | With all labels, pretrained minus tree |
+|---|---|---|---|---|---|
+| Game assessment | 496 | ≈ 0.56 | ≈ 0.52 | ≈ 0.56 | ≈ +0.007 (15,887 labels) |
+| Retail age group | 500 | ≈ 0.43 | ≈ 0.40 | ≈ 0.41 | ≈ +0.004 (about 290,000) |
+| Card age group | 337 | ≈ 0.56 | ≈ 0.54 | ≈ 0.50 | ≈ +0.02 (21,600) |
+| Churn | 225 | ≈ 0.78 | ≈ 0.78 | ≈ 0.74 | ≈ −0.009 (3,600) |
+
+At the fewest labels the pretrained network is ahead of the tree on three tasks and level with it on churn. As labels grow the gap closes to under 0.01 on the assessment and retail tasks; on card age group it narrows in the middle and opens again to about 0.02. On churn the tree is slightly ahead from 900 labels on, by under 0.01 and inside the spread over runs. Against the same network from scratch, the pretrained one's lead is largest at the low end of the label counts: about 0.06 on card age group and 0.04 on churn at the smallest fraction, and about 0.03 on the assessment at a thousand labels.
+
+<Definition title="label-scarcity regime">
+A task is in the *label-scarcity regime* when its labelled positives are few relative to what a model fitted on them needs: tens to hundreds of positives, a new issuer or product, or a task whose labels arrive late or never. Its unlabelled events can still be plentiful.
+</Definition>
+
+<KeyFact>
+The three measurements are consistent with the label count deciding the winner, and none settles it alone. The 69,474-client subset changed labels, pretraining data and class mix together, and since it kept every client who bought in the last month, it still held far more positives than tens to hundreds. The labels-needed curve sits inside the regime, but its target is the pretraining question itself. The fraction experiment varies labels alone against the aggregates, and at a few hundred labelled examples it puts the pretrained network ahead on three of four tasks and level on the fourth. It leaves other differences in place: the two sides differ in model family (a fine-tuned network against a tree), the four tasks are age, churn and an assessment, not fraud, and the scores are accuracy and ROC-AUC, not a cut at an alert budget. And the label count is not the only variable: with plenty of labels, the pretraining task decides whether a frozen vector lands above the aggregates or below them (0.802 against 0.762).
+</KeyFact>
+
+## Added to the aggregates, rarely instead of them
+
+A team that already has features faces a second question in any regime: does a pretrained vector replace them or join them? The benchmark above compared each summary alone. Banks that have tried both, and both together, report a consistent shape.
+
+### Three settings, one shape
+
+<Figure
+  src="./figures/additive.svg"
+  alt="Horizontal bars of ROC-AUC difference from the hand-built features, which sit at zero. For each of six tasks, an amber bar for the embedding alone and a green bar for the embedding added to the features. Marketing response, mean of four tasks, transformer against a production feature set: alone minus 0.005, added plus 0.009. Contrastive embeddings against one bank's own features: retail credit scoring minus 0.01 and plus 0.04; retail churn minus 0.09 and plus 0.02; company credit scoring minus 0.02 and plus 0.04; transfer-fraud monitoring plus 0.02 and plus 0.03; company insurance lead plus 0.14 and plus 0.14."
+  caption="Alone, the embedding lands anywhere from 0.09 below the features to 0.14 above. Added to them, it is never below."
+/>
+
+- **A large bank's production feature set.** A 42-million-parameter transformer was pretrained on two years of the bank's events, about 160 billion transactions plus app sessions and contacts with the bank. The four tasks predict whether a customer responds to an offer of a given product. How many customers carry a response label, and how the held-out test set was drawn, are not disclosed; the labelled data is described only as far smaller than the pretraining data. On that test set the frozen embedding scores 0.787 mean ROC-AUC, features developed over years by several teams 0.792, and both 0.801, each fed to the same tabular network. Alone the embedding wins one of the four tasks (0.704 against 0.681) and loses the other three.
+- **One bank's own features, eight tasks.** Contrastive encoders were pretrained on about ten million companies' transfers and five million individuals' card histories. Five tasks concern companies (two kinds of lead, credit scoring, whether two companies belong to one holding, fraud on transfers) and three concern individuals (credit scoring, churn, an insurance lead). Their label counts and test splits are not disclosed. The bank's hand-built features, a frozen embedding, and both, each fed to a boosted tree and scored by ROC-AUC: both together are best or tied on all eight tasks. The embedding alone loses on all three individuals' tasks, worst on churn: 0.65 against 0.74, and 0.76 together.
+- **Public tasks.** Five public event-sequence tasks (the four of the fraction experiment and credit default from card transactions) carry from 5,000 to about a million labelled examples, with a tenth of them held out for testing. Against whole-history aggregates, a frozen contrastive embedding wins on three and loses on two, by at most 0.02 in each task's own metric. On three of them (default, age group, churn), a comparison of eight label-free methods puts some above the hand-made features and some below on every task.
+
+### Why the vector repeats the aggregates
+
+The shape has a reason. The aggregates already hold most of what predicts the target, and an encoder that read the same events recaptures much of it. That part of the vector repeats columns the tree already has. What it adds is the structure no window was written for. One lender that trained its sequence model jointly with its tabular model found that most of the hand-built transaction features the sequence model made redundant could be dropped with no loss. The overlap is real, and the tree can only gain from what is left over.
+
+For fraud there is a second reason, which the course has already measured. On the simulator, the input that put two thirds of the compromised-terminal frauds into the daily top 100 was <Ref lesson="transaction-aggregates" id="on-the-simulator-one-scenario-found-one-not">the terminal's delayed fraud rate</Ref>, a statistic of labels. An encoder that never reads a label cannot produce it, so the label-derived features stay whatever the encoder learns.
+
+<KeyFact>
+"Added, never below" is a statement about ROC-AUC on marketing, credit, churn and lead tasks and one transfer-fraud task, mostly with undisclosed label counts. None of these comparisons was scored at an alert budget, so whether the added hundredth of ROC-AUC moves the top of a fraud queue has to be measured on the team's own stream.
+</KeyFact>
+
+## Where the learned summary has an edge: a key nobody can name
+
+On one group of tasks the embedding alone beat the bank's features on four of five, once by a wide margin. The tasks have something in common: their entity's events have no natural group-by.
+
+### A card history groups itself; a company's transfers do not
+
+<Figure
+  src="./figures/grouping-key.svg"
+  alt="Left, card payments of one customer with date, amount, country and merchant type; the merchant-type column is outlined in blue, with the note: group by the card, then merchant type, a few hundred fixed categories, count and mean amount per category. Right, transfers of one company with date, amount, currency, sender and receiver; the receiver column is outlined in amber with an arrow to a list of options: the receiver itself, its region, its size, its industry, sent or received. Beside it: group by what? Every answer is a guess, and a feature set has to pick one."
+  caption="A card history comes with its grouping; a company's transfers do not."
+/>
+
+A card's payments group naturally: the card is the entity, and within its history the merchant type has a few hundred fixed values, so "count and mean amount per merchant type" is the obvious column. A company's transfers have a counterparty for each row, and counterparties number in the millions. Grouping them by the receiver itself gives a column per receiver, almost all empty. Grouping by the receiver's region, size or industry gives columns, but each is a guess about which distinction matters, and a hand-built set has to commit to one.
+
+An encoder is not forced to commit. It reads every row with the counterparty's coded attributes, and the pretraining task decides which distinctions are worth keeping. At the bank of the eight tasks, embeddings of small and medium companies beat the bank's hand-built features alone on four of five company tasks, by up to 0.14 on insurance lead generation (0.71 to 0.85), where embeddings of retail customers beat them on none of three. The bank's explanation is the grouping key. It is an interpretation: companies and individuals also differ in data volume and in how much effort went into each feature set, and no experiment separates these. The company tasks include monitoring transfers for fraud, at 0.82 for the bank's features, 0.84 for the embedding and 0.85 for both, an internal ROC-AUC with no precision, prevalence or released data behind it.
+
+### One account's rows, not the network
+
+The edge has a boundary. The encoder reads one entity's own rows. In the transfer log of the graph module, account A's rows show 1,400 sent to C on 2 May and 1,200 received from D on 4 June. That C paid D on 20 May is in C's rows, not A's, so no encoder of A's history sees that the money came back. An unclear key inside one account's history is the encoder's best case. Structure across accounts is <Ref lesson="guilt-by-association" />'s and the graph module's.
+
+## The three cases of the opening
+
+The opening asked when a learned summary beats the hand-built one. The evidence points to three variables: how many labelled positives the task has, whether the events have a natural grouping key, and whether the encoder can read the issuer's fields. Only the label count was varied alone against the aggregates, on four public tasks; the grouping key and the vocabulary never were. So the map below is a reading of the evidence, not a measured rule.
+
+<Figure
+  src="./figures/decision-map.svg"
+  alt="A two-by-two grid. Columns: labelled positives few, tens to hundreds; or many, thousands a month. Rows: grouping key clear or unclear. Few and clear, amber: new product line, forty cases, frozen vector plus small model beside a few aggregates. Many and clear, blue: the card stream of a large issuer, aggregates plus tree, a vector added if it measures. Few and unclear, amber: laundering team, pairs of accounts, the encoder's best case, blind to the network. Many and unclear, green: company transfers with plenty of labels, hybrid, the vector beside the bank's features. Below, a dashed strip for vocabulary: a second issuer with the same card-message standard can reuse an encoder trained elsewhere; one with different fields needs a new encoder, with no labels, and new aggregates."
+  caption="Three variables the evidence points to: labels, grouping key and vocabulary. Each cell is a reading of it, not a measured rule."
+/>
+
+**Forty labelled positives** is the label-scarcity regime with a clear key. Pretrain on the events of all the bank's customers, not only the product's, freeze the encoder, and fit a small model on the vector beside a few aggregates. With forty positives every metric is noisy, so the comparison with aggregates alone is read against <Ref lesson="alert-budget-metrics" id="what-each-disagreement-means">the noise the metrics lesson measured</Ref>.
+
+**A laundering team** has scarce, late labels and an unclear key: the encoder's best case for each account. It still sees only each account's own rows, and laundering lives in the connections between them, so the graph module's features stay.
+
+**A second issuer** is a question of vocabulary before labels. An encoder reads fields through codes it was trained on and cannot read a field it never saw. Issuers whose card messages follow one international standard are the exception.
+
+An encoder was pretrained on the card histories of 180 issuers in that format, then used frozen at three issuers in other countries it had never seen, each with eleven months of labelled card fraud, split by cardholder and forward in time. Its vector was added to fourteen windowed features in a small network, and the score was *value detection*: the share of the fraudulent amount caught when the threshold is set to a fixed ratio of false alarms to caught frauds, between 1:1 and 20:1. With the vector the share was higher at every ratio tested, a gain shown as curves rather than tabulated, which <Ref lesson="reading-foundation-model-claims" /> takes apart. An issuer with different fields needs a new encoder, pretrained on its own events with no labels, as it needs new aggregates. What the encoder saves is the design of the features, not the pretraining.
+
+The cells with plenty of labels rest on different evidence. Two comparisons against the aggregates had plenty of labels: the benchmark's full run, where the network trained on the labels led, and the full-label ends of the fraction curves, where the pretrained network and the tree were within about 0.02 of each other.
+
+The Belgian e-commerce stream of <Ref lesson="ulb-handbook-benchmark" />, with about 800 frauds a day and the card as the obvious key, is closest to the three issuers just described, where a vector added to windowed features raised value detection. So for that stream a vector is the thing to test: added to the aggregates and the tree, not in their place, and kept only if a prequential comparison at its own alert budget shows it earns its serving cost.
+
+For company transfers with plenty of labels the hybrid is an inference: at the eight-task bank the vector beside the features was ahead of either alone on the company tasks, whose key is unclear, but their label counts were not disclosed, so that cell rests on the key, not on a measured label volume.
+
+<Conclusion>
+You can now put a price on a hand-built feature set: a decision per key, window, statistic and delay, made again for every task and issuer and kept correct for as long as the model runs. You can say what an event-sequence representation is (an encoder pretrained on a task the events grade, frozen, read as of a time) and why its fair opponent is a whole-history aggregation recipe rather than a task's own features. And you can say which way the evidence points in each label regime, and how far it is from a clean experiment: only the label count has been varied alone against the aggregates, on four public tasks that are not fraud, where a pretrained network led at a few hundred labelled examples on three. With two million labelled clients a GRU trained end to end leads (0.819 against 0.783 for the aggregates), on 69 thousand it falls to last; a pretrained vector beside a mature feature set adds about a hundredth (0.787 alone, 0.792 features, 0.801 both); its edge is largest where the grouping key cannot be named, and it is blind to the network around the account.
+
+What stays open is how an encoder is trained when no one has named the task. <Ref lesson="contrastive-event-embeddings" /> builds the first such training task, pieces of one customer's history as positives and other customers' as negatives, and the cheap way an encoder can solve it without learning anything useful.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+From the table of the two-million and 69-thousand-client runs, compute each model's gap to the aggregates in both runs. Which gaps change sign? For each of those, compare the gap with the standard deviations of the two rows involved, and say which sign change is a finding and which are not.
+
+<Solution>
+Full data: supervised GRU +0.036, generative +0.019, contrastive −0.010, masked −0.021. Subset: supervised GRU −0.036, generative −0.002, contrastive +0.004, masked 0.000.
+
+Three gaps change sign: the supervised GRU's, the generative transformer's and the contrastive encoder's. On the subset the aggregates' row has a standard deviation of 0.009 and the others 0.003 to 0.007. The generative gap of −0.002 and the contrastive +0.004 are well inside those, so on the subset neither is distinguishable from the aggregates: those two sign changes are a move from "different" to "level", not a reversal. The supervised GRU's −0.036 is about four times the largest of the two deviations, in the opposite direction from its full-data +0.036 (about eighteen deviations). That one is a finding. The transferable move: before reading a sign change, check whether the new gap clears the spread of the row it is measured against.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague's summary of the benchmark: "On two million clients the generative transformer scores 0.802 against 0.783 for aggregates, so learned representations beat feature engineering. Our fraud team should replace its aggregates with one." Name every step that fails, and state the regime in which a narrower version of the claim would hold.
+
+<Solution>
+**The comparison leaves out a row.** With every client labelled, the supervised GRU scores 0.819, above the generative vector. Learning the summary from the labels beats learning it from the events in that regime, so "learned beats engineered" is true only of one learned row, and the best learned row is not a pretrained one.
+
+**Two of three pretrained rows lose.** The contrastive and masked encoders score 0.773 and 0.762, below the aggregates. Pretraining is not one method with one result.
+
+**"Replace" was never tested.** The benchmark compares summaries alone. Where banks tested both, the vector alone beat their features on some tasks and lost by up to 0.09 on others, and the two together were never below the features.
+
+**The task is not fraud.** Its rows are about as rare as fraud, one client-month in a few hundred to a couple of thousand being positive for a product, but the unit is a client's month rather than a payment, nobody is trying to evade the model, and the label is a purchase. ROC-AUC, the benchmark's score, averages over cuts that an alert budget never reaches at fraud's base rates, as the metrics lesson showed. And a fraud team's strongest inputs include label-derived ones, such as a terminal's delayed fraud rate, which an encoder that reads no labels cannot produce.
+
+A narrower claim that the evidence supports: in a task with few labelled positives, a frozen pretrained vector added to the aggregates is likely to raise ROC-AUC a little, and is worth a prequential comparison at the team's own budget before it is served.
+</Solution>
+</Exercise>
+
+<Exercise>
+A customer opened an account today and has made no event; another has made exactly one. (a) What does the aggregation recipe of this lesson return for each? (b) What does a recurrent encoder return for the customer with no events, and why is it the same for every new customer? (c) What can the downstream model learn from either summary about these customers, and what one column fixes the ambiguity in both?
+
+<Solution>
+(a) No events: count 0 and sum 0; the mean and standard deviation are undefined, and implementations fill them with 0 or a missing value. Category counts are all 0. One event: count 1, the sum and mean equal the amount, the standard deviation is undefined (sample divisor 0), and one category count is 1.
+
+(b) A recurrent encoder starts from a fixed initial state and changes it only when an event arrives. With no events it returns that initial state (or a learned function of it), the same vector for every customer with no history. This is the situation of <Ref lesson="sequence-models-for-transactions" id="exercises">the padding exercise of the sequence lesson</Ref>: a fixed vector that says nothing about the customer.
+
+(c) With the recipe, the zero-filled mean and standard deviation of the customer with no events coincide with values real customers have: a standard deviation of 0 is also what anyone whose payments were all equal shows. The model cannot tell "no data" from "a value". With the encoder, every new customer gets the same vector, so the model can only learn one score for all of them. The repair is the same for both: a column with the age or size of the history (days since the first event, the event count) beside the summary, and undefined statistics left missing rather than zero for a tree that handles missing values. It matters most for the new product of the opening, where many of the forty positives may be new customers.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two experiments each claim to show that pretraining pays when labels are few.
+
+- The benchmark's 69,474-client subset, where the supervised GRU falls from 0.819 to 0.745 and the pretrained rows stay between 0.779 and 0.785.
+- A public set of a Czech bank's accounts from the 1990s: 4,500 clients' histories, of which 682 clients carry a loan-default label, split at random into 478 for training and 204 for testing. A boosted tree scores F1 0.608 ± 0.079 over five such splits; two transformers trained from scratch on the 478 score 0.548 and 0.526; the better transformer, pretrained on the histories of every client outside the test split, scores 0.673 ± 0.038.
+
+(a) For each, list what differs between the configurations compared besides the number of labels. (b) Is the 0.673 against 0.608 a separation? (c) Design one experiment that isolates the number of labels, and state in advance what result would show that pretraining pays at scarce labels.
+
+<Solution>
+(a) Subset: the number of labelled clients, the number of unlabelled histories the encoders were pretrained on (the same thirty-fold cut), and the class mix (every recent buyer kept, about ten non-buyers sampled per buyer, which enriches the share of buyers). Czech set: the transformer's pretraining used the unlabelled histories of every client outside the test split, the tree used none; the tree and the transformer also differ as model families and in inputs (the tree read hand-made features of the history, the transformer the rows).
+
+(b) No clear separation. The difference is 0.065; the tree's spread over splits alone is 0.079, and with 204 test clients per split both numbers move a lot. F1 also judges one threshold, <Ref lesson="alert-budget-metrics" id="a-threshold-metric-judges-a-cut-nobody-chose">a cut nobody chose</Ref>, so the two models may differ at that cut and not elsewhere. What is clearer is the comparison within the transformer: 0.548 from scratch against 0.673 pretrained, the same architecture, where pretraining is the only change.
+
+(c) Pretrain the encoder once, on all unlabelled histories before a fixed date. Then fit the downstream models (aggregates alone, vector alone, both) on a random 100%, 10% and 3% of the labelled training clients, test on the same held-out clients, and repeat each draw several times. Compare paired: for each test client both scorers see the same rows, so take the difference in ROC-AUC per bootstrap resample of clients and report its interval. Pretraining pays at scarce labels if the interval for (vector + aggregates) minus aggregates sits above zero at 3% or 10%. It pays because labels are scarce if, in addition, that gain at 3% or 10% exceeds the gain at 100%: take the difference of the two gains in each resample, and its interval sits above zero. A gain at every fraction with no difference between them says the vector helps whatever the label count. If the gain's interval spans zero at every fraction, the vector adds nothing measurable on this task.
+</Solution>
+</Exercise>
+
+<Exercise>
+On the transaction simulator of <Ref lesson="canonical-datasets" />, take the training and test weeks of the course's benchmark. Build this lesson's aggregation recipe over each card's whole history before each payment: sum, mean and standard deviation of amount, and the count of payments in each hour-of-day band (night, morning, afternoon, evening). Train the same random forest on (i) the recipe, (ii) the recipe plus the three terminal counts, (iii) the fifteen inputs, and report AP and CP@100. Predict the order before running, and say which of the three scenarios each set can find.
+
+<Solution>
+Predicted order: (iii) far above (ii) ≥ (i). The fifteen inputs hold the terminal's delayed fraud rate, which found about two thirds of compromised-terminal frauds in the daily top 100 in <Ref lesson="transaction-aggregates" id="on-the-simulator-one-scenario-found-one-not">the aggregates lesson's measurement</Ref> (AP 0.65, CP@100 0.29, against AP 0.20 and CP@100 0.08 for card windows plus terminal counts). The recipe and the terminal counts contain no label, so neither sees scenario 2; expect AP near or below 0.20.
+
+By scenario: scenario 1 (amount above 220) is found by every set, since the amount is in each. Scenario 3, the leaked card whose payments are multiplied by five, needs a reference point for the card's own amounts. The whole-history mean gives one, but over 14 days of fraud the mean itself rises, so the recipe finds fewer of these than the fifteen inputs' 1- and 7-day windows, which compare against a recent reference. Scenario 2 needs labels, so only (iii) finds it.
+
+The point for this lesson: any label-free summary of a card's history, the recipe or a pretrained encoder, sits on the label-free side of this table. On a stream where the strongest signal is a statistic of labels, it can only be added.
+</Solution>
+</Exercise>
+
+<Exercise>
+Return to the eight-row transfer log of <Ref lesson="fraud-as-a-graph" id="money-that-returns-a-cycle-in-time-order">the graph module</Ref>, where A pays C 1,400 on 2 May, C pays D 1,300 on 20 May and D pays A 1,200 on 4 June. (a) Write two group-by keys a hand-built aggregate over A's history could use for its counterparties, and what each one loses. (b) A pretrained encoder reads A's rows in order, with each counterparty's identifier and coded attributes. Which part of the cycle can it see, and which can it not, whatever it was trained on?
+
+<Solution>
+(a) By counterparty identifier: "transfers to C", "transfers from D", one column per counterparty, almost all empty across accounts, and blind to any counterparty first seen after training. By counterparty attribute, such as its region or a "new counterparty" flag: dense columns, but A's transfer to C and receipt from D become two unrelated counts in two groups. Neither key relates the money out to the money in.
+
+(b) A's rows hold two events: 1,400 out to C on 2 May and 1,200 in from D on 4 June. An encoder can represent that A sent money out and received a similar, slightly smaller amount back five weeks later from a different account, a pattern it can learn to weigh. It cannot see that C paid D on 20 May, because that row is in C's and D's histories, not A's. Without it, "money returned" and "an unrelated customer paid A" look the same. Following the money needs the graph: a walk along the edges, or <Ref lesson="guilt-by-association" />'s exposure scores, computed over all accounts' rows.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two customers' events are cut into a first and a second half of 20 events each, counted by three event types (card payment, transfer, cash withdrawal):
+
+| | card | transfer | cash |
+|---|---|---|---|
+| A, first half | 12 | 6 | 2 |
+| A, second half | 10 | 7 | 3 |
+| B, first half | 2 | 4 | 14 |
+| B, second half | 3 | 3 | 14 |
+
+(a) Turn each row into a distribution and compute the Kullback–Leibler divergence $D(P \| Q) = \sum_i p_i \ln(p_i / q_i)$, in nats, met in <Ref lesson="concept-drift" id="a-cheaper-distance-one-column-at-a-time">the drift lesson</Ref>: $D(A_1 \| A_2)$, A's first half against A's second, and $D(A_1 \| B_2)$, A's first half against B's second. (b) If an encoder were trained to make the two halves of one customer close and halves of different customers far apart, what assumption about behaviour would that training rely on, and what kind of customer breaks it?
+
+<Solution>
+(a) A1 = (0.6, 0.3, 0.1), A2 = (0.5, 0.35, 0.15), B2 = (0.15, 0.15, 0.7).
+
+$D(A_1 \| A_2) = 0.6 \ln\frac{0.6}{0.5} + 0.3 \ln\frac{0.3}{0.35} + 0.1 \ln\frac{0.1}{0.15} = 0.109 - 0.046 - 0.041 = 0.023$.
+
+$D(A_1 \| B_2) = 0.6 \ln\frac{0.6}{0.15} + 0.3 \ln\frac{0.3}{0.15} + 0.1 \ln\frac{0.1}{0.7} = 0.832 + 0.208 - 0.195 = 0.845$.
+
+The same customer's halves differ by about one fortieth of a nat, two different customers' by most of a nat, about 37 times as much. (For B's own halves the divergence is 0.017.)
+
+(b) That a customer's behaviour repeats: two stretches of one history look more alike than stretches of two histories, as the divergences here show. If it holds, "are these two pieces from the same customer?" is a question the events can grade, and an encoder that answers it has to represent what makes a customer recognisable. A customer whose behaviour changes breaks it, and a card taken over by a thief is exactly such a customer, so what the training task rewards and what fraud detection needs pull apart there. <Ref lesson="contrastive-event-embeddings" /> builds this training task, checks the assumption with the same divergence on real histories, and shows the shortcut that lets an encoder pass it without learning behaviour at all.
+</Solution>
+</Exercise>
+
+<References>
+1. D. Mollaev, I. Kireev, M. Postnova et al., "Multimodal Banking Dataset: Understanding Client Needs through Event Sequences," arXiv:2409.17587, 2024 (v2, 2025) — Sec. 3.1–3.3 (two million corporate clients, the 256- and 1,024-dimensional embeddings, 950 million transactions, the product-purchase task with events strictly before the month, 81% without purchases, the anonymisation that keeps each date's hour, the 69,474-client subset), Sec. 4.1 (five client folds, mean ROC-AUC), Sec. 4.2.1 (the aggregation baseline, the contrastive, masked and generative encoders, the supervised GRU), Table 2 (full data), Table 6 (the subset), Table 9 (rebalancing moves the contrastive row by at most 0.002). Dataset under CC BY 4.0: https://huggingface.co/datasets/ai-lab/MBD
+2. D. Babaev, N. Ovsov, I. Kireev, M. Ivanova, G. Gusev, I. Nazarov, A. Tuzhilin, "CoLES: Contrastive Learning for Event Sequences with Self-Supervision," *Proceedings of SIGMOD 2022* (arXiv:2002.08232) — Sec. 4.1.2 (the hand-crafted aggregation recipe), Table 6 (frozen embeddings against designed features on five public tasks), Sec. 4.0.3 (labelled and test split of the public tasks), Sec. 4.2.4 and Fig. 4 (fine-tuned encoder, network from scratch and a boosted tree on the hand-crafted features at each label fraction; values read off the figure), Sec. 4.3 and Tables 8–11 (pretraining on ten million companies and five million individuals; the bank's company and retail tasks with baseline, embedding and hybrid; the grouping-key explanation; fraud monitoring reported as AUROC only).
+3. N. Rusakov, V. Meshkov, K. Zorin, G. Zaripov, A. Uglov et al., "A Foundation Model for Multimodal Event Sequences in Financial Applications," *KDD '26*, applied data science track (arXiv:2607.09955) — Sec. 5.1 (data, 160 billion transaction events, production feature set, held-out test set), Sec. 5.4 (labelled data far smaller than pretraining data), Sec. 5.2 and Table 2 (engineered features 0.792, pretrained embedding 0.787, both 0.801 on four marketing-response tasks).
+4. D. Burakov, "EventGPT: Next-Event Pretraining on Banking Customer Histories," arXiv:2611.03302, 2026, preprint — Sec. 6.1 (positives per client-month on the test fold), Sec. 6.4 (the 114 engineered features), Sec. 7.1, Table 3 (the Markov chain times activity baseline), Fig. 10 and Tables 6 and 10 (labels needed to match the zero-label score), Sec. 7.2–7.4 (frozen embedding 0.787 against engineered 0.808, the rank-averaged ensemble).
+5. P. Skalski, D. Sutton, S. Burrell, I. Perez, J. Wong, "Towards a Foundation Purchasing Model: Pretrained Generative Autoregression on Transaction Sequences," ICAIF '23 workshop (arXiv:2401.01641) — Table 2 (hand-engineered features against four label-free methods on four public tasks: best of those baselines on expenditure and default, beaten on churn and age), Sec. 5.1–5.3 (pretraining on 180 issuers in one card-message format, three hold-out issuers split by cardholder and in time, value detection rate at a false-positive ratio, Fig. 2).
+6. S. Luetto, F. Garuti, E. Sangineto, L. Forni, R. Cucchiara, "One Transformer for All Time Series: Representing and Training with Time-Dependent Heterogeneous Tabular Data," *Machine Learning*, 2025 (arXiv:2302.06375) — Table 13 and App. B (loan default on the PKDD'99 Czech bank data: 4,500 histories, 682 labelled clients split 478/204, test clients kept out of pretraining, pretrained against from-scratch transformers and XGBoost).
+7. D. T. Braithwaite, M. Cavalcanti, R. A. McEver et al., "Your Spending Needs Attention: Modeling Financial Habits with Transformers," arXiv:2507.23267, 2025, industry preprint — Sec. 4.1 (291 tabular features; joint fusion makes most redundant hand-built transaction features removable, relative AUC only).
+8. A. Sakhno, I. Kireev, D. Babaev, M. Savchenko, G. Gusev, A. Savchenko, "PyTorch-Lifestream: Learning Embeddings on Discrete Event Sequences," *IJCAI-25 Demonstrations Track*, pp. 11104–11108 — Table 1 (eight self-supervised methods against hand-made features on three public tasks, no method best on all). https://github.com/pytorch-lifestream/pytorch-lifestream
+9. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 3.3 "Baseline feature transformation" (the fifteen inputs taken apart in the ledger). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+10. J. Jurgovsky, M. Granitzer, K. Ziegler, S. Calabretto, P.-E. Portier, L. He-Guelton, O. Caelen, "Sequence Classification for Credit-Card Fraud Detection," *Expert Systems with Applications* 100, 2018, pp. 234–245 — Tables 4–5 (the LSTM's gain on card-present payments and its closing once aggregates are in).
+11. M. Weber, G. Domeniconi, J. Chen, D. K. I. Weidele, C. Bellei, T. Robinson, C. E. Leiserson, "Anti-Money Laundering in Bitcoin: Experimenting with Graph Convolutional Networks for Financial Forensics," KDD Workshop on Anomaly Detection in Finance, 2019 (arXiv:1908.02591) — Table 2 (a forest on hand-built neighbour aggregates against graph convolutional networks).
+</References>

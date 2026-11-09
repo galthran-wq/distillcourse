@@ -1,0 +1,516 @@
+A transaction is a row with a timestamp, an amount with a long tail, a dozen categorical codes and a merchant id drawn from ten million. A language model reads a sequence of tokens from a fixed vocabulary and learns by predicting the next one. How does a row become tokens without losing the size of the amount or the gap since the last event, what should the model be asked to predict, and what in that prediction is useful for a task it was never trained on?
+
+<Ref lesson="contrastive-event-embeddings" id="what-a-history-can-grade-are-two-pieces-from-the-same-customer">The contrastive lesson</Ref> set this task aside. Predicting the next event favours what matters, since a habit that predicts the next purchase gets learned and a detail that predicts nothing does not, but it needs a loss for every field of an event. That lesson's last exercise showed the difficulty on one field: a squared error on the log amount, asked for a next payment that is either a card payment of about 30 or a transfer of about 2,000, predicts about 160, an amount neither kind of event takes.
+
+Language models already solve the general version of the problem. Text is cut into pieces from a fixed list, every piece is a class, and the model is trained to give the next piece a high probability with the same cross-entropy loss the course's fraud networks used. If a transaction could be written in such pieces, the whole machinery would apply to it. The obvious way to do that is to write the transaction as text.
+
+## Why not write the row as a sentence?
+
+Turning a transaction into the input a language model reads is called tokenisation, and the choices made there decide what the model can see.
+
+### What a language model reads
+
+<Definition title="token, vocabulary, next-token prediction">
+A *vocabulary* is a finite list of symbols fixed before training; a *token* is one entry of it, written as its index. A sequence model trained by *next-token prediction* reads tokens $u_1, \dots, u_{i}$ and outputs a probability for every entry of the vocabulary as $u_{i+1}$; its loss at position $i$ is $-\ln \hat p(u_{i+1})$, the cross-entropy of a classifier with as many classes as the vocabulary has entries.
+</Definition>
+
+The loss is the one of <Ref lesson="neural-tabular-detectors" id="cross-entropy-the-loss-whose-best-answer-is-the-fraud-share">the network lesson</Ref>, with tens of thousands of classes instead of two. A model that has learned nothing spreads its probability evenly and pays $\ln |V|$ at every position, where $|V|$ is the size of the vocabulary. That number is the starting point every training curve falls from.
+
+Text tokenisers are built for English. A *byte-pair* tokeniser starts from single characters and repeatedly merges the most frequent adjacent pair in a large body of text into a new entry, until the list holds a fixed number of entries; a widely used one has 50,257. Frequent words become one token, rare strings several.
+
+### One payment through a text tokeniser
+
+Take the payment the course has followed since <Ref lesson="transaction-aggregates" id="what-the-raw-record-can-tell-a-model">the aggregates lesson</Ref>: card 4471 at merchant 9023, EUR 184.00 on Tuesday 12 March 2024 at 14:07:31, by chip, merchant category code (MCC) 5411 for grocery stores, merchant country Belgium. Written with field names, `time: 2024-03-12 14:07:31, card: 4471, amount: 184.00, currency: EUR, entry mode: chip, merchant: 9023, MCC: 5411, merchant country: BE`, it becomes 48 tokens of the 50,257-entry tokeniser. Without the names, as a line of a CSV file, it is 31.
+
+Most of the 48 are not the payment. Every `:`, every `,`, and the names `merchant country` and `entry mode` are tokens, repeated identically in every row. The values themselves are cut where the tokeniser's merges happen to fall:
+
+| written as | tokens |
+|---|---|
+| `184.00` | `184` `.` `00` |
+| `1840.00` | `18` `40` `.` `00` |
+| `18.40` | `18` `.` `40` |
+| `1,840.00` | `1` `,` `840` `.` `00` |
+
+An amount a hundred times smaller, 18.40, shares the digit pieces `18` and `40` with 1840.00, while the same 1,840 written with a thousands separator shares none of the pieces that write the number, only `.` and `00`. Nothing in a piece says how large the number is, so magnitude has to be reassembled by the model from digit strings, and the same value gets different pieces depending on the character before it (`4471` after a space is ` 4` `471`, after a comma `44` `71`). The merchant id fares worse: a seven-digit id becomes three or four pieces that mean nothing on their own.
+
+### A vocabulary per field
+
+The fix is to stop treating the row as text. The row has a known list of fields; give each field its own small vocabulary, and write each field as one token from it.
+
+<Definition title="per-field vocabulary">
+In a *per-field vocabulary* every field of an event has its own set of tokens: a categorical field one token per value, a numerical field one token per bin, and a timestamp a few calendar tokens. The token `hour=14` and the token `mday=14` are different entries even though both carry the number 14. An event is written as its field tokens in a fixed order, preceded by a marker token that starts it.
+</Definition>
+
+Written this way, the payment above is ten tokens: the event marker, the gap since the card's previous event, hour, weekday and day of the month, the amount's bin, the entry mode, the MCC, the merchant and the country. The currency token is left out when it is the home currency, which it is for almost every row.
+
+<Figure
+  src="./figures/tokens.svg"
+  alt="The payment card 4471, Tuesday 2024-03-12 14:07:31, EUR 184.00 in the home currency, chip, MCC 5411, merchant 9023, Belgium, with the previous event at 10:47:12, written as ten boxes: [EVT], dt=58 from the gap of 12,019 seconds, hour=14, wday=Tue and mday=12 from the time, amt_19 for the bin from 174 to 274 euros, ch=chip, mcc=5411, merchant through three hashed rows, and cty=BE. Under each box its row in the input table: 1, 62, 159, 170, 187, 226, 229, 412, 9023, 856."
+  caption="One payment as ten tokens: every field is one entry of a vocabulary built for that field."
+/>
+
+The saving is in the context window, the number of tokens a model reads at once. Attention compares every pair of tokens in the window, so its cost grows with the square of the window's length, and windows are set by what the hardware affords.
+
+<Figure
+  src="./figures/budget.svg"
+  alt="Two bar panels. Left, tokens for one transaction: text with field names 48, text with values only 31, a vocabulary per field 10. Right, transactions in a 4,096-token window: 85, 132 and 409."
+  caption="The same window holds about three to five times more history when each field is one token."
+/>
+
+On a public synthetic card set the same comparison gives about 39 text tokens against 12 field tokens per transaction, and in a window of 4,092 tokens about 102 transactions against 315.
+
+### What the field tokens buy, measured
+
+Field tokens could win for two reasons: the model may read each transaction better when every field is one clean token, or it may simply see more transactions. In a fixed window the two arrive together, so a score that rises with field tokens cannot say which one did it. Separating them takes a comparison at an equal number of transactions, which means shrinking the field-token window until it holds no more history than text does.
+
+One bank ran that comparison on its credit-default model: a transformer pretrained by next-token prediction on its customers' transactions, then trained together with the bank's tabular features on 10 million labelled rows. Every variant was scored by ROC-AUC on a test period later than the training period and not overlapping it. The reference point is the field-token model with a 1,024-token window, which holds 81 transactions, and every figure below is a relative change in ROC-AUC from that model.
+
+| tokens | window | transactions | ROC-AUC against the reference |
+|---|---|---|---|
+| field tokens (reference) | 1,024 | 81 | — |
+| text | 1,024 | 31 | −0.37% |
+| field tokens | 352 | 28 | −0.36% |
+| text | 662 | 20 | −0.54% |
+| field tokens | 224 | 18 | −0.45% |
+
+The text here was cut by a byte-pair tokeniser trained on the bank's own transaction descriptions; the field-token model wrote the amount, the date and the other structured fields as one token each and the description, the one free-text field, as byte-pair pieces beside them. In the same 1,024 tokens it holds 31 transactions and scores 0.37% below the reference. Cut the field-token window to 352 tokens, so that it holds 28, and it scores 0.36% below: level with text. At about 20 transactions the two are again close, with field tokens slightly ahead. Both rows also show the cost of history: going from about 30 transactions to about 20 costs field tokens 0.09 of a percentage point and text 0.17, and the reference, with 81, is ahead of everything.
+
+<KeyFact>
+At an equal number of transactions, field tokens and text scored nearly the same. What a per-field vocabulary buys is history: three to five times more transactions in the same window, at the same cost per token.
+</KeyFact>
+
+<Aside>
+**Why not start from a model that already reads English?** The same bank tried language models already trained on general text, each with its own tokeniser, in the same 1,024-token window. Those tokenisers are long-winded on transactions, so the window held only 18 transactions for a model of the same size as the bank's own and 24 for two larger recent ones, of 0.6 and 4 billion parameters. Against the reference they scored −0.91%, −0.41% and −0.43%. At that history the bank's own models trained from scratch scored −0.45% (field tokens, 18 transactions) and −0.54% (text, 20). The same-size model fell below both; the larger ones did about as well as a from-scratch model with similar history, and no better. Knowing English did not make up for the history its tokeniser pushed out of the window, and the larger models took 3.7 and 9 times as long to train.
+</Aside>
+
+## The amount: from a long-tailed number to a class
+
+A per-field vocabulary needs every field to take one of a fixed list of values. Categorical codes already do. The amount does not: it runs from a few cents to tens of thousands of euros, with most payments under €100 and a long tail above.
+
+### Bins that each hold the same share of payments
+
+The obvious way to make the amount a class is to round it to the euro. That gives a vocabulary of tens of thousands of classes, most of them seen a handful of times: the model cannot learn a probability for €4,317 from three examples. Equal-width bins fail the other way: with ten bins of €1,000 each, almost every payment lands in the first one.
+
+<Ref lesson="scorecards-woe" id="cutting-a-number-the-edge-that-matters">The scorecard lesson</Ref> rejected equal-frequency bins because they ignore the label, and a scorecard's bins exist to separate fraud from genuine. Here there is no label, and the bins have a different job: every class must be seen often enough to learn its probability. Equal-frequency bins, cut at quantiles of the amount, do exactly that.
+
+<Definition title="quantile binning">
+Fit $q - 1$ edges at the $1/q, 2/q, \dots, (q-1)/q$ quantiles of the nonzero amounts in the pretraining data. An amount becomes the token `amt_k` of the bin it falls in, $k = 1, \dots, q$, and an amount of exactly zero becomes a token `amt_0` of its own. Each nonzero token then covers a share $1/q$ of the training payments.
+</Definition>
+
+Zero gets its own token because it is a different event, not a small amount: a card check, a fee waiver, a declined attempt recorded at zero. With $q = 20$ there are 21 amount tokens.
+
+<FigureSequence
+  name="amount"
+  alt="Three frames sharing one layout. Top: the distribution of nonzero card amounts on a log axis from 1 to 10,000 euros, with 19 dashed quantile edges between about 4.48 and 273.53 euros, the zero bucket amt_0 drawn as a box beside the axis, and labels amt_1, amt_10, amt_20 under their bins. Bottom: an empty bar chart over bins 0 to 20. Frame 2 shades the bin from 173.69 to 273.53 euros, marks 184 euros in it as amt_19, and draws the plain target, a bar of height 1 on bin 19. Frame 3 replaces it with the smoothed target: 0.9 on bin 19 and 0.1/3 on bins 17, 18 and 20."
+  caption="An amount becomes a bin, and the bin becomes a target the loss can grade."
+/>
+
+<Task>
+Step to frame 2 and read the width of the bin €184 falls in, then the width of the bin above it. The first spans about €100; the second runs from €273.53 to every amount ever paid. Ask what the token keeps of a €5,000 payment.
+</Task>
+
+The figure uses an illustrative card stream whose nonzero amounts have a median of €35 and a long right tail. Its bins are narrow where payments are dense and wide in the tail, so a €300 and a €30,000 payment are the same `amt_20`. The token keeps the order of magnitude and loses the detail where payments are rare; a finer grid, $q = 50$ or $100$, buys tail resolution at the cost of rarer classes.
+
+### What a plain bin target misses: the bins are ordered
+
+The loss for the amount is now a cross-entropy over 21 classes. That loss treats every wrong bin alike: a prediction that puts its weight on bin 18 and one that puts it on bin 5 are equally wrong if both give the true bin 19 the same probability. The amount bins are ordered, and a near miss should cost less than a far one.
+
+The fix keeps the cross-entropy and changes the target. Instead of 1 on the true bin and 0 elsewhere, the target puts $1 - \varepsilon$ on the true bin and spreads $\varepsilon$ over its neighbours. One implementation spreads it over the five bins on each side; the example uses two.
+
+<Example title="two predictions with the same probability on the true bin">
+The next amount is €184, bin 19. Two models give it probability 0.30. Model A puts 0.40 on bin 18 and 0.10 on each of bins 17 and 20; model B puts 0.40 on bin 5 (about €12 to €15) and 0.10 on each of bins 4 and 6. Each spreads its last 0.10 evenly over the other 17 bins, $0.10/17 = 0.0059$ each.
+
+With the plain target, both pay $-\ln 0.30 = 1.204$.
+
+With $\varepsilon = 0.1$ spread over the three bins within two of bin 19 (bins 17, 18 and 20; there is no bin 21), the target is 0.9 on bin 19 and $0.1/3 = 0.0333$ on each of the three. The loss is $-\sum_k \text{target}_k \ln \hat p_k$:
+
+- A: $0.9 \times 1.204 + 0.0333 \times (-\ln 0.10 - \ln 0.40 - \ln 0.10) = 1.084 + 0.0333 \times (2.303 + 0.916 + 2.303) = 1.268$;
+- B: $1.084 + 0.0333 \times 3 \times (-\ln 0.0059) = 1.084 + 0.0333 \times 3 \times 5.136 = 1.597$.
+
+The smoothed target charges B 0.33 more for putting its weight on amounts more than ten times too small; the plain target could not tell them apart.
+</Example>
+
+<Exercise>
+Model C gives bin 19 probability 0.60 and bin 20 probability 0.30, and spreads 0.10 evenly over the other 19 bins. Compute its loss under the plain and the smoothed target of the example. What is the lowest loss any prediction can reach under the smoothed target, and which prediction reaches it?
+
+<Solution>
+Plain: $-\ln 0.60 = 0.511$. The other bins get $0.10/19 = 0.00526$ each. Smoothed: $0.9 \times 0.511 + 0.0333 \times (-\ln 0.00526 - \ln 0.00526 - \ln 0.30) = 0.460 + 0.0333 \times (5.247 + 5.247 + 1.204) = 0.460 + 0.390 = 0.850$. C is far better than A and B on the true bin, but bins 17 and 18 get almost nothing, and the smoothed target charges for that.
+
+A cross-entropy $-\sum_k t_k \ln \hat p_k$ is lowest when $\hat p = t$ (the same argument as the network lesson's, where the best constant answer to a group was its fraud share), and its value there is $-\sum_k t_k \ln t_k = -0.9 \ln 0.9 - 3 \times 0.0333 \ln 0.0333 = 0.095 + 0.340 = 0.435$. The smoothed loss never reaches zero; a model that matches the target exactly still pays 0.435, and the comparison between models is what matters.
+</Solution>
+</Exercise>
+
+<Aside>
+**Keeping the number on the input side.** A bin is what the model must *predict*, a class it can be graded on. What it *reads* need not be binned: an amount can enter as a number and leave as a class. Fed as one standardised number, the log amount gives the first layer a single input, and a network fits smooth functions of one input easily and sharp ones slowly. One remedy hands it sharp features ready-made: for a standardised value $v$, the $2L$ *frequency features* $\sin(2^l \pi v)$ and $\cos(2^l \pi v)$, $l = 0, \dots, L-1$, passed through a learned linear layer.
+
+With amounts of median €35, the log amount standardised by its spread of 1.25 puts €184 at $v = 1.328$ and €190 at $v = 1.353$. At $l = 0$ their features are $(-0.857, -0.515)$ and $(-0.896, -0.445)$: nearly the same, so the low frequencies place both in the same region of amounts. At $l = 5$ they are $(0.999, 0.046)$ and $(-0.822, -0.570)$: entirely different, so the high frequencies let the network tell €184 from €190 if that matters. $L$ is a sensitive setting: too many pairs hand the network distinctions finer than anything the task depends on.
+</Aside>
+
+## Time: the gap since the last event, on a soft log scale
+
+A language model knows where each token stands in the sequence. For text that is enough: the fifth word comes after the fourth, and nothing passes between them. Events are different. Two payments one minute apart and two payments one month apart are both neighbours in the sequence, and a model that sees only positions cannot tell a burst from a quiet month. <Ref lesson="behavioural-profiles" id="the-time-since-the-previous-payment">The behavioural-profiles lesson</Ref> made the gap since the previous payment a feature for that reason; here the gap must become a token.
+
+### A scale on which habits are evenly spaced
+
+The gap $\Delta$ in seconds runs from under a second, for a retried authorisation, to years, for a dormant account: eight orders of magnitude. A year is about $3 \times 10^7$ seconds and a day 86,400, so an even grid of seconds would spend more than 99% of its bins on gaps longer than a day. The logarithm fixes the range, and on it multiplying a gap by 30 always adds the same amount, which matches how habits are spaced: within minutes, within hours, daily, monthly. But the logarithm goes to $-\infty$ at $\Delta = 0$ and makes the step from one second to two as long as the step from a day to two days, when a second's difference between two events means nothing.
+
+<Definition title="soft-log gap">
+The gap $\Delta \ge 0$ in seconds since the customer's previous event is mapped to $\phi(\Delta) = 8 \ln(1 + \Delta/8)$. As a token it is `dt=` the whole part of $\phi(\Delta)$, capped at 140.
+</Definition>
+
+For $\Delta$ well below 8 seconds, $\ln(1 + \Delta/8) \approx \Delta/8$ and $\phi(\Delta) \approx \Delta$: the scale is linear, in seconds. Well above 8 seconds, $\phi(\Delta) \approx 8 \ln \Delta - 8 \ln 8$: logarithmic, with each doubling of the gap adding $8 \ln 2 = 5.5$. The cap of 140 is reached at about ten years.
+
+| gap | $\phi(\Delta)$ | token |
+|---|---|---|
+| 1 second | 0.94 | `dt=0` |
+| 1 minute | 17.1 | `dt=17` |
+| 1 hour | 48.9 | `dt=48` |
+| 1 day | 74.3 | `dt=74` |
+| 30 days | 101.5 | `dt=101` |
+| 1 year | 121.5 | `dt=121` |
+
+<Figure
+  src="./figures/gap.svg"
+  alt="The curve 8 ln(1 + gap/8) against the gap in seconds on a log axis from 1 second to about ten years, rising from near 0 to 140. Points mark 1 second (1), 1 minute (17), 1 hour (49), 1 day (74), 30 days (102) and 1 year (121). Blue brackets mark the step from a minute to an hour, +32, and from a day to thirty days, +27."
+  caption="A minute to an hour and a day to a month are steps of about the same size."
+/>
+
+The payment at 14:07:31 came 3 h 20 min after the card's previous event at 10:47:12, a gap of 12,019 seconds: $\phi = 8 \ln(1 + 1{,}502) = 58.5$, the token `dt=58`.
+
+### The calendar, and time inside the model
+
+The gap says how long since the last event; it does not say that the payment fell on a Tuesday afternoon. Weekly and daily cycles are real in payments (payday, weekend shopping, night-time), so the timestamp is also written as calendar tokens: hour of the day, day of the week, day of the month, as in the ten-token payment. An alternative feeds them as sines and cosines of their cycle, the treatment <Ref lesson="behavioural-profiles" id="clock-time-lives-on-a-circle">the behavioural-profiles lesson</Ref> gave the hour, so that 23:00 sits next to 00:00.
+
+A recurrent network reads the gap token like any other input. A transformer needs more, because attention by itself ignores order: it mixes every event with every other one.
+
+<Aside>
+**Time inside a transformer.** A transformer tells its tokens apart by position: to each token's vector it adds a *position encoding*, a vector of sines and cosines of the token's index $i$ at several frequencies, the same construction as the frequency features of the amount Aside applied to $i$ instead of an amount. The number fed into those sinusoids can be computed from time instead of from the count of events. One design feeds them a learned mix of the event's index and its time, $w_p i + w_t t_i + b$; another computes the position as $64 \ln(1 + t_i/60)$ from the seconds $t_i$ since the window's first event, the same soft logarithm with different constants. How much such time encodings add is measured in <Ref lesson="reading-foundation-model-claims" />, where the tables that report it are read.
+</Aside>
+
+## Ten million merchants: a table too large to hold
+
+The merchant is the field with the most values and, often, the most signal: where a customer shops is a large part of who they are, and a merchant a card has never used before is the classic sign of a stolen card.
+
+### A table row per merchant
+
+The obvious token is the merchant id itself, with a trained vector per merchant: the <Ref lesson="neural-tabular-detectors" id="an-embedding-is-a-linear-layer-on-the-one-hot-input">entity embedding of the network lesson</Ref>, one row of a table per value. At ten million merchants and 128 numbers per row, the table holds 1.28 billion parameters, more than many whole transaction models. A merchant that first appears after training has no row at all.
+
+### Hashing into shared rows
+
+The table can be made smaller by letting merchants share rows, provided each merchant still ends up with a vector of its own.
+
+<Definition title="hashed entity embedding">
+For the $n$ entity ids seen in the pretraining data, fix a table of $S + 1$ rows with $S \ll n$, and $k$ hash functions $h_1, \dots, h_k$, each mapping an id to one of rows $1, \dots, S$ at random but always the same way. When the vocabulary is built, the rows $h_1(e), \dots, h_k(e)$ of every seen id $e$ are computed once and stored in a fixed lookup, and the vector of $e$ is the mean of those $k$ rows. Row 0 is a vector of zeros, never trained, and every id missing from the lookup gets it.
+</Definition>
+
+<Figure
+  src="./figures/hashing.svg"
+  alt="Left, three boxes: merchant 9023 in amber, merchant 4,118,560 in blue, and an unseen merchant. Centre, a table of 100,001 rows. Merchant 9023 sends three amber arrows, labelled three hashes, to rows 18,204, 61,377 and 93,050; merchant 4,118,560 sends three dashed blue arrows to rows 18,204, 61,377 and 77,401; the unseen merchant points to row 0. Right, the mean of merchant 9023's three rows is its vector; a note says two of its rows are shared with merchant 4,118,560 but the set of three is not. Footer: a row per merchant is 10,000,000 × 128, about 1.28 billion numbers; the shared table 100,001 × 128, about 12.8 million."
+  caption="Each row is shared by many merchants; each merchant's set of three rows is almost always its own."
+/>
+
+With $n = 10^7$, $S = 10^5$ and $k = 3$, the table holds $100{,}001 \times 128 \approx 12.8$ million numbers, a hundredth of the full one. Every row is shared: each hash sends about $n/S = 100$ merchants to it, and a row's vector is pulled by the gradients of all of them. A merchant's vector is still its own because its three rows are a combination that almost no other merchant has. With one hash, every merchant would share its vector exactly with about 100 others. With three, a second merchant lands on the same three rows with probability of order $1/S^3 = 10^{-15}$, and over all 50 trillion pairs of merchants that is well under one collision.
+
+A merchant that first appears after pretraining is not in the lookup. The hash functions would accept its id like any other, but the three rows they picked would be rows trained by about 300 other merchants, a hundred per row, and their mean would be a vector that looks learned and describes none of them. It goes to row 0 instead, the zero vector, which says plainly that the model has no history for this merchant. That is the <Ref lesson="neural-tabular-detectors" id="an-embedding-is-a-linear-layer-on-the-one-hot-input">"unknown" row</Ref> of the network lesson, and for a fraud model it carries meaning: a never-seen merchant is itself a signal.
+
+### The output side: one table for reading and predicting
+
+Predicting the next merchant needs, for each of the ten million, a score: a final layer from the model's state to $10^7$ outputs, another 1.28 billion weights. Instead, the score of merchant $j$ is the dot product of the state with merchant $j$'s own input vector, so the same table both reads merchants and predicts them. This is *weight tying*: no second table, and a merchant scores high when the state points the way its vector does.
+
+One payment network measured both designs against the same model built with a full merchant table and an untied output layer. Hashing the table cut peak GPU memory by 22.6%; tying the output to the table cut it by 73.8%. Its task was anomaly detection, scored by an internal accuracy at an operating threshold whose formula is not disclosed; on that score hashing moved the model by +1.9% and tying by −0.6%, both relative changes: the memory was saved at little cost to the task.
+
+<KeyFact>
+Hashing trades two things against each other at different rates: the expected number of pairs of merchants sharing a whole vector falls as $S^{-k}$, while the table's parameters grow only in proportion to $S$. Uniqueness is bought with more hashes, not a larger table. What no setting buys back is that every row also carries the gradients of the $n/S$ other merchants hashed to it, so a merchant's vector is never trained on its own payments alone.
+</KeyFact>
+
+<Exercise>
+A regional issuer has $n = 2 \times 10^6$ merchants and wants a 64-number merchant vector. (a) How many parameters does a row per merchant take, and how many a hashed table with $S = 50{,}000$? (b) With $k = 1$, about how many merchants share each vector exactly? (c) Untied, how many weights does the merchant output layer add in each case?
+
+<Solution>
+(a) Full: $2 \times 10^6 \times 64 = 128$ million. Hashed: $50{,}001 \times 64 \approx 3.2$ million, a fortieth.
+
+(b) One hash sends $n/S = 40$ merchants to each row on average, and with $k = 1$ a merchant's vector is its row, so about 40 merchants share each vector exactly: the model cannot tell them apart at all.
+
+(c) An untied output layer needs one 64-number weight vector per merchant it can predict, $2 \times 10^6 \times 64 = 128$ million weights, whether the input table is hashed or not: the model must still score every merchant. Tied, it adds nothing, since each merchant's score is the dot product of the state with its input vector (computed from the hashed rows when the table is hashed).
+</Solution>
+</Exercise>
+
+## One token per field, or a key and a value
+
+The ten-token payment came from a card stream, where every event has much the same fields. A bank's event stream is more mixed. A card payment carries an MCC and a merchant; a transfer carries a recipient country and a free-text description; an app login carries a device and the country of its IP address; a message to support is nothing but text.
+
+### What a per-field vocabulary already handles
+
+Different kinds of event are not the problem. Every token of a per-field vocabulary names its own field, `hour=14` and `mday=14` being different entries, so nothing about a token depends on where it stands in the event. A login is written as its marker, its gap, its three time tokens, its device and its IP country, and it simply has no amount token, just as the payment above has no currency token. One public model over a bank's customers writes a stream of three kinds of event this way (a profile event, transactions, a daily location summary): each event is its marker, its kind, its gap and its own fields, about 8 tokens on average, and nothing is padded. Its event encoder reads an event's tokens in both directions, because a record means the same whatever order its fields are listed in.
+
+### Where one token per field stops
+
+Two kinds of field break the scheme.
+
+**Several fields whose value is text.** A payment description takes more distinct values than any list fixed in advance could hold, so it cannot be one token. Cut by a byte-pair tokeniser trained on a bank's own text, `metal plan` becomes the three pieces `met` `al` `plan`. With one text field that costs nothing: every piece can only have come from it, and the bank model of the comparison above wrote its descriptions exactly so, as pieces beside its field tokens. With several, the pieces of one shared tokeniser are shared by every text field: the same `plan` appears in a transfer description and in a support message, and a piece no longer says which field it came from. The per-field answer would be a separate subword vocabulary for every text field, each with its own copy of the common pieces and each learned only from that field's text.
+
+**The same values under many fields.** An amount, a fee and a balance are all numbers cut into percentile bins; a merchant country, a recipient country and an IP country are all drawn from the same list of about 250 countries. A per-field vocabulary needs a separate copy of each list under each field, `mcty=BE`, `rcty=BE` and `ipcty=BE`, three entries, each learned only from the events in which that one field is Belgium.
+
+Both are solved by stating the field and the value as two separate vocabulary entries, whose vectors are summed into one position.
+
+### When the key travels with the value
+
+<Definition title="key–value tokens">
+An event is a variable-length list of pairs (key, value): the key names a field from a small vocabulary of keys, and the value is a token from one vocabulary of values shared by all fields (a bin for a number, one token for a categorical value, byte-pair pieces for free text). A field whose value is several pieces gives one pair per piece, each with the same key. Each pair is one position of the sequence; its input vector is the sum of the key's vector and the value's vector.
+</Definition>
+
+Because the two vectors are added, a key costs no extra position: a field with a one-token value takes one position, as under a per-field vocabulary, and a description of three pieces takes three. The value `plan` has one vector wherever it occurs, and the key `description` or `message` added to it says where it occurred; a country token is learned from every field that holds a country, and the key tells the model which of them this one is.
+
+One bank that built its model this way, over card payments, transfers, trading, app activity and customer communications, needed about 60 keys and about 28,000 value tokens, held in one table that embeds both. Numbers became percentile bins with a separate zero bin, as in the amount section; categorical fields with few distinct values, the MCC among them, became one token per value; high-cardinality text, such as a payment description, became byte-pair pieces, with an `[UNK]` token for pieces never seen in training. Inside a field the pieces get position encodings, the sinusoids of the time Aside, counted 0, 1, 2 from the field's first piece, so that `met` `al` `plan` stays in order; across fields there is no order, since the key already says which field a piece belongs to.
+
+The choice follows the fields, not the mix of events. When every field takes one value from a list of its own, a per-field vocabulary is enough, however many kinds of event share the stream. When several fields carry text, or the same list of values recurs under many fields, the key and the value become separate vocabulary entries.
+
+## Predicting the next event
+
+The tokens exist; now the model needs a task. The first family asks it to continue the history.
+
+### The loss, field by field
+
+<Definition title="next-event prediction">
+An encoder reads a customer's events $x_1, \dots, x_t$ in time order and produces a state $h_t$ that depends on no later event. A small output head per field $f$ maps $h_t$ to a probability for every value of $f$ in event $t+1$. The loss at position $t$ is the sum over fields of $-\ln \hat p_f(x_{t+1, f})$, and the loss of a history is the sum over its positions.
+</Definition>
+
+The encoder can be a GRU, which carries <Ref lesson="contrastive-event-embeddings" id="the-gru-and-the-vector-it-stores">one state forward one event at a time</Ref>, or a transformer whose attention is *causal*: each position may attend only to itself and earlier positions, so that the prediction at $t$ cannot read the answer. A model that writes every field as a token and predicts token after token is the same thing at finer grain: inside event $t+1$, each field is predicted from the history and the fields of $t+1$ already written.
+
+Some fields need no head. Given the time of event $t$ and the predicted gap, the hour, weekday and day of month of event $t+1$ follow. One payment-network model predicts four fields only: the gap, the amount, the merchant and the MCC.
+
+<FigureSequence
+  name="next-event"
+  alt="Three frames sharing one layout. Bottom: three events of card 4471, e1 on 26 February at 19:02 for 61.30 euros at MCC 5812, e2 on 11 March at 18:40 for 42.10 at MCC 5411 and merchant 9023, e3 on 12 March at 10:47 for 3.20 at MCC 5814; above them GRU states h1, h2, h3 linked left to right, h3 in amber; right, a dashed box e4 to be predicted: 14:07:31, 184 euros, MCC 5411, merchant 9023. Frame 1 marks predict every field of e4 from h3 alone. Frame 2 adds four heads from h3 with the probability each gives the true value and its negative log: gap p(dt=58) 0.04, 3.22; amount p(amt_19) 0.08, 2.53; MCC p(5411) 0.35, 1.05; merchant p(9023) 0.12, 2.12; loss at this position 8.91, untrained about 30.5. Frame 3 adds a blue arc from h3 back to e1: reconstruct e1 from h3 and the gap back to it, 15 days, weight exp(−15/60) = 0.78."
+  caption="One position of next-event training: four fields of the next payment, each graded by its own cross-entropy."
+/>
+
+<Task>
+On frame 2, find the head that would cost the most if the model had learned nothing. With 141 gap tokens, 21 amount tokens, 600 MCC codes and ten million merchants, an untrained head pays the log of its vocabulary size: predict which term dominates before reading the example.
+</Task>
+
+<Example title="the loss at one position">
+Card 4471's state $h_3$ after its 10:47 payment must predict the 14:07 payment. The four heads give the true values these probabilities: gap token `dt=58` 0.04, amount token `amt_19` 0.08, MCC 5411 0.35, merchant 9023 0.12. The loss at this position is
+$$
+-\ln 0.04 - \ln 0.08 - \ln 0.35 - \ln 0.12 = 3.22 + 2.53 + 1.05 + 2.12 = 8.91 .
+$$
+An untrained model spreads each head evenly: $\ln 141 + \ln 21 + \ln 600 + \ln 10^7 = 4.95 + 3.04 + 6.40 + 16.12 = 30.51$. More than half of the untrained loss is the merchant's term, and so is much of what the model can win by learning: here it fell from 16.12 to 2.12 because this card returns to merchant 9023, which its state remembers from 11 March.
+</Example>
+
+The merchant term's size has a consequence: with the terms summed at equal weight, the largest share of what the loss can gain lies in learning which merchants each customer revisits and which merchants go together. That is a habit a downstream task about the customer often needs, and it is why the merchant table and its output layer were worth the trouble of the merchant section.
+
+The amount and gap could instead be predicted as numbers, with a squared error on their logs, as one payment-network model does. The loss then mixes squared errors and cross-entropies on different scales, which must be weighted against one another by hand, and the squared error's best answer is the mean of the log, the 160 of the contrastive lesson's exercise. Bins avoid both.
+
+<Exercise>
+The same card's state after its 14:07 payment must predict its next event, a payment 2 days later of €12.40 (bin 5) at MCC 5814 at a merchant the card has never used. The heads give the true values 0.03, 0.07, 0.20 and 0.0004. Compute the loss at this position, and say which term shows that this payment would surprise the model most.
+
+<Solution>
+$-\ln 0.03 - \ln 0.07 - \ln 0.20 - \ln 0.0004 = 3.51 + 2.66 + 1.61 + 7.82 = 15.60$. The merchant term, 7.82, is the largest by far: a merchant the card has never used is the least expected part of this event, which is the information a fraud model reads from the same history. The other three terms are close to the earlier example's.
+</Solution>
+</Exercise>
+
+### Every position is graded
+
+A history of $T$ events gives $T - 1$ predictions, each graded on every field, in one pass of the encoder: the causal mask or the recurrence ensures each prediction has seen only its past, so all of them can be computed at once. A customer with 900 events is 899 graded predictions; a bank's histories give billions. That density is why a next-event model can be trained without any label at all and still have a great deal to learn from.
+
+### What the next event cannot teach: the far past
+
+The next event depends mostly on the last few: the next purchase follows today's routine. A state trained only to predict it has little reason to keep what happened two months ago. Some tasks need exactly that. A customer about to leave the bank shows it as a slowing: fewer payments per week than in the spring, a salary that stopped arriving. The last few events of a slowing customer look like anyone's last few events.
+
+<Definition title="past reconstruction">
+A second head takes the state $h_t$ and a gap $\Delta_{t,t-j}$ back to an earlier event $x_{t-j}$, and predicts that event's fields, with the same per-field loss as the next-event head. Over the last $J$ events the losses are summed with weights $\exp(-\Delta_{t,t-j}/\lambda)$, so that recent past events count more, at a rate set by the decay length $\lambda$. The total loss at position $t$ is $(1 - \alpha)$ times the next-event loss plus $\alpha$ times the past-reconstruction loss.
+</Definition>
+
+To reconstruct an event of three weeks ago from $h_t$, the state has to hold it, or hold enough of the pattern it belonged to. With $\lambda = 60$ days, an event a week back has weight $e^{-7/60} = 0.89$, a month back $e^{-30/60} = 0.61$, six months back $e^{-182/60} = 0.05$: the head asks for the last two or three months.
+
+The comparison behind the figure below used four public card-transaction tasks: churn of 10,000 bank clients and age group of 50,000 card holders (the two of <Ref lesson="contrastive-event-embeddings" id="where-the-pairs-come-from-random-slices-of-one-history">the contrastive lesson's comparisons</Ref>), next month's total spending of 400,000 retail shoppers, scored by a squared error of the log, and credit default of 1.5 million card holders. On each, an encoder (a two-layer network on each event, then a GRU of 512) was pretrained on every history, frozen, and read as the average of its states; a three-layer network was trained on 80% of the labelled clients and scored on the other 20%, averaged over runs. Only the pretraining loss changed between the three variants on each task.
+
+<Figure
+  src="./figures/ablation.svg"
+  alt="Four rows of dot strips, each on its own axis. Churn, ROC-AUC 0.80 to 0.85: next event only 0.814, past reconstruction only 0.833, both 0.845. Age group, accuracy 0.53 to 0.65: past reconstruction only 0.542, next event only 0.630, both 0.642. Next month's spending, an error where lower is better, 0.715 to 0.75: both 0.723, next event only 0.733, past reconstruction only 0.747. Credit default, ROC-AUC 0.74 to 0.80: past reconstruction only 0.744, next event only 0.795, both 0.798."
+  caption="Each head alone wins somewhere; the two together win everywhere."
+/>
+
+Next event alone beats past reconstruction alone on three tasks, by up to 0.09 of accuracy on age. On churn the order reverses, 0.833 against 0.814, the slowing the next event cannot see. Both together beat either alone on all four. The best weight $\alpha$ was largest on churn (0.1 against 0.001 to 0.005 on the others).
+
+The same logic decides how the states are read. <Ref lesson="contrastive-event-embeddings" id="what-the-task-keeps-and-what-it-discards">The contrastive lesson</Ref> found that averaging a generative encoder's states instead of keeping the last raised age-group accuracy by 6% of its value and lowered churn ROC-AUC by half a percent. A stable trait such as age is best estimated from the whole history; a recent change such as a slowing is diluted by averaging.
+
+## Hiding fields and filling them in
+
+A next-event state at $t$ has read only the events up to $t$, and is graded only on the fields of $t+1$. Much of what a history says has context on both sides. A payment in the middle of a month sits between the routine before it and the routine after it, and its amount or its merchant can be guessed from both. Nor does the question have to be about the next event: any field of any event can be hidden and asked for. A task built from holes instead of continuations uses both sides, and raises a natural expectation: a model trained on it, which sees every event with its context before and after, should represent each event better than one that sees only the past.
+
+### Masking a window
+
+<Definition title="masked-field prediction">
+A window of consecutive events is written as tokens; a random share of them is replaced by a `[MASK]` token, and the model, reading the whole window in both directions, predicts each hidden token. The loss is the cross-entropy summed over the hidden positions only.
+</Definition>
+
+The model reads the window in both directions, so a hidden amount in the fifth event is predicted from the four before it and the five after it. The usual architecture is two levels. A field-level encoder reads the tokens of one event and produces one vector per event; a sequence-level encoder reads the window's event vectors and relates events to one another. The hierarchy keeps attention cheap: within an event over ten tokens, across the window over ten events, rather than over all hundred tokens at once.
+
+<Figure
+  src="./figures/masked.svg"
+  alt="A grid of ten events by eight field tokens (dt, hour, wday, amt, ch, mcc, merch, cty). Scattered amber cells are single masked tokens; event 6's whole row is blue, a masked event; the merch column is green in every other row, one field masked in every event. Right: a field-level encoder per event feeds one vector per event up to a sequence-level encoder; both read in both directions."
+  caption="Three kinds of hole: a token, a whole event, a whole field."
+/>
+
+Masking at one level only lets the model rely on what is next to each hole. Hiding 15% of single tokens is the standard choice from text. Hiding a whole event (in one bank's recipe, 10% of events) forces it to predict a payment from the surrounding payments alone. Hiding one field in every event (10% of fields) forces it to predict, say, every merchant of the window from the amounts, times and categories. A further trick replaces a few chosen positions with `[UNK]` instead of `[MASK]` and leaves them out of the loss: the model loses those inputs without being graded on them, a form of input dropout.
+
+### Two shortcuts the masked task offers
+
+<Ref lesson="contrastive-event-embeddings" id="the-shortcut-reproduced">The contrastive lesson</Ref> showed that a self-supervised task is only as good as the shortcuts it rules out. Masking has two.
+
+**The label column.** A public synthetic card set carries a fraud flag on every row. Left in the window, it is a field like any other, and the model would learn to predict it from the others and the others from it, so the representation would encode the label the downstream model is later trained on. That breaks the downstream model because labels arrive late, on <Ref lesson="point-in-time-features" id="a-feature-built-from-labels-what-the-bank-knew-that-morning">the label clock of the point-in-time lesson</Ref>: when a payment is scored, its own flag and those of the events just before it are not yet known, so an embedding that carries the flag gives training rows information that live rows lack, and the downstream score then measures the leak, not the history. The flag is removed before pretraining. The same holds for any column computed from labels that had not arrived by the event's time, such as a terminal's fraud rate computed from today's labels.
+
+**A static field copied from a neighbour.** If the customer's age bracket or home region is repeated on every event, a masked copy is read off the next event, where the same value is in plain sight. The task becomes trivial for that field, and the repeated tokens cost attention in every row. The fix is to encode static fields once per window, by a separate encoder, and leave them out of the event rows.
+
+### Which family
+
+Does the context on both sides make the better representation? The one public head-to-head points the other way. On <Ref lesson="limits-of-hand-built-features" id="the-ranking">the two-million-client bank benchmark</Ref>, a frozen generative transformer scored 0.802 mean ROC-AUC and a frozen masked one 0.762, and both lost to a GRU trained on the labels (0.819). That is one benchmark, with one implementation of each family, and the gap need not hold elsewhere.
+
+Two properties of the generative family matter for a bank beyond that number. Its state at $t$ reads nothing after $t$, so reading it at any cut-off obeys the point-in-time rule by construction. And a recurrent next-event encoder advances its stored state by one step per new event, <Ref lesson="contrastive-event-embeddings" id="the-gru-and-the-vector-it-stores">the serving argument of the contrastive lesson</Ref>. A masked model's window must still end at the cut-off when it is used, so reading both directions inside it buys context within the window, not information from after it.
+
+## What the trained model gives a task it was never trained on
+
+Pretraining ends with a model that predicts events. A downstream task (a product purchase, a churn flag, a fraud label) can use it in two ways: read its predictions, or read its state.
+
+### The next-event distribution as a score
+
+Some questions have the form of the pretraining task. "Will the customer make a transaction of kind X next month?" is close to "what is the probability that the next event is of kind X?", which the model answers with no label at all. To ask it at a cut-off date, append to the history the start of an event: the event marker and the gap token from the last event to the cut-off. The head's probability for kind X is the score.
+
+<Ref lesson="limits-of-hand-built-features" id="how-many-labels-a-label-free-score-is-worth">The limits lesson</Ref> quoted the result on the public 100,000-client bank data: 0.79 to 0.92 ROC-AUC on five targets of the form "the client's first transaction of kind X next month", worth from a few dozen to a few hundred labelled positives, with a Markov chain over event kinds times recent activity scoring 0.79 to 0.88. One detail of that score explains where it is strong. A next-event model predicts habits first: the customer who pays kind X every month gets the highest probability of X next. The target counts only a first occurrence, so those customers can never be positive. Setting the score to zero for customers who already had kind X, a rule that uses no label, is what lifts the score on one target from 0.72 to 0.91. Without it, the model's best predictions are the ones the target excludes.
+
+### The state as columns
+
+For every other task the state is read as a vector, the event-sequence representation of <Ref lesson="limits-of-hand-built-features" id="the-vector-read-as-of-a-time">the limits lesson</Ref>. A causal model leaves one state per event, and each is valid as of its own time, so both the last state and the average of all of them read nothing after the cut-off. Which to take follows the pooling comparison recalled at the end of the past-reconstruction section; a fraud is a recent change, so the synthetic-card fraud run below takes the last state. To read it as of a cut-off date rather than as of the last event, the history is closed with the marker and gap token of a "now" event, so that two customers with the same events and different silences since then get different embeddings.
+
+What the state has learned can be inspected. One payment-processor model, pretrained with both heads on 5.1 billion card transactions of 61 million cardholders at 180 European issuers, was given a vector per merchant category by averaging the states after transactions in that category. The nearest categories, by cosine distance:
+
+| category | nearest | second nearest |
+|---|---|---|
+| Lufthansa | British Airways (0.23) | Scandinavian Airlines (0.32) |
+| Hilton Hotels | Doubletree Hotels (0.19) | Hampton Inns (0.20) |
+| Fast food | Eating places (0.14) | Convenience stores (0.26) |
+
+(Large airlines and hotel chains have merchant category codes of their own.) The model was told nothing about industries. Airlines sit together because the same customers buy from them in similar sequences, and the hotels sat close to the airlines, because a flight and a hotel are often bought together. No count over a window produces that: an aggregate counts payments at a merchant, it does not know which other merchants behave like it.
+
+### On a fraud label: a feature, not a detector
+
+The one public fraud measurement of a next-event model uses the synthetic card set with its rule-generated fraud: 24 million transactions of 20,000 simulated users, 0.12% fraud. The transactions were split by date into the first 80% for training, the next 10% for validation and the last 10% for test. A transformer of about 29 million parameters was pretrained by next-token prediction on the field tokens (about 12 per transaction, 6,251 in the vocabulary), and its last state was taken as the embedding. Three XGBoost models were fitted on a balanced sample of a million training rows and scored on 100,000 test rows drawn to keep the natural fraud rate of about 0.1%: one on 13 hand-built features, one on the embedding alone, one on both.
+
+<Figure
+  src="./figures/ap.svg"
+  alt="Horizontal bars of average precision on an axis from 0 to 0.2, with a dashed line at the random-ranking value of about 0.001. 13 hand-built features, blue, 0.124, ROC-AUC 0.9885; embedding alone, grey, 0.012, ROC-AUC 0.8775; both, amber, 0.176, ROC-AUC 0.9925."
+  caption="Alone, the embedding ranks far below the features; beside them, it adds."
+/>
+
+Read as <Ref lesson="alert-budget-metrics" id="what-a-ranking-with-no-information-scores">multiples of the base rate</Ref>, the AP of a random ranking: the embedding alone reaches about twelve times it, the 13 features about 120 times, both together about 175 times, a rise of 42% in AP over the features. ROC-AUC moves from 0.9885 to 0.9925, a change at the top of a scale that rarity has already squeezed. Three things in the setup are not known from the published run: which 13 features formed the baseline, whether each test row's embedding read only events before that row, and how much of the synthetic generator's fraud rule a sequence model can recover that a real fraudster's behaviour would not offer. <Ref lesson="reading-foundation-model-claims" /> takes up all three.
+
+What no history encoder can supply is anything about the other party: whether merchant 9023 has just been compromised, or whether the account a transfer goes to received money from forty other customers this morning. Those live in other customers' histories, <Ref lesson="limits-of-hand-built-features" id="one-accounts-rows-not-the-network">the network the encoder never reads</Ref>.
+
+<Conclusion>
+You can now design the tokeniser for a transaction stream and say why each part has its form: one token per field, because a text tokeniser spends most of its tokens on punctuation and splits numbers into pieces that lose their size, and because the history that fits in a window is what field tokens buy (at equal history, text scored nearly the same); amounts as quantile bins with a zero bin, predicted as classes with a target smoothed over neighbouring bins because the bins are ordered; the gap as $8 \ln(1 + \Delta/8)$, linear for seconds and logarithmic beyond, plus calendar tokens; merchants through three hashed rows of a shared table, with a reserved row for the unseen and the output tied to the table; the key and the value as separate vocabulary entries, summed into one position, when several fields carry text or the same list of values recurs under many fields. You can write the next-event loss field by field, add the past-reconstruction head that recovers the slowing a churn task needs (both heads together beat either on all four public tasks), set up masked-field prediction with its two shortcuts removed, and say what the trained model gives a later task: a label-free score for questions shaped like the next event, and a state that adds to hand-built features rather than replacing them (AP 0.124 to 0.176 at 0.1% fraud, 0.012 alone).
+
+What stays open is scale. A single bank's histories run to billions of events; how such a model is trained once and then fitted to forty tasks, what that costs, and how it is served inside a payment's deadline is <Ref lesson="transaction-foundation-models" />.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+A bank's stream holds four kinds of event, each starting with a marker token: a card payment (gap, hour, weekday, day of month, amount, entry mode, MCC, merchant, merchant country), a transfer (gap, hour, weekday, day of month, amount, fee, recipient country, description), an app login (gap, hour, weekday, day of month, device, IP country) and a support message (gap, hour, weekday, day of month, text). Amounts and fees are cut into 21 bins each, with edges fitted per field; countries come from a list of 250; text is cut by a byte-pair tokeniser of 20,000 pieces, a description averaging 4 pieces and a support message 30. (a) Under a per-field vocabulary that leaves absent fields out, how many tokens does a payment take, and a login? Which fields cannot be written as one token each, and what goes wrong when they are cut by one shared byte-pair tokeniser? (b) For the amount, fee, three country and two text fields, count the value entries needed with a separate vocabulary per field (each text field with a byte-pair vocabulary of its own, of the same size) and with one value vocabulary shared under keys. (c) Under key–value tokens, how many positions does each of the four kinds take, and what did the keys cost in positions for the payment and the login?
+
+<Solution>
+(a) Payment: the marker and 9 field tokens, 10; login: the marker and 6, 7. Nothing is padded: each token names its own field, so a login has no amount token rather than an empty one. The description and the support text cannot be one token each: each takes more distinct values than a list can hold. Cut by one shared tokeniser, each becomes several pieces, and with two text fields a piece does not say which of them it came from; with only one, it would. The per-field way out is a byte-pair vocabulary per text field, which (b) counts.
+
+(b) Per field: bins $21 + 21 = 42$, countries $3 \times 250 = 750$, text $2 \times 20{,}000 = 40{,}000$, in all 40,792 entries. Shared: $21 + 250 + 20{,}000 = 20{,}271$ value entries, plus 7 keys, 20,278: about half. A shared bin token means "the $k$-th share of whichever field the key names", since the edges are fitted per field. Almost all of the saving is the second copy of the text vocabulary; for the countries the gain is less in size than in evidence, since the one `BE` entry is now learned from all three fields.
+
+(c) Payment $1 + 9 = 10$; transfer $1 + 7 + 4 = 12$, the description giving one pair per piece; login $1 + 6 = 7$; support message $1 + 4 + 30 = 35$. The payment and the login take exactly what they took in (a): the key's vector is added to the value's, not given a position of its own, so the keys cost nothing in window length. What decides between the schemes is (a)'s text fields and (b)'s repeated lists, not the number of kinds of event.
+</Solution>
+</Exercise>
+
+<Exercise>
+A hashed table has $S$ rows (row 0 aside), $k$ hash functions treated as independent and uniform, and $n$ ids. (a) What is the probability that two given ids get the same row from one given hash? (b) That they get the same row from every one of the $k$ hashes? (c) The merchant vector is a mean of rows, so it does not depend on which hash gave which row. Bound the probability that two ids get the same set of rows from below by (b) and from above, for $k$ distinct rows, by $k!/S^k$, and evaluate the expected number of colliding pairs among $n = 10^7$ ids for $S = 10^5$, $k = 3$, and for $k = 1$. (d) Compute the parameters of the full and the hashed table for $d = 128$.
+
+<Solution>
+(a) Each hash sends the second id to the first id's row with probability $1/S$.
+
+(b) Independence across hashes: $(1/S)^k$.
+
+(c) The same set of rows arises when the second id's rows are any rearrangement of the first's. For $k$ distinct rows there are $k!$ orderings, each with probability $1/S^k$, so the probability is at most $k!/S^k$ and at least $1/S^k$ (the identity ordering). The number of pairs is $n(n-1)/2 \approx 5 \times 10^{13}$. For $k = 3$, $S = 10^5$: between $5 \times 10^{13} \times 10^{-15} = 0.05$ and $6 \times 0.05 = 0.3$ expected colliding pairs: almost surely no two merchants share a vector. For $k = 1$: $5 \times 10^{13} / 10^5 = 5 \times 10^8$ colliding pairs, each row shared by about 100 merchants.
+
+(d) Full: $10^7 \times 128 = 1.28 \times 10^9$. Hashed: $(10^5 + 1) \times 128 \approx 1.28 \times 10^7$, plus a fixed lookup of $3 \times 10^7$ integers that is not trained. The move: the collision count falls as $S^{-k}$ while the parameter count grows only with $S$, so a second and third hash buy uniqueness that a hundredfold larger table could not.
+</Solution>
+</Exercise>
+
+<Exercise>
+In the past-reconstruction loss the event $j$ steps back is weighted by $\exp(-\Delta_{t,t-j}/\lambda)$, for the last $J$ events. (a) What does the head learn as $\lambda \to 0$, and why does the result add little to next-event prediction? (b) What does it learn as $\lambda \to \infty$, and what goes wrong? (c) A team's churn signal is a slowing over about three months. Give a reasonable $\lambda$ and $J$, with the arithmetic.
+
+<Solution>
+(a) As $\lambda \to 0$, $\exp(-\Delta/\lambda) \to 0$ for every $\Delta > 0$: only an event at gap zero keeps its weight. In practice the loss vanishes except for events within seconds of $t$, and the head reconstructs only the immediate neighbour of the current event, which the state already holds because it just read it. The head asks the state to keep nothing the next-event task did not already make it keep.
+
+(b) As $\lambda \to \infty$, every weight tends to 1: the head must reconstruct all $J$ past events equally, a week ago as hard as a year ago. The state must then store detail of the far past at the expense of the present, and the loss rewards every past detail equally, the flaw of reconstruction <Ref lesson="contrastive-event-embeddings" id="two-targets-one-misses-what-matters-one-is-costly-to-write">the contrastive lesson</Ref> named. With $J$ large, the past-reconstruction term also grows with $J$ and swamps the next-event term unless $\alpha$ shrinks to compensate.
+
+(c) The head should still weigh events three months back noticeably. With $\lambda = 60$ days, an event 90 days back has weight $e^{-1.5} = 0.22$ and one 30 days back $0.61$; with $\lambda = 30$ days, 90 days back is $e^{-3} = 0.05$, too little. $J$ must reach that far: a customer with 40 events a month needs $J \approx 120$ to cover three months; capping $J$ lower would cut off the slowing however slowly the weights decay.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague argues: "A masked model reads each window in both directions, so its representation contains strictly more information than a causal model's and must score higher downstream." Refute the argument, naming the step that fails and the evidence against the conclusion.
+
+<Solution>
+**The evidence.** On the two-million-client bank benchmark a frozen generative transformer scored 0.802 mean ROC-AUC and a frozen masked one 0.762, both frozen into the same boosted tree. The conclusion fails on the one public head-to-head.
+
+**The failing step: "more information" about what.** Within a window, the masked model's vector for event 5 has read events 6 to 10 as well. But the downstream model is given the representation at a cut-off, and the window must end at the cut-off or the row would read the future (the point-in-time rule). Reading both directions inside a window that ends at the cut-off adds no event the causal model's last state has not read: the causal state at the cut-off has read the whole window too. What differs is what each was trained to keep, and that is set by the loss, not by the direction of reading.
+
+**What the losses keep.** The next-event loss rewards the state for holding whatever predicts behaviour, which is what a task about the customer's future needs. The masked loss rewards recovering a hidden field from its neighbours, which a model can often do from local context (the amounts around a hidden amount) without representing the customer's habits at all. More context per hole makes the masked task easier, not the representation richer.
+</Solution>
+</Exercise>
+
+<Exercise>
+On the public 100,000-client cut of the bank benchmark, design the check that the amount bins are fitted honestly. (a) Fit the 19 quantile edges of 20 bins of the nonzero amount on the clients of the four pretraining folds only, then tokenise the clients of the held-out fold with them. What share of held-out amounts should each bin receive if the folds are alike, and what would you report? (b) What would fitting the edges on all clients leak, and how large do you expect the effect to be? (c) The data are a cut across clients, not forward in time. What changes if the bins are later used on next year's payments?
+
+<Solution>
+(a) Each bin was cut to hold 5% of the pretraining amounts; if held-out clients spend like pretraining clients, each bin gets about 5% of held-out amounts, with sampling noise of order $\sqrt{0.05 \times 0.95 / N}$ for $N$ held-out amounts (with millions of events, a few hundredths of a percent). Report the 20 shares and the largest deviation from 5%, and separately the share of exact zeros. A held-out amount above the top edge or below the bottom one is not lost: it falls in `amt_20` or `amt_1`, which is why the top bin's share is the one to watch. In code: `edges = np.quantile(train_amt[train_amt > 0], np.arange(1, 20) / 20)`, then `np.searchsorted(edges, test_amt, side="right") + 1` for nonzero amounts and 0 for zeros, then the counts of bins 1 to 20 divided by the number of nonzero held-out amounts.
+
+(b) Fitting on all clients uses the held-out clients' amounts to choose the bins, so the vocabulary is shaped by the test data. The leak is small for quantile edges on millions of amounts (adding a fifth of the data moves each edge by little), far smaller than leaking labels. It is the same kind of leak as pretraining the encoder on the test clients' events, which inflates scores more, and the rule is the same: anything fitted, the vocabulary included, is fitted on training data only.
+
+(c) Next year's amounts can shift: prices rise, a product changes. The shares then drift away from 5%, most visibly in the top and bottom bins, and a fixed vocabulary reads inflated amounts as larger. The check of (a) run on each new month is a monitor of that drift; refitting the edges changes the meaning of every amount token, so the encoder must then be retrained with them.
+</Solution>
+</Exercise>
+
+<Exercise>
+<Ref lesson="point-in-time-features" id="a-feature-built-from-labels-what-the-bank-knew-that-morning">The point-in-time lesson</Ref> built a terminal's delayed fraud rate from labels that had arrived by the payment's time. A team proposes to add it as a token to every event of the pretraining stream, "since the encoder needs no labels of its own." (a) What goes wrong if the pretraining job computes the rate from the labels it holds today, and what does computing it correctly cost the encoder? (b) Which part of the masked-pretraining recipe follows the same rule, and why? (c) Where should the delayed rate go instead?
+
+<Solution>
+(a) The delayed rate for an event at time $t$ uses labels that had arrived by $t$. In a pretraining job run months later, the convenient computation reads today's labels for the whole history, so old events get rates that include frauds discovered after them, values the live system never had: the leak of the point-in-time lesson, now inside the token stream. Built correctly, through an as-of join on a time-keyed log, the token is legitimate, but the encoder is no longer label-free: pretraining, and every embedding served, needs the time-keyed label log beside the event stream. It can no longer be pretrained on a stream that carries no labels, such as another portfolio or a market with no fraud team, and a change in the label delay or in labelling practice changes its input and calls for pretraining again. It also duplicates a column the downstream model can hold itself, which is (c).
+
+(b) The fraud flag is removed from the window before masked pretraining, for the label-clock reason of (a). When an event is scored, its own flag and those of the events just before it have not arrived, so a flag in the window gives training rows what live rows lack; the flag is the extreme case of the naive rate in (a), a rate that reads the event's own outcome. An embedding that encodes it would carry the label the downstream model is trained on, and the downstream score would measure that leak. What is excluded is information from after the event's time, not every token derived from labels: the correctly built rate of (a) is legitimate, at the price that (a) names.
+
+(c) Beside the embedding, as a column of the downstream model, computed point-in-time as before. The downstream model is the one trained on labels, so label-derived features belong to it, which is also why <Ref lesson="limits-of-hand-built-features" id="why-the-vector-repeats-the-aggregates">a label-free encoder cannot replace them</Ref>.
+</Solution>
+</Exercise>
+
+<Exercise>
+A bank pretrains on 26 million customers whose histories hold on average about 920 events each, written at about 8.6 tokens per event. (a) How many tokens is one pass over the data? (b) A model reads 4,096-token windows; how many windows is that, and how many windows does an average customer's history fill? (c) Training compute for transformers is often estimated at about 6 floating-point operations per parameter per token. For a model of 100 million parameters, how many operations is one pass, and how long would it take on one accelerator sustaining $3 \times 10^{14}$ operations per second?
+
+<Solution>
+(a) $26 \times 10^6 \times 920 \times 8.6 \approx 2.06 \times 10^{11}$: about 206 billion tokens.
+
+(b) $2.06 \times 10^{11} / 4{,}096 \approx 5.0 \times 10^7$ windows. An average history is $920 \times 8.6 \approx 7{,}900$ tokens, about two windows: the window holds only half of a typical customer's history, so either the early half is truncated or the model must summarise it some other way.
+
+(c) $6 \times 10^8 \times 2.06 \times 10^{11} \approx 1.2 \times 10^{20}$ operations; at $3 \times 10^{14}$ per second, $4.1 \times 10^5$ seconds, about 4.8 days on one accelerator for one pass, and proportionally more for a billion parameters (about 48 days). Both numbers, the history that does not fit a window and the weeks of compute, are the problems <Ref lesson="transaction-foundation-models" /> takes up: a hierarchy and a profile of first occurrences for the first, and the measured cost of training such models on clusters of accelerators for the second.
+</Solution>
+</Exercise>
+
+<References>
+1. I. Padhi, Y. Schiff, I. Melnyk, M. Rigotti, Y. Mroueh, P. Dognin, J. Ross, R. Nair, E. Altman, "Tabular Transformers for Modeling Multivariate Time Series," *ICASSP 2021* (arXiv:2011.01843), a four-page conference paper — Sec. 2.1 and Fig. 1 (quantising continuous fields into per-field vocabularies), Sec. 2.2 and Fig. 2 (field-level and sequence-level transformers), Sec. 2.3 (15% field masking, the fraud label excluded from pretraining), Sec. 3 (a GPT model on rows separated by [SEP]). The synthetic card dataset and code: https://github.com/IBM/TabFormer
+2. D. Zhang, L. Wang, X. Dai, S. Jain, J. Wang, Y. Fan, C.-C. M. Yeh, Y. Zheng, Z. Zhuang, W. Zhang, "FATA-Trans: Field And Time-Aware Transformer for Sequential Tabular Data," *CIKM 2023* (arXiv:2310.13818) — Sec. 2.2 (a replicated static field makes its masked prediction trivial and costs compute), Sec. 2.3 (static fields encoded once; the time-aware position $w_p i + w_t t_i + b$).
+3. S. Luetto, F. Garuti, E. Sangineto, L. Forni, R. Cucchiara, "One Transformer for All Time Series: Representing and Training with Time-Dependent Heterogeneous Tabular Data," *Machine Learning*, 2025 (arXiv:2302.06375) — Eq. 2 (frequency features of a standardised log value), Eq. 4–5 (the quantised bin as target with neighbourhood label smoothing), Sec. 4 (timestamps as calendar fields), Tab. 3 (sensitivity to the number of frequency pairs), App. A (pretraining sets that include downstream test windows).
+4. P. Skalski, D. Sutton, S. Burrell, I. Perez, J. Wong, "Towards a Foundation Purchasing Model: Pretrained Generative Autoregression on Transaction Sequences," *ICAIF '23 workshop* (arXiv:2401.01641) — Sec. 3.1 Eq. 1–3 (next-event prediction per field, past reconstruction weighted $\exp(-\delta/\lambda)$, the mixed loss), Sec. 3.2 (MLP, GRU and the serving argument), Tables 1 and 3 (the four public tasks and the ablation), Sec. 5.1 and Table 5 (pretraining at 180 issuers; nearest merchant categories). Code for the public experiments: https://github.com/Featurespace/foundation-model-paper
+5. M. Ostroukhov, R. Mikhailov, V. Iashin et al., "PRAGMA: Revolut Foundation Model," arXiv:2604.08649, 2026, industry preprint with no released data — Introduction (the cost of serialising records as text), Sec. 2.2 and Fig. 3 (key, value and time tokens; percentile buckets with a zero bucket; $8 \ln(1 + t/8)$; cyclical calendar features), Sec. 2.3.1 (key and value embeddings summed), Sec. 2.3.5 (token, event and key masking; [UNK] positions excluded from the loss).
+6. Visa Research, "TransactionGPT," arXiv:2511.08939, 2026, industry preprint with no released data — Sec. 3.2.3 and App. A (hashed compositional merchant embeddings, row 0 for unseen ids), Table 2 (time fields), Sec. 3.5 Eq. 11–12 (four next-transaction targets, squared error on log values), weight tying, Table 6 (memory and task effect of hashing and tying).
+7. D. T. Braithwaite, M. Cavalcanti, R. A. McEver et al., "Your Spending Needs Attention: Modeling Financial Habits with Transformers," arXiv:2507.23267, 2025, industry preprint with no released data — Sec. 1 (about 55 tokens per transaction as text), Sec. 3.1 (special tokens for sign, 21 amount bins and date fields beside byte-pair description tokens), Sec. 4.5 and Table 3 (field tokens against text at matched transaction counts; pretrained language models).
+8. NVIDIA, "Build Your Own Transaction Foundation Model for Financial Intelligence," NVIDIA developer blog and developer example, 2026, a vendor tutorial — the domain tokeniser against byte-pair encoding (about 12 against 39 tokens per transaction), last-token pooling, Table 1 (13 features, embeddings and both on the synthetic card set). https://developer.nvidia.com/blog/build-your-own-transaction-foundation-model-for-financial-intelligence
+9. D. Burakov, "EventGPT: Next-Event Pretraining on Banking Customer Histories," arXiv:2611.03302, 2026, preprint with released weights (CC BY 4.0) — Sec. 3.2 (temporal rotary positions $64 \ln(1 + \Delta t/60)$), Sec. 3.4 (the "now" event), Sec. 5.2 (gap tokens $\lfloor 8 \ln(1 + \Delta s/8) \rfloor$ capped at 140, 21 quantile amount bins), Sec. 6.3 and 7.1 (zero-shot scoring from the next-event distribution, the rule for earlier occurrences).
+10. O. Press, L. Wolf, "Using the Output Embedding to Improve Language Models," *EACL 2017* — weight tying between the input table and the output layer.
+11. R. Sennrich, B. Haddow, A. Birch, "Neural Machine Translation of Rare Words with Subword Units," *ACL 2016* — byte-pair encoding as a tokeniser. The token counts of this chapter were computed with the 50,257-entry GPT-2 encoding of the tiktoken library: https://github.com/openai/tiktoken
+</References>

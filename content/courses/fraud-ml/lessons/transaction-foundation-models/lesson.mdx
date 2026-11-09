@@ -1,0 +1,452 @@
+A bank runs forty scoring models, each with its own feature pipeline, each retrained from its own labels. Twenty-six million customers' histories sit in one store. Could one model be trained once on all of them and then fitted to each task in hours, what would it cost to train and to serve inside a payment's deadline, and where would it get its gains — from the history alone, or only beside the features each team already has?
+
+The module so far has built the pieces at small scale. <Ref lesson="limits-of-hand-built-features" id="the-vector-read-as-of-a-time">An encoder pretrained on a task the events grade</Ref> gives each customer a vector as of a time; <Ref lesson="generative-pretraining-and-tokenisation" id="when-the-key-travels-with-the-value">key–value tokens</Ref>, used when several fields carry free text or the same list of values recurs under many fields, write each field as a key naming it plus a value from one shared vocabulary; next-event and masked-field prediction train the encoder without a label. What they did not show is the design of one encoder that a whole bank shares.
+
+A bank with forty models has two obvious alternatives to its forty feature pipelines. Each team could train a sequence model end to end on its own labels, which won on <Ref lesson="limits-of-hand-built-features" id="the-ranking">the two-million-client benchmark</Ref> with every client labelled and fell to last on a 69-thousand-client cut. Or each team could pretrain its own encoder on the same events, forty times over. The third option is to pretrain once on everything and share the result.
+
+<Definition title="transaction foundation model">
+A *transaction foundation model* is one encoder pretrained once, on an institution's whole event stream, and then adapted to many downstream tasks, each with its own labels. Its tokens are the institution's own fields and codes.
+</Definition>
+
+The running case is a digital bank that built one: 26 million customers in 111 countries, 24 billion events over 25 months of 2023 to 2025 (card payments, transfers, top-ups, trading, app screens, messages from the bank), written as key–value tokens, 207 billion in all, or 8.6 per event. It adapts the one encoder to six tasks: credit scoring, a fraud task it calls external fraud, a customer's lifetime value, whether a customer who abandoned a loan application opens the message sent to bring them back, whether a payment is a recurring subscription, and product recommendation. Of external fraud it says only that it is a binary classification scored by precision and recall; it does not say which frauds the label covers, and it does not give the operating point (the threshold, or the number of alerts) at which the two are measured. Each task has fixed training, validation and test partitions, used for every comparison on that task, whose construction the bank does not describe. Every result it publishes is a relative change against a reference model whose absolute score it withholds, so each number below is quoted as relative, with its reference named.
+
+## Thousands of events per customer: an encoder that reads events, not tokens
+
+The first obstacle is length. 24 billion events over 26 million customers is about 920 events per customer on average, and an active customer has tens of thousands.
+
+### What one flat sequence would cost
+
+<Ref lesson="generative-pretraining-and-tokenisation" id="exercises">The last exercise of the tokenisation lesson</Ref> found that an average history of 920 events at 8.6 tokens each is about 7,900 tokens, two windows of 4,096. The digital bank caps a history at 6,500 events, keeping the most recent. At 8.6 tokens per event that is about 56,000 tokens. Attention compares every pair of positions in each layer, so one flat sequence of 56,000 tokens means about $3.1 \times 10^9$ pairs per layer, against $1.7 \times 10^7$ for a window of 4,096: 186 times as many.
+
+### Two levels: events first, then the history
+
+<Ref lesson="generative-pretraining-and-tokenisation" id="masking-a-window">The masked-field section</Ref> already met the remedy as a two-level architecture. At this length it is what makes the history fit at all.
+
+<Definition title="hierarchical event encoder">
+An *event encoder* reads the tokens of one event, alone, and returns one vector for it. A *history encoder* reads the sequence of event vectors, with each event's time to the last event as its position, and relates events to one another. The *hierarchical event encoder* is the two in sequence: attention inside an event runs over its own tokens only, and attention across events runs over one vector per event.
+</Definition>
+
+<Example title="attention pairs for one long history">
+A history of $E$ events at $k = 8.6$ tokens each.
+
+**Flat:** one sequence of $kE$ tokens, $(kE)^2 = 74E^2$ pairs per layer.
+
+**Hierarchical:** $E$ event-level attentions of $k^2 = 74$ pairs each, $74E$ pairs in all, plus a history-level attention over $E$ vectors, $E^2$ pairs.
+
+At $E = 6{,}500$: flat $74 \times 6{,}500^2 = 3.1 \times 10^9$; hierarchical $74 \times 6{,}500 + 6{,}500^2 = 4.8 \times 10^5 + 4.2 \times 10^7 = 4.3 \times 10^7$. The ratio is 73. In general it is $74E^2 / (74E + E^2) = 74E/(E + 74)$, which approaches $k^2 = 74$ once a history holds more than a few hundred events.
+</Example>
+
+<Exercise>
+Compute the same two counts for an average customer, $E = 920$, and the ratio. Then say which of the two terms of the hierarchical count dominates, and from what history length on.
+
+<Solution>
+Flat: $74 \times 920^2 = 6.26 \times 10^7$. Hierarchical: $74 \times 920 + 920^2 = 68{,}080 + 846{,}400 = 9.14 \times 10^5$. Ratio $6.26 \times 10^7 / 9.14 \times 10^5 = 68$, which is $74 \times 920 / 994$.
+
+The history-level term $E^2$ exceeds the event-level term $74E$ as soon as $E > 74$. For any customer with more than about 74 events, almost all the attention cost sits in the history encoder, and that cost is still quadratic in the number of events. The hierarchy divides the pairs by $k^2$ but leaves the square in $E$; a design that must read very long histories needs a second remedy for $E^2$, which the section after next meets.
+</Solution>
+</Exercise>
+
+### Seventy times fewer pairs, three times faster
+
+The arithmetic predicts a seventyfold saving. The measured one is smaller, because attention pairs are not the only cost: every token still passes through the layers that work on tokens, each of which applies a small network to every position after its attention (its feed-forward block), and that cost scales with the number of tokens, not with its square.
+
+The public next-event model on the 100,000-client cut of <Ref lesson="limits-of-hand-built-features" id="the-benchmark">the bank benchmark</Ref> was trained both ways on the same 655 million tokens on one L4, a small inference-class GPU. It is trained to predict the next event token by token, so its hierarchical version needs one part the definition above does not have: a small *token decoder* on top of the history encoder: two layers that take the history encoder's state after the previous event and the next event's tokens, one position per token, and predict each token from the ones before it. Those two layers and the two event-encoder layers see every token; the six history layers in between see one vector per event of about eight tokens. Counted per token, that is $2 + 6/8 + 2 = 4.75$ layer passes, against 10 for a flat model of the same ten layers.
+
+<Figure
+  src="./figures/hierarchy-speed.svg"
+  alt="Dot chart of hours to train on 655 million tokens on one L4 GPU, against the context window in tokens. Hierarchical encoder, amber: 1.5 hours at 2,048, 4,096 and 8,192 tokens. Flat decoder, blue: 3.9 hours at 2,048 and 6.2 hours at 4,096; not trained at 8,192. Labels: 2.6 times and 4.1 times."
+  caption="The hierarchy's cost stays flat as the window grows; the flat model's grows with it."
+/>
+
+The flat model took 3.9 hours at a 2,048-token window and 6.2 hours at 4,096. The hierarchical one took 1.5 hours at every window from 2,048 to 8,192 tokens: 2.6 to 4.1 times faster where both ran, and able to read a window the flat model was not trained on.
+
+### The price: one vector per event
+
+The history encoder sees an event only through its one vector. Everything the event encoder did not put in that vector is lost to every later layer. One card network measured the squeeze: widening its event vector from 64 to 128 numbers improved its downstream measures substantially, and 256 did not fit in the 80 GB of memory of its GPU. Its fix was to let the event encoder emit a few vectors per event instead of one, which it calls virtual tokens. The same network also bounds the history term that the exercise above left quadratic: each event attends only to the nearest $w$ events, so the history encoder compares about $wE$ pairs instead of $E^2$, and the cost grows in proportion to the history's length. That *local attention* cut peak memory by a quarter and moved its anomaly-detection score, an internal accuracy whose formula it does not give, by +2.8% relative.
+
+<Aside>
+**Packing histories of different lengths.** Histories run from a handful of events to 6,500, and events from a few tokens to 24. Padding every event to the longest and every history to the longest in a batch would spend most of the compute on padding. The digital bank stores its histories in files grouped by event count, so a batch holds histories of equal length and the history encoder works on a rectangular array, and it concatenates the tokens of all events into one buffer for the event encoder, with an attention kernel that keeps each event's tokens to themselves. Against padded batches this raised throughput two to five times, depending on how unequal the lengths were. It also truncates single events to 24 tokens (0.01% of events are affected) and the profile below to 200.
+</Aside>
+
+## What the newest 6,500 events leave out: the profile state
+
+Truncation solves the length and creates the next problem. Keeping the most recent 6,500 events throws away the oldest ones, and for an active customer the oldest are the ones that say how long the account has existed.
+
+### Truncation cuts the oldest milestones
+
+Take a customer who opened an account four years before the cut-off and now generates about twenty events a day, payments and app screens together. 6,500 events cover about 325 days. The account opening, the first top-up, the first card and the first login from abroad all lie three years before the window starts, and a history encoder that reads only the window cannot know whether this is a four-year customer or one who joined last year.
+
+<Figure
+  src="./figures/truncation.svg"
+  alt="A timeline from early 2021 to the cut-off in 2025. Grey ticks for events, sparse early and dense in the last year. Four amber diamonds in 2021: account opened, first top-up, first card, first login abroad. A bracket over the last 11 months: the newest 6,500 events, the window the history encoder reads. The earlier events are faded and labelled dropped by truncation. An amber arrow lifts the four milestones into a box: profile state, each with its time before the cut-off, for example first top-up 4.1 years before."
+  caption="The window keeps the newest events; the milestones that date the account are kept separately, with their age."
+/>
+
+### A profile, encoded once
+
+The answer keeps the milestones out of the event sequence and gives them a place of their own.
+
+<Definition title="profile state">
+The *profile state* of a customer at a cut-off is a set of key–value pairs encoded apart from the event history: attributes that describe the account at the cut-off (plan, service region, balance quantile) and *first-occurrence events* (first top-up, first card, first login abroad), each carrying the time between it and the cut-off. A profile encoder turns it into one vector, which is placed in front of the event vectors as the first position of the history encoder.
+</Definition>
+
+The time attached to each milestone is the logarithm of the seconds from it to the cut-off, the scale <Ref lesson="generative-pretraining-and-tokenisation" id="a-scale-on-which-habits-are-evenly-spaced">the gap tokens</Ref> use, so "first top-up 4.1 years ago" is a value the encoder can read whatever the window holds. The profile also takes the static attributes out of every event row, which is <Ref lesson="generative-pretraining-and-tokenisation" id="two-shortcuts-the-masked-task-offers">the rule the masked task already needed</Ref>: a field that never changes is stated once, not copied into each event where a masked copy can be read off its neighbour.
+
+<Figure
+  src="./figures/backbone.svg"
+  alt="An architecture stacked bottom to top. Bottom left: profile state tokens, plan=metal, region=uk, first_topup 4.1 years ago, first_card 3.9 years ago, into a profile encoder that outputs the USR vector. Bottom right: events e1 to eE, each a short row of key and value tokens, each through the same event encoder that sees one event alone, outputting an EVT vector per event, with calendar features added. Middle: a history encoder over USR, EVT1 to EVTE, with time to the last event as position. Its output at the USR position, in amber, is the customer's embedding. Top: arrows fan out to task heads, credit scoring, external fraud, lifetime value, three more, each through a probe on the frozen embedding or through adapters inside the encoders."
+  caption="One customer through the shared encoder: a profile vector, one vector per event, and one embedding that every task head reads."
+/>
+
+The history encoder's output at the profile's position is the customer's embedding; the bank names the profile's vector `[USR]` and each event's `[EVT]`, as in the figure. It has read the profile and, through attention, every event vector in the window, and it is what each task's head reads.
+
+### What it is worth on fraud
+
+The digital bank trained its smallest model, 10 million parameters, with and without the profile branch, and compared the two on each task. On external fraud the model with the profile had **46.8% higher precision and 85.6% higher recall**, both relative to the model that read events only. Credit scoring gained 31.8% relative in precision–recall area; lifetime value about 2%; the abandoned-application task lost 3.0% relative in precision–recall area.
+
+<KeyFact>
+On external fraud the profile is the largest single comparison the bank reports for that task. It was measured at the smallest size only, and the profile branch was removed whole, attributes and milestones together; that a new account's age is what carries the gain is a reading of the result, not a measurement.
+</KeyFact>
+
+The reading is plausible for fraud in particular, if the external-fraud label holds the frauds one would guess from its name; the bank does not define it, so what follows is an interpretation, not a description of the label. <Ref lesson="financial-crime-typology">The typology lesson</Ref> placed account takeover in the account's own history: a takeover shows as a break from a long-established pattern, and an account opened to receive and pass on stolen money has no long pattern at all. If the label holds both, telling them apart needs the account's age, and an encoder that sees only the last eleven months of a busy customer cannot tell a four-year account from a new one. The abandoned-application task, which turns on what the customer did in the days before dropping out, has nothing to gain from the account's age, and lost a little.
+
+## One encoder, forty tasks: a probe or adapters
+
+The pretrained encoder exists once. Each of the forty tasks has its own labels, and the question is what the task is allowed to change.
+
+### The probe: a small model on the frozen vector
+
+The cheapest answer changes nothing in the encoder. Every labelled row is passed through the frozen encoder once, its embedding is stored, and a small model is fitted on those vectors.
+
+The digital bank standardises the embedding (192 numbers at the smallest size) and fits a logistic regression. Fitting takes a couple of minutes and is insensitive to its settings. A boosted tree on 192 columns also works, it reports, but it needs its settings tuned per task and fits more slowly, which matters when the probe's job is to answer quick questions: is this task worth pursuing at all, does a new pretraining checkpoint beat the old one, does a change to the tokeniser pay. This is the arrangement of <Ref lesson="limits-of-hand-built-features" id="the-vector-read-as-of-a-time">the limits lesson</Ref>, a frozen vector with labels entering only at the last step.
+
+A probe can only re-weight what pretraining put in the vector. The digital bank's encoder was trained by masked-field prediction, which rewards whatever helps fill a hidden field from its context. If a fraud signal is something the masked task had no reason to keep, no logistic regression on the vector can recover it.
+
+### Low-rank adapters: a small change inside the encoder
+
+The other end is to train the whole encoder further on the task's labels. At 100 million parameters, for each of forty tasks, that is forty copies of the model to train and store, and training a hundred million weights on a few thousand labelled positives risks overwriting what pretraining learned. The middle way adds a small number of trainable weights inside the frozen encoder.
+
+<Definition title="low-rank adapter">
+For a weight matrix $W$ of size $d_\text{out} \times d_\text{in}$ in the pretrained encoder, a *low-rank adapter* of rank $r$ adds two trainable matrices $B$ ($d_\text{out} \times r$) and $A$ ($r \times d_\text{in}$), with $r$ much smaller than either dimension, and replaces $W x$ by $W x + B A x$. $W$ stays frozen; only $A$ and $B$ are trained on the task's labels. $B$ starts at zero, so training starts from the pretrained model exactly.
+</Definition>
+
+The method is known as LoRA, for low-rank adaptation. $BA$ is a matrix of the same size as $W$, but of rank at most $r$: the adapter can move each layer's output only within an $r$-dimensional subspace that training chooses.
+
+<Figure
+  src="./figures/adapter.svg"
+  alt="A 512 by 512 grey square labelled W, frozen, 262,144 numbers. Beside it, plus, an amber tall thin matrix B of 512 by 8 times a wide thin matrix A of 8 by 512, labelled trained, 8,192 numbers, 3.1 percent of W. Under B: starts at zero. Under the whole: the layer computes W x plus B A x."
+  caption="A rank-8 adapter on one 512-wide layer trains 3% as many numbers as the layer holds."
+/>
+
+<Example title="the adapter on one projection">
+The digital bank's 100-million-parameter model has width $d = 512$. One of its attention projections is a $512 \times 512$ matrix, 262,144 numbers. A rank-8 adapter adds $B$ of $512 \times 8$ and $A$ of $8 \times 512$: $2 \times 512 \times 8 = 8{,}192$ numbers, 3.1% of the matrix. A feed-forward matrix of $512 \times 2{,}048$ holds 1,048,576; its rank-8 adapter holds $8 \times (512 + 2{,}048) = 20{,}480$, 2.0%.
+</Example>
+
+<Exercise>
+A layer of that model has three $512 \times 512$ projections that the adapters touch (for the attention's queries, keys and values), one more $512 \times 512$ output projection that they do not, and two feed-forward matrices, $512 \times 2{,}048$ and $2{,}048 \times 512$, that they do. The three encoders hold 25 such layers between them (3 in the profile encoder, 16 in the event encoder, 6 in the history encoder). Count the adapter numbers per layer and in total, and compare with the weights of the 25 layers. The bank reports adapters at 2–4% of the model's parameters; does your count agree?
+
+<Solution>
+Per layer, adapters on three $512 \times 512$ projections: $3 \times 8{,}192 = 24{,}576$; on the two feed-forward matrices: $2 \times 20{,}480 = 40{,}960$. Total $65{,}536$ per layer, $25 \times 65{,}536 = 1{,}638{,}400$ for the model.
+
+Weights per layer: four $512 \times 512$ projections, $4 \times 262{,}144 = 1{,}048{,}576$, and two feed-forward matrices, $2 \times 1{,}048{,}576 = 2{,}097{,}152$: $3{,}145{,}728$, or $12d^2$. For 25 layers, $78.6$ million. Adapters are $1.64 / 78.6 = 2.1\%$ of the layer weights, and about 1.6% of the full 100 million, which also counts the embedding table of about 28,000 value and 60 key tokens at 512 numbers each ($14.4$ million). The bank's 2–4% sits at or slightly above this count; a rank of 16, which it also tried, doubles it.
+</Solution>
+</Exercise>
+
+Adapters on the attention and feed-forward weights of every layer, at rank 8, train in about one eighth of the wall-clock time pretraining took: 12 hours to a few days per task, depending on how many labelled rows it has. All forty tasks share the frozen encoder; each stores only its adapters and its head.
+
+### What each choice buys, measured
+
+The digital bank compared three routes to each task on that task's fixed splits: the probe on the frozen vector, adapters on the pretrained encoder, and the same architecture trained from random weights on the task's labels alone.
+
+<Figure
+  src="./figures/lora-probe.svg"
+  alt="Two bar panels for external fraud, relative percentage gains. Left, adapters over the probe on the same frozen encoder, at 10M, 100M and 1B parameters: precision +30.8, +29.8, +23.8; recall +27.4, +24.5, +13.3. Right, pretrained encoder with adapters over the same 100M architecture trained from scratch on the task: precision +8.0, recall +17.0."
+  caption="On external fraud the adapters beat the probe at every size, by less as the encoder grows; pretraining beats training from scratch by less again."
+/>
+
+**Adapters over the probe.** On external fraud, adapters raised precision by 30.8% and recall by 27.4%, relative to the probe on the same 10-million-parameter encoder; at a billion parameters the margins were 23.8% and 13.3%. The adapters won on every task and size the bank reports, by the most (+72.9% relative in precision–recall area at the smallest size) on the abandoned-application task, its one with the fewest labelled rows. One reading of the shrinking fraud margin is the probe's limit: a larger frozen encoder keeps more of what the task needs, so there is less left for the adapters to add.
+
+**Pretraining over training from scratch.** At 100 million parameters, the pretrained encoder with adapters beat the same architecture trained on the task's labels alone, on every task. On external fraud the margin was 8.0% in precision and 17.0% in recall, relative. It was largest on the abandoned-application task (+18.6% in precision–recall area) and smallest on lifetime value and recurring payments (+0.3 to +0.6%), where, the bank notes, the scratch model already captured most of what the task needed.
+
+That ordering is <Ref lesson="limits-of-hand-built-features" id="how-many-labels-a-label-free-score-is-worth">the label-scarcity regime</Ref> again: pretraining pays most where the task's own labels are fewest. The large bank of the limits lesson found the same with abundant unlabelled data and far fewer labels: at 8 million parameters, its frozen encoder with a small network trained on the frozen embedding, beside its features, scored 0.795 mean ROC-AUC over its four marketing tasks, against 0.791 for the same architecture and features trained end to end on the labels. On the public two-million-client benchmark, where every client is labelled, the end-to-end model won (0.819 against 0.802).
+
+<KeyFact>
+A probe is minutes and needs only stored vectors; adapters are hours to days per task and beat it on every task the bank reports. The probe is the instrument for deciding which tasks deserve the adapters, not a weaker production model to be retired.
+</KeyFact>
+
+## Meeting the features each team already has
+
+The forty teams do not start from nothing. Each has a feature set, often hundreds of columns, some built from the same transactions the encoder reads and some from sources it never sees: a credit bureau's score, an application form, a <Ref lesson="point-in-time-features" id="a-feature-built-from-labels-what-the-bank-knew-that-morning">label-derived terminal risk</Ref>. <Ref lesson="limits-of-hand-built-features" id="three-settings-one-shape">The limits lesson</Ref> found the embedding added to such features far more often than it replaced them. How the two are wired together is a design choice with measurable consequences.
+
+### Three wirings
+
+<Definition title="embedding–feature fusion">
+The ways a pretrained encoder's embedding and a team's tabular features enter one model. **Early fusion:** the frozen embedding and the features are columns of one model, typically a boosted tree. **Late fusion:** the encoder is first fine-tuned on the task's labels alone; its tuned embedding and the features then go into a boosted tree. **Joint fusion:** the encoder and a neural network over the features are trained together, end to end, with one loss, so that the encoder's update sees what the features already explain.
+</Definition>
+
+One lender, a bank with over 100 million customers, built all three for credit default: whether a customer is 65 days late on a payment six months after the scoring date. It trained on 203 million rows and tested on 2 million from a later, separate period, with 291 features (some built from transactions, some from bureau scores) and LightGBM, a boosted tree library, as the production model on those features. That tree on the 291 features alone is the baseline the full-data results below are measured against.
+
+<Figure
+  src="./figures/fusion.svg"
+  alt="Three panels side by side, trainable parts in amber, frozen parts in grey. Early: a grey frozen encoder emits an embedding; it and the features feed an amber boosted tree; one training step. Late: step 1, an amber encoder fine-tuned on the labels with no features; step 2, its embedding and the features feed an amber boosted tree. Joint: an amber encoder with adapters and an amber neural network over the features meet in an amber head; one loss, with gradient arrows running back into both branches. Under each, the lender's measurement on credit default, from two separate experiments: early, 0.51 percent below joint, in a 10-million-row ablation where late fusion was not run; late, plus 0.97 percent, and joint, plus 1.25 percent, on the full data, relative AUC over a boosted tree on the 291 features alone, where early fusion was not run. A footer: two experiments, two references, not one ranking."
+  caption="Three ways to put an embedding beside the features, and what the lender measured for each."
+/>
+
+The wiring suggests an order before anything is measured. Early fusion hands the tree an embedding that pretraining shaped for filling hidden fields, not for this task; the tree can only re-weight it, as a probe can. Late fusion should do better, because the embedding is tuned to the task's labels before the tree sees it. It is still tuned in isolation: the fine-tuning does not know which of its signals the features already carry, and may spend its capacity re-learning the average spend that a feature column holds exactly. Joint fusion should do better again, because one loss decides what the encoder adds beyond the features. That is an expectation, early below late below joint, not yet a measurement.
+
+### Why a tree cannot join
+
+Joint fusion trains both branches with one loss, by gradient: the error at the output is passed back through the head into the encoder's adapters on one side and into the feature network's weights on the other. A boosted tree is not fitted that way. Its split thresholds are found by search, not moved by a gradient, and its output is a step function of its inputs. <Ref lesson="neural-tabular-detectors" id="four-things-that-come-naturally-to-a-network">the network lesson</Ref> named the consequence: a split passes no gradient back. So a tree cannot be a branch trained by that loss, and as the model that combines the two branches it would stop the gradient before it reached the encoder. The feature branch has to be a network, and that network first has to be as good as the tree on the features alone, or the fusion starts from a loss.
+
+The lender's neural branch, each version tuned, against LightGBM on the features alone, in relative AUC:
+
+| network on the 291 features | against the boosted tree |
+|---|---|
+| plain multi-layer network | −0.44% |
+| cross network (explicit products of features) | −0.09% |
+| plain network, numbers as periodic embeddings | −0.23% |
+| cross network, numbers as periodic embeddings | +0.06% |
+| the same, with weight decay | +0.08% |
+
+The periodic embeddings are <Ref lesson="generative-pretraining-and-tokenisation" id="what-a-plain-bin-target-misses-the-bins-are-ordered">the frequency features of the amount Aside</Ref>, sines and cosines of each number, with one change: there the frequencies were fixed at $2^l\pi$, here they are learned. Applied to every numeric feature, they took four tuned architectures to reach parity with the tree and a fifth to edge past it, before the encoder enters at all.
+
+### Two experiments, two references
+
+**The full data, against the tree on the features.** With a 330-million-parameter encoder pretrained on the lender's transactions, on the 203 million training rows: late fusion, its encoder fine-tuned on a fifth of the rows with no features and the tree fitted on the rest, raised test AUC by 0.97% relative to LightGBM on the features alone; late fusion with the neural branch in place of the tree gave the same 0.97%; joint fusion gave 1.25%.
+
+**A 10-million-row ablation, against joint fusion.** Run on a twentieth of the rows with half the context window (1,024 tokens against 2,048), to save compute, and scored relative to joint fusion on that same subset: the features alone 0.96% lower, the encoder alone 2.83% lower, early fusion 0.51% lower.
+
+Neither experiment holds all three wirings, and the two score against different models on different amounts of data: joint over late is measured, and joint over early, but early against late never is. As shares of joint fusion's gain over the features alone, early kept about half in the ablation (joint sat 0.96 above the features and early 0.51 below joint, so early took 0.45 of the 0.96) and late about four-fifths on the full data (0.97 of 1.25). The shares fit the expected order but do not measure it: one was taken on 10 million rows with half the context, the other on 203 million.
+
+<KeyFact>
+Joint fusion's margin over late fusion on credit default is 0.28 percentage points of relative AUC, about a fifth of its whole gain, bought with a neural feature branch tuned to parity first and training runs of a week each. Which wiring to build is an engineering budget, not a modelling truth.
+</KeyFact>
+
+Once joint fusion was in place, the lender found it could drop 90% of the hand-built transaction features the encoder had made redundant with no loss, <Ref lesson="limits-of-hand-built-features" id="why-the-vector-repeats-the-aggregates">the overlap the limits lesson described</Ref> turned into a saving on feature upkeep. The large bank's design sits between early and joint: its encoder stays frozen, and a small network on the frozen embedding is trained together with a neural network over the features, the arrangement behind <Ref lesson="limits-of-hand-built-features" id="three-settings-one-shape">0.787 alone, 0.792 for the features, 0.801 for both</Ref>.
+
+### A frozen embedding beside a tree on public data: extra columns or a second ranking
+
+Early fusion into a tree is not guaranteed to help. On the public 100,000-client cut, the next-event model's frozen embedding met a boosted tree on 114 engineered features (mean ROC-AUC over the four product targets) in two ways: as extra columns of the tree, and as a second model whose ranking of the customers is averaged with the tree's, at equal weights fixed in advance. The first is early fusion as defined above; the second fuses nothing inside a model, since the two are fitted apart and only their rankings are averaged. Any second model can raise a rank average, so a control average leaves the embedding out.
+
+| model | mean ROC-AUC, against the tree alone |
+|---|---|
+| logistic head on the frozen embedding, alone | 0.787 against 0.816, on one test fold |
+| the tree with the embedding as extra columns | level or lower (0.815 to 0.808 in one variant) |
+| rank average: the tree and a logistic head on the embedding, the profile fields and the count of each token over the whole history | +0.014 to +0.018 |
+| control: the same average without the embedding (profile fields one-hot, same token counts) | +0.001 to +0.008 |
+
+On each of five test folds and two pretraining seeds, the average with the embedding beat the control by 0.007 to 0.016. The embedding is the one difference between the two, so that remainder is the encoder's share: it earned its place as a second ranking, not as columns of the tree.
+
+## What it costs, and what a larger encoder buys
+
+Every design above has a price in accelerator time, and the opening asked what it is. The figures below are wall-clock times as the banks report them, on the hardware they name, converted to GPU-days: one GPU busy for one day.
+
+### The cost card
+
+| run | model | hardware and time | GPU-days |
+|---|---|---|---|
+| public next-event model, pretraining | 23M | one L4, 1.5–2 h | 0.06–0.08 |
+| digital bank, pretraining | 10M | 16 H100, ~2 days | ~32 |
+| digital bank, pretraining | 100M | 16 H100, ~2 weeks | ~224 |
+| digital bank, pretraining | 1B | 32 H100, ~2 weeks | ~448 |
+| digital bank, adapters for one task | any | ~1/8 of pretraining wall-clock, 12 h to days | ~4–56 if run on the same GPUs |
+| lender, one joint-fusion run on 203M rows | 330M | 8 A100, 7 days | 56 |
+| lender, scoring 100M+ customers once | 330M | 60 A100, ~5 h | ~12.5 |
+
+<Figure
+  src="./figures/cost.svg"
+  alt="Horizontal bars on a logarithmic axis of GPU-days from 0.01 to 1,000. Public next-event model on one L4, 0.06 to 0.08. Digital bank pretraining, H100: 10M parameters 32; 100M 224; 1B 448. Adapters for one task, one eighth of pretraining, if run on the same H100s: 4 to 56. Lender, A100: one joint-fusion run 56; one daily scoring pass 12.5, labelled every day."
+  caption="Four orders of magnitude between a public pretraining run and an institution's; the daily scoring pass is a recurring cost of its own."
+/>
+
+The GPUs are not equal: an H100 is several times faster than an L4 on this work, and an A100 sits between. The table orders the runs; it does not convert them into one currency.
+
+Three readings follow. The pretraining is paid once per institution and per architecture, not per task: forty tasks with adapters at one eighth each cost about five pretrainings' worth of time, and forty probes cost minutes. The wall-clock does not grow in proportion to parameters: the billion-parameter model took the same two weeks as the 100-million one on twice the GPUs, so the runs differed in passes over the data, in how fully they used the GPUs, or both. Nor do they follow the six-operations-per-parameter-per-token estimate of <Ref lesson="generative-pretraining-and-tokenisation" id="exercises">the tokenisation lesson's last exercise</Ref>, which put one pass of the 100-million model at about 4.8 days on one accelerator; the reported run used about 224 GPU-days, so more passes, lower utilisation or both, and the reports do not say which. Plan from measured wall-clock, not from that formula. And scoring is a recurring cost: the lender's daily pass over 100 million customers costs a fifth of one joint-fusion training run, every day.
+
+### Scale, alone and beside the features
+
+<Figure
+  src="./figures/scale.svg"
+  alt="Mean ROC-AUC over four marketing tasks against encoder size, 2M, 8M and 42M parameters. Amber line, embedding alone: 0.750, 0.774, 0.787. Green line, embedding with the features: 0.792, 0.796, 0.801. Dashed grey line at 0.792: the features alone. Brackets: alone gains 0.037 from 2M to 42M; with features gains 0.009."
+  caption="The larger encoder moves the embedding alone four times as far as it moves the combination."
+/>
+
+The large bank pretrained encoders of 2, 8 and 42 million parameters on its two years of events and read each one alone and beside its production features, on the same four marketing tasks. Alone, the embedding rose from 0.750 to 0.774 to 0.787 mean ROC-AUC. With the features, it went from 0.792 to 0.796 to 0.801, where the features alone score 0.792: the smallest encoder added nothing to them. The three sizes also read longer histories (256, 1,024 and 2,048 events), so size and context changed together; at 8 million parameters, context alone from 256 to 1,024 events moved the combination from 0.790 to 0.795.
+
+The digital bank's sizes answer a different question. Each is scored against that task's own existing model, with no run of the embedding with and without features, so they cannot separate the two cases; what they show is that the gain from size differs by task. On credit scoring, precision–recall area went from +70.3% at 10 million parameters to +130.2% at a billion, relative. On external fraud, precision went from +0.3% at 10 million to +12.3% at 100 million and +16.7% at a billion; recall went from +33.4% to +66.4% at 100 million and was slightly lower at a billion, +64.7%: nearly all of the fraud gain was reached by 100 million. Lifetime value moved from −1.2% to +1.8%, and recurring-payment detection stayed flat at +5% to +6%. The lender's encoders, by contrast, always sat beside its features: under joint fusion, its 24-million and 330-million-parameter models, each pretrained and fine-tuned on 20 million rows rather than the full 203 million, gave +0.37% and +0.62% relative AUC over the tree fitted on all 203 million rows, a quarter of a point for fourteen times the parameters.
+
+<KeyFact>
+Where the embedding stands alone (no feature set yet, a new task, a new product), a larger encoder pays in full. Where it sits beside a mature feature set, the features already hold most of what scale would add, and the same compute buys a hundredth of ROC-AUC or less.
+</KeyFact>
+
+## Serving the embedding: a dated, versioned feature
+
+A fraud score is needed <Ref lesson="fraud-detection-system" id="could-the-model-refuse-payments">within seconds of the payment</Ref>, a credit score at the moment of an application, a marketing score in tonight's campaign run. What can the encoder afford at each of those moments?
+
+### Two clocks, two designs
+
+<Ref lesson="point-in-time-features" id="one-log-written-once-read-two-ways">The feature store</Ref> already runs two clocks: a nightly batch for slow features, a stream for the minutes. The embedding fits either, and the task decides which.
+
+**Encode at scoring time.** For fraud the latest events matter most: a takeover shows in the last hour of a history, not in its average. The digital bank computes the embedding for external fraud when the score is requested, reading the customer's recent events from the shared event bus. The card network serves a compact model the same way: a 56-million-parameter transaction model predicted the next merchant category in 0.27 ms on one A100, where a fine-tuned 7-billion-parameter text model took 84.9 ms, and a heavier variant ran at 2.5 times the latency of a lighter one and stayed inside the network's service-level agreement. The local attention met with the event vector above is what keeps a long history affordable on that path.
+
+**Encode ahead and store.** For credit and marketing, a day-old embedding is enough. The lender runs a daily batch over its whole customer base, about 5 hours on 60 A100s, and stores the result. A recurrent encoder offers a third design between the two: <Ref lesson="contrastive-event-embeddings" id="the-gru-and-the-vector-it-stores">the stored GRU state advanced by one step per new event</Ref>, which is why a payment processor chose a GRU for its fraud encoder. A transformer has no such state to advance.
+
+### Delta scoring: re-encoding only what changed
+
+A daily batch need not re-encode everyone. A customer with no new event since yesterday has the same history, so the same embedding, with one exception: <Ref lesson="generative-pretraining-and-tokenisation" id="the-state-as-columns">the "now" event</Ref> that closes the history at the cut-off carries the silence since the last event, and its gap token moves as the silence grows.
+
+<Figure
+  src="./figures/delta.svg"
+  alt="Three client rows, yesterday's run and today's run. Client A: a new event since yesterday; now token dt=74 yesterday, dt=63 today; rescore. Client B: no new event, silent three days yesterday and four today; dt=83 to dt=85; rescore. Client C: silent 45 days, then 46; dt=104 both days; keep yesterday's score."
+  caption="A daily job re-encodes only the customers whose history or whose silence token changed, and matches a full pass exactly."
+/>
+
+How often does a silent customer's now token change? The token is the whole part of $\phi(\Delta) = 8\ln(1 + \Delta/8)$, with $\Delta$ the silence in seconds. A silence of $g$ days is $\Delta = 86{,}400\,g$ seconds, so large that the $1$ inside the logarithm no longer matters, and one more day of silence adds $8\ln\big((g+1)/g\big) \approx 8/g$ to $\phi$. Client B in the figure, silent three days and then four, gains $8 \ln(4/3) = 2.3$, from 83.1 to 85.4, and its token moves. Once $g$ exceeds eight the daily increment is below one, and the whole part changes only on the days when $\phi$ crosses an integer: on about $8/g$ of days. At $g = 30$ the increment is $8 \ln(31/30) = 0.26$, so the token changes about one day in four; client C, at 45 days, gains $0.18$ and stays at 104.
+
+*Delta scoring* rescores every customer with a new event and every customer whose now token changed, and keeps the rest. On the public bank data, where most clients act every few days, 57% of clients had a new event on an average day and another 32% a changed now token: 90% were rescored. The saving grows with the share of customers silent for weeks.
+
+### Stale by a delivery delay: the event-bus test
+
+Encoding at scoring time raises the opposite worry. The digital bank's event bus delivers events with relaxed guarantees, so the newest events of a customer may not have arrived when the fraud score is requested. The bank tested what that costs: it dropped every event younger than the 99.9th percentile of the bus's observed delivery delay and compared the score with the one on the full history. On external fraud, precision and recall moved by **at most 0.2%**, relative; on credit scoring, at most 0.9%.
+
+The test covers a delivery lag inside the encoder's own input; the bank does not give its size, but a 99.9th percentile of a bus's delay is a lag in delivery, not a day. A nightly embedding is a day stale, a different question: there the stream features of <Ref lesson="point-in-time-features" id="two-implementations-of-the-same-feature">the burst example</Ref> carry the last hours beside a day-old vector, and whether that is enough for a given fraud pattern has to be measured, which the first exercise below sets up.
+
+### What the stored row must carry
+
+Stored, the embedding is a feature like any other, and the point-in-time rules apply with two additions.
+
+- **An as-of time, set by the history, not by the job.** The row is stamped with the cut-off its history ends at, the now event's date, not the time the batch ran; the as-of join then hands each training label the latest embedding before it.
+- **A checkpoint and a vocabulary.** Two checkpoints of the same encoder put customers in unrelated coordinates, so an embedding from one is meaningless to a head fitted on another, and refitting the vocabulary renumbers every token. The public next-event model stores a fingerprint of its vocabulary with each checkpoint and refuses to encode against any other; each encoder version gets its own feature set, and each head is valid only on the version it was fitted on.
+
+The <Ref lesson="point-in-time-features" id="the-parity-check">parity check</Ref> extends to the history itself. Transactions change after they happen (pending to settled, amounts corrected, reversals), so the lender presents every history as it stood at the score date and diffs current records against stored snapshots. That diff found buy-now-pay-later prepayments rewriting the timestamps of earlier transactions, which put future information into past histories. Its labels also mature six months after scoring, so the newest six months of events cannot enter the supervised fine-tune: the model is always trained on a history at least half a year old.
+
+### A checkpoint belongs to one institution
+
+The vector is 192 to 1,024 numbers per customer; <Ref lesson="contrastive-event-embeddings" id="the-gru-and-the-vector-it-stores">four-bit storage</Ref> keeps 256 of them in 128 bytes. What cannot be shrunk away is that the vocabulary is the institution's own: its event types, its field codes, its quantile edges for amounts. A token id means something only together with the vocabulary file it was fitted with, and another bank's `mcc=5411` is a different id or no id at all. Only the gap tokens mean the same everywhere.
+
+Inside one institution the weights transfer across tasks; that is the design. Inside one payment processor, whose 180 issuers share a card-message standard, <Ref lesson="limits-of-hand-built-features" id="the-three-cases-of-the-opening">the second-issuer case</Ref> transferred too: at three issuers in countries absent from pretraining, the frozen encoder's embeddings did about as well as embeddings from a copy pretrained further on each issuer's own events. Across institutions with different schemas nothing transfers but the recipe: the tokeniser's rules, the architecture and the training procedure.
+
+## Where the gains come from
+
+The opening asked whether the gains come from the history alone or only beside the features. The banks' reports contain four comparisons in which one thing changed and everything else stayed, and those are the only numbers that attribute a gain to a cause.
+
+### Four controlled comparisons on one fraud task
+
+<FigureSequence
+  name="attribution"
+  alt="Four frames sharing one layout: horizontal bar pairs, precision and recall, relative percentage gain on external fraud, axis 0 to 90. Frame 1: profile state versus events only, 10M parameters: precision +46.8, recall +85.6. Frame 2 adds: adapters versus probe on the same frozen encoder, 10M: +30.8, +27.4. Frame 3 adds: pretrained encoder with adapters versus the same 100M architecture from scratch: +8.0, +17.0. Frame 4 adds: 1B over 10M, computed from their gains against the same existing model: precision +16.3, recall +23.5. A note on every frame: each row has its own reference; the rows do not add."
+  caption="What changed, one thing at a time, and what it moved on external fraud."
+/>
+
+<Task>
+Step through the four frames and, before reading on, rank the four changes by their effect on recall. Then try to multiply them into one total gain over a model with no profile, no pretraining and a probe, and say which reference each row would need to share for that product to mean anything.
+</Task>
+
+The fourth row is the one that can be computed exactly, because both sizes share a reference: $1.167/1.003 = 1.163$ and $1.647/1.334 = 1.235$, so the billion-parameter model has 16.3% higher precision and 23.5% higher recall than the 10-million one, nearly all of it by 100 million (from there to a billion, $1.167/1.123$ gives +3.9% precision and $1.647/1.664$ gives −1.0% recall). The order is the same on both measures: profile, adapters, size, pretraining. No product of the rows is a total gain: each is relative to its own reference (an event-only model, a probe, a scratch model, the task's existing model), at its own size, and none of those references is published with an absolute value. On this task, what the encoder reads and how it is adapted moved the score more than its size beyond 100 million parameters. None of the four rows adds or removes a feature set, so the opening's other half, the history alone or beside the features, is answered only outside fraud, by the large bank's sizes in <Ref lesson="transaction-foundation-models" id="scale-alone-and-beside-the-features">the scale section</Ref>.
+
+### What none of them measured
+
+One task in the digital bank's report shows the boundary of the whole design. On anti-money laundering, a probe on the billion-parameter encoder's embedding scored 47.1% lower F0.5 (an F-score that weights precision above recall), relative, than the bank's production model, which reads features computed across customers. A customer's history is that customer's rows; <Ref lesson="limits-of-hand-built-features" id="one-accounts-rows-not-the-network">the money that comes back through two other accounts</Ref> is in theirs. <Ref lesson="reading-foundation-model-claims" /> reads that result in full.
+
+None of the offline comparisons is the business result either. The large bank ran its encoder against the production boosted trees for six of its more than forty products, for two months, with a tenth of customers in the treatment group, and reported +1% in total net present value across all products. It reported the total because one optimiser allocates the limited contact capacity across all offers, so a better score for one product shifts contacts and revenue away from others. The lender deployed its model to all customers in one market without A/B-testing every variant, because a label that matures in six months makes every test arm at least half a year long.
+
+<Conclusion>
+You can now lay out an institution-scale transaction encoder and say what forces each part. A hierarchy reads one vector per event because a 6,500-event history is 56,000 tokens; it divides attention pairs by up to seventy, though they stay quadratic in the number of events, and cut measured training time three to four times. A profile state keeps the first-occurrence milestones that truncation drops, and on external fraud it is the largest single comparison reported (+46.8% precision, +85.6% recall, relative). One encoder is fitted to many tasks by a probe in minutes or by low-rank adapters in about an eighth of pretraining time, which beat the probe on every task reported; joint fusion with a neural feature branch beats late fusion by about a quarter of a point of relative AUC, and early fusion, measured only in a smaller ablation, cannot be ranked against late; a larger encoder pays where the embedding stands alone (0.750 to 0.787) and much less beside mature features (0.792 to 0.801). Serving reads the latest events at scoring time for fraud, where the event bus's delivery lag cost at most 0.2%, or stores a dated embedding with its checkpoint, rescored by delta scoring; the vocabulary ties it to one institution.
+
+Every institutional number in this chapter is a relative change against a reference whose absolute value, prevalence and operating point are not published, and the one comparison against a network-aware model went the other way. <Ref lesson="reading-foundation-model-claims" /> takes up what such a claim can and cannot establish, and how to restate one in the course's own terms.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+A card issuer scores each payment within seconds of authorisation, after the answer (<Ref lesson="fraud-detection-system" id="could-the-model-refuse-payments">the fraud-detection-system lesson</Ref>). A team proposes to add a customer embedding from the bank's masked transformer, computed in last night's batch, as the fraud model's only history input, replacing the stream's minute and hour windows. (a) Does the event-bus staleness result license this? (b) What does the night-old embedding miss that the proposal throws away, and what would you keep? (c) Write the check that would catch a serving path reading embeddings from a newer encoder checkpoint than the one the fraud model was trained on.
+
+<Solution>
+(a) No. The test dropped events younger than the bus's 99.9th-percentile delivery delay, a lag in delivery whose size is not given, from a history encoded at scoring time, and found at most 0.2% relative change on external fraud. A nightly embedding is missing up to a day of events. The test says nothing about a day's staleness.
+
+(b) A takeover or a burst of card tests happens within the hours since the batch: exactly the events a night-old embedding has not read, and exactly what <Ref lesson="point-in-time-features" id="two-implementations-of-the-same-feature">the stream's minute and hour windows</Ref> measure. Keep both: the stored embedding as a slow feature on the batch clock, the stream windows on the event clock, both written to the time-keyed log and read as of each payment. Whether the embedding adds anything beside them is measured on prequential folds at the team's alert budget, not assumed.
+
+(c) Every stored embedding row carries the checkpoint id and the vocabulary fingerprint it was computed with, and the fraud model's artefact records the ones its training rows used. The parity replay of a past day runs the serving path and compares, per row, the checkpoint id it read with the one in the training table, and the vector itself with the training vector for the same customer and as-of date. Any disagreement in the id is a skew on every row; the scoring service should also refuse to score when the two ids differ, as the public model refuses a mismatched vocabulary.
+</Solution>
+</Exercise>
+
+<Exercise>
+A customer completed onboarding yesterday: a plan, a region and an identity check are in the profile, and there is no transaction or app event yet. (a) The digital bank discards customers with no events from pretraining. What does the encoder produce for this customer at scoring time, and what does each part of the hierarchy see? (b) A second customer opened an account four years ago and has 30,000 events. Which part of the encoder carries the difference between the two, and how does the profile ablation bear on it? (c) What would you add for a fraud model so that the first customer is not scored as if it were the second?
+
+<Solution>
+(a) The event encoder has nothing to read; the history encoder sees one position, the profile vector, and its output there is the embedding. It is computed from the attributes alone, a region of the embedding space that pretraining never trained on, since no zero-event customer entered it. The vector exists but nothing ensured it means anything.
+
+(b) Only the profile distinguishes them by age: the four-year customer's window holds the newest 6,500 of its 30,000 events, about eleven months at its twenty or so events a day, and its first-occurrence events carry gaps of about four years; the new customer's carry none or gaps of a day. With the profile branch removed, both would be read from their recent events only, and a busy four-year customer and a busy new one would look alike. The ablation removed the whole profile, attributes and milestones together, so its +46.8% precision and +85.6% recall on external fraud are the most this confusion could account for, not a measure of it; the bank did not report the gain by account age.
+
+(c) Columns beside the embedding that the downstream model can read directly: the account's age, the number of events seen, and a flag for "embedding computed from fewer than $n$ events", with the embedding set to missing rather than to its value for very short histories, the same rule <Ref lesson="limits-of-hand-built-features" id="exercises">the limits lesson's new-customer exercise</Ref> gave for aggregates. A fraud model can then learn a separate rule for new accounts instead of trusting a vector from an untrained region.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague writes: "Adapters beat the probe by 30.8% in precision on fraud, so fine-tuning always beats a frozen embedding. We should retire the probe and fine-tune every task." Refute the claim and the recommendation, with numbers from the chapter.
+
+<Solution>
+**The claim.** Its scope is one bank, six tasks and three sizes, and inside that scope the margin shrinks as the encoder grows: 30.8% precision and 27.4% recall at 10 million parameters, 23.8% and 13.3% at a billion, so the gap depends on what the frozen encoder kept. Nothing in it covers other banks or larger encoders, and elsewhere frozen encoders held their own on different comparisons: the large bank's frozen pretrained encoder, with a small network trained on its embedding, beat the same architecture trained from scratch on the labels alone, 0.795 against 0.791 at 8 million parameters, and at three unseen issuers a payment processor's frozen embeddings did about as well as embeddings from a copy pretrained further, without labels, on each issuer's own events. "Always" is a claim the evidence does not reach.
+
+**The recommendation.** Both routes use the task's labels; what differs is time and storage. Adapters take about an eighth of the pretraining time per task, 12 hours to days, and leave one set of adapter weights per task to keep. Forty tasks at an eighth each is about five pretrainings of compute. The probe costs minutes and needs only stored vectors, which is why the bank uses it to decide whether a task is worth adapting, to choose between pretraining checkpoints, and to test tokeniser changes. Retiring it removes the screening step, not a weak model. The transferable move: a measured margin is a statement about one reference, one size and one task; before generalising it, ask what it cost and what it was relative to.
+</Solution>
+</Exercise>
+
+<Exercise>
+Let a history have $E$ events of $k$ tokens each. (a) Write the attention pairs per layer for a flat model and for the hierarchy, and show that their ratio tends to $k^2$. (b) A layer's feed-forward block costs in proportion to the number of positions it processes. A flat model of $L$ layers processes $kE$ positions per layer; a hierarchy with $L_e$ event layers and $L_h$ history layers processes $kE$ per event layer and $E$ per history layer. Write the ratio of feed-forward costs. (c) Evaluate both for $k = 8$, $L = 10$, $L_e = 2$, $L_h = 6$, with a further $L_t = 2$ token-decoder layers that also see every token, and compare with the measured 2.6 to 4.1 times.
+
+<Solution>
+(a) Flat: $(kE)^2 = k^2E^2$. Hierarchy: $E$ events of $k^2$ pairs plus $E^2$: $k^2E + E^2$. Ratio $k^2E^2/(k^2E + E^2) = k^2E/(k^2 + E) \to k^2$ as $E \to \infty$.
+
+(b) Flat: $L \cdot kE$. Hierarchy: $L_e kE + L_h E$ (plus $L_t kE$ for the token decoder). Ratio $Lk / (L_e k + L_h + L_t k)$: in "layer passes per token", $L$ against $L_e + L_h/k + L_t$.
+
+(c) Attention: $k^2 = 64$, so up to about 64 times fewer pairs for long histories. Feed-forward: $10$ against $2 + 6/8 + 2 = 4.75$ layer passes per token, a ratio of 2.1. The measured 2.6 at a 2,048-token window and 4.1 at 4,096 sit between the two, closer to the feed-forward ratio: at a few thousand tokens the feed-forward blocks are a large share of a flat model's cost, and the attention share, which the hierarchy cuts sixtyfold, grows with the window. That is why the gap widens from 2,048 to 4,096, and why the hierarchy's time does not change with the window while the flat model's does.
+</Solution>
+</Exercise>
+
+<Exercise>
+Design and run, on the public 100,000-client bank data, the measurement behind delta scoring, using the next-event model's released pretrained weights. (a) For each day of one month, which two groups of clients must be re-encoded, and how do you count each? (b) For 500 clients, embed each at two consecutive daily cut-offs. How do you check that a client in neither group has exactly the same embedding, and what would a difference mean? (c) What share of clients would you expect to re-encode on a bank whose customers are mostly silent for weeks between events, using the $8/g$ rule?
+
+<Solution>
+(a) Group 1: clients with at least one event between yesterday's cut-off and today's, counted from event timestamps. Group 2: clients with no new event whose now token changed, which is $\lfloor 8\ln(1 + \Delta/8) \rfloor$ evaluated at today's and yesterday's silence $\Delta$ in seconds; count the clients where the two differ. Report both shares per day and their sum; on this data the published averages are 57% and 32%, 90% together (79% with transactions only, 31% and 48%).
+
+(b) Encode each client's history closed by its now event at both cut-offs, with the vocabulary the checkpoint was trained with. For clients in neither group, the token sequence is identical, so the embeddings must match to floating-point tolerance (compare the maximum absolute difference with, say, $10^{-5}$). A difference means the encoding is not a function of the tokens alone: a nondeterministic kernel, a history window drawn differently, a vocabulary fitted again, or an event stream that changed after the fact (the lender's snapshot-diff problem). Each must be fixed before delta scoring can stand in for a full pass.
+
+(c) A client silent for $g$ days changes now token on about $8/g$ of days. If, say, 30% of customers have an event on a given day and the rest have been silent for about 30 days on average, another $0.7 \times 8/30 \approx 0.19$ of customers change token: about half the customers are re-encoded instead of 90%. With most customers silent for 60 days or more, the second group falls below a tenth.
+</Solution>
+</Exercise>
+
+<Exercise>
+From the large bank's size table (embedding alone 0.750 / 0.774 / 0.787 and with features 0.792 / 0.796 / 0.801 at 2M / 8M / 42M parameters; features alone 0.792), compute at each size (a) what the features add to the embedding and (b) what the embedding adds to the features. (c) A team with no feature set and a team with a mature one each ask for budget to move from the 8M to the 42M encoder. Which request does the table support, and what confound in the table must the answer state?
+
+<Solution>
+(a) Features over embedding: $0.792 - 0.750 = 0.042$; $0.796 - 0.774 = 0.022$; $0.801 - 0.787 = 0.014$.
+
+(b) Embedding over features: $0.792 - 0.792 = 0$; $0.796 - 0.792 = 0.004$; $0.801 - 0.792 = 0.009$.
+
+(c) From 8M to 42M the embedding alone gains $0.013$ and the combination $0.005$: the team without features gets more than twice the gain, and it is the one whose score is the embedding's score. The table supports that request. The confound: the three sizes also read different history lengths (256, 1,024 and 2,048 events), and at 8M, context alone from 256 to 1,024 moved the combination by 0.005. Part of each step is history length, not parameters; a request that hinges on parameters alone would need sizes compared at one context length. The move: when two things changed together, a step in the result is attributed to their sum, never to the one the request is about.
+</Solution>
+</Exercise>
+
+<Exercise>
+The digital bank reports, for external fraud with its 100-million-parameter encoder and adapters, +12.3% precision and +66.4% recall relative to the task's existing model. Your team runs that task at 100 alerts a day. (a) Compute the encoder's precision at your budget and the number of frauds it would catch per day. (b) Suppose the existing model's precision were 0.30 at your budget; compute both again. What else must you know for the recall figure to translate into frauds caught? (c) Say what single fact, missing from the report, decides whether +12.3% is worth deploying.
+
+<Solution>
+(a) It cannot be done: a relative change multiplies an absolute value that is not given. +12.3% of an unknown precision is an unknown precision.
+
+(b) With a baseline precision of 0.30, the encoder's is $0.30 \times 1.123 = 0.337$: about 34 frauds in 100 alerts instead of 30, if 100 alerts is the operating point at which both precisions were measured. Recall +66.4% means catching 1.664 times the baseline's share of frauds; turning that into frauds per day needs the number of frauds per day and the baseline recall, and recall and precision are only both meaningful together at one stated threshold. If the report's operating point flags more than 100 a day, neither number applies to your queue.
+
+(c) The operating point: at what number of alerts per day, or at what threshold, precision and recall were measured, together with the baseline's absolute values and the fraud prevalence of the test set. Without them the pair cannot be placed on <Ref lesson="alert-budget-metrics" id="precision-at-k-the-metric-cut-where-the-team-cuts">the budget-cut metrics</Ref> the course uses. That missing denominator is the first question <Ref lesson="reading-foundation-model-claims" /> asks of every headline number.
+</Solution>
+</Exercise>
+
+<References>
+1. M. Ostroukhov, R. Mikhailov, V. Iashin et al., "PRAGMA: Revolut Foundation Model," arXiv:2604.08649, 2026, industry preprint reporting relative results only — Sec. 2.1 (26M users, 111 countries, 24B events, 207B tokens, 25 months), Sec. 2.1.2 (profile state and life-long first-occurrence events), Sec. 2.3 and Fig. 4 (profile, event and history encoders; the [USR] and [EVT] vectors), Table 1 (10M / 100M / 1B), Sec. 2.4 (storage by event count, sequence packing 2–5×, truncation at 6,500 events, 16 and 32 H100s, about 2 days and 2 weeks), Sec. 3.1 (linear probe with L-BFGS; LoRA at rank 8 on attention and feed-forward weights, 2–4% of parameters, one eighth of pretraining time), Table 2 (sizes, adapters against probe, against training from scratch), Sec. 3.4.2 (event staleness), Table 3 (profile-state ablation), Table 6 (anti-money laundering).
+2. E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, W. Chen, "LoRA: Low-Rank Adaptation of Large Language Models," *ICLR 2022* (arXiv:2106.09685) — Sec. 4.1 (the update $W + BA$, $B$ initialised at zero, rank $r$).
+3. D. T. Braithwaite, M. Cavalcanti, R. A. McEver et al., "Your Spending Needs Attention: Modeling Financial Habits with Transformers," arXiv:2507.23267, 2025, industry preprint — Sec. 3.3 and Fig. 4 (early, late and joint fusion; trees cannot join), Sec. 4.1 (credit-default task, 203M training rows, 291 features, LightGBM baseline, 90% of redundant transaction features removable), Sec. 4.2.1 (24M and 330M models), Sec. 4.3 and Table 1 (late and joint fusion; daily inference on 60 A100s; histories as of the score date; snapshot diffs and the buy-now-pay-later timestamp leak; six-month labels), Table 3 (ablation on 10M rows), App. B Table 5 (neural branch against LightGBM), App. C (7 days on 8 A100s per run).
+4. N. Rusakov, V. Meshkov, K. Zorin, G. Zaripov, A. Uglov, A. Vasilev, A. Klenitskiy, "A Foundation Model for Multimodal Event Sequences in Financial Applications," *KDD '26* applied track (arXiv:2607.09955) — Sec. 4.1–4.3 (heterogeneous event encoder, frozen encoder with an adapter beside a tabular network), Table 2 (0.787 / 0.792 / 0.801), Table 3 (2M / 8M / 42M with and without features), Table 4 (context length), Table 5 (pretrained against supervised, 8M model), Sec. 6 (online test, net present value across products).
+5. Visa Research (Y. Dou et al.), "TransactionGPT," arXiv:2511.08939, 2025, industry preprint — Sec. 3.1 (metadata, feature and temporal transformers), Sec. 3.2.1 (local attention), Sec. 3.3.2 (virtual tokens), Sec. 3.4 (latency within the service-level agreement), Sec. 5.3 (56M model against a fine-tuned 7B text model, 0.27 ms against 84.9 ms), Table 6 and Sec. 6 (local attention; event-vector width 64, 128, 256).
+6. D. Burakov, "EventGPT: Next-Event Pretraining on Banking Customer Histories," arXiv:2611.03302, 2026, preprint with released weights — Sec. 3.4 (the now event), Sec. 6.4 (114 engineered features), Sec. 7.4 and Tables 8–9 (rank-averaged ensembles over five folds and two seeds), App. C (the embedding as CatBoost columns, 0.815 to 0.808), Sec. 6.5 and 8 (hierarchical against flat training time on one L4; per-institution vocabularies), App. B (delta scoring), App. E (the embedding as a dated feature; checkpoint and vocabulary fingerprint).
+7. P. Skalski, D. Sutton, S. Burrell, I. Perez, J. Wong, "Towards a Foundation Purchasing Model: Pretrained Generative Autoregression on Transaction Sequences," *ICAIF '23* (arXiv:2401.01641) — Sec. 3.2 (a GRU chosen for serving: one stored state and one new event), Sec. 5.1–5.3 (pretraining at 180 issuers; frozen against further-pretrained embeddings at three hold-out issuers).
+8. D. Babaev, N. Ovsov, I. Kireev, M. Ivanova, G. Gusev, I. Nazarov, A. Tuzhilin, "CoLES: Contrastive Learning for Event Sequences with Self-Supervision," *SIGMOD 2022* (arXiv:2002.08232) — Sec. 4.3.1 (encoders for 10M corporate and 5M retail clients applied to over 90M cards; quantised embeddings).
+</References>

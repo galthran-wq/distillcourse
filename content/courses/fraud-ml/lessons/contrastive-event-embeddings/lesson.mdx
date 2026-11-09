@@ -1,0 +1,451 @@
+There are two years of events for two million customers and no label for the task at hand. A network can only be trained to do something that the data itself can grade. What can it be asked to do with a customer's history alone, so that what it learns about the history is useful later for a task nobody has named yet, and what is the cheap way for it to cheat?
+
+<Ref lesson="limits-of-hand-built-features" id="a-task-the-events-grade-themselves">The previous lesson</Ref> named the object: an encoder pretrained on a task the events grade, frozen, and read as of a time as a block of columns beside the aggregates. It named two such tasks in a sentence each, hiding the next event and asking whether two stretches of history come from the same customer, and it quoted the score of a contrastive encoder on <Ref lesson="limits-of-hand-built-features" id="the-ranking">the bank benchmark</Ref>, below the whole-history aggregates. It left open how such an encoder is trained.
+
+Every network in the course so far was trained by a loss that compares an output with a target: a fraud label, or, for the autoencoder, the input itself. Here the target must come out of the history, and it must be chosen so that getting it right forces the encoder to learn something a later task can use.
+
+## What a history can grade: are two pieces from the same customer?
+
+A label-free target has to be computable from the events alone, and answering it has to require the kind of knowledge a later task needs.
+
+### Two targets: one misses what matters, one is costly to write
+
+**Reconstruct the history.** The <Ref lesson="one-class-and-reconstruction" id="what-stops-the-copying">autoencoder</Ref> was trained to reproduce its input through a narrow code. Applied to a history of hundreds of events squeezed into one vector, the loss rewards every field of every event equally: the exact amount, the exact minute, the order of two purchases on the same afternoon. Nothing in it says which details matter more. On the simulator, the error of a network trained this way, added as an input to a supervised network, <Ref lesson="one-class-and-reconstruction" id="what-the-sixteenth-input-added">moved average precision from 0.699 to 0.704</Ref>, within noise: a summary rewarded for keeping everything about the inputs told the classifier nothing new.
+
+**Predict the next event.** Hide event $t+1$ and ask for it from the events up to $t$. This target meets the second condition: a habit that predicts the next purchase gets learned, a detail that predicts nothing does not. Its price is in the loss. The answer is a whole event, so the loss needs a term for each of its fields, and the fields are awkward: an amount with a long tail, a merchant drawn from millions of values. <Ref lesson="generative-pretraining-and-tokenisation" /> takes this target up after solving that problem.
+
+### The question of identity
+
+A third target asks a question with one answer for the whole piece of history, so one loss serves every field at once. Cut two pieces out of the histories in a batch, and ask whether both pieces came from the same customer. The answer is known for every pair, so the data grades it. Whether it meets the second condition depends on what the encoder must learn to answer it.
+
+<Definition title="positive and negative pairs">
+Given pieces of history cut from several customers, a *positive pair* is two pieces from the same customer and a *negative pair* is two pieces from different customers. A *contrastive* task trains an encoder so that the vectors of a positive pair are close and those of a negative pair are far apart.
+</Definition>
+
+<Figure
+  src="./figures/slices.svg"
+  alt="Left, two timelines of events in time order, customer A in amber with three random contiguous pieces marked under it, customer B in blue with two. Right, a unit circle with the three vectors of A's pieces close together on the left, two amber arcs outside the circle converging on them labelled pulled together, and B's two vectors on the right; a dashed chord from A's group to B's group with arrowheads pointing outward, labelled pushed apart until rho apart. A legend pairs the converging amber arrows with same customer, positive pair, and the dashed outward arrow with two customers, negative pair."
+  caption="Pieces of one customer are pulled together; pieces of two customers are pushed apart, but only until they are a distance ρ set by the loss below."
+/>
+
+What the encoder must learn to pass is set by what the two pieces of a positive pair share and what they do not. Two stretches of one customer's life differ in which purchases they hold, when, and for how much; they share the customer's habits: the mix of event types, the usual amounts, the rhythm. To put them together and keep other customers away, the encoder has to represent exactly the second list and ignore the first.
+
+<KeyFact>
+A contrastive task teaches the encoder to keep what stays the same within one customer and differs between customers, and to discard what changes within one customer. Every later property of the embedding, good and bad, follows from that pair of instructions.
+</KeyFact>
+
+The kept list is a behavioural profile, which is what a task about the customer (an age group, a credit default, the chance of leaving the bank) is likely to need, so the identity question meets the second condition too.
+
+## Where the pairs come from: random slices of one history
+
+A batch of histories supplies negative pairs at once: any piece of customer A against any piece of customer B. Positive pairs are the problem, because each customer has exactly one history.
+
+### Two copies of the same history teach nothing
+
+The simplest positive pair is the history and itself. Every encoder maps identical inputs to identical vectors, so every positive pair sits at distance zero from the start and the positive half of the task is solved before training begins. The task needs two views of the customer that differ.
+
+One way to make them differ is to leave the history intact and change the network: run it twice with different dropout masks, so the two vectors differ only by the network's own noise. That was tried on a public churn task (card transactions of 10,000 bank clients, half of them labelled with whether they left; downstream a small network on the frozen vector, scored by ROC-AUC on a held-out fifth). The dropout-only encoder scored 0.650; whole-history aggregates scored 0.798; the slices built below 0.813. Two views that differ only by noise never make the encoder decide which properties of the history belong to the customer.
+
+### The slice sampler
+
+The views that work are cut from the history itself. Each is a *slice*, a contiguous stretch of the customer's events, with its length and its start drawn at random.
+
+<Definition title="random-slice sampler">
+For a customer with $T$ events and settings $m \le M$ (shortest and longest slice) and $K$ (attempts per customer), repeat $K$ times: draw a length $L$ uniformly from $1, \dots, T$; if $m \le L \le M$, draw a start $s$ uniformly from $0, \dots, T - L$ and keep events $s, \dots, s + L - 1$ as a slice; otherwise discard the draw. Slices of one customer form positive pairs with each other, and with every slice of another customer negative pairs.
+</Definition>
+
+<Figure
+  src="./figures/sampler.svg"
+  alt="A timeline of 120 events numbered 0 to 120. Five draws listed on the left: length 7, discarded as shorter than 20; length 45, kept with start 12, events 12 to 56; length 112, discarded as longer than 60; length 30, kept with start 62, events 62 to 91; length 58, kept with start 40, events 40 to 97. The kept slices are amber bars under the timeline."
+  caption="Five draws on one history: three slices survive, and they may overlap."
+/>
+
+Slices may overlap: draws 2 and 5 above share seventeen events. A length outside $[m, M]$ is discarded rather than clipped to the nearest bound, because clipping would turn every long draw into a slice of exactly $M$ events. The rule has a cost: the chance that a draw survives is $(\min(M, T) - m + 1)/T$, which falls as the history grows.
+
+<Exercise>
+A customer has $T = 2{,}000$ events; $m = 20$, $M = 60$, $K = 5$. (a) How many slices does the sampler produce on average? (b) If draws were clipped to $[20, 60]$ instead of discarded, what share of slices would have length exactly 60? (c) Propose a rule that gives every customer with $T \ge m$ exactly $K$ slices of lengths spread evenly over $[m, \min(M, T)]$.
+
+<Solution>
+(a) A draw survives when $L \in \{20, \dots, 60\}$, 41 values out of 2,000: probability 0.0205. Five attempts give $5 \times 0.0205 \approx 0.10$ slices: nine customers in ten with this history length contribute no slice at all to a batch.
+
+(b) Every draw above 60 becomes 60: 1,940 of 2,000 values, 97%. Draws from 1 to 19 become 20 (1%). Almost every slice would be 60 events long, and the encoder would rarely see a short stretch.
+
+(c) Draw the length uniformly from $m, \dots, \min(M, T)$ directly, then the start uniformly from $0, \dots, T - L$, $K$ times. Surviving lengths in the original rule are uniform on that same range, so the distribution of lengths is unchanged; only the wasted draws go. Customers with fewer than $m$ events are left out of training.
+</Solution>
+</Exercise>
+
+Slices are not the only way to cut views out of one history, and whether they are the right way can only be judged by what the frozen vector is worth on a task with labels. Three comparisons in this chapter (the views here, the negatives and the encoder further on) share one setup, stated once. The tasks are the four public ones of the <Ref lesson="limits-of-hand-built-features" id="how-many-labels-a-label-free-score-is-worth">previous lesson's fraction experiment</Ref>:
+
+- **age group** of 50,000 card holders from their card transactions, 30,000 of them labelled with one of four balanced groups;
+- **churn** of 10,000 bank clients from their card transactions, 5,000 labelled, about half of them leavers;
+- **game assessment**, the grade (one of four) a child gets in an in-game assessment, from 330,000 gameplays of 18,000 children, of which 17,700 are labelled;
+- **retail age group** of 400,000 shoppers from their purchases, all labelled, groups balanced.
+
+For each task the encoder is pretrained on every history, labelled or not, and frozen; its vector is the only input to a boosted tree fitted on the labels. A tenth of the labelled examples is set aside, and on the other nine tenths the tree is scored by five-fold cross-validation. Churn, with two classes, is scored by ROC-AUC; the other three, with four classes each, by accuracy, the share of examples whose predicted class is the true one. A margin on churn is therefore a difference of ROC-AUC and a margin elsewhere a difference of accuracy, and the two are not on one scale. Everything not under comparison is held at each task's own best configuration, which on churn reads slices with an LSTM and on the other three with a GRU.
+
+Two alternatives to slices were tested in that setup: random samples of events from anywhere in the history (kept in time order but not contiguous), and a random split of the history into disjoint segments. The second was meant to fix a suspected flaw of slices: two overlapping slices share events, which the encoder could match by memorising them. Slices scored higher than both on all four tasks. The smallest margin is 0.003 of ROC-AUC on churn (0.823 against 0.820 for random samples), the largest 0.055 of accuracy on the game assessment (0.618 against 0.563 for either alternative). These churn scores are not comparable with the dropout comparison above, which came from a different study with a different downstream network and test split. A plausible reading is that at use the encoder reads a contiguous history, and slices train it on inputs of that kind, with the gaps between events as they really occur.
+
+### The assumption, checked: behaviour repeats
+
+Calling two slices a positive pair asserts something about the data: that two stretches of one customer's history look more alike than stretches of two customers. If it were false, the task would ask the encoder to put together pieces that have nothing in common, and it could only memorise. The assumption can be checked before any network is trained, with the measurement of the <Ref lesson="limits-of-hand-built-features" id="exercises">previous lesson's last exercise</Ref>: turn each slice into a histogram of its event types, add half a count to every bin so that none is empty, and compute the Kullback–Leibler divergence between two slices.
+
+<Figure
+  src="./figures/kl-test.svg"
+  alt="Two histogram panels of KL divergence in nats from 0 to 3. Left, bank clients' event types, 1,955 clients with two disjoint 50-event slices each: the same-client distribution in amber is piled near zero with median 0.09; the two-client distribution in blue spreads out to 3 and beyond with median 0.98. Right, control with event types shuffled across clients: both distributions coincide near 0.16."
+  caption="Two slices of one client are about ten times closer than slices of two clients; with the client removed from the data, the gap disappears."
+/>
+
+The left panel is measured on the public 100,000-client cut of the bank benchmark, using the field that records the event's type (52 values occur in this cut, of the 56 the dataset defines; the fifteen most frequent cover 95% of events, the rest are pooled). For each of 1,955 clients with at least 120 events, two disjoint slices of 50 events were cut at random places; the same-client divergence is between those two, the two-client divergence between one client's first slice and a randomly chosen other client's second. The same-client median is 0.09 nats, the two-client median 0.98, and 96% of same-client pairs fall below the two-client median.
+
+The right panel is the control. The event types of all clients were pooled, shuffled and dealt back into the same histories, so each "client" is now a random draw from the population. The two distributions coincide (medians 0.16 and 0.16). The divergence of 0.16 between two slices with nothing in common is the sampling noise of a 50-event histogram, and the real same-client value lies below it: one client's slices agree more closely than two random draws from the population do, because a client's events concentrate on a few types.
+
+<KeyFact>
+The slice task rests on a checkable property, not a hope: on this data two slices of one client differ by a tenth of what slices of two clients do, and a dataset without the property shows no gap at all. Data where the check fails gives the contrastive task nothing to learn. Text is such a case: the same divergence check, run on two pieces of one text post against pieces of two different posts, shows no gap.
+</KeyFact>
+
+## The loss: pull positives together, push negatives to a margin
+
+The pairs now exist; the encoder turns each slice $u$ into a vector $c_u$, and the loss must say how far apart the vectors of each pair should be. Write $d_{uv}$ for the Euclidean distance between $c_u$ and $c_v$, and $Y_{uv} = 1$ for a positive pair, $0$ for a negative one.
+
+### Pulling alone collapses
+
+The obvious loss is the one that states half of the task: make positives close, $\tfrac{1}{2} \sum Y_{uv} d_{uv}^2$ over the batch. Its minimum is zero, and an encoder that outputs one fixed vector for every slice of every customer attains it: all distances are zero, so every positive pair is perfect. The encoder has learned nothing, and the loss cannot tell. This failure is called *collapse*. A supervised loss never has it, because the label differs between examples; here the only thing that differs between examples is which customer they came from, and only the negative pairs use that.
+
+### The margin
+
+The negative pairs must be pushed apart. Pushing without limit fails differently: a term like $-d_{uv}^2$ has no minimum, since scaling every vector up lowers it for ever, and it keeps spending its gradient on customers already far apart. The fix is to push a negative pair only while it is closer than a set distance $\rho$, the *margin*, and to release it once it is beyond.
+
+<Definition title="contrastive margin loss">
+For a pair of slices $(u, v)$ with vectors at distance $d_{uv}$, label $Y_{uv}$ and margin $\rho > 0$,
+$$
+\mathcal{L}_{uv} = \tfrac{1}{2}\, Y_{uv}\, d_{uv}^2 + \tfrac{1}{2}\,(1 - Y_{uv}) \max(0,\ \rho - d_{uv})^2 .
+$$
+The loss of a batch is the mean of $\mathcal{L}_{uv}$ over the pairs it uses.
+</Definition>
+
+A positive pair is pulled whatever its distance, with a gradient proportional to $d_{uv}$. A negative pair contributes nothing when $d_{uv} \ge \rho$, and a push that grows as the pair gets closer when $d_{uv} < \rho$. The collapsed encoder now pays $\tfrac{1}{2}\rho^2$ for every negative pair. Training here uses $\rho = 0.5$.
+
+<Example title="the loss of four slices">
+Two customers, two slices each, with vectors on the unit circle at angles a1 = 0°, a2 = 40° (customer A) and b1 = 60°, b2 = 150° (customer B). Two unit vectors $\theta$ degrees apart are $d = 2 \sin(\theta/2)$ apart.
+
+| pair | kind | angle | $d$ | term |
+|---|---|---|---|---|
+| a1–a2 | positive | 40° | 0.684 | $\tfrac{1}{2}(0.684)^2 = 0.234$ |
+| b1–b2 | positive | 90° | 1.414 | $\tfrac{1}{2}(1.414)^2 = 1.000$ |
+| a1–b1 | negative | 60° | 1.000 | $1.000 \ge 0.5$: 0 |
+| a1–b2 | negative | 150° | 1.932 | 0 |
+| a2–b1 | negative | 20° | 0.347 | $\tfrac{1}{2}(0.5 - 0.347)^2 = 0.012$ |
+| a2–b2 | negative | 110° | 1.638 | 0 |
+
+The six terms sum to 1.246. Most of it is customer B's two slices, a quarter-turn apart: the gradient will pull them together. One negative pair, a2 and b1, is inside the margin and gets pushed. Three of the four negative pairs are already further apart than $\rho$ and contribute neither loss nor gradient.
+</Example>
+
+<FigureSequence
+  name="margin"
+  alt="Four frames sharing one layout: a unit circle with points a1 and a2 in amber and b1 and b2 in blue, and a table of the six pairs with their distances. Frame 1 shows the points and the table without loss terms. Frame 2 draws the two positive pairs and fills in their terms, 0.234 and 1.000. Frame 3 marks the arc within 0.5 of a2, draws the negative pair a2–b1 in black and fills in 0.012. Frame 4 draws the three remaining negative pairs dashed and fills in zeros; the sum is 1.246."
+  caption="One loss term at a time: positives always count, a negative counts only inside the margin."
+/>
+
+<Task>
+Step through the frames and, before frame 4, predict how many of the four negative pairs carry a loss. Then check the margin's size as an angle: $d = 0.5$ means $2 - 2\cos\theta = 0.25$, so $\theta \approx 29°$. Only b1 lies within 29° of a2.
+</Task>
+
+<Exercise>
+After one gradient step the vectors sit at a1 = 5°, a2 = 30°, b1 = 70°, b2 = 120°. Compute the six terms and the total, and say which pair stopped contributing.
+
+<Solution>
+Positives: a1–a2 at 25°, $d = 2\sin 12.5° = 0.433$, term $0.094$; b1–b2 at 50°, $d = 2 \sin 25° = 0.845$, term $0.357$. Negatives: a2–b1 at 40°, $d = 0.684 \ge 0.5$, term 0; a1–b1 at 65°, $d = 1.075$, 0; a1–b2 at 115°, $d = 1.687$, 0; a2–b2 at 90°, $d = 1.414$, 0. Total 0.451, down from 1.246. The pair a2–b1 left the margin and no longer contributes; every term left is a positive pair still being pulled.
+</Solution>
+</Exercise>
+
+## A batch scored by one matrix product
+
+The example had six pairs. A training batch has tens of thousands, and every distance has to be computed at each step.
+
+### The batch arithmetic
+
+A batch takes $N$ customers and $K$ slices of each. With $N = 64$ and $K = 5$, that is 320 slices. On the age-group task described above, slices average about 90 events, so one batch holds about 28,800 events, and a step takes about 142 milliseconds on one GPU. The 320 slices form $320 \times 319 / 2 = 51{,}040$ pairs:
+
+- positive: $N \cdot K(K-1)/2 = 64 \times 10 = 640$;
+- negative: $K^2 \cdot N(N-1)/2 = 25 \times 2{,}016 = 50{,}400$.
+
+Each slice has 4 positive partners and 315 negative ones.
+
+### Unit vectors give the margin a scale
+
+Before the distances, the vectors need a fixed length, and the reason is the margin. $\rho = 0.5$ is a distance, and a distance means something only against the size of the vectors. An encoder whose outputs can have any length controls that size: multiply every vector by 10 and every distance grows tenfold, positive and negative alike: negatives that sat inside the margin clear it, positive terms grow a hundredfold, and nothing about which slices are near which has changed. Training would then trade the positive terms against the negative ones by stretching or shrinking all the vectors together, and $\rho$ would no longer say how far apart two customers must be. Dividing the encoder's output by its length removes that freedom: every $c_u$ is a unit vector, distances run from 0 (same direction) to 2 (opposite), and $\rho = 0.5$ is the fixed angle of about 29° found in the Task above. Nothing the task needs is lost, because whether two slices belong together is a question of direction. The worked example above already lived on the unit circle.
+
+Unit length also simplifies the computation of the 51,040 distances. For any two vectors,
+$$
+d_{uv}^2 = \|c_u - c_v\|^2 = \|c_u\|^2 + \|c_v\|^2 - 2\, c_u \cdot c_v .
+$$
+Stack the 320 vectors as the rows of a matrix $C$. The product $C C^\top$ holds every dot product at once, so one matrix product, which a GPU does in one call, plus the 320 squared lengths gives every distance in the batch. With unit vectors the lengths are all 1 and the formula shrinks to $d_{uv}^2 = 2 - 2\, c_u \cdot c_v$: the squared distances are $2 - 2\, C C^\top$, entry by entry.
+
+<Figure
+  src="./figures/batch-matrix.svg"
+  alt="A 12 by 12 grid for a toy batch of 4 customers A to D with 3 slices each; cell shade shows distance, dark for close. Amber squares outline the four 3 by 3 diagonal blocks of same-customer pairs, all dark. Blue circles mark, in each row, the two nearest slices of other customers: A's rows mark B's slices and B's rows mark A's, C's rows mark two of B's, D's rows mark two of A's. A note says A and B behave alike, so their slices supply each other's hard negatives."
+  caption="The batch's distance matrix: positives on the diagonal blocks, and in each row the nearest other customers."
+/>
+
+## Which negatives: the nearest ones
+
+The batch has 79 negative pairs for every positive one, and the margin decides which of them do any work. Once training is under way, most customers in a random batch are nothing alike, their slices are far beyond $\rho$, and their terms are exactly zero. Averaged into the batch loss, those zeros dilute the few negatives that still carry a gradient.
+
+### Hard negatives
+
+The negatives that carry a gradient are those inside the margin, and they are the nearest ones. The distance matrix is already computed, so they can be read off it: in each row, among the slices of other customers, take the $k$ with the smallest distance.
+
+<Definition title="hard negatives">
+For a slice $u$ in a batch, its $k$ *hard negatives* are the $k$ slices of other customers with the smallest distance $d_{uv}$ to it. A loss with hard-negative mining averages the negative term over these $k$ pairs per slice, instead of over all negative pairs or a random sample of them.
+</Definition>
+
+"Hard" is a rank in distance, not a property of the customer: the same slice can be a hard negative in one batch and irrelevant in the next, depending on who else was drawn. In the toy batch of the figure, customers A and B behave alike, so each supplies the other's hard negatives, and the loss concentrates on telling those two apart. That is the distinction the encoder has not yet learned; the distinction between A and C, it already has.
+
+### What the choice of negatives buys
+
+In the setup of the slice comparison (each task's own best configuration, the frozen vector into a boosted tree, five-fold cross-validation), the negatives were chosen three ways: the hard negatives above, negatives drawn at random, and a distance-weighted sampler that favours nearer negatives without taking only the nearest. Only the choice of negatives changed; the encoder on churn is the LSTM, on the other tasks the GRU:
+
+| | age group (accuracy) | churn (ROC-AUC) | game assessment (accuracy) | retail age (accuracy) |
+|---|---|---|---|---|
+| hard negatives | **0.639** | **0.823** | **0.618** | **0.542** |
+| distance-weighted | 0.629 | 0.821 | 0.603 | 0.536 |
+| random negatives | 0.626 | 0.815 | 0.593 | 0.530 |
+
+Hard negatives are first on all four, and random negatives last: by 0.008 of ROC-AUC on churn and by 0.012 to 0.025 of accuracy on the other three. On the game assessment the step from random to hard negatives, 0.025, is about half the 0.055 by which slices beat the other two ways of cutting views on the same task and under the same scoring: which negatives enter the loss matters on the same order as how the positives are cut.
+
+The margin loss itself was compared with four other contrastive losses on the same tasks, among them a triplet loss (one positive and one negative per anchor slice, with the positive required to be closer by a margin). The margin loss was first or tied for first on every task (another margin-based loss tied it on churn at 0.823). Two of the others, that second margin-based loss and a loss on the histogram of distances, came within 0.009 of it everywhere; the triplet loss and a binomial deviance loss fell 0.042 and 0.054 of ROC-AUC behind on churn (0.781 and 0.769 against 0.823), five to seven times the 0.008 that separated hard from random negatives there. The form of the loss can matter more than the choice of pairs.
+
+## What reads a slice: an event encoder and a GRU
+
+Up to here the encoder has been a box that maps a slice to a unit vector. Its input is awkward: a slice is a run of anywhere from 15 to a few hundred events, each with categorical codes and long-tailed numbers, and the output must be one vector of fixed length whatever the run's length. A bank also has to keep that vector current as events arrive, so it must be cheap to update. What network takes such a run to one vector, and what does it cost to keep it current?
+
+### From fields to an event vector
+
+Before a run of events can be read, each event has to become a vector of one fixed length. An event has categorical fields (the event type, a currency, a coded counterparty type) and numerical ones (the amount, the gap since the previous event). Each categorical field gets an <Ref lesson="neural-tabular-detectors" id="an-embedding-is-a-linear-layer-on-the-one-hot-input">embedding table</Ref>, one trained row per value. Each numerical field is standardised, after a log for the long-tailed amount, <Ref lesson="neural-tabular-detectors" id="standardise-on-the-training-block-compress-a-long-tail-first">as the network lesson did for its inputs</Ref>. The rows looked up for the event's values and the standardised numbers are concatenated into one event vector $z_t$.
+
+### The GRU, and the vector it stores
+
+The sequence of event vectors is read by a GRU, the gated recurrent layer that <Ref lesson="limits-of-hand-built-features" id="the-benchmark">the previous lesson glossed</Ref>: like <Ref lesson="sequence-models-for-transactions" id="the-lstm-a-path-the-gradient-can-survive">the LSTM</Ref>, it carries a state forward and updates it at each event, with gates that decide how much of the old state to keep. Starting from a learned initial state $h_0$,
+$$
+h_t = \mathrm{GRU}(z_t,\ h_{t-1}), \qquad t = 1, \dots, T,
+$$
+and the slice's embedding is the last state, divided by its length: $c = h_T / \|h_T\|$.
+
+<Aside>
+**The GRU update.** With $\sigma$ the sigmoid and $\odot$ the product of components, one step computes an update gate $g_t = \sigma(W_g z_t + U_g h_{t-1} + b_g)$, a reset gate $r_t = \sigma(W_r z_t + U_r h_{t-1} + b_r)$, a proposed state $\tilde h_t = \tanh(W z_t + U (r_t \odot h_{t-1}) + b)$, and the new state $h_t = (1 - g_t) \odot h_{t-1} + g_t \odot \tilde h_t$. The last line is the LSTM's cell update with one gate doing two jobs: where $g_t$ is near 0 the old state passes unchanged, the path along which a gradient survives many steps. The GRU has no separate cell, so its state is both its memory and its output, and it has three weight blocks where the LSTM has four.
+</Aside>
+
+The recurrence has a consequence for serving. A customer's embedding at the latest cut-off is the GRU's state after their latest event. When a new event arrives, the next state is one GRU step from the stored one: the history is not read again.
+
+<Figure
+  src="./figures/incremental.svg"
+  alt="Top, in amber, a recurrent encoder: a stored state h400 and a new event z401 enter one GRU step, which produces h401, stored for the next event; work, one event; storage, one vector. Bottom, in blue, a transformer encoder: a row of 401 event bars feeds a box saying in every layer the new event attends to all 401; work, 401 events; storage, vectors of all 401."
+  caption="A recurrent encoder advances a stored vector by one event; a transformer has to look at the whole history again."
+/>
+
+A transformer encoder, which mixes every event's vector with the others' in each layer, has no single state to advance: to include the new event it attends over all of the customer's events, and it must keep their vectors to do so. A bank that recomputes embeddings as events arrive therefore stores one vector per customer for a recurrent encoder, and one per event per layer for a transformer. The vector itself is small: 256 numbers take 1 KB in single precision, and mapped onto 16 levels (4 bits each) they take 128 bytes, about 12 GB for 90 million cards.
+
+### GRU, LSTM, transformer: what was measured
+
+In the same setup, with the encoder now the one thing varied, GRU and LSTM split the four tasks two each, the largest gap 0.017 of accuracy on age group in the GRU's favour, with no interval reported; a transformer encoder scored lower than the GRU on all four:
+
+| | age group | churn | game assessment | retail age |
+|---|---|---|---|---|
+| GRU | 0.638 | 0.812 | 0.618 | 0.542 |
+| LSTM | 0.621 | 0.823 | 0.620 | 0.535 |
+| transformer | 0.622 | 0.780 | 0.542 | 0.499 |
+
+Churn's 0.823 in the negatives table is this table's LSTM row, because the LSTM is churn's own configuration; a GRU on churn scores 0.812. On the other three tasks the GRU row repeats the configuration of the earlier tables (age group reads 0.638 here against 0.639 there, a thousandth apart as reported). This is a result about public datasets of ten thousand to a few hundred thousand clients, with sequences of hundreds of events, trained with this loss, not a ranking of architectures in general.
+
+## The cheap way to pass: recognising the customer
+
+The contrastive task rewards whatever is the same within a customer and differs between customers. The habits of the KeyFact above fit that description. So does any field whose value never changes.
+
+### A static field solves the task
+
+Suppose each event carries, besides its own fields, a field of the customer's: a segment code, a region, an age bracket, an account type. Such a field is *static*: it has the same value on every event of the customer. Two slices of one customer then share it exactly, and two slices of different customers differ in it unless the two customers happen to share a value.
+
+An encoder that maps each value of the static field to its own direction on the sphere, and ignores everything else, puts every positive pair at distance 0 and every negative pair between customers with different values at whatever distance it chose, beyond $\rho$. How much of the task that solves depends on how many values the field has. In a batch of $N = 64$ customers there are 2,016 pairs of customers. If the field has $V$ equally frequent values, two given customers share a value with probability $1/V$, so on average $2{,}016/V$ pairs of customers in the batch cannot be told apart by the field:
+
+- a segment code with $V = 10$ values leaves about 200 of the 2,016 pairs, so it solves 90% of the negative pairs;
+- a combination of region, segment and age bracket with $V = 1{,}000$ values leaves about 2, so it solves 99.9%.
+
+<Definition title="identity shortcut">
+An encoder takes the *identity shortcut* when it solves a self-supervised task by recognising which entity a piece of history belongs to from a static attribute, rather than from the behaviour the task was meant to make it represent.
+</Definition>
+
+The shortcut leaves the loss near zero and the gradient from behaviour near zero with it: the only negative pairs still inside the margin are those few whose static values collide. The embedding ends up encoding which value the customer has, which a downstream model could have read from the static field directly.
+
+### The shortcut, reproduced
+
+The arithmetic says what an encoder could do; a run shows what it does. The course ran it on 6,000 clients of the public 100,000-client cut of the bank benchmark, half of them buyers of at least one product:
+
+- **Encoder.** Embeddings of six categorical fields of each event, its log amount and the log gap since the previous event, into a GRU of 128 units.
+- **Training.** Batches of 64 clients with four slices of 15 to 64 events each, margin 0.5, the 5 hardest negatives per slice, five minutes on a CPU, on events before August 2022 of clients outside the test fold.
+- **Downstream.** The vector read at the start of each month, from earlier events only; a logistic regression on it per product, fitted on months up to September 2022 of the training clients and scored on October 2022 to January 2023 of the held-out clients; mean ROC-AUC over the four products.
+
+It was trained twice: on the dynamic fields only, and with one extra field on every event, a code from 1,000 values assigned to each client at random. The code carries no information about the client's behaviour or products; it can only identify.
+
+<Figure
+  src="./figures/shortcut.svg"
+  alt="Left, training loss on a log axis over about 800 batches: the dynamic-only run in amber falls from about 0.08 to 0.037; the run with a 1,000-value client code in blue drops below 0.01 within 100 batches and ends at 0.0038. Right top, held-out loss of the code-trained encoder: 0.004 with codes as trained, 0.104 with one code for every client, 0.281 with a random code per slice. Right bottom, downstream ROC-AUC of the vector alone: 0.691 dynamic fields only, 0.614 with the client code."
+  caption="With a client code on every event, the loss falls ten times lower and the vector is worth less downstream."
+/>
+
+The code-trained encoder's loss reaches a tenth of the dynamic-only loss within a hundred batches and stays there. The check confirms what it learned: on held-out batches, giving every slice a random code, so that two slices of one client no longer share it, raises its loss seventy-fold, from 0.004 to 0.281, and giving every client the same code raises it to 0.104. And downstream, for the four products of the bank benchmark on held-out clients, its vector alone scores 0.614 mean ROC-AUC against 0.691 for the dynamic-only vector. One seed on one cut, but the loss, the check and the downstream score point the same way.
+
+<KeyFact>
+A self-supervised task is only as good as the shortcuts it rules out. The contrastive task rules out none by itself: anything constant within a customer and varied across customers solves it, so the encoder is fed dynamic fields only, and static attributes go to the downstream model as columns of their own.
+</KeyFact>
+
+The same rule reaches beyond static fields. A field that is nearly constant within most customers, the currency of a customer who only ever pays at home, or an identifier of the account's branch, offers a partial shortcut of the same kind. The check is the one used above: after training, give each slice a random value of the suspect field, so that two slices of one customer no longer share it, and recompute the loss on held-out batches. If the loss jumps, the encoder was reading the field. Dealing the values out across customers instead, one value per customer, would prove nothing: each customer would still carry one value on all its slices, which is all the shortcut needs.
+
+## What the frozen vector is worth
+
+Frozen, the vector goes to a downstream model as the previous lesson's pipeline did. What it is worth there follows from what the task trained it to keep.
+
+### What the task keeps, and what it discards
+
+The vector keeps the stable habits that the chapter's first KeyFact says the task rewards. Much of that is what a whole-history aggregate computes directly, a count per event type or a mean amount, so on tasks where those are the signal the vector competes with the aggregates rather than adding to them.
+
+One measurement shows how strongly the vector is made constant along a history. A sequence encoder can summarise a customer by its last state or by the average of its states over the history, and the two differ only if the states change along the way. The comparison used the protocol of the dropout comparison above (the frozen vector into a small network, fitted on four fifths of the customers and scored on the last fifth, averaged over runs) on four tasks: the churn task of that comparison, scored by ROC-AUC; the age group of 50,000 card holders, by accuracy; the total each of 400,000 shoppers spends in the month after three months of purchases, by the mean squared error of the log amount, where lower is better; and credit default of about 1.5 million card holders, by ROC-AUC. For a contrastive encoder, switching from the last state to the average changes each task's score by less than 2% of its value, because the states are already alike at every point of one customer's history. An encoder trained generatively, to predict each next event and reconstruct past ones, has states that do change: averaging raised its age-group accuracy by 6% of its value (from about 0.605 to 0.642) and lowered its churn ROC-AUC by half a percent.
+
+### The evidence on three kinds of data
+
+<Figure
+  src="./figures/scoreboard.svg"
+  alt="Three panels, each with its own ROC-AUC axis. Left, public tasks (frozen vector or designed features into a boosted tree): churn, designed features 0.825, contrastive embedding 0.843; credit default, 0.779 against 0.792. Middle, the bank benchmark: about two million clients, aggregates 0.783, contrastive 0.773; 69 thousand clients, 0.781 against 0.785. Right, business payments with fraud labels: 30 engineered features 0.9245, features plus embedding 0.9205, embedding alone 0.8644."
+  caption="The frozen contrastive vector against hand-built features: ahead on some tasks, level or behind on others, and redundant beside a strong feature set."
+/>
+
+**Public tasks.** <Ref lesson="limits-of-hand-built-features" id="three-settings-one-shape">The previous lesson</Ref> reported that on five public tasks a frozen contrastive embedding beats whole-history aggregates on three and loses on two, by at most 0.02 in each task's own metric. The five are the four of the comparisons above plus the credit-default task of the last-state measurement, and the per-task numbers show where the wins fall. They come from a different protocol from the tables above: the frozen vector, in each task's final configuration, goes into a boosted tree scored on the held-out tenth of labelled examples, averaged over five runs, rather than by cross-validation on the other nine tenths; that is why churn reads 0.843 here and 0.823 in the tables above. The three wins are churn (0.843 against 0.825 ROC-AUC), credit default (0.792 against 0.779 ROC-AUC) and age group (0.638 against 0.631 accuracy, inside the vector's standard deviation of 0.007 over the five runs). The two losses are the game assessment, by a thousandth of accuracy (0.601 against 0.602), and retail age group (0.539 against 0.547). Churn, credit default and retail are clear of the run-to-run spread; age group and the game assessment are not.
+
+**The bank benchmark.** On <Ref lesson="limits-of-hand-built-features" id="the-ranking">the two-million-client benchmark</Ref> the contrastive vector scored 0.773 against 0.783 for the aggregates, and on the 69,474-client subset 0.785 against 0.781, inside the noise. The generative encoder, whose task rewards predicting what comes next, scored 0.802 on the full data.
+
+**Business payments with fraud labels.** The third case trains its encoder on a different contrastive task. Instead of comparing two slices, the encoder reads a customer's past and predicts the vector of the next short window of events; the prediction is scored against the true window's vector, with the windows of other customers in the batch as negatives. The task is still "which of these futures is this customer's", so the identity shortcut applies to it too: on this data, static customer attributes fed into the encoder let it pass the task without reading behaviour, and they were removed. The data are wire and electronic payments of business customers, with fraud labels on a small minority of customers, split once by time into training, validation and test. Downstream is XGBoost:
+
+| inputs to XGBoost | test ROC-AUC |
+|---|---|
+| 30 engineered features (frequency, recency, novelty of counterparties and devices, channel activity) | 0.9245 |
+| the same 30 plus the 32-number embedding | 0.9205 |
+| the embedding alone | 0.8644 |
+
+The embedding alone scores 0.86, far above the 0.5 of a random ranking, so it holds real signal about these customers. Added to the 30 features it adds nothing: the difference of 0.004 is one split with no interval, too small to call a loss. The signal is real and redundant. The 30 features count, time and flag novelty over the same rows the encoder read, and a vector trained to describe each customer's stable behaviour recaptures what those columns already hold, the mechanism the previous lesson <Ref lesson="limits-of-hand-built-features" id="why-the-vector-repeats-the-aggregates">inferred from three settings</Ref>. All three numbers are ROC-AUC, which <Ref lesson="alert-budget-metrics" id="how-much-of-the-curve-a-hundred-alerts-can-reach">mostly reads cuts an alert budget never reaches</Ref>, and none comes with the precision at a budget.
+
+<KeyFact>
+A frozen contrastive embedding beats generic whole-history aggregates on some public tasks (churn, 0.843 against 0.825; credit default, 0.792 against 0.779), ties or loses on others (age group, retail age group, the bank benchmark), and repeats a feature set that already describes the customer's stable behaviour (0.9205 with it, 0.9245 without). Fraud by takeover shows as a change in one customer's behaviour, which is what the task trained the vector to discard: an inference from the task's definition, not yet a measurement on card fraud.
+</KeyFact>
+
+### Does the order of events matter to this encoder?
+
+A GRU reads events in order, so it can use order. Whether it does depends on whether order helps tell customers apart. The course measured it with the setup of the shortcut run, on a larger cut of 12,000 clients trained for ten minutes (786 batches), with two downstream additions: windowed aggregates (counts, amounts and event-type counts over 30 days, 90 days and all history) into a boosted tree, and the average of the two models' ranks. The run was repeated with each client's events shuffled into random order before slicing and before reading.
+
+| mean ROC-AUC, four products | order kept | order shuffled |
+|---|---|---|
+| windowed aggregates | 0.703 | 0.703 |
+| contrastive vector alone | 0.689 | 0.678 |
+| rank average of the two | 0.713 | 0.707 |
+
+Shuffling costs the vector 0.011. Each column is one training run with one seed, and no interval was computed for that difference itself, so its noise has to be judged indirectly, two ways. The four products disagree: shuffling lowers the vector's ROC-AUC on three of them, by 0.016 to 0.042, and raises it on the fourth by 0.030, so the mean of 0.011 sits inside the spread between products. And the interval computed on this run for the vector's difference from the aggregates with order kept, a 95% client-bootstrap interval, is about 0.05 wide; read as a rough gauge of how far a single run's score can move, it is five times the shuffle effect. On this data, order carries little. Two properties of the data explain it. The dataset's dates were perturbed with noise that keeps only each event's hour, so the order of events within a few days is unreliable. And the task asks "same client?", which, as the divergence check showed, the mix of event types answers on its own. On the card-present stream of <Ref lesson="sequence-models-for-transactions" id="what-survives-that-noise">the sequence lesson</Ref>, where genuine order is constrained, order carried signal for a supervised LSTM; the shuffle test says nothing about such data.
+
+<Conclusion>
+You can now build a training task for a sequence encoder from unlabelled histories: cut random contiguous slices of each customer, after checking with event-type divergences that a customer's slices are closer to each other than to other customers' (0.09 against 0.98 nats here); score pairs with the margin loss, which pulls positives together and pushes negatives only until they are $\rho$ apart, so that the encoder cannot collapse to one point; compute every distance in the batch from one matrix product of unit vectors; and keep, for each slice, the nearest other customers as hard negatives, which beat random ones on every public task measured. You can say why the encoder must be fed dynamic fields only: a static field solves the task by identifying the customer. And you can say what the frozen vector is worth: it describes the customer's stable behaviour, so it beats generic aggregates on some tasks, ties or loses on others, and repeats a strong feature set (0.9205 with it, 0.9245 without).
+
+What stays open is the other family of label-free task. Predicting the next event asks the encoder for what changes, not what stays, but it needs a loss for every field of an event, including an amount with a long tail and a merchant drawn from millions of values. <Ref lesson="generative-pretraining-and-tokenisation" /> turns a transaction into tokens so that such a loss can be written.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+Four slices have unit vectors $a_1 = (1, 0, 0)$, $a_2 = (0.8, 0.6, 0)$ from customer A and $b_1 = (0.6, 0.8, 0)$, $b_2 = (0, 0.6, 0.8)$ from customer B. (a) Compute all six squared distances from dot products, then the six loss terms at $\rho = 0.5$, their sum, and the batch loss of the Definition, their mean. (b) With one hard negative per slice, list the negative pairs that enter the loss and the negative part of the loss averaged over them.
+
+<Solution>
+(a) $d^2 = 2 - 2\, c_u \cdot c_v$. Dot products: $a_1 a_2 = 0.8$, $b_1 b_2 = 0.48$, $a_1 b_1 = 0.6$, $a_1 b_2 = 0$, $a_2 b_1 = 0.48 + 0.48 = 0.96$, $a_2 b_2 = 0.36$. Squared distances: 0.40, 1.04, 0.80, 2.00, 0.08, 1.28; distances 0.632, 1.020, 0.894, 1.414, 0.283, 1.131.
+
+Positive terms: $\tfrac{1}{2}(0.40) = 0.200$ and $\tfrac{1}{2}(1.04) = 0.520$. Negative terms: only $a_2 b_1$ is inside the margin, $\tfrac{1}{2}(0.5 - 0.283)^2 = \tfrac{1}{2}(0.217)^2 = 0.024$; the other three negative terms are 0. Sum of the six terms 0.744; batch loss, the mean over the six pairs, $0.744/6 = 0.124$.
+
+(b) Each slice's nearest slice of the other customer: $a_1 \to b_1$ (0.894 against 1.414), $a_2 \to b_1$ (0.283), $b_1 \to a_2$ (0.283), $b_2 \to a_2$ (1.131 against 1.414). The pairs $a_1 b_1$ and $b_2 a_2$ are beyond the margin and contribute 0; $a_2 b_1$ enters twice, once from each row, with 0.024 each. Mean negative term $(0 + 0.024 + 0.024 + 0)/4 = 0.012$. Averaged over all four negative pairs it would be $0.024/4 = 0.006$: hard selection doubles the weight of the one pair that carries a gradient, and in a batch of 315 negatives per slice the factor is far larger.
+</Solution>
+</Exercise>
+
+<Exercise>
+Unit vectors are at most 2 apart. Describe what the margin loss trains the encoder to do (a) when $\rho \ge 2$ and (b) as $\rho \to 0$. For each, say why the setting defeats the purpose of the margin.
+
+<Solution>
+(a) With $\rho \ge 2$, every negative pair satisfies $d_{uv} \le 2 \le \rho$, so every negative term is $\tfrac{1}{2}(\rho - d_{uv})^2$ and none is ever zero. Its gradient pushes every negative pair apart with strength $\rho - d_{uv}$, at least $\rho - 2$, however far apart the two customers already are. All 50,400 negative pairs of a batch keep pulling on the weights and no pair is ever released. At $\rho = 2$ a confused pair at $d = 0.3$ is still pushed seventeen times harder than a separated one at $d = 1.9$ (1.7 against 0.1), but the ratio $(\rho - 0.3)/(\rho - 1.9)$ falls toward 1 as $\rho$ grows, so a large margin pushes confused and separated pairs almost alike. With large $\rho$ these terms also dominate the 640 positive ones, so slices of one customer are barely pulled together. The margin's job, releasing pairs that are already separated, is gone.
+
+(b) As $\rho \to 0$, $\max(0, \rho - d)^2 \to 0$ for every $d \ge 0$: the negative term vanishes and only the positive term remains, whose minimum is the collapsed encoder with one vector for every slice. For small positive $\rho$ the encoder only has to keep customers a sliver apart, $\rho = 0.05$ is about 3°, so it can satisfy the loss with all customers crowded into a small cap of the sphere, a vector in which a downstream tree finds little room to separate them. The margin sets how far apart distinct customers must be; set to zero, it no longer asks for anything.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague explains the slice sampler: "Random slices work because they multiply the training data: five slices per customer is five times the examples, and longer histories give more slices." Refute it, naming what the slices actually rely on and the measurement that shows it.
+
+<Solution>
+**The count of views is not what was measured to matter.** Random non-contiguous samples and disjoint segments also produce several views per customer from the same events, the same amount of data, and both scored lower than contiguous slices on all four public tasks. Dropout-only views produce as many pairs as one likes from one copy of the history and scored 0.650 on churn, against 0.813 for slices and 0.798 for aggregates.
+
+**Longer histories give fewer slices, not more,** under the sampler as defined above: a draw survives with probability $(\min(M,T) - m + 1)/T$, so a 2,000-event history yields 0.1 slices from five draws. With the fix of the in-chapter exercise, drawing the length from $[m, \min(M, T)]$ directly, every history long enough gives exactly $K$ slices, so the count does not grow with the history there either.
+
+**What slices rely on** is that a customer's behaviour repeats: two stretches of one history share a distribution that stretches of two histories do not. The divergence check measures it, 0.09 against 0.98 nats between event-type histograms, with no gap at all once the client is shuffled out of the data. On data without that property, slices would multiply examples and teach nothing.
+</Solution>
+</Exercise>
+
+<Exercise>
+A batch holds $N$ customers with $K$ slices each. (a) Derive the numbers of positive and negative pairs and their ratio, and evaluate for $N = 64$, $K = 5$. (b) Suppose that at some point in training a fraction $q$ of all negative pairs is inside the margin, the rest beyond it. Compare two schemes that each put $k$ negatives per slice into the loss: $k$ drawn at random, and the $k$ hardest. How many non-zero negative terms does each give per batch, and how many batches does the random scheme need to supply as many as one batch of hard negatives? Evaluate for $q = 0.02$, $k = 5$. (c) What assumption does (b) make about the hard negatives?
+
+<Solution>
+(a) Positive pairs: within each customer, $\binom{K}{2} = K(K-1)/2$ pairs, so $N K (K-1)/2$. Negative pairs: each pair of customers, $\binom{N}{2}$ of them, gives $K \times K$ slice pairs, so $K^2 N(N-1)/2$. Ratio of negatives to positives $K(N-1)/(K-1)$. For $N = 64$, $K = 5$: 640 positives, 50,400 negatives, ratio 78.75.
+
+(b) Random: each of the $NK$ slices draws $k$ negatives, each inside the margin with probability $q$, so the expected number of non-zero terms is $NK k q$; with $NK = 320$, $k = 5$, $q = 0.02$: 32 per batch. Hard: each slice has $K(N-1) = 315$ negatives, of which about $315 q \approx 6.3$ are inside the margin; the $k = 5$ nearest are those, so all $NK k = 1{,}600$ terms are non-zero. The random scheme needs $1/q = 50$ batches to supply as many non-zero negative terms as one batch of hard negatives.
+
+(c) That each slice has at least $k$ negatives inside the margin, $K(N-1)q \ge k$. When it has fewer, the hardest $k$ include pairs beyond the margin, which contribute zero, and the advantage shrinks to $K(N-1)q/(kq) = K(N-1)/k$ per slice. Near the end of training, when few negatives remain inside the margin, a larger batch $N$ is what keeps hard negatives supplied.
+</Solution>
+</Exercise>
+
+<Exercise>
+A team pretraining a contrastive encoder on card histories wants to add two customer fields to every event: a segment code with 12 values and a region with 80 values, all combinations equally frequent. (a) In a batch of 64 customers, how many of the 2,016 customer pairs can the combination of the two fields not separate, on average? (b) Describe what the training loss and the downstream score will show compared with a run without the two fields. (c) Design the check that proves the encoder used them, and state the result that would prove it. (d) The downstream task is churn, and region does predict churn. Where should region go?
+
+<Solution>
+(a) The combination has $12 \times 80 = 960$ values, so two customers share it with probability $1/960$: on average $2{,}016/960 \approx 2.1$ pairs of customers in the batch are not separated, and about 99.9% are.
+
+(b) The training loss falls much faster and to a far lower level than in the dynamic-only run, because the encoder can satisfy almost every negative pair by mapping each of the 960 combinations to its own direction. Downstream, the vector carries mostly the combination; the score falls toward what segment and region alone give, below the dynamic-only vector, because the behaviour the task was meant to teach received almost no gradient.
+
+(c) Train the encoder with the fields. On held-out batches compute the loss three times: as is; with a random combination drawn for each slice, so that two slices of one customer no longer share it; and with one combination for every customer. If the encoder reads the fields, the second puts its positive pairs far apart and the third puts its negative pairs together, and both raise the loss far above the trained level; the run in the lesson went from 0.004 to 0.281 and 0.104. A dynamic-only encoder's loss is unchanged by either, since it never reads the fields. Shuffling the combinations between customers, one per customer, would not test anything: every customer would still carry one value on all its slices.
+
+(d) Into the downstream model, as a column beside the frozen vector. The downstream model is trained on churn labels, so it can weigh region against them; the encoder's task cannot use region except as a shortcut.
+</Solution>
+</Exercise>
+
+<Exercise>
+<Ref lesson="sequence-models-for-transactions" id="what-survives-that-noise">The sequence lesson</Ref> found that an LSTM on raw fields gained over a forest on card-present payments (AUCPR 0.138 to 0.200) and not on e-commerce payments (0.179 against 0.180), and attributed the card-present gain to history and order together. (a) If you ran this lesson's shuffled-order experiment on contrastive encoders trained on each stream, which would you expect to move more, and why? (b) Why might even that stream move little under a contrastive task? (c) What does the date noise of the public bank data do to the question, and what would you change to ask it properly?
+
+<Solution>
+(a) The card-present stream. Genuine card-present order is constrained by where the cardholder physically is, so the order of events carries information about the customer, and an encoder that reads it can use it; online, genuine order already jumps between merchants, so there is less to lose by shuffling.
+
+(b) The contrastive task rewards only what tells customers apart. If two card-present customers differ mostly in which merchants and amounts they use, a bag of events answers "same customer?" as well as a sequence does, and the encoder has no reason to rely on order even where order exists. The LSTM's gain was for a fraud label, which rewards a break in order; the contrastive task does not ask about breaks. Order would matter to it only if customers differed in their order patterns, and the shuffle test measures exactly that.
+
+(c) Noise that keeps only each event's hour moves events across days, so the recorded order of events a few days apart is partly random: a shuffle then destroys an order that was already damaged, and a small effect can be the data's, not the method's. To ask the question properly, use a stream whose timestamps are exact, such as the simulator with a planted order-dependent scenario or a bank's own log, run the shuffle within and across days separately, and repeat over seeds so that the difference is read against a spread.
+</Solution>
+</Exercise>
+
+<Exercise>
+Replace the contrastive loss with a next-event task on the same GRU: from the state after event $t$, predict event $t + 1$. (a) Write the loss for the event type, which takes 52 values in the cut used for the divergence check. (b) Write a loss for the amount. What goes wrong if the next amount is either a card payment of around 30 or a transfer of around 2,000? (c) What change to the amount field would let one kind of loss serve every field?
+
+<Solution>
+(a) A layer from the state to 52 scores, a softmax, and the cross-entropy $-\ln \hat p(\text{type}_{t+1})$: the same loss as the fraud network's, with 52 classes instead of 2.
+
+(b) The amount is a number with a long tail, not a class, so cross-entropy does not apply. The usual substitute is a squared error on the log amount, $(\widehat{\ln a} - \ln a_{t+1})^2$. Its best answer is the mean of the log amount given the state: if the next event is a card payment of about 30 with probability 0.6 and a transfer of about 2,000 with 0.4, the prediction is $\exp(0.6 \ln 30 + 0.4 \ln 2000) \approx 160$, an amount neither kind of event takes. The squared error also lives on a different scale from the cross-entropies and has to be weighted against them by hand.
+
+(c) Cut the amount into bins (quantiles of the amount, say, with a separate bin for zero) and predict the bin as a class, with the same cross-entropy as the type. A two-peaked next amount then becomes two likely bins. Turning every field of a transaction into tokens of a vocabulary this way, and choosing the bins, is the subject of <Ref lesson="generative-pretraining-and-tokenisation" />.
+</Solution>
+</Exercise>
+
+<References>
+1. D. Babaev, N. Ovsov, I. Kireev, M. Ivanova, G. Gusev, I. Nazarov, A. Tuzhilin, "CoLES: Contrastive Learning for Event Sequences with Self-Supervision," *Proceedings of SIGMOD 2022* (arXiv:2002.08232) — Sec. 3.1 (one observed sequence per entity, no ready-made positive pairs), Sec. 3.2 and Algorithm 1 (random slices), Sec. 3.3 (batches of N × K slices, the margin loss with ρ, unit-norm embeddings and $d^2 = 2 - 2c_u \cdot c_v$, negative sampling), Sec. 3.4 (event encoder and GRU with learnt initial state), Sec. 4.0.2 and Fig. 2 (the KL repeatability check and the text-post control), Sec. 4.0.4 (64 × 5 slices, about 28,800 events, 142 ms per batch), Tables 2–5 (slices against other samplers, encoder types, losses, negative sampling), Table 6 (frozen embeddings against designed features), Sec. 4.3.1 (incremental recalculation with a recurrent encoder, 4-bit quantisation to 128 bytes). Code: https://github.com/dllllb/coles-paper
+2. D. Butvinik, Y. Marcus, N. Tal, G. Azoulay, "Temporal Contrastive Transformer for Financial Crime Detection: Self-Supervised Sequence Embeddings via Predictive Contrastive Coding," arXiv:2605.21490, 2026, industry preprint — Sec. 3.3 and 6.3 (static features introduce shortcut signals; dynamic features only), Sec. 3.4 (predictive contrastive coding with in-batch negatives), Sec. 4.1–4.3 (business payment data, chronological split, 30 engineered features), Table 1 (0.9245 / 0.9205 / 0.8644, one split), Sec. 6.2 (the embedding recovers what the aggregates hold).
+3. P. Skalski, D. Sutton, S. Burrell, I. Perez, J. Wong, "Towards a Foundation Purchasing Model: Pretrained Generative Autoregression on Transaction Sequences," ICAIF '23 workshop (arXiv:2401.01641) — Sec. 4.1–4.3 and Table 2 (dropout-only contrastive views, hand-engineered features and slices on the churn task), Sec. 4.4.3 and Table 4 (averaging states barely changes contrastive embeddings).
+4. A. Sakhno, I. Kireev, D. Babaev, M. Savchenko, G. Gusev, A. Savchenko, "PyTorch-Lifestream: Learning Embeddings on Discrete Event Sequences," *IJCAI-25 Demonstrations Track*, pp. 11104–11108 — the reference implementation of slice sampling, the margin loss and hard-negative selection, and Table 1. Library and documentation: https://github.com/pytorch-lifestream/pytorch-lifestream
+5. D. Mollaev, I. Kireev, M. Postnova et al., "Multimodal Banking Dataset: Understanding Client Needs through Event Sequences," arXiv:2409.17587, 2024 — Sec. 3.3 (noise on amounts and dates keeping the hour), the 100,000-client cut used for the divergence check and the order experiment. Dataset under CC BY 4.0: https://huggingface.co/datasets/ai-lab/MBD
+6. R. Hadsell, S. Chopra, Y. LeCun, "Dimensionality Reduction by Learning an Invariant Mapping," *CVPR 2006* — the margin form of the contrastive loss and the collapse it prevents.
+7. K. Cho, B. van Merriënboer, C. Gulcehre et al., "Learning Phrase Representations using RNN Encoder–Decoder for Statistical Machine Translation," *EMNLP 2014* — the hidden unit with reset and update gates (the GRU).
+</References>

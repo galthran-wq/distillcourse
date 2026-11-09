@@ -1,0 +1,516 @@
+checkpoints:
+  slice-sampler:
+    kind: exact
+    seed: 101
+    atol: 0.5
+    inputs_code: |
+      # Histories shorter than, equal to and longer than max_len, and one of exactly min_len.
+      inputs = ([40, 64, 65, 200, 15, 1000], 5, 15, 64, 2024)
+    wrong:
+      - hint: "An over-long length is clipped to the history's length instead of being drawn from the lengths that fit, so draws pile up on the longest slice."
+        code: |
+          def f(ns, k, min_len, max_len, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              out = []
+              for n in ns:
+                  for _ in range(k):
+                      length = min(int(rng.integers(min_len, max_len + 1)), n)
+                      start = int(rng.integers(0, n - length + 1))
+                      out.append((start, length))
+              return np.array(out)
+      - hint: "The start is drawn from the whole history, so a slice can run past its last event."
+        code: |
+          def f(ns, k, min_len, max_len, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              out = []
+              for n in ns:
+                  for _ in range(k):
+                      length = int(rng.integers(min_len, min(max_len, n) + 1))
+                      start = int(rng.integers(0, n))
+                      out.append((start, length))
+              return np.array(out)
+
+  coles-loss:
+    kind: exact
+    seed: 202
+    atol: 1.0e-6
+    inputs_code: |
+      # Four clients, two slices each, rows of unequal length; the clients share
+      # a common direction, so some negative pairs fall inside the margin.
+      common = rng.normal(size=16)
+      centres = common + 0.7 * rng.normal(size=(4, 16))
+      z = np.repeat(centres, 2, axis=0) + 0.35 * rng.normal(size=(8, 16))
+      z = z * rng.uniform(0.5, 2.0, size=(8, 1))
+      inputs = (z, np.repeat(np.arange(4), 2), 0.8)
+    wrong:
+      - hint: "Each row is paired with itself: the diagonal entered the positive pairs."
+        code: |
+          def f(z, client_ids, margin):
+              import torch
+              import torch.nn.functional as F
+              z = F.normalize(torch.tensor(z), dim=1)
+              ids = torch.tensor(client_ids)
+              d2 = (2 - 2 * z @ z.T).clamp(min=1e-12)
+              same = ids[:, None] == ids[None, :]
+              neg = 0.5 * (margin - d2.sqrt()[~same]).clamp(min=0) ** 2
+              return torch.cat([0.5 * d2[same], neg]).mean().item()
+      - hint: "The negative term has no clamp at zero: pairs beyond the margin are pulled back towards it."
+        code: |
+          def f(z, client_ids, margin):
+              import torch
+              import torch.nn.functional as F
+              z = F.normalize(torch.tensor(z), dim=1)
+              ids = torch.tensor(client_ids)
+              d2 = (2 - 2 * z @ z.T).clamp(min=1e-12)
+              same = ids[:, None] == ids[None, :]
+              off = ~torch.eye(len(z), dtype=torch.bool)
+              neg = 0.5 * (margin - d2.sqrt()[~same]) ** 2
+              return torch.cat([0.5 * d2[same & off], neg]).mean().item()
+      - hint: "The rows were not normalised: 2 - 2 u.v is the squared distance only between unit vectors."
+        code: |
+          def f(z, client_ids, margin):
+              import torch
+              z = torch.tensor(z)
+              ids = torch.tensor(client_ids)
+              d2 = (2 - 2 * z @ z.T).clamp(min=1e-12)
+              same = ids[:, None] == ids[None, :]
+              off = ~torch.eye(len(z), dtype=torch.bool)
+              neg = 0.5 * (margin - d2.sqrt()[~same]).clamp(min=0) ** 2
+              return torch.cat([0.5 * d2[same & off], neg]).mean().item()
+
+  hard-negatives:
+    kind: exact
+    seed: 303
+    atol: 1.0e-6
+    inputs_code: |
+      # Four clients, two slices each, as for the loss; three hard negatives per row.
+      common = rng.normal(size=16)
+      centres = common + 0.7 * rng.normal(size=(4, 16))
+      z = np.repeat(centres, 2, axis=0) + 0.35 * rng.normal(size=(8, 16))
+      z = z * rng.uniform(0.5, 2.0, size=(8, 1))
+      inputs = (z, np.repeat(np.arange(4), 2), 0.8, 3)
+    wrong:
+      - hint: "Only the row itself is excluded, so a slice of the same client can be picked as a hard negative."
+        code: |
+          def f(z, client_ids, margin, n_hard):
+              import torch
+              import torch.nn.functional as F
+              u = F.normalize(torch.tensor(z), dim=1)
+              ids = torch.tensor(client_ids)
+              d2 = (2 - 2 * u @ u.T).clamp(min=1e-12)
+              d = d2.sqrt()
+              same = ids[:, None] == ids[None, :]
+              off = ~torch.eye(len(u), dtype=torch.bool)
+              idx = torch.cdist(u, u).masked_fill(~off, float("inf")).topk(n_hard, dim=1, largest=False).indices
+              neg = 0.5 * (margin - d.gather(1, idx)).clamp(min=0) ** 2
+              return idx.numpy().astype(float), torch.cat([0.5 * d2[same & off], neg.reshape(-1)]).mean().item()
+      - hint: "The farthest other-client slices were taken instead of the nearest: they sit beyond the margin and carry no gradient."
+        code: |
+          def f(z, client_ids, margin, n_hard):
+              import torch
+              import torch.nn.functional as F
+              u = F.normalize(torch.tensor(z), dim=1)
+              ids = torch.tensor(client_ids)
+              d2 = (2 - 2 * u @ u.T).clamp(min=1e-12)
+              d = d2.sqrt()
+              same = ids[:, None] == ids[None, :]
+              off = ~torch.eye(len(u), dtype=torch.bool)
+              idx = torch.cdist(u, u).masked_fill(same, -1.0).topk(n_hard, dim=1, largest=True).indices
+              neg = 0.5 * (margin - d.gather(1, idx)).clamp(min=0) ** 2
+              return idx.numpy().astype(float), torch.cat([0.5 * d2[same & off], neg.reshape(-1)]).mean().item()
+
+  slice-encoder:
+    kind: exact
+    seed: 404
+    atol: 1.0e-6
+    inputs_code: |
+      # Five sequences of unequal length, unsorted, one of a single event; a GRU of 6 units.
+      vocab = {"event_type": 5, "src_type11": 4, "dst_type11": 6, "dst_type12": 9}
+      batch = []
+      for L in [7, 3, 11, 1, 5]:
+          cats = {k: rng.integers(0, n, L) for k, n in vocab.items()}
+          batch.append((rng.normal(size=(L, 2)), cats))
+      inputs = (3, vocab, 6, batch)
+    wrong:
+      - hint: "The batch was padded and run without packing: a short sequence's final state is its state after the padding."
+        code: |
+          def f(seed, vocab, hidden, batch):
+              import torch
+              import torch.nn.functional as F
+              from torch import nn
+              torch.set_default_dtype(torch.float64)
+              try:
+                  torch.manual_seed(seed)
+                  emb = nn.ModuleDict({k: nn.Embedding(n, min(32, 4 + int(n ** 0.5))) for k, n in vocab.items()})
+                  gru = nn.GRU(2 + sum(e.embedding_dim for e in emb.values()), hidden, batch_first=True)
+                  with torch.no_grad():
+                      x = [torch.cat([torch.tensor(num)] + [emb[k](torch.as_tensor(c[k])) for k in emb], dim=1) for num, c in batch]
+                      _, h = gru(nn.utils.rnn.pad_sequence(x, batch_first=True))
+                      return F.normalize(h[-1], dim=1).numpy()
+              finally:
+                  torch.set_default_dtype(torch.float32)
+      - hint: "The mean of the states was returned instead of the state after the last event."
+        code: |
+          def f(seed, vocab, hidden, batch):
+              import torch
+              import torch.nn.functional as F
+              from torch import nn
+              torch.set_default_dtype(torch.float64)
+              try:
+                  torch.manual_seed(seed)
+                  emb = nn.ModuleDict({k: nn.Embedding(n, min(32, 4 + int(n ** 0.5))) for k, n in vocab.items()})
+                  gru = nn.GRU(2 + sum(e.embedding_dim for e in emb.values()), hidden, batch_first=True)
+                  with torch.no_grad():
+                      x = [torch.cat([torch.tensor(num)] + [emb[k](torch.as_tensor(c[k])) for k in emb], dim=1) for num, c in batch]
+                      out, _ = gru(nn.utils.rnn.pack_sequence(x, enforce_sorted=False))
+                      S, L = nn.utils.rnn.pad_packed_sequence(out, batch_first=True)
+                      return F.normalize(S.sum(1) / L[:, None], dim=1).numpy()
+              finally:
+                  torch.set_default_dtype(torch.float32)
+      - hint: "The final state was not set to unit length."
+        code: |
+          def f(seed, vocab, hidden, batch):
+              import torch
+              from torch import nn
+              torch.set_default_dtype(torch.float64)
+              try:
+                  torch.manual_seed(seed)
+                  emb = nn.ModuleDict({k: nn.Embedding(n, min(32, 4 + int(n ** 0.5))) for k, n in vocab.items()})
+                  gru = nn.GRU(2 + sum(e.embedding_dim for e in emb.values()), hidden, batch_first=True)
+                  with torch.no_grad():
+                      x = [torch.cat([torch.tensor(num)] + [emb[k](torch.as_tensor(c[k])) for k in emb], dim=1) for num, c in batch]
+                      _, h = gru(nn.utils.rnn.pack_sequence(x, enforce_sorted=False))
+                      return h[-1].numpy()
+              finally:
+                  torch.set_default_dtype(torch.float32)
+
+  embed-at-cuts:
+    kind: exact
+    seed: 505
+    atol: 1.0e-6
+    inputs_code: |
+      # Six clients, three cuts each: before every event, exactly at an event,
+      # after the last; one client has a single event. A GRU of 3 units.
+      vocab = {"event_type": 5, "src_type11": 4, "dst_type11": 6, "dst_type12": 9}
+      T0 = 1640995200
+      seqs, cuts = [], []
+      for n in [6, 12, 1, 9, 20, 4]:
+          t = T0 + np.cumsum(rng.integers(600, 4 * 86400, n))
+          seq = {"t": t, "amount": np.round(rng.lognormal(8, 2, n), 2)}
+          for k, m in vocab.items():
+              seq[k] = rng.integers(0, m, n)
+          seqs.append(seq)
+          cuts.append(np.array([t[0] - 3600, t[n // 2], t[-1] + 86400]))
+      inputs = (5, vocab, 3, seqs, cuts, (8.0, 2.0))
+    wrong:
+      - hint: "searchsorted(side='right') counts an event stamped exactly at the cut as before it: that event belongs to the month being predicted."
+        code: |
+          def f(seed, vocab, hidden, seqs, cuts, scale):
+              import numpy as np
+              import torch
+              import torch.nn.functional as F
+              from torch import nn
+              torch.set_default_dtype(torch.float64)
+              try:
+                  torch.manual_seed(seed)
+                  emb = nn.ModuleDict({k: nn.Embedding(n, min(32, 4 + int(n ** 0.5))) for k, n in vocab.items()})
+                  gru = nn.GRU(2 + sum(e.embedding_dim for e in emb.values()), hidden, batch_first=True)
+                  out = []
+                  with torch.no_grad():
+                      for s, c in zip(seqs, cuts):
+                          t = s["t"]
+                          gap = np.diff(t, prepend=t[:1])
+                          num = torch.tensor(np.stack([(np.log1p(s["amount"]) - scale[0]) / scale[1], np.log1p(gap / 3600) / 4], 1))
+                          x = torch.cat([num] + [emb[k](torch.as_tensor(s[k])) for k in emb], 1)
+                          S = F.normalize(gru(x[None])[0][0], dim=1).numpy()
+                          n = np.searchsorted(t, c, side="right")
+                          r = S[np.maximum(n - 1, 0)].copy()
+                          r[n == 0] = 0
+                          out.append(r)
+                  return np.concatenate(out)
+              finally:
+                  torch.set_default_dtype(torch.float32)
+      - hint: "The state read is the one after the first event at or after the cut, not the last one before it: the row sees an event of the month it predicts."
+        code: |
+          def f(seed, vocab, hidden, seqs, cuts, scale):
+              import numpy as np
+              import torch
+              import torch.nn.functional as F
+              from torch import nn
+              torch.set_default_dtype(torch.float64)
+              try:
+                  torch.manual_seed(seed)
+                  emb = nn.ModuleDict({k: nn.Embedding(n, min(32, 4 + int(n ** 0.5))) for k, n in vocab.items()})
+                  gru = nn.GRU(2 + sum(e.embedding_dim for e in emb.values()), hidden, batch_first=True)
+                  out = []
+                  with torch.no_grad():
+                      for s, c in zip(seqs, cuts):
+                          t = s["t"]
+                          gap = np.diff(t, prepend=t[:1])
+                          num = torch.tensor(np.stack([(np.log1p(s["amount"]) - scale[0]) / scale[1], np.log1p(gap / 3600) / 4], 1))
+                          x = torch.cat([num] + [emb[k](torch.as_tensor(s[k])) for k in emb], 1)
+                          S = F.normalize(gru(x[None])[0][0], dim=1).numpy()
+                          n = np.searchsorted(t, c, side="left")
+                          out.append(S[np.minimum(n, len(t) - 1)])
+                  return np.concatenate(out)
+              finally:
+                  torch.set_default_dtype(torch.float32)
+
+  window-aggregates:
+    kind: exact
+    seed: 606
+    atol: 1.0e-6
+    inputs_code: |
+      # Fourteen events over 120 days; cuts before every event, exactly at an event, after the last.
+      T0 = 1640995200
+      t = np.sort(T0 + rng.integers(0, 120 * 86400, 14))
+      seq = {"t": t, "amount": np.round(rng.lognormal(7, 1.5, 14), 2), "event_type": rng.integers(1, 5, 14),
+             "src_type11": rng.integers(1, 4, 14), "dst_type11": rng.integers(1, 4, 14),
+             "dst_type12": rng.integers(1, 7, 14)}
+      cuts = np.array([T0 - 86400, t[9], T0 + 121 * 86400])
+      inputs = (seq, cuts, (30, 90, 10000), [2, 1, 3], [1, 3])
+    wrong:
+      - hint: "searchsorted(side='right') at the cut lets an event stamped exactly at the cut into the window."
+        code: |
+          def f(seq, cuts, windows, top_types, top_src):
+              import numpy as np
+              t, la = seq["t"], np.log1p(seq["amount"])
+              it = (seq["event_type"][:, None] == np.asarray(top_types)[None, :]).astype(float)
+              isr = (seq["src_type11"][:, None] == np.asarray(top_src)[None, :]).astype(float)
+              V = np.column_stack([np.ones(len(t)), la, la ** 2, it, it * la[:, None], isr])
+              P = np.vstack([np.zeros(V.shape[1]), np.cumsum(V, axis=0)])
+              hi = np.searchsorted(t, cuts, side="right")
+              out, k = [], len(top_types)
+              for w in windows:
+                  lo = np.searchsorted(t, cuts - w * 86400, side="left")
+                  S = P[hi] - P[lo]
+                  n = S[:, 0]
+                  mean = S[:, 1] / np.maximum(n, 1)
+                  var = np.maximum(S[:, 2] / np.maximum(n, 1) - mean ** 2, 0.0)
+                  dist = np.array([len(np.unique(seq["dst_type12"][a:b])) for a, b in zip(lo, hi)], float)
+                  out += [n[:, None], mean[:, None], var[:, None], dist[:, None], S[:, 3:3 + k], S[:, 3 + k:3 + 2 * k], S[:, 3 + 2 * k:]]
+              last = np.where(hi > 0, (cuts - t[np.maximum(hi - 1, 0)]) / 86400, 9999.0)
+              return np.column_stack(out + [last[:, None]])
+      - hint: "The prefix array has no leading zero row, and indexing it with hi - 1 and lo - 1 wraps to the last row when lo or hi is 0."
+        code: |
+          def f(seq, cuts, windows, top_types, top_src):
+              import numpy as np
+              t, la = seq["t"], np.log1p(seq["amount"])
+              it = (seq["event_type"][:, None] == np.asarray(top_types)[None, :]).astype(float)
+              isr = (seq["src_type11"][:, None] == np.asarray(top_src)[None, :]).astype(float)
+              V = np.column_stack([np.ones(len(t)), la, la ** 2, it, it * la[:, None], isr])
+              P = np.cumsum(V, axis=0)
+              hi = np.searchsorted(t, cuts, side="left")
+              out, k = [], len(top_types)
+              for w in windows:
+                  lo = np.searchsorted(t, cuts - w * 86400, side="left")
+                  S = P[hi - 1] - P[lo - 1]
+                  n = S[:, 0]
+                  mean = S[:, 1] / np.maximum(n, 1)
+                  var = np.maximum(S[:, 2] / np.maximum(n, 1) - mean ** 2, 0.0)
+                  dist = np.array([len(np.unique(seq["dst_type12"][a:b])) for a, b in zip(lo, hi)], float)
+                  out += [n[:, None], mean[:, None], var[:, None], dist[:, None], S[:, 3:3 + k], S[:, 3 + k:3 + 2 * k], S[:, 3 + 2 * k:]]
+              last = np.where(hi > 0, (cuts - t[np.maximum(hi - 1, 0)]) / 86400, 9999.0)
+              return np.column_stack(out + [last[:, None]])
+
+  paired-client-bootstrap:
+    kind: exact
+    seed: 707
+    atol: 1.0e-9
+    inputs_code: |
+      # 40 clients with three rows each, in shuffled row order; two targets; model b less noisy than a.
+      client_ids = rng.permutation(np.repeat(np.arange(100, 140), 3))
+      signal = rng.normal(size=(120, 2))
+      y = (signal + rng.normal(size=(120, 2)) > 1.2).astype(int)
+      a = signal + 1.5 * rng.normal(size=(120, 2))
+      b = signal + 1.0 * rng.normal(size=(120, 2))
+      inputs = (y, a, b, client_ids, 300, 7)
+    wrong:
+      - hint: "Rows were resampled instead of clients: a client's rows are not independent, and the interval comes out too narrow."
+        code: |
+          def f(y, score_a, score_b, client_ids, n_boot, seed):
+              import numpy as np
+              from sklearn.metrics import roc_auc_score
+              rng = np.random.default_rng(seed)
+              stats = []
+              for _ in range(n_boot):
+                  rows = rng.integers(0, len(y), len(y))
+                  d = [roc_auc_score(y[rows, j], score_b[rows, j]) - roc_auc_score(y[rows, j], score_a[rows, j])
+                       for j in range(y.shape[1]) if y[rows, j].min() != y[rows, j].max()]
+                  stats.append(np.mean(d))
+              return np.percentile(stats, [2.5, 97.5])
+      - hint: "Each model's interval was taken separately and the ends subtracted; the statistic must be the difference on the same draw."
+        code: |
+          def f(y, score_a, score_b, client_ids, n_boot, seed):
+              import numpy as np
+              from sklearn.metrics import roc_auc_score
+              rng = np.random.default_rng(seed)
+              _, inv = np.unique(client_ids, return_inverse=True)
+              members = [np.flatnonzero(inv == c) for c in range(inv.max() + 1)]
+              sa, sb = [], []
+              for _ in range(n_boot):
+                  rows = np.concatenate([members[c] for c in rng.integers(0, len(members), len(members))])
+                  keep = [j for j in range(y.shape[1]) if y[rows, j].min() != y[rows, j].max()]
+                  sa.append(np.mean([roc_auc_score(y[rows, j], score_a[rows, j]) for j in keep]))
+                  sb.append(np.mean([roc_auc_score(y[rows, j], score_b[rows, j]) for j in keep]))
+              return np.percentile(sb, [2.5, 97.5]) - np.percentile(sa, [2.5, 97.5])
+
+  pretraining-set:
+    kind: exact
+    seed: 808
+    atol: 0.5
+    inputs_code: |
+      # Twelve clients in five folds; client 3 has an event exactly at the pretraining end.
+      END = 1659312000
+      times = [np.sort(END + rng.integers(-60 * 86400, 30 * 86400, int(rng.integers(0, 30)))) for _ in range(12)]
+      times[3] = END + np.arange(-8, 3) * 86400
+      inputs = (times, np.arange(12) % 5, (0, 1), END, 5)
+    wrong:
+      - hint: "Clients of the evaluation and graded folds were kept: the encoder would have read the clients it is judged on."
+        code: |
+          def f(times, folds, test_folds, pretrain_end, min_events):
+              import numpy as np
+              n = np.array([np.searchsorted(t, pretrain_end, side="left") for t in times])
+              n[n < min_events] = 0
+              return n
+      - hint: "Events after the pretraining end were counted: the encoder would read the months it is evaluated on."
+        code: |
+          def f(times, folds, test_folds, pretrain_end, min_events):
+              import numpy as np
+              n = np.array([len(t) for t in times])
+              n[np.isin(folds, test_folds) | (n < min_events)] = 0
+              return n
+      - hint: "An event stamped exactly at the pretraining end was counted as before it."
+        code: |
+          def f(times, folds, test_folds, pretrain_end, min_events):
+              import numpy as np
+              n = np.array([np.searchsorted(t, pretrain_end, side="right") for t in times])
+              n[np.isin(folds, test_folds) | (n < min_events)] = 0
+              return n
+
+  pretrain-and-embed:
+    kind: exact
+    seed: 909
+    atol: 1.0e-5
+    inputs_code: |
+      # 24 short histories, three of them unusable; 12 steps of a 4-unit encoder,
+      # then the embeddings of four clients at three cuts each.
+      vocab = {"event_type": 5, "src_type11": 4, "dst_type11": 6, "dst_type12": 9}
+      T0 = 1640995200
+      seqs = []
+      for _ in range(24):
+          n = int(rng.integers(20, 50))
+          seq = {"t": T0 + np.cumsum(rng.integers(600, 3 * 86400, n)), "amount": np.round(rng.lognormal(8, 2, n), 2)}
+          for k, m in vocab.items():
+              seq[k] = rng.integers(0, m, n)
+          seqs.append(seq)
+      n_usable = np.array([len(s["t"]) - int(rng.integers(0, 10)) for s in seqs])
+      n_usable[[2, 7, 13]] = 0
+      hyper = {"batch_clients": 6, "k": 2, "min_len": 5, "max_len": 12, "margin": 0.8, "n_hard": 2, "lr": 0.01}
+      query = [0, 5, 9, 17]
+      cuts = [seqs[q]["t"][[3, 10, 19]] for q in query]
+      inputs = (7, vocab, 4, seqs, n_usable, 12, (8.0, 2.0), hyper, query, cuts)
+    wrong:
+      - hint: "The gradients were never cleared: each step's update carries every earlier step's gradient too."
+        code: |
+          def f(seed, vocab, hidden, seqs, n_usable, n_steps, scale, hyper, query, cuts):
+              import numpy as np
+              import torch
+              import torch.nn.functional as F
+              from torch import nn
+              def feat(s, idx):
+                  t = s["t"][idx]
+                  gap = np.diff(t, prepend=t[:1])
+                  num = np.stack([(np.log1p(s["amount"][idx]) - scale[0]) / scale[1], np.log1p(gap / 3600) / 4], 1)
+                  return torch.tensor(num), {k: torch.as_tensor(s[k][idx]) for k in vocab}
+              torch.set_default_dtype(torch.float64)
+              try:
+                  torch.manual_seed(seed)
+                  emb = nn.ModuleDict({k: nn.Embedding(n, min(32, 4 + int(n ** 0.5))) for k, n in vocab.items()})
+                  gru = nn.GRU(2 + sum(e.embedding_dim for e in emb.values()), hidden, batch_first=True)
+                  def enc(batch):
+                      x = [torch.cat([num] + [emb[k](c[k]) for k in emb], 1) for num, c in batch]
+                      out, h = gru(nn.utils.rnn.pack_sequence(x, enforce_sorted=False))
+                      return F.normalize(h[-1], dim=1), out
+                  rng = np.random.default_rng(seed)
+                  params = list(emb.parameters()) + list(gru.parameters())
+                  opt = torch.optim.Adam(params, lr=hyper["lr"])
+                  pool = np.flatnonzero(n_usable)
+                  losses = []
+                  for _ in range(n_steps):
+                      batch, ids = [], []
+                      for j, c in enumerate(rng.choice(pool, hyper["batch_clients"], replace=False)):
+                          n = int(n_usable[c])
+                          for _ in range(hyper["k"]):
+                              L = int(rng.integers(hyper["min_len"], min(hyper["max_len"], n) + 1))
+                              st = int(rng.integers(0, n - L + 1))
+                              batch.append(feat(seqs[c], np.arange(st, st + L)))
+                              ids.append(j)
+                      z, _ = enc(batch)
+                      ids = torch.tensor(ids)
+                      d2 = (2 - 2 * z @ z.T).clamp(min=1e-12)
+                      d = d2.sqrt()
+                      same = ids[:, None] == ids[None, :]
+                      off = ~torch.eye(len(z), dtype=torch.bool)
+                      idx = d.detach().masked_fill(same, float("inf")).topk(hyper["n_hard"], dim=1, largest=False).indices
+                      neg = 0.5 * (hyper["margin"] - d.gather(1, idx)).clamp(min=0) ** 2
+                      loss = torch.cat([0.5 * d2[same & off], neg.reshape(-1)]).mean()
+                      loss.backward()
+                      opt.step()
+                      losses.append(loss.item())
+                  rows = []
+                  with torch.no_grad():
+                      for q, c in zip(query, cuts):
+                          s = seqs[q]
+                          _, out = enc([feat(s, np.arange(len(s["t"])))])
+                          S = F.normalize(nn.utils.rnn.pad_packed_sequence(out, batch_first=True)[0][0], dim=1).numpy()
+                          n = np.searchsorted(s["t"], c, side="left")
+                          r = S[np.maximum(n - 1, 0)].copy()
+                          r[n == 0] = 0
+                          rows.append(r)
+                  return np.asarray(losses), np.concatenate(rows)
+              finally:
+                  torch.set_default_dtype(torch.float32)
+
+  what-the-interval-licenses:
+    kind: review
+    rubric: |
+      The learner read three label budgets (all, 10%, 3% of training clients),
+      each with two 95% client-bootstrap intervals of a difference in mean
+      ROC-AUC (embedding minus aggregates, rank average minus aggregates), and
+      a point-in-time trap that moved the embedding's score.
+      Pass when the answer does all of the following:
+      (a) reads each interval against zero: an interval containing zero
+          licenses neither "better" nor "worse"; one clear of zero licenses
+          the reading for those clients and months. Numbers may be the
+          learner's own; judge the reading, not the values. In the reference
+          run both intervals span zero at all labels and are clear of zero at
+          10% and 3%.
+      (b) treats "pretraining pays when labels are scarce" as a pattern across
+          budgets, not as a single interval;
+      (c) names at least two sources of variation or selection the client
+          bootstrap does not cover: one pretraining seed, one draw of the
+          labelled clients, fixed model settings, the over-sampled buyers
+          (half the clients against about a fifth naturally), several
+          comparisons at once, the particular months;
+      (d) refuses the fraud reading (the data has no fraud label) and the
+          comparison with the published 0.78-0.82 (different cut and mix);
+      (e) says the trap would have inflated the embedding's score and so the
+          embedding-minus-aggregates difference.
+      Fail an answer that declares "the embedding wins" or "the fusion wins"
+      at full labels without reference to an interval, or that reads
+      overlapping per-model intervals instead of the paired difference.
+      A reasonable omission of one point in (c) is acceptable if (a), (d) and
+      (e) are clearly met.
+
+  scarce-label-fusion:
+    kind: metric
+    metric: roc_auc
+    threshold: 0.654
+    holdout: data/holdout.csv
+    labels_code: |
+      import pandas as pd
+      # Product-major, as stack_targets orders the scores.
+      labels = pd.read_csv("private/holdout_y.csv").to_numpy().T.ravel()

@@ -1,0 +1,422 @@
+A vendor reports a detection rate rising from 59% to 97% overnight; a research team reports a 22.5% improvement on a business-critical metric; a workshop paper reports a precision–recall area of 0.958. None of these says what was measured against what, on how many frauds in how many payments. Given the course's results so far, what questions turn each of these numbers into something that can be compared with a boosted tree on windowed aggregates — or shown to be incomparable?
+
+The obvious move is to set each number beside one the course has measured. On the real Belgian card stream, tuned XGBoost on the course's fifteen inputs reached ROC-AUC 0.928 and average precision 0.095 over four forward test weeks (<Ref lesson="imbalance-techniques-revisited" id="six-ensembles-two-streams">the six-ensemble table</Ref>). Beside 0.958 that tree looks weak, and beside 97% it looks hopeless. Neither comparison means anything. The three headline numbers are not the same kind of quantity as 0.095, nor as one another: one is a change relative to a model whose own score is withheld, one is an area measured on a test set in which nearly half the rows are fraud, and one is a share of attacks caught with no count of what was flagged wrongly.
+
+<Ref lesson="transaction-foundation-models" /> ended on the same difficulty: every institutional number there was a relative change against a reference whose absolute value, fraud share and operating point were not published. The claims below were all published between 2023 and 2026, by a payments company, a card network, two banks, a compliance-software vendor, a card-fraud vendor, a GPU maker and the author of an open model. Each gives way to a question the course has already answered for its own numbers.
+
+## Against what: a relative gain hides its baseline
+
+The card network's report on its transaction model says the model "achieves a 22% relative improvement over the production model on a business-critical anomaly detection metric". The tempting reading is that it catches about a fifth more of something, probably fraud. To see what the sentence leaves out, start with the arithmetic of a relative change.
+
+### What a relative improvement leaves out
+
+<Definition title="relative improvement">
+If a baseline scores $b$ on a metric and a new model scores $x$ on the same metric and the same test set, the *relative improvement* is $\mathrm{RI} = x/b - 1$, usually printed as a percentage.
+</Definition>
+
+The digital bank of the previous chapter defines its tables exactly this way, "(x/baseline − 1)", with x the evaluated model's score. The definition needs $b$ to turn RI back into a score, and $b$ is what such reports withhold.
+
+<Example title="one relative gain at two baselines">
+Let the metric be the precision of the 100 alerts a team opens each day, and let a new model report RI = +22.5%.
+
+**Baseline precision 0.40.** The new model's precision is $0.40 \times 1.225 = 0.49$: 40 frauds in the hundred become 49, nine more a day.
+
+**Baseline precision 0.04.** The new precision is $0.04 \times 1.225 = 0.049$: 4 frauds become 4.9, fewer than one more a day. On the course's simulator, differences under about two cards a day over one test week were within noise (<Ref lesson="alert-budget-metrics" id="what-each-disagreement-means">the noise line</Ref>), so this gain could not even be seen in a week's backtest.
+
+The same headline describes nine more frauds a day or fewer than one. And if the metric is not linear in frauds caught, $b$ alone is not enough either.
+</Example>
+
+<Exercise>
+A vendor tells a team that opens 100 alerts a day that its model gives "+50% precision at the same alert volume". (a) Compute the extra frauds per day if the team's current precision at 100 alerts is 0.06, and if it is 0.30. (b) Name two facts about the vendor's measurement that must match the team's situation before either answer applies. Write both numbers before opening the solution.
+
+<Solution>
+(a) At 0.06: $0.06 \times 1.5 = 0.09$, so 6 frauds become 9, three more a day. At 0.30: $0.45$, so 30 become 45, fifteen more a day. The same claim is worth five times as much to the second team.
+
+(b) The vendor's "same alert volume" must be about 100 a day on a stream of the team's size, because precision at another cut is another number; and the vendor's test stream must have the team's fraud share, because <Ref lesson="economics-of-detection" id="the-same-detector-on-different-streams">a precision belongs to the stream it was measured on</Ref>. The baseline the +50% is relative to must also be the team's own model, not the vendor's previous one.
+</Solution>
+</Exercise>
+
+### What the baseline was given
+
+The card network's evaluation set is described as "a key revenue-driven product": 100 million training sequences of eight transactions each, 10 million test sequences taken from a later period, three million merchants, two classes and about 400 downstream features per transaction. The metric is called AD, "the accuracy under an operational threshold"; its formula is withheld "for company policy compliance", and every variant is reported only as its relative improvement over the production model. The production model is not described beyond one sentence: it "is trained on the downstream dataset without missing fields", while the new models train on a merged dataset in which many rows carry only the basic transaction fields (the report calls them metadata: merchant, merchant category, amount, time) and none of the 400 features.
+
+Two things follow. The baseline's absolute accuracy is never given, so $b$ is unknown and the 22.5% cannot become a count. And the task is called anomaly transaction detection throughout; the report never calls it fraud. A card network's anomaly on a revenue product may well be fraud, but a reader cannot know that, nor its base rate.
+
+### The ladder behind the headline
+
+The report does print a table of variants, each against the same production model, and that table says more than the headline.
+
+<Figure
+  src="./figures/ladder.svg"
+  alt="Horizontal bars of relative change against the production model, zero at a vertical line. History of metadata only, one-level, −90.5; two-level, −87.0; history with the 400 features, one-level, −9.1; one transaction with its features and no history, +7.7 in blue; history with the features, two-level, +7.3, bracketed with the previous bar and labelled history adds nothing; features read by their own transformer first, then with the metadata, several vectors per transaction, +19.2; the same with merchant-category vectors from a language model +22.5. Note: one number per variant, no repeats reported; the production model trained on complete rows, the new models on rows with gaps."
+  caption="The headline is the top of a ladder; one rung of it is a model that reads no history at all."
+/>
+
+<Task>
+The one-transaction bar (+7.7) and the two-level history bar with the features (+7.3) differ above all in whether the model reads a history: the report sets them side by side as single transactions against full sequences. Before reading on, say what reading eight transactions instead of one added on this metric.
+</Task>
+
+The blue bar is a transformer that reads one transaction with its features and no history: +7.7. The two-level history model with the same features follows the <Ref lesson="transaction-foundation-models" id="two-levels-events-first-then-the-history">hierarchy of the previous chapter</Ref>: one transformer reads a transaction's basic fields and its 400 features together, its output is reduced to a single vector per transaction, and a second transformer relates those vectors in time. It scores +7.3, so reading eight transactions instead of one added nothing. The one-level history model does worse: a fully connected network squeezes the fields and the 400 features into one vector, a single transformer relates the transactions, and at −9.1 it falls below the production model. The report attributes that loss to the features never being related to one another by attention inside a transaction. The two-level model's first transformer does relate them, and so does the one-transaction model, which is a transformer over one transaction's fields.
+
+The largest gain came with a third design, which changes two things in how a transaction reaches the time model. First, the 400 features get a transformer of their own, and a learned layer compresses its output into a few vectors as wide as one basic field's vector; only then are they read together with the basic fields. In the two-level model every field and every feature had to share one vector width inside one attention. A width large enough for the merchant, one of three million values, made the model costly and risked overfitting each of the 400 features; a width small enough for the features left too little room for the merchant. The report names that forced common width as the difficulty. Second, another learned layer of the same kind turns that stage's output into several vectors per transaction instead of one: the virtual tokens of <Ref lesson="transaction-foundation-models" id="the-price-one-vector-per-event">the one-vector bottleneck</Ref>, so more of what was read inside a transaction reaches the model that relates transactions in time. That design scores +19.2, and the report's variant without that second layer scores −12.9. Initialising the merchant-category vectors from a language model's reading of the category descriptions raised it to +22.5. Without the features, the two history models fall to −87 and −90.5: a history of basic fields alone loses almost all of the production model's accuracy.
+
+The one firm conclusion of the ladder is the module's: the hand-built features carry the metric, and a learned history helps only beside them (<Ref lesson="limits-of-hand-built-features" id="added-to-the-aggregates-rarely-instead-of-them">added to the aggregates, rarely instead</Ref>). Each variant is reported as a single number, with no repeated runs or interval, so +7.3 against +7.7 is a tie and not an order, and whether +22.5 differs from +19.2 beyond the noise of retraining is not known.
+
+<KeyFact>
+Ask first what the baseline scored in absolute terms and what it was given. Without the absolute score a relative gain cannot become frauds caught; where an ablation table exists, it says more than the headline drawn from its top row.
+</KeyFact>
+
+## At what prevalence: a precision–recall area on a test set that is 43% fraud
+
+The workshop paper reports a precision–recall area (PR-AUC, the area under the precision–recall curve, of which average precision is the step-sum version) of 0.958 for its best model against 0.945 for LightGBM. The course chose <Ref lesson="alert-budget-metrics" id="what-a-ranking-with-no-information-scores">average precision</Ref> over ROC-AUC because it reads the top of the list, so a lead of 0.013 on that metric looks like the right kind of evidence. Whether it is depends on the test set it was measured on.
+
+### The experiment
+
+The data are a UK bank's payment-fraud records: transactions together with events from the customer's digital journey, which the paper does not itemise, the most recent 500 or so events per customer, labelled fraud or not. The records were split by time into a training period and a later test period. Both were then subsampled, in the authors' words "to allow scalability in training and inference and to conceal the fraud rate", to 332,000 samples, about a tenth of them test. The test set's fraud share is about 43%, reached by discarding genuine rows; the real rate is not given.
+
+The models: a six-layer transformer of the kind a language model uses, trained end to end on the fraud label with no pretraining, in versions that differ only in how they encode the order and the timing of events; and logistic regression, XGBoost and LightGBM given "the same set of features". The transformers were run three times each; the tree models are deterministic and were run once.
+
+| model | PR-AUC | ROC-AUC |
+|---|---|---|
+| LightGBM, same fields | 0.9454 | 0.9621 |
+| XGBoost, same fields | 0.9345 | 0.9589 |
+| logistic regression, same fields | 0.9249 | 0.9378 |
+| transformer, no position or time encoding | 0.9204 | 0.9360 |
+| transformer, learned positions only | 0.9469 | 0.9566 |
+| transformer, positions and time gaps (best) | 0.9582 | 0.9672 |
+| transformer, absolute timestamps, no positions | 0.913–0.915 | 0.930 |
+
+### What 43% does to the area
+
+A ranking with no information has an average precision equal to the share of positives (<Ref lesson="alert-budget-metrics" id="what-a-ranking-with-no-information-scores">the floor</Ref>). On this test set the floor is 0.43, so every model in the table lives between 0.43 and 1, and the best one uses 0.53 of the 0.57 above the floor. On a card stream at a quarter of a percent the same floor is 0.0025.
+
+The precision of a single cut moves the same way, and the course already has the arithmetic. The test set kept every fraud and a fraction $\beta$ of the genuine rows; <Ref lesson="undersampling-calibration" id="the-keep-rate-on-a-card-stream-and-when-there-is-one">the keep rate</Ref> that turns a stream share $\pi$ into a test share $\pi_s$ is $\beta = \pi(1 - \pi_s)/(\pi_s(1 - \pi))$. On the stream, each kept genuine row stands for $1/\beta$ genuine payments, so a cut that catches the same frauds has the same recall and $1/\beta$ times as many false alerts.
+
+<Example title="a cut with precision 0.90 at 43%, moved to the stream">
+Take a stream share $\pi = 0.4\%$. Then $\beta = 0.004 \times 0.57 / (0.43 \times 0.996) = 0.0053$: each genuine row in the test set stands for about 188 on the stream.
+
+A cut with precision 0.90 on the test set has odds $0.90/0.10 = 9$ frauds per genuine alert. On the stream the genuine alerts are multiplied by 188, so the odds become $9 \times 0.0053 = 0.048$ and the precision $0.048/1.048 = 0.046$.
+
+At $\pi = 0.1\%$, $\beta = 0.0013$, the odds $0.012$ and the precision about 0.012. A cut that is right nine times in ten on the test set is right about once in twenty, or once in eighty, on the bank's stream.
+</Example>
+
+This is <Ref lesson="economics-of-detection" id="the-same-detector-on-different-streams">the base-rate funnel</Ref> run backwards: the paper's test set is an enriched sample, and its precisions belong to that sample.
+
+<FigureSequence
+  name="prevalence"
+  alt="Three frames, two panels each. Left, precision against recall; right, ROC curve. Frame 1: an amber precision–recall curve near precision 1 with a dashed amber floor at 0.43, labelled 43% fraud, AP 0.96; the ROC curve on the right with AUC 0.967 at any fraud share. Frame 2 adds a blue precision–recall curve for the same ranking at 0.4% fraud, falling from 1 to near 0, labelled AP 0.39, random 0.004. Frame 3 marks one cut at recall 0.87: amber point at precision 0.90, blue point at 0.046, and the single ROC point at false-positive rate 0.07, recall 0.87."
+  caption="One ranking, two fraud shares: the ROC curve does not move, the precision–recall curve does."
+/>
+
+<Task>
+On frame 1, predict the average precision of the same ranking at 0.4% fraud before stepping to frame 2. Then on frame 3, check the blue point against the worked example.
+</Task>
+
+The ranking in the figure is a stand-in: genuine scores drawn from a normal distribution, fraud scores from one shifted by 2.6 standard deviations, which gives ROC-AUC 0.967, the paper's best. At 43% fraud its average precision is 0.96, the paper's range; at 0.4% it is 0.39. The stand-in is not far from real data: at ROC-AUC 0.928 and 0.2% fraud it gives AP 0.12, and tuned XGBoost on the Belgian stream, with that ROC-AUC at that rate, had 0.095. Since the paper does not give its real fraud share, the stream AP of its models cannot be computed from anything it reports. The authors say as much: they note that the 0.43 floor "may make the PRAUC values appear to be high" and report differences against the plain transformer instead.
+
+Would the ranking of the models survive at the stream's rate? <Ref lesson="alert-budget-metrics" id="dominance-survives-the-change-of-axes">ROC dominance and PR dominance are the same thing</Ref>: if one model's ROC curve lies above another's everywhere, its precision–recall curve lies above at every fraud share. Areas reorder only when curves cross, and the paper shows no curves. The order may survive; the size of the lead does not carry over.
+
+### What the table does say
+
+ROC-AUC is computed from rates within each class, so it does not change when genuine rows are thinned. The best transformer's 0.9672 against LightGBM's 0.9621 is a statement about the stream too: a randomly drawn fraud outranks a randomly drawn genuine row half a point more often. It says nothing about the top hundred alerts, which sit in <Ref lesson="alert-budget-metrics" id="how-much-of-the-curve-a-hundred-alerts-can-reach">a sliver of the curve</Ref>.
+
+The table also answers a question <Ref lesson="generative-pretraining-and-tokenisation" id="the-calendar-and-time-inside-the-model">the tokenisation chapter</Ref> left open: how much encoding time inside a transformer adds. Learned positions alone, which tell the model the order of events and nothing about their timing, lift PR-AUC from 0.9204 to 0.9469, +0.027. Encoding the gaps between events on top adds a further 0.011. Feeding absolute timestamps without positions lowers both scores. The three runs of each transformer differ by about 0.001, so these differences among variants on one test set are the paper's firmest content: on this data, the order of events carries more than their clock time.
+
+The tree baselines are weaker evidence than they look. They were given "the same set of features" taken "from a single time snapshot": the fields of the scored event, not counts and amounts over the customer's 500-event history built the way <Ref lesson="transaction-aggregates" /> builds them. The comparison the opening asks for, a sequence model against a boosted tree on windowed aggregates, was not run. Their standard deviation of zero means a deterministic fit run once, not a certain one. And the paper's closing claim, that the model "delivers stable improvements that translate into fewer missed frauds and lower false-alarm rates", names no threshold and no count.
+
+<KeyFact>
+Ask at what fraud share the test set was built. Precision, precision–recall area and F-scores change with it; ROC-AUC and recall at a fixed false-positive rate do not. A precision-type number from an enriched test set says nothing about the stream until it is recomputed at the stream's rate, which needs the rate.
+</KeyFact>
+
+## The abstract against the table: what does parity license?
+
+A fourth report gives both an abstract and the table behind it, and the two need not say the same thing. A compliance-software vendor pretrained an encoder on business customers' wire and electronic payments and handed its vector to XGBoost beside 30 engineered features, scoring ROC-AUC on one chronological split. <Ref lesson="contrastive-event-embeddings" id="the-evidence-on-three-kinds-of-data">The contrastive chapter</Ref> already read its three numbers, 0.9245 for the features, 0.9205 for features and embedding, 0.8644 for the embedding alone. The question here is which sentence those three numbers allow, set against the sentence the abstract wrote.
+
+<Quote source="Business-payments preprint, abstract">
+At this early stage, achieving performance comparable to a strong feature-engineered baseline is itself a meaningful outcome, indicating that learned representations approximate domain-specific features without manual engineering.
+</Quote>
+
+The row that is "comparable" to the baseline, 0.9205, contains the 30 engineered features. The claim that the embedding approximates those features "without manual engineering" is a claim about the row without them: the embedding alone, 0.8644, six hundredths below. On its own test the claim fails. What the table does show is the null result <Ref lesson="contrastive-event-embeddings" id="the-evidence-on-three-kinds-of-data">the contrastive chapter drew from it</Ref>, real signal that the features already hold. The report's results section reads it the same way: no measurable improvement, and a 0.004 difference that, on a single split, "does not provide evidence of a systematic degradation". Both readings are in the report; the abstract's, which reads the null result as a success, is the one that travels.
+
+<Figure
+  src="./figures/parity.svg"
+  alt="Dot plot on a ROC-AUC axis from 0.85 to 1.00. Thirty features: test 0.9245 (filled blue), training 0.977 (hollow). Thirty features plus embedding: test 0.9205 (filled amber), training 0.992. Embedding alone: test 0.8644 (filled), training 0.984. Dashed lines join each training and test dot. Note: no interval, no second split; the gap 0.004 between the top two rows is one draw."
+  caption="The row the abstract calls comparable holds the features; the row without them is six hundredths lower, and every row loses 0.05 to 0.12 from training to test."
+/>
+
+Two more facts bear on how far the table can be read. Every configuration scores 0.977 to 0.992 on its training data and 0.86 to 0.92 on test, a gap the authors call overfitting. And the 0.004 comes from one split with no interval, which is why <Ref lesson="contrastive-event-embeddings" id="the-evidence-on-three-kinds-of-data">the contrastive chapter</Ref> declined to call it a loss. How large is one draw? On the course's simulator, the depth-2 tree's first test week scored AP 0.496 against a mean of 0.542 ± 0.031 over four forward weeks (<Ref lesson="delayed-labels-prequential" id="prequential-folds-a-spread-across-weeks">the prequential folds</Ref>): one week sat one and a half standard deviations from its own model's mean. A 0.004 ROC-AUC gap on one split orders nothing.
+
+<KeyFact>
+Each wording of a claim has its own test row. "X adds to Y" is Y with X against Y alone; "X can replace Y" is X alone against Y alone. A report that shows parity on the first pair and concludes the second has not run the second test.
+</KeyFact>
+
+## Did pretraining see the test? Leakage as a quantity
+
+The next question is new with pretraining. An encoder pretrained on events reads no label, so one would expect it cannot leak the answer. It can still meet the test period before it is scored, in three ways.
+
+### Three ways an encoder meets the test early
+
+**Calendar overlap.** When folds are drawn by client, as on <Ref lesson="limits-of-hand-built-features" id="the-benchmark">the two-million-client benchmark</Ref>, the pretraining clients' events run through the same months as the test clients' labels. The encoder never reads a test client, but it has read the market in the months it is tested on: new merchants, a seasonal shift, whatever was happening then.
+
+**Vocabulary fitted on everything.** Amount bins and category codes fitted on all clients, test period included, carry information about the test period into every token (<Ref lesson="generative-pretraining-and-tokenisation" id="exercises">the bin-share exercise</Ref>).
+
+**Calendar time through tenure.** Each event carries a gap token, the time since the event before it (<Ref lesson="generative-pretraining-and-tokenisation" id="a-scale-on-which-habits-are-evenly-spaced">the soft-log gap</Ref>). In a window that starts at the client's first event, the gaps from that event to the last one before the cut-off add up, roughly, to the client's tenure: the time since the client began. For a client present since the data starts, tenure is the date of that last event minus the data's start date, so the model can read roughly where in the calendar the cut-off falls from the gaps alone, with no token that names the month.
+
+The obvious response is to discard any number whose pretraining overlaps the test period. That throws away results the overlap barely touched, because leakage is a quantity, and it can be measured.
+
+### The overlap, measured
+
+The public next-event model of <Ref lesson="transaction-foundation-models" id="a-frozen-embedding-beside-a-tree-on-public-data-extra-columns-or-a-second-ranking">the previous chapter</Ref> was evaluated on the public 100,000-client bank cut, with folds by client, a frozen embedding and a logistic head; the score is the mean ROC-AUC over four product-purchase targets, each test client contributing one row per label month from February 2022 to January 2023. Its author ran the check that separates the overlap from the model, each figure the mean of two training seeds (the two seeds' scores in brackets):
+
+- pretrained on transactions over the full period, 2021–2022: 0.793 (0.791, 0.795);
+- pretrained only on transactions before February 2022, 54% of the tokens, for the same number of steps: 0.789 (0.788, 0.790);
+- the same cut, trained for fewer steps so that each token is seen as often as in the full run: 0.787 (0.784, 0.791).
+
+The overlap is worth 0.004 to 0.006.
+
+<Figure
+  src="./figures/leakage.svg"
+  alt="Timeline from January 2021 to January 2023. Blue bar: pretraining over the full period, 0.793. Amber bar: pretraining before February 2022, 0.789 at the same steps, 0.787 at the same exposure. Dashed grey band: test clients' label months, February 2022 to January 2023. Note: overlap worth 0.004 to 0.006 mean ROC-AUC, paired standard error about 0.005. Below, a strip of the share of rows labelled churn: 12.7 to 20.4% in each month from February to December 2022, and a tall amber bar of 99.1% for January 2023, after the transaction tables end on 31 December 2022; a model that can date the month scores churn ROC-AUC 0.910 against 0.830, without January both 0.93."
+  caption="Moving the pretraining cut before the label months costs half a hundredth; a label month with no data behind it opened a gap of eight hundredths between two pretraining designs that are level without it."
+/>
+
+Is half a hundredth a leak or noise? The report gives two scales. The standard error of a paired difference between two models on the same rows is about 0.005, computed with the variance clustered by client, because a client's twelve monthly rows are not independent (on simulated data with that structure, ignoring the clustering gives 0.0102 where a bootstrap over clients gives 0.0132). And the two seeds of each run differ by 0.002 to 0.007. The overlap sits at about one standard error and is about the size of those seed differences: distinguishable from zero only by a larger experiment, and too small to change any conclusion in the report.
+
+### A leak through the calendar
+
+The same report found a larger effect, in the label rather than the pretraining. The bank's transaction tables end on 31 December 2022. A churn label marks a month in which a client who had transacted before has no transaction, so in January 2023 every client churns: 99.1% of that month's rows are positive, against 12.7% to 20.4% in the other months, and that month holds 20,032 of the test set's 55,920 churn positives. Judging by the other months, where at most about a fifth of rows churn, roughly four in five of January's positives are clients who would have transacted had the data continued. Their histories look like those of clients who stay, so a model that reads only behaviour ranks them among the negatives, and its ROC-AUC falls. A model that can tell which month a row belongs to ranks them high without reading any behaviour, and tenure gives the month away.
+
+The author ran the same model twice, changing only the windows it was pretrained on. A window drawn at a random offset usually starts partway through a history, so the gaps inside it add up to some stretch of the client's life, not to tenure, and a model pretrained on such windows is never taught to keep that sum. An aligned window puts back at its front the client's profile event, the event that carries the client's attributes, stamped at the client's first event, and counts the window's first gap from that event, so every training window carries the client's tenure. With a classification head on each frozen embedding:
+
+- January removed from the label: both models reach churn ROC-AUC 0.93;
+- January kept: the random-window model falls to 0.830, the aligned one to 0.910.
+
+January costs the random-window model 0.10 and the aligned one only 0.02, because the aligned one can date the month. Read as a comparison of two pretraining designs, the table with January in it puts aligned windows eight hundredths ahead, and all of that lead is the calendar: it disappears once January leaves the label. At first the gap looked like a gain from aligned windows. The label in that month was written by the end of the data, not by the clients: <Ref lesson="point-in-time-features" id="two-ways-a-training-row-can-know-too-much">a row that knows too much</Ref>, in a new place.
+
+### Where nobody measured
+
+The synthetic card tutorial of <Ref lesson="generative-pretraining-and-tokenisation" id="on-a-fraud-label-a-feature-not-a-detector">the tokenisation chapter</Ref> (13 features AP 0.124, embedding alone 0.012, both 0.176, a 41.8% rise) left three questions: the baseline, the as-of time, and the generator's rule. The published run answers none of them, and its own description raises two more, identity and the count.
+
+- **The baseline.** The 13 "hand-engineered" features are not listed, so whether they include any windowed aggregate is unknown.
+- **The as-of time.** The embedding is pooled "per user history" and joined back to transaction rows. Whether each test row's vector read only events before that row is not stated.
+- **The generator's rule.** The fraud label was written by the generator's rules, not by fraudsters (<Ref lesson="canonical-datasets" id="which-question-each-one-can-answer">a generator's labels are a fixed script that never reacts</Ref>). A rule is a fixed function of fields the tokeniser reads, so a sequence model can learn to reconstruct it as far as those fields carry it. A real fraudster follows no fixed function and changes tactics once blocked. How much of the 41.8% is the rule reconstructed is unknown, and that unknown share is a ceiling on what would carry over to a real stream.
+- **Identity.** The tokeniser includes the card's and the customer's identity as tokens, and the split by date leaves the same simulated users on both sides. A vector that identifies the user lets the tree learn which users were defrauded in training, which is <Ref lesson="delayed-labels-prequential" id="why-the-cards-identity-stays-out-of-the-features">why the card's identity stays out of the features</Ref>.
+- **The count.** A test set of 100,000 rows at about 0.1% fraud holds about a hundred frauds, scored once. The average precision rests on a hundred positions in one ranking.
+
+None of these shows that the 41.8% is wrong. The first four are ways it could be larger than what the embedding would add on a real stream, and the fifth leaves it uncertain in either direction; none was measured, so the number is an upper bound with unknown slack.
+
+<Aside>
+**Overlapping windows.** A common protocol for public transaction benchmarks cuts each long sequence into windows of ten rows with a stride of five, so neighbouring windows share half their rows, then splits the windows at random into training and test. A test window then shares rows with training windows. On a public air-quality benchmark run that way, one team replaced the stride with ten (no overlap) and its own fine-tuned model's root-mean-square error in predicting the air-pollution concentration rose from 20.05 to 25.37, in the dataset's concentration units, about a quarter worse. The non-overlapping split was also smaller, so not all of that change is the overlap, but its direction is the leak's.
+</Aside>
+
+<KeyFact>
+Ask where the pretraining data ends relative to the test period, and on which rows the vocabulary and the bins were fitted. Where a run with the cut moved before the test period exists, it measures the leak (0.004–0.006 in the one place it was measured); where none exists, the number is an upper bound.
+</KeyFact>
+
+## A before-and-after on one slice, and a lift over a published feature set
+
+Two claims come from companies describing their own products. A payments company reports that a detection rate rose after it deployed its model; a card-fraud vendor reports how much its encoder lifts a fraud model when added to a set of features. Of each a reader must find out what the metric counts and what it cost in false alerts, and what the model was compared against: whether that opponent is the one a team would actually field.
+
+### 59% to 97% overnight
+
+The payments company's post describes card testing, in which a fraudster charges small amounts to stolen card numbers to find the ones that work (<Ref lesson="anomaly-detection-framing" />), and then its foundation model, trained "on tens of billions of transactions":
+
+<Quote source="Payments company blog post, 2025">
+While attacks are up industry-wide, they are down 80% [on the platform]. That's because we've invested significantly to fight card testing: engineering new features, labeling emerging attack patterns, and rapidly retraining our models. […] Then we deployed our Payments Foundation Model. By classifying sequences of embeddings, our detection rate for attacks on large users significantly increased—from 59% to 97%—overnight.
+</Quote>
+
+The paragraph holds two claims, with different causes, and only the second is about the foundation model.
+
+| claim | attributed to | what is missing |
+|---|---|---|
+| card-testing attacks down 80% while up elsewhere | new features, labelling, retraining | the period; what counts as an attack |
+| detection rate 59% → 97% on attacks against large users | classifying sequences of the model's embeddings | what "detection rate" counts; false alerts; how many attacks; the window; what the 59% model was |
+
+Start with the metric. The post does not define its detection rate; read as the share of attacks caught, which is the natural reading, it is a recall. A recall without its false alerts has a trivial maximum, since flagging every payment of the large users catches every attack. The count of genuine payments flagged, the number of attacks behind 97%, and the length of time over which "overnight" was measured are all absent.
+
+The mechanism is plausible. A card test on a large merchant is a few small charges among millions of ordinary ones; a score on each payment sees one small charge, and a classifier over a sequence of payments can see the pattern of many. A plausible mechanism is a reason to test, not a measurement.
+
+### Up to 140% against a 2012 feature set
+
+The second claim is the card-message encoder of <Ref lesson="limits-of-hand-built-features" id="the-three-cases-of-the-opening">the limits chapter</Ref>: pretrained on 5.1 billion transactions of 180 European issuers, used frozen at three issuers in other countries, its vector added to a baseline's inputs in a fully connected classifier of three hidden layers, scored by value detection, the share of fraudulent amount caught at a fixed ratio of false alerts to caught frauds. The report's sentence: "At 5:1 FP-ratio our embeddings can provide up to 140% uplift over the hand-engineered features."
+
+The frame is the best among the claims here. The three issuers' fraud rates are stated (0.04%, 0.027% and 0.11%); each is split both by time and by cardholder; the metric weighs frauds by their amount, as <Ref lesson="example-dependent-cost" /> argued a detector should be judged; error bars come from repeated training runs; and the evaluated issuers were not in the pretraining data. A ratio of five false alerts per caught fraud is a precision of $1/6 \approx 0.17$, close to the operating points of the course's own queues.
+
+<Figure
+  src="./figures/vdr-curves.png"
+  alt="Three side-by-side line charts, one per issuer, of value detection rate (0 to 0.6) against false-positive ratio at 2:1, 5:1, 7:1, 10:1, 15:1 and 20:1. In each, a blue baseline curve lies below two nearly overlapping orange and green curves for the baseline plus a pretrained or fine-tuned embedding, each point with an error bar. The gap is widest at the left of the second panel, where the baseline starts near 0.02 against about 0.10, and at 20:1 the curves sit about 0.06 to 0.10 apart."
+  caption="Value detection rate against the ratio of false alerts to caught frauds on three held-out issuers: the 2012 feature set alone (blue) and with the pretrained (orange) or fine-tuned (green) embedding added; error bars over repeated training runs. The relative gain is largest where the baseline is lowest — 5:1 on the second issuer is the report's 140% — and falls to roughly a tenth to a quarter at 20:1."
+/>
+
+Then the baseline: what was the encoder's vector added to? It is a set of 14 aggregates of each cardholder's past transactions over several windows, such as the average amount per transaction over the last month, taken from a feature design published in 2012, beside the transaction's own fields. That is the kind of opponent the opening asks for, a model on windowed aggregates, and a stronger one than the workshop paper's trees, which saw only the fields of the scored event. How strong it is, nobody measured. The report does not compare the 14 aggregates with any issuer's own model; for scale, the card network's production model in the first section was given about 400 features per transaction. The lift is a lift over a published feature set, not over the model a team would replace.
+
+What the report does give is the size of the lift at every operating point, and that shows where the headline comes from. The curves, read off the plot, put the baseline's value detection at 5:1 at about 0.17, 0.11 and 0.22 on the three issuers, and the baseline with the embedding at about 0.29, 0.24 to 0.26 and 0.32 to 0.34. Those are gains of about 0.10 to 0.15 in the share of fraudulent value caught, or +50% to +140% relative. The 140% is the second issuer, whose baseline is lowest. At 20:1 the gains on the three issuers are about 0.06 to 0.10 in value detection, 11% to 25% relative; at 2:1 the second issuer's baseline is near 0.02, and the relative gain there would exceed 300%. Across the grid the absolute gains stay between about 0.06 and 0.15, while the relative ones run from about 11% to over 300%: dividing by the baseline makes the gain largest wherever the baseline is lowest. "Up to" names that cell.
+
+<KeyFact>
+The baseline question has a second half, and vendor numbers need it most: was the opponent the model a team would replace, and which cell of the grid is the headline? A deployment before-and-after with no count of false alerts is a hypothesis. A relative lift is largest where the baseline is lowest, so read the absolute gain across the grid; and a lift over a published feature set says nothing about the lift over an institution's own model. Either claim is tested on your own stream, at your alert budget, against your own model.
+</KeyFact>
+
+## What the embedding cannot see: the network
+
+The last question asks what a model cannot see by construction, and here the clearest answer comes from the design's strongest advocate. The digital bank of <Ref lesson="transaction-foundation-models" id="what-none-of-them-measured">the previous chapter</Ref> reported one task on which its encoder lost: anti-money laundering, where a logistic probe on the billion-parameter model's embedding scored 47.1% lower F0.5 than the bank's production model.
+
+### A history is one node's rows
+
+F0.5 is the member of the F-score family that weights precision above recall: $F_{0.5} = 1.25\,PR/(0.25P + R)$. At precision 0.5 and recall 0.2 it is $1.25 \times 0.1/(0.125 + 0.2) = 0.38$, where F1 would be 0.29. A laundering team reviews alerts by hand, so a metric that rewards a clean queue over a long one fits the task. The bank does not give the production model's F0.5, so −47.1% is again relative; whatever the baseline scored, the probe scored about half of it.
+
+The bank gives two reasons. The anti-money-laundering dataset is large enough for the production model to learn the task from its own labels without pretraining, which is <Ref lesson="limits-of-hand-built-features" id="fewer-labels-the-ranking-turns-over">the label regime in which pretraining gains least</Ref>. And, "more critically", the production model "leverages cross-record features that capture network-level signals", while the encoder "processes event histories in isolation".
+
+<Figure
+  src="./figures/network.svg"
+  alt="Left, account A's own rows: 2 May A to C 1,400 out; 4 June D to A 1,200 in; a dashed blue row, 20 May C to D, not in A's rows; below, anti-money laundering, probe on the embedding: F0.5 47.1% below the network-aware baseline. Right, A as an amber node with arrows to C (1,400), from D (1,200), and a dashed blue arrow C to D on 20 May; below, card data, nine exposure columns alone ROC-AUC 0.920, beside history 0.953 to 0.986."
+  caption="The encoder reads A's two rows; the transfer that closes the loop is in C's and D's."
+/>
+
+The course has measured the other side. <Ref lesson="limits-of-hand-built-features" id="one-accounts-rows-not-the-network">The cycle A → C → D → A</Ref> is invisible from A's rows because the transfer that closes it is in C's and D's. On a card issuer's five weeks, nine exposure scores propagated over the card–merchant graph reached ROC-AUC 0.920 alone and lifted the history features from 0.953 to 0.986, while correlating with them by no more than 0.1 (<Ref lesson="guilt-by-association" id="five-weeks-of-a-card-issuer">the exposure experiment</Ref>). On the Bitcoin graph, a random forest on neighbour aggregates beat the graph network because <Ref lesson="elliptic-illicit-nodes" id="the-72-aggregates-are-a-fixed-layer">the aggregates were already a pass over the neighbours</Ref>. Laundering is a shape across accounts, and an encoder of one account's history, however large, does not read the other accounts.
+
+### Pretraining on the graph: not yet measured
+
+Self-supervised pretraining has also been proposed on the graph itself, for laundering: contrastive or masked objectives over accounts and the transfers between them, rather than over one account's rows. Whether that beats a supervised graph model, or a boosted tree on graph features such as <Ref lesson="guilt-by-association" id="restarting-at-the-known-fraud-the-exposure-score">the exposure scores</Ref>, has not been shown in any comparison read for this course. The one measured comparison between a pretrained history encoder and a network-aware production model is the bank's, and it went against the encoder.
+
+<KeyFact>
+Ask what the model cannot see by construction. The −47.1% puts the encoder in place of the network features; the row that would show whether it adds anything beside them, the production model with the embedding added, was not reported.
+</KeyFact>
+
+## Six questions, and the course's own numbers
+
+Each section asked one question of one claim. Asked of every claim at once, they become a checklist of six: the baseline (absolute, what it was given, how strong), the metric and the fraud share it was taken at, the split (forward in time, entities apart, <Ref lesson="delayed-labels-prequential" id="where-the-training-set-must-end-the-delay-block">a delay where labels lag</Ref>), the pretraining cut, the runs and intervals, and the blind spot.
+
+### Eight claims against six questions
+
+<Figure
+  src="./figures/checklist.svg"
+  alt="Grid of eight claims (rows) against six questions (columns: baseline; metric and prevalence; split; pretraining cut; runs and intervals; blind spot stated). Payments company blog, 59 to 97% detection: not stated except metric, a problem. Card network, +22.5% anomaly accuracy: baseline and metric problems, split and pretraining cut sound, runs a problem, blind spot not stated. Bank workshop paper, PR-AUC 0.958: baseline, metric and runs problems, split sound, pretraining not applicable. Business-payments preprint: baseline and split sound, metric and runs problems, pretraining cut not stated, blind spot stated. Public next-event model: baseline, metric, pretraining cut and runs sound, split by client a problem. Digital bank: baseline, metric and runs problems, split and pretraining not stated, blind spot stated. 180-issuer encoder: how strong the baseline is not stated, everything else sound except blind spot not stated. GPU vendor tutorial: baseline and pretraining cut not stated, metric and split sound, runs a problem, blind spot stated."
+  caption="No claim passes all six; the best-framed fraud result never says how its opponent compares with an issuer's own model."
+/>
+
+Read down the columns. Five of the eight split forward in time. Only two pass the baseline column, and neither reports precision at the stream's fraud share. Runs and intervals are missing or inadequate in six of the eight. The best-framed fraud result, the 180-issuer encoder, describes its opponent in full and draws its curves, but leaves open the question a team cares about: how the 14 aggregates compare with the model the team runs now.
+
+### What a well-made claim reports
+
+The good practices are already in the record, each in a different report. The public bank dataset's authors trained models on the private data and on its anonymised release and checked that the ranking of models agreed (Kendall's rank correlation 0.94), so results on the public copy say something about the bank's. The next-event model's author moved the pretraining cut, removed the leaking label month, clustered standard errors by client and reported the seed spread. The digital bank tested its embedding with recent events dropped, up to the 99.9th percentile of the event bus's delivery delay, and stated the 0.2% movement. The 180-issuer encoder was evaluated on issuers outside pretraining with error bars over runs. And every table that matters carries a row with the opponent alone: features without the embedding, embedding without the features.
+
+### The same questions for the course's own run
+
+The checklist applies to the course as well. <Ref lesson="contrastive-event-embeddings" id="does-the-order-of-events-matter-to-this-encoder">The contrastive chapter's order experiment</Ref> compared windowed aggregates (0.703 mean ROC-AUC), the course's own embedding (0.689) and their rank average (0.713) on the public bank data. Its baseline is the course's own, absolute and described; the metric is ROC-AUC on product targets whose shares are known; the downstream split is by client and forward in months, with the head fitted on months up to September 2022 and scored on October 2022 to January 2023; the pretraining read events before August 2022, from clients outside the test fold, so its cut falls before the test months. It fails on runs and intervals. There was one seed, and no interval was computed for the 0.010 between the rank average and the aggregates, so that difference is not established. The one interval reported, for the vector against the aggregates, was about 0.05 wide, which shows how wide such an interval can be on this data: five times the difference in question. <Ref lesson="transaction-embedding-lab" /> builds the interval that this run lacks.
+
+The application has its own departures from what the module's results assume. None of the fraud numbers above was measured on public data at a stated fraud share except the synthetic card set, whose fraud is written by a rule; every institution's baseline is its own and unpublished; no claim reports precision at a fixed number of alerts per day or a cost in money, the two quantities the course decides deployment by; and the one comparison against a network-aware model is the one the encoder lost.
+
+<Conclusion>
+You can now take a published or vendor claim about a pretrained or sequence model for transactions and restate it in the course's terms, or show that it cannot be restated. Six questions do it. The baseline: what it scored in absolute terms, what it was given and how strong it was (+22.5% is unevaluable without its baseline, and the ladder behind it showed a history read the two-level way adding nothing over one transaction with its features, a gain only once the features were read on their own first, and almost none of the production model's accuracy left without the features; 140% is the best issuer at one ratio, over a 2012 feature set whose strength against an issuer's own model was never measured). The metric and its fraud share (a cut with precision 0.90 on a 43%-fraud test set is about 0.05 at 0.4% fraud, while ROC-AUC does not move). The split, forward in time and by entity. The pretraining cut (measured once, at 0.004–0.006). The runs and intervals (a 0.004 gap on one split orders nothing, and the abstract's "comparable" is tested by the row without the features). And the blind spot (a history encoder lost 47.1% F0.5 to a network-aware model on laundering).
+
+What none of the reports gives is the comparison a team needs: the embedding beside its own windowed aggregates, on its own stream, at its own alert budget, with an interval. <Ref lesson="transaction-embedding-lab" /> runs that comparison on public bank data, with a client-level bootstrap of the difference, at all labels and at a tenth of them.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+A ranked list of 20 test rows holds 8 frauds, at ranks 1, 2, 4, 5, 7, 10, 13 and 17. (a) Compute its average precision and its ROC-AUC. (b) The list came from a test set built by keeping every fraud and one genuine row in ten. Put each genuine row back as ten genuine rows at the same position, keeping the order, and compute both metrics again. (c) What are the fraud shares before and after, and what does each metric's change say?
+
+<Solution>
+(a) Count the genuine rows above each fraud: 0, 0, 1, 1, 2, 4, 6, 9. The precision at the $j$-th fraud is $j/(j + N_j)$ with $N_j$ that count: $1, 1, 3/4, 4/5, 5/7, 6/10, 7/13, 8/17$, that is $1, 1, 0.750, 0.800, 0.714, 0.600, 0.538, 0.471$. Their sum is 5.873, and AP $= 5.873/8 = 0.734$. For ROC-AUC, each fraud outranks the genuine rows below it: $12 - N_j$ = 12, 12, 11, 11, 10, 8, 6, 3, total 73 of $8 \times 12 = 96$ pairs, so AUC $= 0.760$.
+
+(b) Now $N_j$ becomes $10N_j$: precisions $1, 1, 3/13, 4/14, 5/25, 6/46, 7/67, 8/98$ $= 1, 1, 0.231, 0.286, 0.200, 0.130, 0.104, 0.082$, sum 3.033, AP $= 0.379$. ROC-AUC: each fraud outranks $10(12 - N_j)$ of 120 genuine rows, total $730$ of $960$ pairs, $0.760$ again.
+
+(c) The fraud share falls from $8/20 = 40\%$ to $8/128 = 6.25\%$. AP halves, from 0.734 to 0.379, with the ranking unchanged; ROC-AUC is unchanged, because it reads only the share of genuine rows below each fraud, which copying does not change. Only the first two frauds keep their precision, because nothing genuine is above them. The move: an AP or precision from an enriched test set is recomputed by multiplying the genuine counts by $1/\beta$; a ROC-AUC needs no recomputation and says nothing about the top.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague summarises the workshop paper: "PR-AUC rose from 0.9454 to 0.9582. At the bank's real fraud share of 0.4% the transformer therefore catches about 1.4% more fraud than LightGBM at every precision." Refute the claim, naming what it would need that the paper does not give, and say what the ROC-AUC gap of 0.005 does license.
+
+<Solution>
+The 1.4% is $0.9582/0.9454 - 1 = 0.0135$, a relative change in an area, and an area is not a recall at a precision. Three things fail.
+
+**The fraud share.** The paper does not give the bank's real rate; 0.4% is the colleague's assumption. At any real rate, every precision on the curve falls as in the body's example, its odds multiplied by $\beta$ (0.90 to about 0.05 at 0.4%), and the areas fall by amounts that depend on the curves' shapes near the top, not on the areas at 43%.
+
+**The curves.** "At every precision" requires one curve above the other everywhere, that is ROC dominance, which carries over to every fraud share. The paper shows no curves, so dominance is unknown, and two curves with areas 0.958 and 0.945 may cross.
+
+**The operating point.** A team works at a fixed number of alerts, where precision at 0.4% is a few per cent or tens of per cent. Whether the transformer catches more there depends on the shape of the curves at the left end of the ROC curve, which no area reports.
+
+The ROC-AUC gap of 0.005 does carry over, since ROC-AUC does not depend on the fraud share: on the stream, a random fraud outranks a random genuine payment about half a percentage point more often under the transformer than under LightGBM, on this one test set, with LightGBM run once and given fields of the scored event rather than windowed aggregates.
+</Solution>
+</Exercise>
+
+<Exercise>
+From the next-event model's leakage check (full-period pretraining 0.793, out-of-time 0.789 at the same steps and 0.787 at the same token exposure; paired standard error of a difference about 0.005; each figure the mean of two seeds, which scored 0.791 and 0.795, 0.788 and 0.790, 0.784 and 0.791), (a) estimate how many standard errors each overlap effect is. (b) Which uncertainty, test-sample or training-seed, does the 0.005 describe, how large is the other one here, and what can two seeds per run tell you about it? (c) Why must the standard error be clustered by client, and in which direction would ignoring that mislead?
+
+<Solution>
+(a) $0.004/0.005 = 0.8$ and $0.006/0.005 = 1.2$ standard errors: neither is distinguishable from zero at any usual level.
+
+(b) The 0.005 is the test-sample uncertainty of a paired difference between two fixed models scored on the same rows: how much the difference would move with another draw of test clients. It says nothing about retraining. The seed pairs differ by 0.004, 0.002 and 0.007: the same order as the 0.005, so neither source dominates, and an overlap effect of 0.004 to 0.006 is about the size of either. The seed ranges almost touch (0.791–0.795 against 0.788–0.790) or overlap (0.784–0.791), but with two seeds per run a range is a weak estimate of the spread: two draws can sit close together by chance, so non-overlapping ranges would be weak evidence of a real gap, and overlapping ones say little more.
+
+(c) Each test client contributes twelve monthly rows that share one history and one embedding, so they are correlated: twelve rows carry less information than twelve independent rows. Treating them as independent shrinks the variance; on simulated data with that structure the unclustered standard error was 0.0102 against 0.0132 by a bootstrap over clients. Ignoring the clustering makes differences look more significant than they are.
+</Solution>
+</Exercise>
+
+<Exercise>
+A report states a relative improvement of $+X$ in a metric $m$, against a baseline whose value $b$ is withheld. A team has a budget of $k$ alerts a day and wants the number of frauds the new model would catch. (a) Show that the answer cannot be computed from $X$ alone when $m$ is the precision at $k$. (b) Find what the report must add for the answer to be exact, and the one bound that $X$ gives by itself. (c) Show that even with $b$ known, the answer cannot be computed when $m$ is "accuracy under an operational threshold", and say why.
+
+<Solution>
+(a) The new precision at $k$ is $b(1 + X)$ and frauds caught are $kb(1 + X)$. For any target count $c$ there is a $b$ with $kb(1+X) = c$ (any $c \le k$), so $X$ alone fixes nothing: two baselines of 0.04 and 0.40 give 4.9 and 49 frauds a day at $X = 22.5\%$ and $k = 100$.
+
+(b) With $b$ given, measured at the same $k$ on a stream with the team's fraud share, the count $kb(1 + X)$ is exact. Alone, $X$ bounds $b$: precision cannot exceed 1, so $b(1+X) \le 1$ and $b \le 1/(1 + X)$; at $X = 22.5\%$, $b \le 0.816$. That rules out almost nothing.
+
+(c) Accuracy at a threshold is $(TP + TN)/N$. A change in it can come from fewer false alerts (more true negatives) or from more frauds caught, in any mix. On a stream at 0.25% fraud, a model that flags nothing has accuracy 0.9975, and moving accuracy from 0.990 to 0.992 can be done entirely by flagging fewer genuine payments while catching no more fraud. Without the confusion matrix, frauds caught are not determined by accuracy and $b$; it is the course's <Ref lesson="economics-of-detection">case against accuracy</Ref> under rarity. The move: before asking for $b$, ask whether $m$ is a function of frauds caught at your budget at all.
+</Solution>
+</Exercise>
+
+<Exercise>
+Design the reproduction that would tell whether the synthetic card tutorial's +41.8% in AP survives against windowed aggregates. State the baseline, the as-of rule for the embedding, how identity is handled, the test count and the interval, and what result would count as "survives".
+
+<Solution>
+**Baseline.** Build windowed aggregates per card and per merchant (count and mean amount over 1, 7 and 30 days, strictly before each transaction, as <Ref lesson="transaction-aggregates" /> built them) beside the raw fields, and fit the same XGBoost on that set. Keep the 13-feature row as a second baseline so the original comparison is reproduced too.
+
+**As-of embedding.** For each row, encode only the user's events strictly before that transaction (the state just before it, from one causal pass per user), never the pooled whole history. Pretrain only on transactions before the test period's first day, and fit the vocabulary and amount bins on that period alone.
+
+**Identity.** Remove the card and customer identity tokens from the tokeniser, or replace them per slice with random values, and compare the embedding's AP with and without them: a large drop is the identity route.
+
+**Count and interval.** Score the whole test period (about 2.4 million rows at about 0.1%, some 2,400 to 2,900 frauds, rather than a 100,000-row sample of about 100), and bootstrap the paired AP difference over users, since a user's rows are correlated.
+
+**Survives** means: the interval of AP(aggregates + embedding) − AP(aggregates) excludes zero, and the identity-free embedding gives most of that gain. If the gain against aggregates is inside the interval, or appears only with identity tokens, the 41.8% was a gain against a weak baseline or a leak, not a property of the embedding. State the fraud share beside every AP, since the fraud here is generated by a rule.
+</Solution>
+</Exercise>
+
+<Exercise>
+The digital bank gave two reasons for its −47.1% on anti-money laundering: (1) its production model had enough labels to learn the task alone; (2) the task is relational and the encoder reads each history in isolation. Using <Ref lesson="guilt-by-association" /> for the graph side, design an experiment on the bank's own data that separates the two reasons, and say which arm needs no new data or features.
+
+<Solution>
+**Arm A (labels).** Subsample the anti-money-laundering training labels to 100%, 30%, 10% and 3%, and at each fraction train the production model and the probe on the embedding on the same subsample, scored on one fixed test period. If reason (1) carries the gap, the gap shrinks as labels shrink and may reverse, the label-scarcity pattern. This arm needs nothing new: the labels, the production features and the stored embeddings all exist.
+
+**Arm B (network).** Compute exposure scores for each account by a random walk with restart over the transfer graph, restarting at accounts confirmed in earlier filings, using only confirmations that had arrived by each night, at two or three horizons. Add them as columns beside the embedding in the probe, and conversely remove the production model's cross-account features. If reason (2) carries the gap, the probe plus exposure closes most of it, and the production model without its cross-account features falls towards the probe.
+
+**Reading.** Arm B moving the gap and arm A not means the relational reason; arm A moving it and B not means the label reason; both moving means both. The guilt-by-association result predicts arm B: on card data, nine exposure columns added three points of ROC-AUC beside history while correlating with it by at most 0.1, so they carry signal a history does not. Score both arms by F0.5 with an interval from a bootstrap over accounts, and keep the test period after every training and pretraining period.
+</Solution>
+</Exercise>
+
+<Exercise>
+A compliance-technology report on report-drafting agents concludes that its system saves investigators "around 61%" of their time. Its evaluation table shows six investigators rating "efficiency gains in investigation" at 3.06 on a scale of 1 to 5, next to the figure 61%. Apply the six questions. What is the 61%, what is missing for it to be a time saving, and what would a measured one need?
+
+<Solution>
+**What it is.** $3.06/5 = 0.612$: the 61% is the average rating divided by the top of the scale, a rating renormalised to a percentage, not a time.
+
+**Baseline.** None: no arm of investigators writing the same reports without the system, no stopwatch on either. **Metric and prevalence.** A perceived-benefit rating from six people; nothing about what share of drafts needed correction. **Split, runs, intervals.** Six raters, one rating each, no interval, no description of which cases were rated. **Blind spot.** The cost on the other side of the ledger, the time to check and correct a draft, is not measured.
+
+**A measured saving** needs two arms on the same case mix, timed: investigators writing reports with and without drafts, the minutes per report in each, the corrections made to each draft and the time they took, and an interval over cases and investigators. <Ref lesson="llms-in-the-investigation-queue" /> takes up exactly this distinction, between a benefit perceived and a benefit measured, for language models placed after the detector.
+</Solution>
+</Exercise>
+
+<References>
+1. Visa Research (Y. Dou et al.), "TransactionGPT," arXiv:2511.08939v2, 2026, industry preprint — abstract and Sec. 1 (the 22% relative improvement on a business-critical anomaly-detection metric), Sec. 4.1 and Table 3 (the revenue-driven product dataset: sequences of eight, 100M training and 10M later test sequences, two classes, about 400 features), Sec. 3.1, Table 1 and Sec. 3.3 (the one-level, two-level and feature-first designs; feature and transaction virtual tokens), Sec. 5.1 (the AD metric as accuracy under an operational threshold, relative improvement only, the production model trained without missing fields; the single-transaction feature transformer), Table 4 (the ladder of variants, including the variant without the second virtual-token layer).
+2. G. Aminian, A. Elliott, T. Li, T. C. H. Wong, V. C. Dehon, Ł. Szpruch, C. Maple, C. Read, M. Brown, G. Reinert, M. Mamouei, "FraudTransformer: Time-Aware GPT for Transaction Fraud Detection," ICAIF '25 workshop (arXiv:2509.23712) — Sec. 4 (temporal split, subsampling to conceal the fraud rate, 43% fraud in the test set, about 500 events per customer), Sec. 7.2 (baselines on the same features), Sec. 7.6 and Table 4 (single-snapshot features, deterministic trees, three transformer runs; PR-AUC and ROC-AUC of every variant), Sec. 7.7 (the 0.43 random baseline), Sec. 8 (conclusion).
+3. D. Butvinik, Y. Marcus, N. Tal, G. Azoulay, "Temporal Contrastive Transformer for Financial Crime Detection: Self-Supervised Sequence Embeddings via Predictive Contrastive Coding," arXiv:2605.21490, 2026, industry preprint — abstract, Sec. 4.1 (business payments, chronological split), Sec. 5.1 and Table 1 (training, validation and test ROC-AUC; the single-split caution), Sec. 6.1–6.3 (the reading of the null result; each party modelled in isolation).
+4. D. Burakov, "EventGPT: Next-Event Pretraining on Banking Customer Histories," arXiv:2611.03302, 2026, preprint with released weights — Sec. 6.1 (the last month: 99.1% churn, 0.910 against 0.830), Sec. 6.2 (standard errors clustered by client, 0.0102 against 0.0129 and 0.0132), Sec. 7.3 (the churn gain of aligned windows traced to the last month), Sec. 9 (seed and head-draw variation; the out-of-time pretraining run, 0.793 / 0.789 / 0.787 at 54% of the tokens), Table 13 (the two seeds behind each pretraining-period figure), App. D (aligned training windows and tenure).
+5. M. Ostroukhov, R. Mikhailov, V. Iashin et al., "PRAGMA: Revolut Foundation Model," arXiv:2604.08649, 2026, industry preprint — Table 2 (relative results only), Sec. 3.4.2 (event staleness at the 99.9th percentile of propagation delay), Sec. 3.4.6 and Table 6 (anti-money laundering, −47.1% F0.5 by a linear probe, relative performance defined as model / baseline − 1, the two stated reasons).
+6. P. Skalski, D. Sutton, S. Burrell, I. Perez, J. Wong, "Towards a Foundation Purchasing Model: Pretrained Generative Autoregression on Transaction Sequences," ICAIF '23 (arXiv:2401.01641) — Sec. 5.1–5.2 (180 issuers, three hold-out issuers at 0.04%, 0.027% and 0.11% fraud, split by time and cardholder, the 14-feature baseline, value detection rate at a false-positive ratio), Sec. 5.3 and Fig. 2 (curves with error bars; up to 140% at 5:1).
+7. Stripe, "Using AI to optimize payments performance with the Payments Intelligence Suite," Stripe blog, 2025 — the section "The future of our AI models" (Payments Foundation Model, card testing down 80%, detection rate on attacks against large users from 59% to 97%). https://stripe.com/blog/using-ai-optimize-payments-performance-payments-intelligence-suite
+8. NVIDIA, "Build Your Own Transaction Foundation Model for Financial Intelligence," NVIDIA developer blog and developer example, 2026, a vendor tutorial — the temporal 80/10/10 split and the 100,000-row stratified test set, the tokeniser's card and customer identity fields, pooling per user history, Table 1 (+41.76% AP). https://developer.nvidia.com/blog/build-your-own-transaction-foundation-model-for-financial-intelligence
+9. S. Luetto, F. Garuti, E. Sangineto, L. Forni, R. Cucchiara, "One Transformer for All Time Series: Representing and Training with Time-Dependent Heterogeneous Tabular Data," *Machine Learning* 2025 (arXiv:2302.06375) — App. A (the benchmark protocol that pretrains on downstream test sequences; stride-5 overlapping windows and the non-overlapping repartition), Tables 4–5 (20.05 against 25.37 on the pollution task).
+10. D. Mollaev, I. Kireev, M. Postnova et al., "Multimodal Banking Dataset: Understanding Client Needs through Event Sequences," arXiv:2409.17587, 2024 (v2, 2025) — Sec. 5 and Fig. 2 (model rankings on private and anonymised public data, Kendall's τ = 0.94).
+11. H. Lu, H. Wang, "Graph Contrastive Pre-training for Anti-money Laundering," *International Journal of Computational Intelligence Systems* 17, 307 (2024), doi:10.1007/s44196-024-00720-4 — proposes graph pretraining for laundering; its results are not used in this chapter.
+12. Y. Shang, "Digital currency money laundering identification model based on graph structure and transformer self-supervised learning," *Discover Artificial Intelligence* 6, 1288 (2026), doi:10.1007/s44163-026-02264-2 — proposes graph pretraining for laundering; its results are not used in this chapter.
+</References>
