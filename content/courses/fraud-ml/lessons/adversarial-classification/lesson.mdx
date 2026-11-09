@@ -1,0 +1,558 @@
+A spam filter is published, and within weeks spammers are inserting ordinary words until each message passes. A fraud detector is used, and fraudsters learn to keep amounts under what it flags. If the adversary knows the classifier and pays a cost per feature changed, what is their cheapest way through, what should the classifier do knowing that, and does the back-and-forth ever settle?
+
+You have already watched a small version of this happen. In the last exercise of <Ref lesson="drift-strategies-on-worldline" id="exercises">the Worldline drift study</Ref>, a planted fraudster probed the model every Monday and moved its fraud amount to wherever the top 100 alerts would miss it. Against a frozen model it found a blind spot and stayed there. Against a model retrained every night the amount never settled: 160, 160, 160, 180, 400, 400, 200, 160, 160, 140, then 400 again.
+
+The tools of the drift module do not explain that. <Ref lesson="concept-drift" id="naming-the-three-parts">Concept drift</Ref> names what moved: here the likelihood of the positives, $p(x \mid +)$, which changes $p(y \mid x)$ and reorders payments, so real drift. <Ref lesson="change-detectors">The change detectors</Ref> say when to retrain. Both treat the change as something that happens to the stream, like a holiday season. This change is a reply. Retrain, and the reply is aimed at the new model; the data you just learned from is no longer the data you will score. Retraining faster chases a target that moves because you moved.
+
+## A change that answers the classifier
+
+To reason about a reply you need to write down who replies, to what, and what they want. The obvious model, a stream whose distribution changes from day to day, has no place for "because the classifier changed".
+
+### Why drift handling does not cover it
+
+Call the malicious instances positive ($+$: spam, fraud) and the innocent ones negative ($-$). Before deployment the positives follow some distribution $P(x \mid +)$. After deployment the adversary turns each positive $x$ into $x' = A(x)$, chosen with the classifier in view, and the classifier sees the distribution of $A(x)$, call it $P_A(x' \mid +)$. Negatives are left alone: nobody edits a genuine message to get it caught.
+
+A drift learner estimates the current distribution and fits to it. Here the current distribution is a function of the fitted classifier: fit $C_1$ to $P_{A_0}$, the stream before any attack ($A_0(x) = x$), and the adversary answers with $A_1$, so the stream becomes $P_{A_1}$; fit $C_2$ to that, and so on. There is no stationary target for the estimate to converge to, unless the two sides happen to settle.
+
+### Two players, two utilities
+
+The smallest model that makes "the adversary's move depends on the classifier's" explicit is a game. Each side has a payoff, and it is convenient to write payoffs as *utilities*, numbers to be maximised. A utility is a cost with its sign flipped: <Ref lesson="example-dependent-cost">the cost-matrix lesson</Ref> minimised the cost of a missed fraud; here the same miss is a negative utility.
+
+<Definition title="adversarial classification game">
+Instances are vectors $x = (x_1, \dots, x_n)$ of features. Two players move.
+
+- The **classifier** chooses a decision rule $C$ and the subset $X_C$ of features it measures. Its utility for predicting $y_C$ when the truth is $y$ is $U_C(y_C, y)$, and measuring feature $i$ costs it $V_i$. It maximises
+$$
+U_C = \sum_{(x,y)} P(x, y)\, U_C\big(C(A(x)), y\big) \;-\; \sum_{i \in X_C} V_i .
+$$
+- The **adversary** chooses a map $A$ with $A(x) = x$ for every negative $x$. Changing feature $i$ from $x_i$ to $x_i'$ costs it $W_i(x_i, x_i')$, with $W_i(x_i, x_i) = 0$, and $W(x, x')$ is the sum over the features changed. Its utility for the classifier's verdict $y_C$ on a true $y$ is $U_A(y_C, y)$, and it maximises
+$$
+U_A = \sum_{(x,y)} P(x, y)\, \Big[ U_A\big(C(A(x)), y\big) - W\big(x, A(x)\big) \Big].
+$$
+</Definition>
+
+The adversary gains only when a positive is called negative. Write that gain as $\Delta U_A = U_A(-, +) - U_A(+, +)$: what one successful camouflage is worth. Because the edit cost is subtracted, an adversary never edits a positive so heavily that the edits cost more than getting through is worth. A spammer who has to strip the product out of the message to pass the filter has nothing left to sell.
+
+$W$ is the adversary's edit cost; it is unrelated to the window length $W$ of the drift lessons.
+
+The measurement cost $V_i$ matters in fraud, where measuring a feature can mean a phone call to the cardholder or a document check. In spam it is close to zero, and from here on it is set to zero.
+
+### Which solution to look for
+
+Game theory's standard answer is a *Nash equilibrium*: a pair $(C, A)$ in which neither side can gain by changing its own choice alone. It fails here for two reasons. The first is size. With $n$ binary features there are $2^n$ possible messages, a classifier is a labelling of all of them, so there are $2^{2^n}$ classifiers: for a vocabulary of 20 words, about a million messages and $2^{1{,}000{,}000}$ classifiers. General equilibrium algorithms are exponential in the number of actions. The second is behaviour: an equilibrium assumes each side plays optimally against an optimal opponent, which neither spammers nor fraud teams do.
+
+<Aside>
+One special case is solved. If every edit either costs one unit or is impossible, an equilibrium exists and can be found in time polynomial in the number of instances. That number is $2^n$, so the special case does not rescue a realistic feature space.
+</Aside>
+
+The tractable alternative follows how deployment actually goes, one side at a time. The classifier is trained as if there were no adversary. The adversary, knowing that classifier, plays its best reply. The classifier, knowing that reply, plays its best reply in turn. Both sides are assumed to know every parameter of the other: utilities, edit costs and the fitted model. That *complete information* assumption is strong: real fraudsters do not have it, and make do by probing, trying a change and watching whether it is stopped.
+
+<Figure
+  src="./figures/game-loop.svg"
+  alt="Three boxes left to right. 1. Classifier: fits on mail collected before any attack. 2. Adversary: edits each caught spam in the cheapest way that is still worth it. 3. Classifier: answers again, knowing that edit. Amber arrows join 1 to 2 and 2 to 3 under an amber bracket labelled single shot: one move each, both sides knowing every parameter of the other. A dashed blue arrow loops from box 3 back to box 2, labelled repeated game: the adversary relearns what the classifier now outputs, and replies again"
+  caption="The single-shot game is one move each; if the adversary is allowed to answer the classifier's answer, the game repeats along the dashed loop."
+/>
+
+## The classifier the adversary faces: a sum of log-odds against a threshold
+
+The adversary's reply depends on the classifier's form. A form that splits its evidence into one additive term per feature turns the adversary's problem into arithmetic, and the classifier the spam filters of the early 2000s actually ran has that form: naive Bayes, from the classical-ml course. It treats the features as independent within each class, so
+
+$$
+\mathrm{LO}_C(x) = \ln\frac{P(+ \mid x)}{P(- \mid x)} = \ln\frac{P(+)}{P(-)} + \sum_{i \in X_C} \mathrm{LO}_C(x_i),
+\qquad
+\mathrm{LO}_C(x_i) = \ln\frac{P(x_i \mid +)}{P(x_i \mid -)} .
+$$
+
+$\mathrm{LO}_C(x)$ is the message's *log-odds* of being spam, and $\mathrm{LO}_C(x_i)$ is feature $i$'s contribution. A word much commoner in spam than in ham has a large positive contribution; a word typical of the mailing list's own discussions has a negative one.
+
+### Where the threshold comes from
+
+<Task>
+Recall the per-payment rule of <Ref lesson="example-dependent-cost" id="the-decision-that-minimises-expected-cost">the cost-matrix lesson</Ref> before reading on: with an alert costing $C_a$ and a missed fraud costing its amount, when is a payment flagged? (Flag when $C_a \le \mathrm{Amt} \cdot p$: compare the expected cost of each action and take the cheaper.)
+</Task>
+
+The classifier does the same comparison in utilities. It predicts spam when the expected utility of saying spam beats that of saying ham:
+$$
+U_C(+,+)\,P(+ \mid x) + U_C(+,-)\,P(- \mid x) \;>\; U_C(-,+)\,P(+ \mid x) + U_C(-,-)\,P(- \mid x).
+$$
+Gather the $P(+ \mid x)$ terms on one side and take logarithms:
+$$
+\mathrm{LO}_C(x) \;>\; \mathrm{LT}(U_C) = \ln \frac{U_C(-,-) - U_C(+,-)}{U_C(+,+) - U_C(-,+)} .
+$$
+$\mathrm{LT}$ is the *log threshold*. It is the Bayes minimum-risk rule of the cost-matrix lesson, read on the log-odds scale, and it moves with the utilities alone.
+
+<Example title="three false-alarm penalties">
+A filter for a mailing list earns $+1$ for each message it gets right and $-1$ for each spam it lets through. Throwing away a genuine message is much worse: penalty $10$, $100$ or $1{,}000$, depending on how much the list's members would mind.
+
+| False-alarm penalty $-U_C(+,-)$ | $\mathrm{LT} = \ln \dfrac{1 + \text{penalty}}{1 + 1}$ | Spam only if posterior odds exceed |
+|---|---|---|
+| 10 | $\ln 5.5 = 1.70$ | 5.5 to 1 |
+| 100 | $\ln 50.5 = 3.92$ | 50 to 1 |
+| 1,000 | $\ln 500.5 = 6.22$ | 500 to 1 |
+
+The stricter the penalty, the more spam-like a message must look before it is filtered, and the more spam passes untouched.
+</Example>
+
+### The gap
+
+<Definition title="gap">
+For a message $x$ the *gap* is $\mathrm{gap}(x) = \mathrm{LO}_C(x) - \mathrm{LT}(U_C)$. The classifier calls $x$ spam if and only if $\mathrm{gap}(x) > 0$.
+</Definition>
+
+The gap is a distance on the log-odds scale, not a difference of probabilities. Take a message with $\mathrm{LO}_C(x) = 4.90$ under the penalty-10 filter: its gap is $4.90 - 1.70 = 3.20$, and the spammer must remove 3.2 units of log-odds to get it through. Each candidate edit removes some amount. Changing feature $i$ from $x_i$ to $x_i'$ replaces its contribution $\mathrm{LO}_C(x_i)$ by $\mathrm{LO}_C(x_i')$, so it cuts $\Delta\mathrm{LO}_{i,x_i'} = \mathrm{LO}_C(x_i) - \mathrm{LO}_C(x_i')$: adding a word whose presence counts $-0.9$ where its absence counted $+0.3$ cuts 1.2. Because naive Bayes adds the contributions, cuts add too.
+
+<Figure
+  src="./figures/gap.svg"
+  alt="A horizontal log-odds axis from 0 to 6. A dashed vertical line at 1.70 is labelled LT = ln 5.5 = 1.70, spam above, ham at or below. An amber dot at 4.90 is the message, with an amber bracket from 1.70 to 4.90 labelled gap 3.20. Below, eight grey leftward arrows from 4.90, labelled e1 minus 2.0 price 9, e2 minus 1.6 price 6, e3 minus 1.2 price 3, e4 minus 1.2 price 4, e5 minus 0.8 price 2, e6 minus 0.8 price 4, e7 minus 0.4 price 1, e8 minus 0.4 price 2, their thickness growing with price. At the bottom, an amber chain e3, e4, e5 ends exactly at 1.70, labelled cut 3.2, price 9; a blue chain e1, e2 ends at 1.30, labelled cut 3.6, price 15"
+  caption="The spammer must cut the whole gap; two sets of edits that do it, at different prices."
+/>
+
+<KeyFact>
+Because the threshold is set by the utilities, the classifier's own false-alarm penalty decides how much camouflage the adversary must buy: a stricter penalty lowers every gap before any edit is made.
+</KeyFact>
+
+## The cheapest way through: minimum-cost camouflage
+
+The spammer of the figure has eight candidate edits and a gap of 3.2 to close. Which edits should it make?
+
+### Largest-first is not cheapest
+
+The obvious move is to take the edit that cuts the most, then the next, until the gap closes: e1 (2.0) and e2 (1.6) cut 3.6 at a price of $9 + 6 = 15$. But the big cuts are the expensive ones. Three middling edits, e3, e4 and e5, cut exactly 3.2 for $3 + 4 + 2 = 9$.
+
+The next idea is to rank by cut per unit price. e3, e5 and e7 each buy 0.4 per unit of price, the best ratio on offer; together they cut 2.4 for 6. The best remaining ratio is e4's 0.3, which brings the cut to 3.6 for 10. That is still not the cheapest: the ratio rule committed to e7, and the 0.4 it bought was not needed once e4 was in. Neither greedy order finds the price of 9, and nothing short of considering combinations does.
+
+### A knapsack, and when the adversary bothers
+
+<Definition title="minimum-cost camouflage">
+For a message $x$ with $\mathrm{gap}(x) > 0$, let $z_{i,v} \in \{0, 1\}$ say whether feature $i$ is changed to value $v$. The *minimum-cost camouflage* $\mathrm{MCC}(x)$ is the instance produced by the solution of
+$$
+\min_{z} \sum_{i \in X_C} \sum_{v} W_i(x_i, v)\, z_{i,v}
+\quad\text{subject to}\quad
+\sum_{i \in X_C} \sum_{v} \Delta\mathrm{LO}_{i,v}\, z_{i,v} \;\ge\; \mathrm{gap}(x),
+\qquad \sum_{v} z_{i,v} \le 1 \text{ for each } i .
+$$
+It is the cheapest instance, by the adversary's prices, that the classifier calls ham.
+</Definition>
+
+The first constraint makes the edited message ham; the second lets each feature take only one new value.
+
+This is a *knapsack problem*: choose items, each with a weight and a value, so that the value reaches a target at the least total weight. The edits are the items, their prices the weights, their cuts the values, and the gap the target. The reduction also runs the other way: any 0-1 knapsack can be written as a camouflage problem with one feature per item. So a general fast algorithm for camouflage would be a fast algorithm for knapsack, which is NP-hard, and no such algorithm is known.
+
+Finding the cheapest camouflage is half of the adversary's decision. The other half is whether to use it. Camouflage pays only if it costs less than getting through is worth, $W(x, \mathrm{MCC}(x)) < \Delta U_A$. Call that the *act condition*. The adversary's reply is
+
+$$
+A(x) =
+\begin{cases}
+\mathrm{MCC}(x) & \text{if the classifier calls } x \text{ spam and } W\big(x, \mathrm{MCC}(x)\big) < \Delta U_A, \\
+x & \text{otherwise.}
+\end{cases}
+$$
+
+A message already called ham needs no edit, and a message whose cheapest camouflage costs more than $\Delta U_A$ is sent as it is and caught. Both cases leave $x$ unchanged, and the classifier will use exactly that.
+
+### A table over the discretised gap
+
+NP-hard means that no known method is fast on every instance of the knapsack. The spammer does not face every instance. Its cuts are all multiples of 0.4, and that regularity is enough to build the answer up in a table.
+
+Count cuts in steps of 0.4: e1's 2.0 is 5 steps, and the gap of 3.2 is 8. Then define
+
+$$
+F(i, w) = \text{the least price at which edits among the first } i \text{ cut at least } w \text{ steps}.
+$$
+
+Two facts fill the table. With no edits ($i = 0$) a positive cut is impossible, $F(0, w) = \infty$ for $w > 0$, and a cut of zero is free, $F(i, w) = 0$ for $w \le 0$. And edit $i$ is either left out, which costs $F(i-1, w)$, or used, which costs its price plus the cheapest way to cut the rest with the earlier edits:
+
+$$
+F(i, w) = \min\Big\{\, F(i-1, w),\;\; W_i + F\big(i-1,\, w - u_i\big) \Big\},
+$$
+
+with $u_i$ edit $i$'s cut in steps. Each of the eight edits changes a different feature, so a row is a feature. A feature that can take several new values is still one row: its cell takes the second term once per value and keeps the smallest, since the feature ends with only one of them.
+
+<FigureSequence
+  name="findmcc"
+  alt="Five frames of a table with rows i from 0 to 8 and columns w from 0 to 8, beside a list of the edits e1 to e8 with cuts 5, 4, 3, 3, 2, 2, 1, 1 steps and prices 9, 6, 3, 4, 2, 4, 1, 2. Frame 1 fills row 0 (0 then infinity) and row 1 (0, then 9 up to w = 5, then infinity). Frame 2 fills rows 2 and 3; the last column reads 15 then 12. Frame 3 fills rows 4 and 5; the last column drops to 9 in row 5, highlighted. Frame 4 fills rows 6 to 8; the last column stays 9. Frame 5 highlights the path back: (5, 8) to (4, 6) to (3, 3) to (2, 0), and marks e3, e4 and e5 in the list"
+  caption="The cheapest cut of 8 steps, built one edit at a time and then read back."
+/>
+
+<Task>
+Before stepping to frame 3, compute $F(5, 8)$ from rows 3 and 4 yourself: it is $\min\{F(4, 8),\; 2 + F(4, 6)\}$. Then, in frame 5, check that following the arrows back lists the three edits that cost 9.
+</Task>
+
+The answer is $F(8, 8) = 9$, below the payoff of $\Delta U_A = 20$ that a passed spam is worth, so the spammer makes the three edits.
+
+<Demo name="CamouflageKnapsack" caption="The eight edits against a gap of 3.2 and a payoff of 20. After each pass the classifier retrains, and every edit used keeps half its cut, rounded down to the grid, for the rest of the game." />
+
+<Task>
+Play the spammer. Pick edits until the gap closes at a price below 20, send, and repeat: get three rounds through, then find the round where no affordable set closes the gap. (Round four at the latest; earlier if a round bought more cut than it needed and burned edits a later round could have used.) Then note what this classifier assumes: it never forgets. An edit you used keeps its halved cut even after you stop using it.
+</Task>
+
+**Why a hard problem has a fast table.** The table has one row per feature and one column per step of the gap, nine here ($w = 0, \dots, 8$), and each cell compares one option per candidate value. The work is (features) $\times$ (gap in steps) $\times$ (values per feature): linear in the number of features, and linear in the gap counted in grid steps. That second count is where the hardness hides. It measures how large the gap is against the grid, not how many digits it takes to write the numbers down. On a grid of 0.4 the gap of 3.2 is 8 steps; on a grid of 0.001 it is 3,200; with cuts that differ only in the ninth decimal it is billions. The hard knapsack instances are those whose numbers need many digits before the cheapest set can be told from a dearer one, and on them the table grows tenfold with every digit. A method fast in the size of its numbers but slow in their length is called *pseudo-polynomial*; this one, linear in both counts, is *pseudo-linear*. Log-odds cuts known to a decimal or two keep the spammer on the easy side.
+
+**What rounding costs.** Real cuts are rarely whole multiples of a step, and rounding to the nearest step can err in the costly direction. Take a gap of 0.78 and two edits that cut 0.38 each. Rounded to the nearest 0.4, each edit is 1 step and the gap is 2 steps, so the table says the pair closes it; in fact the pair cuts 0.76, and the spammer pays for edits that leave the message caught. Rounding every cut down and the gap up removes that error: the two cuts become 0 steps, and any set the table accepts closes the real gap. The error left runs the other way. A set that closes the real gap by a hair can look short on the grid, so the table may pass over the cheapest camouflage and return a dearer one. A finer grid shrinks that loss and adds columns.
+
+Some messages can be ruled out before any table is built.
+
+<Lemma title="no affordable camouflage">
+If every edit's cut per unit price is below the gap per unit of payoff,
+$$
+\max_{i,\,v} \frac{\Delta\mathrm{LO}_{i,v}}{W_i(x_i, v)} \;<\; \frac{\mathrm{gap}(x)}{\Delta U_A},
+$$
+then $A(x) = x$: the spammer sends the message unedited.
+
+<Proof>
+Write $r$ for the left-hand side. Take any set of edits whose total price is below $\Delta U_A$, the only sets the adversary would pay for. Each edit cuts at most $r$ times its price, so the set cuts at most $r \times (\text{total price}) < r\,\Delta U_A < \mathrm{gap}(x)$. No affordable set closes the gap, so the act condition fails and $A(x) = x$.
+</Proof>
+</Lemma>
+
+The eight edits have a best ratio of $0.4$ (e3, e5 and e7). A message with gap 8.2 would need every one of the eight edits, which together cut 8.4 (price 31): each cuts at least 0.4, more than the 0.2 to spare; the lemma rules it out without the table, because $8.2/20 = 0.41$ exceeds $0.4$. The message of the figure, at $3.2/20 = 0.16$, is not ruled out, and the table is needed.
+
+### When every word costs the same
+
+The table is needed because prices differ. In the simplest attack a spammer may only add words, and every added word costs the same one unit. Then the cheapest camouflage is the one with the fewest words, and the fewest words come from taking the biggest cuts first: insert words in decreasing order of how strongly they signal ham, and stop when the gap closes. With unit prices the eight edits would be closed by e1 and e2, two words. That is what spammers did in practice: pad the message with words typical of genuine mail.
+
+<Exercise>
+A card-not-present payment is flagged with a gap of 2.6. The fraudster can make five changes, each with its cut in log-odds and its price, in units of €10 of effort or lost profit: a proxy address in the cardholder's country $(1.2, 1)$; a merchant category the card has used before $(0.9, 1)$; waiting for the cardholder's usual hour $(0.8, 2)$; a device not seen with other compromised cards $(0.5, 1)$; an amount near the card's typical size $(0.4, 1)$. A payment that passes is worth $\Delta U_A = 3$ units to the fraudster. Find the minimum-cost camouflage by hand and say whether the fraudster acts. What changes at $\Delta U_A = 3.5$?
+
+<Solution>
+**Fewest edits.** The two largest cuts give $1.2 + 0.9 = 2.1 < 2.6$, so any closing set has at least three edits.
+
+**Three edits.** Adding the third-largest cut, $1.2 + 0.9 + 0.8 = 2.9$, closes the gap at price $1 + 1 + 2 = 4$. Swapping the 0.8 (price 2) for the 0.5 (price 1) gives $1.2 + 0.9 + 0.5 = 2.6$, exactly the gap, at price 3. The payment is then classified genuine, because the rule flags only when the gap is positive. No three edits are cheaper than 3, since every edit costs at least 1. So $\mathrm{MCC}$ is proxy + familiar merchant category + clean device, price 3.
+
+**Does it act?** The rule is to act only if the price is strictly below the payoff: $3 < 3$ fails, so the fraudster sends the payment as it is and it is caught. At $\Delta U_A = 3.5$, $3 < 3.5$ and the fraudster makes the three changes. The move: find the fewest edits that can close the gap, then the cheapest set of that size or larger, then compare with the payoff.
+</Solution>
+</Exercise>
+
+## What the classifier should do, knowing the reply
+
+The adversary has moved. What should the classifier do on the next message? The obvious answer is to retrain on the attacked mail. It has two problems. The labels of the attacked mail arrive late, as every label in this course does. And a retrained classifier is a new target, which the adversary answers again. Under complete information there is a third option that needs no new labels: the classifier knows the adversary's map $A$, so it can compute what the attacked stream looks like.
+
+### Only the spam likelihood moves
+
+Three assumptions fix the setting. The classifier assumes the adversary plays the best reply $A$ of the previous section against plain naive Bayes. The training data was collected before the attack and is untainted. And each $W_i$ is a *semi-metric*: zero only when nothing changes, positive otherwise, and changing a feature from $a$ to $c$ never costs more than going through an intermediate value $b$, so $W_i(a, c) \le W_i(a, b) + W_i(b, c)$. Editing a feature twice costs at least as much as editing it once to the final value. That holds whenever the adversary could always take the detour, which is most real cases.
+
+Of the quantities in naive Bayes, the adversary changes only one. $P(+)$ and $P(-)$ are untouched, since it creates no messages; $P(x \mid -)$ is untouched, since it edits no ham. What changes is the probability of observing $x'$ among spam. A spam is observed as $x'$ if it was born as some $x$ that the map sends to $x'$:
+
+$$
+P_A(x' \mid +) = \sum_{x \,:\, A(x) = x'} P(x \mid +)
+= \sum_{x \in X_A'(x')} P(x \mid +) \;+\; I(x')\, P(x' \mid +),
+$$
+
+where $X_A'(x')$ is the set of *pre-images* of $x'$: the other messages the adversary sends to $x'$, because $x'$ is their cheapest camouflage *and* its price is below $\Delta U_A$. A message whose cheapest camouflage is $x'$ but costs $\Delta U_A$ or more is sent unedited and is not a pre-image. And $I(x') = 1$ if a spam born as $x'$ would be left as $x'$: because naive Bayes already calls $x'$ ham, or because its cheapest camouflage costs at least $\Delta U_A$. Otherwise $I(x') = 0$: every spam born as $x'$ is edited away.
+
+<Definition title="adversary-aware classifier">
+The *adversary-aware classifier* makes the classifier's expected-utility decision with $P_A(x' \mid +)$ in place of $P(x' \mid +)$: it predicts spam for $x'$ when
+$$
+U_C(+,+)\,P(+)P_A(x' \mid +) + U_C(+,-)\,P(-)P(x' \mid -) \;>\; U_C(-,+)\,P(+)P_A(x' \mid +) + U_C(-,-)\,P(-)P(x' \mid -).
+$$
+</Definition>
+
+### A mailbox of three words
+
+<Example title="the aware classifier on a mailbox of three words">
+A mailing list receives 1,000 spam and 5,000 genuine messages per period. A message is described by three words, present or absent: *offer*, *seminar*, *linguistics*. Spam contains *offer* 80% of the time, *seminar* 5%, *linguistics* 10%; genuine mail 5%, 40% and 50%. The words occur independently within each class, so the count of any message is a product of these rates: 684 spam with *offer* alone is $1{,}000 \times 0.8 \times 0.95 \times 0.9$. Naive Bayes is fitted on these rates. The penalty is 10, so a message is spam when its posterior odds exceed 5.5. With counts, the posterior odds at a message are simply (spam with that message) / (ham with that message).
+
+**The contributions.** The prior is $\ln(1/5) = -1.61$. *Offer* present adds $\ln(0.8/0.05) = +2.77$, absent $\ln(0.2/0.95) = -1.56$. *Seminar* present adds $\ln(0.05/0.4) = -2.08$, absent $+0.46$. *Linguistics* present adds $-1.61$, absent $+0.59$.
+
+**Who is caught.** Only *offer* alone is: $-1.61 + 2.77 + 0.46 + 0.59 = 2.21 > 1.70$, gap 0.51, odds $684/75 = 9.1$. Every other message is below 1.70.
+
+**The spammer's reply.** The spammer may add a word at 0.1 per character and gains $\Delta U_A = 20$ per passed spam. Adding *seminar* cuts $0.46 + 2.08 = 2.54$ for 0.7; adding *linguistics* cuts $0.59 + 1.61 = 2.20$ for 1.1. Either closes the gap of 0.51; *seminar* is cheaper. So all 684 *offer*-only spam become *offer* + *seminar*.
+
+**The likelihood under attack**, for the four messages containing *offer*:
+
+| Observed $x'$ | Spam born as $x'$ | Ham | $I(x')$ | Spam arriving as $x'$ | Naive Bayes | Aware |
+|---|---|---|---|---|---|---|
+| *offer* | 684 | 75 | 0 | 0 | spam | ham |
+| *offer* + *seminar* | 36 | 50 | 1 | $36 + 684 = 720$ | ham | spam ($720/50 = 14.4$) |
+| *offer* + *linguistics* | 76 | 75 | 1 | 76 | ham | ham ($76/75 = 1.0$) |
+| all three | 4 | 50 | 1 | 4 | ham | ham |
+
+The 200 spam without *offer* are ham to both classifiers.
+
+**The tally.** Before the attack, naive Bayes catches 684 spam with 75 false alarms. Under attack it catches none: 1,000 spam through, 75 false alarms. The aware classifier catches 720, lets 280 through, and raises 50 false alarms instead of 75.
+</Example>
+
+<Figure
+  src="./figures/preimages.svg"
+  alt="Two panels. Left, titled x prime = offer + seminar: an amber box offer only, 684 spam, cheapest edit add seminar, price 0.7, with an amber arrow into an observed x prime box; a blue box offer + seminar, 36 spam born here, naive Bayes passes them, I of x prime = 1, with a blue arrow into the same box. Below, an amber bar of 720 spam that arrive as x prime, of 1,000, and a blue bar of 50 ham, of 5,000; verdict aware: spam (naive Bayes: ham). Right, titled x prime = offer only: a dashed box no pre-image, no message has x prime as its cheapest camouflage; a dashed blue box offer only, 684 born here, edited away, I of x prime = 0. Bars: 0 spam, 75 ham; verdict aware: ham (naive Bayes: spam)"
+  caption="The two cases of the indicator: a message that receives the edited spam, and a message that loses all of its own."
+/>
+
+Two of the table's verdicts look strange and are right. A message with *offer* alone is now called ham: no spam arrives in that form, because every spam born that way is edited, so only the 75 genuine messages remain. That is why the false alarms fall. And *offer* + *linguistics* stays ham while *offer* + *seminar* becomes spam, though *linguistics* signals ham less strongly than *seminar*. The difference is the price: *seminar* is the spammer's cheapest edit, so its presence beside *offer* is the trace of a camouflage.
+
+<KeyFact>
+Reading the cheapest edit as evidence is only as good as the classifier's copy of the adversary's prices. If it believed *seminar* cheapest while the spammer in fact added *linguistics*, the 684 would arrive as *offer* + *linguistics*, which it calls ham, and it would catch 36 spam of 1,000 with 50 false alarms.
+</KeyFact>
+
+### Finding the pre-images without listing every message
+
+The three-word mailbox could be checked by running $A$ on all eight messages. With a real vocabulary there are $2^n$ messages, and the pre-images of $x'$ must be found without listing them. Two results do it. The first says which features of $x'$ could have been edited.
+
+<Lemma title="which features could have been changed">
+Let $x_A$ be a spam and $x' = \mathrm{MCC}(x_A)$. If feature $i$ differs between them, then
+$$
+\mathrm{gap}(x') + \mathrm{LO}_C\big((x_A)_i\big) - \mathrm{LO}_C(x_i') > 0 .
+$$
+
+<Proof>
+Let $x''$ be $x'$ with feature $i$ put back to $(x_A)_i$. It differs from $x_A$ in one feature fewer than $x'$, and every change has a positive price, so $W(x_A, x'') < W(x_A, x')$. Since $x'$ is the cheapest instance the classifier calls ham, the cheaper $x''$ must be called spam: $\mathrm{gap}(x'') > 0$. Naive Bayes adds contributions, so $\mathrm{gap}(x'') = \mathrm{gap}(x') + \mathrm{LO}_C((x_A)_i) - \mathrm{LO}_C(x_i')$.
+</Proof>
+</Lemma>
+
+In the mailbox, take $x' = $ *offer* + *seminar*, with $\mathrm{gap}(x') = -0.33 - 1.70 = -2.03$. Which of its features could the spammer have changed? A spammer who adds words changes a feature from absent to present, so run the test on each word present in $x'$.
+
+- ***Seminar***. Had it been absent in $x_A$, the left side is $-2.03 + 0.46 - (-2.08) = 0.51 > 0$: a candidate.
+- ***Offer***. Had it been absent in $x_A$, the left side is $-2.03 + (-1.56) - 2.77 = -6.36 < 0$: ruled out. Taking *offer* out of $x'$ leaves a message naive Bayes still calls ham, so a spammer who had added *offer* could have stopped short of it and paid less: no cheapest camouflage adds it.
+
+*Linguistics* is absent from $x'$, and a spammer who can only add words cannot have taken it out. So *seminar* is the one feature of $x'$ that can have been changed.
+
+The second result says that the candidates found one feature at a time are enough.
+
+<Theorem title="partial reverts share the camouflage">
+Assume each $W_i$ is a semi-metric and $\mathrm{MCC}$ is unique. Let $x_A$ be a spam with $x' = \mathrm{MCC}(x_A)$, let $D$ be the set of features changed, and let $E$ be a non-empty proper subset of $D$. Let $x_A'$ agree with $x'$ on $E$ and with $x_A$ elsewhere: some of the edits made, the rest not yet. Then $x' = \mathrm{MCC}(x_A')$.
+
+<Proof>
+**$x_A'$ is spam.** It is reached from $x_A$ by the edits in $E$ alone, strictly cheaper than all of $D$. If the classifier called $x_A'$ ham, it would be a cheaper camouflage of $x_A$ than $x'$.
+
+**Contradiction.** Suppose $x'' = \mathrm{MCC}(x_A') \ne x'$. Then $W(x_A', x'') < W(x_A', x')$. The cost from $x_A$ to $x'$ is the sum of per-feature prices over $D$, which splits into the prices over $E$ and over $D \setminus E$: $W(x_A, x') = W(x_A, x_A') + W(x_A', x')$. By the triangle inequality,
+$$
+W(x_A, x'') \;\le\; W(x_A, x_A') + W(x_A', x'') \;<\; W(x_A, x_A') + W(x_A', x') \;=\; W(x_A, x').
+$$
+So $x''$ is a ham-classified instance strictly cheaper to reach from $x_A$ than $x'$, contradicting $x' = \mathrm{MCC}(x_A)$.
+</Proof>
+</Theorem>
+
+Now take any pre-image $x_A$ of $x'$, and let $D$ be the features it changed. Apply the theorem once for each feature $i$ in $D$, with $E = D$ minus $i$. Then $x_A'$ is $x'$ with only feature $i$ put back to $(x_A)_i$, and its cheapest camouflage is $x'$. That camouflage costs less than $x_A$'s did, so less than $\Delta U_A$, and the adversary sends $x_A'$ to $x'$: the single revert is a pre-image. (If $D$ holds one feature, $x_A$ is its own single revert.) So every pair $(i, (x_A)_i)$ by which a pre-image differs from $x'$ is a pair whose single revert is a pre-image.
+
+That gives the search. Collect $GV$, the feature values $(i, v)$ for which $x'$ with feature $i$ set to $v$ is a pre-image; it takes one check per candidate that passes the lemma. By the argument above, every pre-image of $x'$ differs from $x'$ only in pairs from $GV$. The single reverts are themselves distinct pre-images, so
+
+$$
+\sum_{(i,v) \in GV} P\big(x'_{[i=v]} \mid +\big) \;\le\; \sum_{x \in X_A'(x')} P(x \mid +),
+$$
+
+a lower bound on the pre-image mass that costs one naive Bayes product per element of $GV$. If the aware classifier already says spam with this lower bound in place of the pre-image mass, the message is spam; if it still says ham with an upper bound, from all combinations of $GV$, the message is ham. The Ling-Spam experiment below predicted with the lower bound alone. In the mailbox $GV$ holds only *seminar* absent, and the bound is exact: 684.
+
+The theorem is the only place the triangle inequality is needed. Without it, a spam two edits from $x'$ could have a cheaper route to some other ham-classified message through an intermediate value, and partial reverts would point elsewhere.
+
+## What the aware classifier recovers on real mail
+
+The mailbox is built to make the mechanism visible. Whether the effect survives a real corpus was tested on Ling-Spam, the messages of a linguistics mailing list: 2,412 genuine messages and the 481 spam the list received, about one message in six. Naive Bayes and the aware classifier were each trained and tested by 10-fold cross-validation, with the utilities of the penalty example, $\Delta U_A = 20$, and three ways of attacking.
+
+- **Add words.** Each word is a present/absent feature; the spammer may only add words, at one unit each, as many as cost less than $\Delta U_A = 20$ in total.
+- **Add length.** The same, at 0.1 per character, so fewer than 200 characters.
+- **Synonyms.** Each word position is a feature; the spammer may replace a word only by a synonym from the WordNet lexical database, at one unit each, fewer than 20 replacements. The message keeps its meaning.
+
+<Figure
+  src="./figures/false-negatives.svg"
+  alt="Grouped bar chart of spam let through, out of 481, at false-alarm penalty 10. No attack: naive Bayes 94. Add words: naive Bayes 481, adversary-aware 93. Add length: naive Bayes 477, adversary-aware 94. Synonyms: naive Bayes 408, adversary-aware 164. A dashed line at 481 is labelled every spam. Naive Bayes bars are blue, adversary-aware bars amber"
+  caption="Under the add-words attack naive Bayes lets every spam through; the aware classifier misses about as many as naive Bayes did with no attack."
+/>
+
+| Penalty | 10 | | 100 | | 1,000 | |
+|---|---|---|---|---|---|---|
+| Spam through (FN), false alarms (FP) | FN | FP | FN | FP | FN | FP |
+| Naive Bayes, no attack | 94 | 2 | 124 | 1 | 165 | 1 |
+| Naive Bayes, add words | 481 | 2 | 481 | 1 | 481 | 1 |
+| Aware, add words | 93 | 0 | 123 | 0 | 164 | 0 |
+| Naive Bayes, add length | 477 | 2 | 477 | 1 | 477 | 1 |
+| Aware, add length | 94 | 0 | 124 | 0 | 165 | 0 |
+| Naive Bayes, synonyms | 408 | 2 | 413 | 1 | 414 | 1 |
+| Aware, synonyms | 164 | 1 | 196 | 0 | 229 | 0 |
+
+Three readings.
+
+**The attack is total and the recovery nearly so.** The add-words budget is enough to pass every one of the 481 spam through naive Bayes, at every penalty. The aware classifier lets 93 through, one fewer than naive Bayes on unattacked mail. Synonyms are the harder attack to undo: there the aware classifier still misses 164 to 229.
+
+**False alarms fall to zero** under both adding attacks, and under synonyms to one at penalty 10 and zero above it. It happened for the reason the mailbox showed. A spam is almost never sent unedited, so the spam-like genuine messages that naive Bayes used to flag now share their region of feature space with no spam at all, and the aware classifier calls them ham.
+
+**The penalty costs the aware classifier little.** Its misses do rise with the penalty, from 93 to 123 to 164, because a stricter threshold lets more spam pass. But it raises no false alarm for the penalty to multiply, so its utility, averaged as in the penalty example over the 2,893 messages, falls only from 0.936 at penalty 10 to 0.887 at penalty 1,000. Naive Bayes under add words misses all 481 at every penalty, and its one or two false alarms, multiplied by the growing penalty, take its utility from 0.660 to 0.321.
+
+These numbers rest on the assumptions of the single round. The aware classifier knew the adversary's prices, payoff and model exactly, and was trained on mail collected before the attack. The test is spam, not fraud: no comparable experiment on payment data exists, and the fraud evidence below is a record of adaptations, not a measurement.
+
+## Does the back-and-forth settle?
+
+The single round ends with the classifier's reply. Nothing stops the spammer from moving again. Two learners, each improving against the other, would be expected to approach a resting point where neither can do better. The record shows the opposite.
+
+### Two rounds that undo each other
+
+The repeated game was run on Ling-Spam under the add-words attack. In each round the spammer fits a naive Bayes to the labels the deployed classifier gives, and attacks that model with its cheapest camouflage. The classifier, aware of this round's attack, classifies the attacked mail. A new naive Bayes is fitted to that mail and its labels, and becomes the model the spammer attacks next. The fitted naive Bayes scored close to the aware classifier it imitated, so the spammer was attacking a fair copy.
+
+Over 15 rounds, the aware classifier beat naive Bayes in every round, by most at penalty 1,000. And utility never settled: it alternated between two values, round after round.
+
+<FigureSequence
+  name="word-life"
+  alt="Four frames, one per round, of one word's log-odds under the naive Bayes fitted that round, drawn as a bar below zero (good, amber) or above zero (spammy, blue). Round 1: good under the last model, the spammer inserts it. Round 2: refitted on round 1, where it filled the spam, it is spammy and dropped. Round 3: refitted on round 2, where it sat only in ham, it is good again and inserted again. Round 4: spammy again, dropped again. Beneath, a schematic strip of the classifier's utility per round alternates between two levels"
+  caption="The life of one word in the repeated game: each refit undoes the spammer's last choice, and the spammer's next choice undoes the refit."
+/>
+
+<Task>
+Before stepping to frame 4, predict the word's sign in round 4 and say why; then say what round 5 would show. (Spammy, because it filled round 3's spam; in round 5 it is good again and inserted, because round 4's mail held it only in ham.)
+</Task>
+
+The mechanism is the life of one word, and it turns on what each refit sees: the latest round's mail alone, not the history the demo's classifier kept. In some round the spammer inserts a word that the current model counts as strongly genuine, one of the few best good words, into much of its spam. The classifier catches the camouflage, and the naive Bayes fitted on that round's mail sees the word in many messages labelled spam: it no longer cuts the log-odds, so in the next round the spammer leaves it out and uses other good words. With the word gone from the spam, the next fit sees it mainly in genuine mail, its contribution turns negative again, and the spammer inserts it again. Each side's best reply undoes the other's last move, and the period is two.
+
+The planted fraudster of the <Ref lesson="drift-strategies-on-worldline" id="exercises">Worldline exercise</Ref> did the same with an amount: it went down until the nightly model learned the low band, then jumped back up, plausibly once the 30-day window had dropped the high-amount frauds.
+
+<KeyFact>
+Period two is a measurement from one setting: the add-words attack on Ling-Spam, with a spammer that refits naive Bayes each round. The argument above fixes the mechanism, a refit on the latest mail undoing the last move, but not the period; another corpus or another attack can cycle differently. What carries over is that retraining on the latest data alone gives the adversary its abandoned edits back.
+</KeyFact>
+
+### The fraud versions of the game
+
+Fraud has no Ling-Spam, but the same moves are on record. What replaces complete information is probing, and its effect is that a deployed detection system gradually loses the detection power it had. Practitioners in telephone and card fraud reported, by the early 2000s:
+
+| What the detector learned to flag | What the fraudsters did next | The price of the edit |
+|---|---|---|
+| A large volume of activity on a brand-new account (<Ref lesson="financial-crime-typology" id="superimposed-and-subscription-fraud">subscription fraud</Ref>) | Lie low, pay the first bills, then ramp up spending | Months of waiting and the bills paid |
+| Fraudulent wireless calls from fixed "calling dens" at known locations | Roving calling dens: service sold from the back of a van driving around the city | A van and a driver |
+| Cash transactions over \$10,000, reported to the authorities | Deposits just under \$10,000 at several banks, the <Ref lesson="financial-crime-typology" id="structuring-and-mules-the-crime-answers-the-rule">structuring</Ref> of the typology lesson | More deposits, more mules |
+
+Each row is a minimum-cost camouflage in the game's sense: the cheapest change to the features the detector measured that moved the case below its threshold, chosen because it cost less than the fraud was worth. The classifier's best reply in each case is to measure something the cheap edit does not reach. <Ref lesson="fraud-as-a-graph" id="a-position-in-the-graph-is-hard-to-forge">A position in the graph</Ref> is hard to forge because the fraudster cannot see the whole network. In the game's terms, graph features are the features whose edit price $W_i$ is high.
+
+### When an edit costs almost nothing
+
+The game's cost side has moved recently. A randomised study of personalised phishing emails, with 101 participants recruited around universities, compared four arms. A generic phishing email drew clicks from 12% of its recipients; emails written by human experts from public information about each target, 54%; emails written end to end by a language-model pipeline from the same information, 54%; the pipeline with a human editing its output, 56%. The expert spent about 34 minutes per target; the automated email cost about 4 cents. The caveats matter: only 60 of the 101 participants showed any activity after signing up, a click is not a compromise, and one population was tested. What is measured is that a convincing personalised edit stopped being expensive.
+
+In the game, that is $W$ falling. The prices enter the aware classifier twice: through the *camouflage map*, where each positive would go ($\mathrm{MCC}(x)$), and through the act condition, whether it goes. Both $I(x')$ and the pre-image sets are built from the two together. The model separates two ways $W$ can fall by which of the two they move.
+
+| How $W$ falls | The cheapest set | Who acts | What a classifier with the old prices gets wrong |
+|---|---|---|---|
+| Every price by the same factor | Unchanged: scaling all prices by one factor reorders no two sets' totals | More positives: $W(x, \mathrm{MCC}(x)) < \Delta U_A$ holds for more messages, and the pruning lemma fires less, since every cut-per-price ratio grows | Only the act condition. The map is right, but the classifier misplaces each newly camouflaged positive $x$: it keeps $I(x) = 1$ where the truth is 0, and leaves $x$ out of the pre-image set of $\mathrm{MCC}(x)$, which $x$ has now joined |
+| Some prices more than others: fluent personalised text becomes nearly free, a device history or an account's age does not | Changes: the arrows point somewhere new | More positives, those the newly cheap edits can carry below the threshold | The camouflage map itself, and with it the pre-image sets: it reads the old edit as evidence while the spam arrives by the new one |
+
+Automation cheapens writing, not every edit, so the second row is the likely one. The levers left are the features whose edits stay dear.
+
+Financial-intelligence bodies report generated identity documents and video used to pass onboarding checks, but no incidence rate and no detector loss attributed to them has been measured. One list from such an alert shows the aware classifier's idea in practice: a customer who uses a third-party webcam plug-in during a live identity check, or declines multi-factor authentication, is flagged. The counter-move is itself the feature.
+
+<Aside>
+The same alerts warn of "pattern mimicry": models trained on genuine payment streams generating sequences that look statistically like them. It is stated as a capability, not measured. In the game it would be a cheap edit to the features a model learns from sequences, the row of the table where some prices fall more than others.
+</Aside>
+
+### What the law asks of a high-risk system
+
+The EU's AI Act names the attacks of the game among its robustness and cybersecurity requirements. For a system that falls in its high-risk category it requires:
+
+<Quote source="Regulation (EU) 2024/1689 (AI Act), Art. 15(5)">
+The technical solutions to address AI specific vulnerabilities shall include, where appropriate, measures to prevent, detect, respond to, resolve and control for attacks trying to manipulate the training data set (data poisoning), or pre-trained components used in training (model poisoning), inputs designed to cause the AI model to make a mistake (adversarial examples or model evasion), confidentiality attacks or model flaws.
+</Quote>
+
+The minimum-cost camouflage is the "model evasion" entry. The game assumed the first entry, data poisoning, away: the aware classifier's training set was untainted by assumption. Whether a fraud detector falls in the high-risk category at all is a question of its own, taken up in <Ref lesson="eu-ai-act-fraud" />. The same article's previous paragraph asks systems that keep learning after deployment to address "feedback loops", in which biased outputs influence input for future operations.
+
+<Conclusion>
+You can now write evasion as a game: a classifier maximising a utility with a log threshold $\mathrm{LT}$ set by its own false-alarm penalty, and an adversary that pays $W$ per feature changed and gains $\Delta U_A$ per positive passed. Against naive Bayes, the adversary's best reply is the minimum-cost camouflage, a knapsack over log-odds cuts that a table over the discretised gap solves, used only when its price is below $\Delta U_A$. The classifier's best reply keeps $P(+)$ and $P(x \mid -)$ and replaces the spam likelihood by the mass of the pre-images that the reply sends to $x'$, found through single-feature reverts because the edit cost obeys the triangle inequality. On a real spam corpus that reply took the add-words attack from 481 of 481 spam through to 93, with no false alarms. Repeated on that corpus, the game did not settle: utility alternated with period two, because each refit on the latest mail undoes the adversary's last choice and hands back the edits it abandoned.
+
+The adversary is one way a detector shapes its own data. The other needs no adversary at all: the labels a fraud model learns from are the investigators' verdicts on the payments it chose to alert. <Ref lesson="alert-feedback-selection-bias" /> takes up what that selection does to training, and why it cannot be weighted away.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+Take the message with $\mathrm{LO}_C = 4.90$ and its eight edits e1 to e8. At false-alarm penalties 100 and 1,000, is the message caught, and if so, what does its cheapest camouflage cost? Use the finished table, with steps of 0.4 and the gap rounded up to a whole number of steps.
+
+<Solution>
+**Penalty 100.** $\mathrm{LT} = \ln 50.5 = 3.92$, so the gap is $4.90 - 3.92 = 0.98$, which rounds up to 3 steps (1.2). The table's last row gives $F(8, 3) = 3$: e3 alone (3 steps, price 3), or e5 + e7 (2 + 1 steps, price 2 + 1). Either way the price is 3, below 20, and the spammer edits.
+
+**Penalty 1,000.** $\mathrm{LT} = \ln 500.5 = 6.22 > 4.90$: the gap is negative, the message is already ham, and the spammer does nothing. The move: the classifier's own penalty moves the threshold; read the gap first, and only then the table.
+</Solution>
+</Exercise>
+
+<Exercise>
+In the mailbox of three words: (a) make every price infinite, so the spammer can change nothing, and show that the aware classifier is naive Bayes, naming the terms of $P_A(x' \mid +)$ that change; (b) make only *seminar* impossible to add, keep *linguistics* at 1.1, and recompute the attack, the aware verdicts and the counts of spam through and false alarms; (c) now set every price to zero. Which clause of the semi-metric assumption fails, and which step of the theorem on partial reverts needs it?
+
+<Solution>
+**(a)** With no affordable edit, $A(x) = x$ for every message. Every pre-image set $X_A'(x')$ is empty and $I(x') = 1$ for every $x'$, so $P_A(x' \mid +) = P(x' \mid +)$ and the aware decision is naive Bayes's. Counts: 684 caught, 316 through, 75 false alarms.
+
+**(b)** The 684 *offer*-only spam now add *linguistics* (cut 2.20 against a gap of 0.51, price 1.1 < 20) and become *offer* + *linguistics*. Under attack: *offer* alone has 0 spam and 75 ham, so it is ham; *offer* + *linguistics* has $76 + 684 = 760$ spam against 75 ham, odds 10.1 > 5.5, so it is spam; *offer* + *seminar* has 36 against 50, ham; all three, 4 against 50, ham. The aware classifier catches 760, lets 240 through, and raises 75 false alarms (the genuine *offer* + *linguistics* messages). The signature has moved to the other word; the false alarms are no longer fewer, because genuine *offer* mail lacks *seminar* more often (60%) than it has it (40%), and *linguistics* appears in half of both.
+
+**(c)** With every price zero, a change costs nothing, so the first clause, "$W_i(a, b) = 0$ only if $a = b$", fails. The theorem's first step needs strictly positive prices: a partial revert $x_A'$ is spam because reaching it is strictly cheaper than reaching $x'$. At price zero every closing set ties, the cheapest camouflage is not unique, and the pre-image of an observed message depends on a tie-break the classifier cannot know. The boundary is the case where the theory gives no aware classifier at all. The move: when a hypothesis is "strictly", look for the step that uses the strictness.
+</Solution>
+</Exercise>
+
+<Exercise>
+"Retraining weekly on the latest labelled spam makes the filter adversary-aware, because the camouflaged messages enter the training set." Refute it: name the assumption of the aware classifier that this procedure breaks, and use the repeated game to say what weekly retraining produces instead.
+
+<Solution>
+**What the aware classifier is.** It keeps the training distribution $P(x \mid +)$ fitted on mail from before the attack, and computes what the attack does to it through the adversary's map: $P_A(x' \mid +)$ as a sum over pre-images. Its training data is untainted by assumption. Retraining on attacked mail does the opposite: it replaces $P(x \mid +)$ by an estimate of $P_A(x \mid +)$ for last week's adversary, with no model of the adversary at all.
+
+**What that produces.** The retrained naive Bayes learns that last week's camouflage words are spam words, which is right for last week's spam. This week's spammer, facing the retrained model, stops using those words, because they no longer cut the log-odds, and uses the words the retraining made look innocent. The repeated game showed the mechanism: each refit undoes the spammer's last choice and the spammer's next choice undoes the refit, so the filter chases the spammer without settling. On Ling-Spam under add words, utility alternated with period two. Retraining makes the filter a moving target, not an aware one; awareness means modelling the reply, not fitting its last output.
+</Solution>
+</Exercise>
+
+<Exercise>
+In the add-words attack every added word costs one unit. Prove that inserting words in decreasing order of their cut, and stopping when the gap closes, gives a minimum-cost camouflage. Then, for the eight edits e1 to e8 against the gap of 3.2, keep every price at 1 and change only e1's: from what price on is largest-first no longer a cheapest camouflage?
+
+<Solution>
+**Counting argument.** With unit prices, the price of a set is its size, so the task is the fewest words whose cuts sum to at least the gap. Sort the cuts $c_1 \ge c_2 \ge \dots$. Let $k$ be the smallest number with $c_1 + \dots + c_k \ge \mathrm{gap}$; greedy takes exactly these $k$. Any set of $j < k$ words has total cut at most $c_1 + \dots + c_j$, the $j$ largest cuts, which is below the gap by the choice of $k$. So no smaller set closes the gap, and greedy is optimal.
+
+**Where it breaks.** The argument used only that all prices are equal. Call e1's price $p$. Largest-first takes e1 + e2 (cut 3.6) for $p + 1$. Without e1, no two words close the gap (the best pair, e2 + e3, cuts 2.8), and three do: e2 + e3 + e4 cuts 4.0 for 3. At $p = 2$ the two sets tie at price 3, so largest-first is still a cheapest camouflage; it loses for every $p > 2$. Doubling one price is not enough; any rise past double is. The move: a proof that a greedy rule is optimal shows what it depends on; perturb exactly that.
+</Solution>
+</Exercise>
+
+<Exercise>
+The utility of a classifier on the mailing-list corpus is the average over its 2,893 messages of $+1$ per correct message, $-1$ per spam let through, and $-100$ per false alarm. From the table of false negatives and false positives, compute it at penalty 100 for naive Bayes with no attack, naive Bayes under add words, and the aware classifier under add words. Then design the experiment that would tell "the aware classifier is a better classifier" from "the adversary ran out of budget".
+
+<Solution>
+**Utilities.** There are 481 spam and 2,412 genuine messages.
+
+- Naive Bayes, no attack: 124 through, so 357 caught; 1 false alarm, so 2,411 genuine right. $(357 + 2{,}411 - 124 - 100)/2{,}893 = 2{,}544/2{,}893 = 0.879$.
+- Naive Bayes, add words: 0 caught, 481 through, 1 false alarm. $(2{,}411 - 481 - 100)/2{,}893 = 1{,}830/2{,}893 = 0.633$.
+- Aware, add words: 358 caught, 123 through, 0 false alarms. $(358 + 2{,}412 - 123)/2{,}893 = 2{,}647/2{,}893 = 0.915$.
+
+The aware classifier under attack scores above naive Bayes with no attack, and the whole difference, $2{,}647 - 2{,}544 = 103$, is the one false alarm it avoids (worth 101: $-100$ becomes $+1$) plus one more spam caught (worth 2: $-1$ becomes $+1$).
+
+**The experiment.** The two explanations predict different things when the budget changes. Fix the classifier and vary $\Delta U_A$ from 0 to far above 20. Record, for each value, the share of spam the adversary edits and the aware classifier's misses among edited and among unedited spam. If the gain comes from reading the camouflage, misses among edited spam stay low as the budget grows, because a richer adversary's cheapest camouflage is still predictable. If the gain comes from the budget, misses grow with $\Delta U_A$ as more messages become affordable to camouflage beyond the classifier's reach. A second arm runs the aware classifier on unattacked mail: if it is better there too, part of the gain is not about the adversary. Agreement means the edited-spam miss rate is flat in $\Delta U_A$ within its fold-to-fold spread.
+</Solution>
+</Exercise>
+
+<Exercise>
+Rewrite the log threshold with the per-payment cost matrix of the cost-matrix lesson: an alert costs $C_a$ whether or not the payment is fraud, a missed fraud costs its amount, and a genuine payment left alone costs nothing. Show that the gap now depends on the amount. A fraudster wants \$10,000 from a card whose payments the model scores at log-odds $-5.0$, with $C_a = \text{\textdollar}5$. Is a single \$10,000 payment flagged? Are fifty \$200 payments? What feature would close this route, and from which lesson?
+
+<Solution>
+**The threshold.** Utilities are negative costs: $U_C(+,+) = U_C(+,-) = -C_a$, $U_C(-,+) = -\mathrm{Amt}$, $U_C(-,-) = 0$. Then
+$$
+\mathrm{LT} = \ln \frac{0 - (-C_a)}{-C_a - (-\mathrm{Amt})} = \ln \frac{C_a}{\mathrm{Amt} - C_a}.
+$$
+Posterior odds above $C_a/(\mathrm{Amt} - C_a)$ means $p(\mathrm{Amt} - C_a) > C_a(1 - p)$, that is $p \cdot \mathrm{Amt} > C_a$: the per-payment rule of <Ref lesson="example-dependent-cost" id="reading-the-threshold">the cost-matrix lesson</Ref>, except at the tie $p \cdot \mathrm{Amt} = C_a$, which that rule flags and the game's strict inequality does not. Neither payment below sits at the tie. The gap is $\mathrm{LO}_C(x) - \ln\frac{C_a}{\mathrm{Amt} - C_a}$, which grows with the amount: a large payment has a low threshold.
+
+**One payment.** $\mathrm{LT} = \ln(5/9{,}995) = -7.60$; the gap is $-5.0 + 7.60 = 2.60 > 0$, so it is flagged. (Check: $p = 1/(1 + e^{5}) = 0.0067$, and $0.0067 \times 10{,}000 = \text{\textdollar}67 > \text{\textdollar}5$.)
+
+**Fifty payments.** $\mathrm{LT} = \ln(5/195) = -3.66$; the gap is $-5.0 + 3.66 = -1.34 < 0$, so each passes. ($0.0067 \times 200 = \text{\textdollar}1.34 < \text{\textdollar}5$.) Splitting changes no feature the model sees; it moves the threshold, which is set by the amount. This is structuring, aimed at a cost-sensitive model rather than a reporting rule.
+
+**The defence.** A feature the split cannot leave unchanged: the card's amount and count over the last 24 hours, from <Ref lesson="transaction-aggregates" />. Fifty payments in a day on one card raise the log-odds of each later piece, so the edit acquires a price.
+</Solution>
+</Exercise>
+
+<Exercise>
+Automation has cut the price of a convincing edit. Take the eight edits e1 to e8 ($\Delta U_A = 20$) and two messages: the one with gap 3.2, and one with gap 8.2, which the pruning lemma rules out at today's prices. (a) Every price is multiplied by the same factor $f$, $0 < f \le 1$. For each message, which part of the adversary's reply moves with $f$: the set of edits it would use, or whether it uses them? At what $f$ does the second message start being camouflaged, and over what range of $f$ does the lemma still settle it without the table? (b) Instead only e1 and e2 fall, to a price of 1 each. Find the new cheapest camouflage of the first message. (c) For each change, say what an aware classifier that kept the old prices gets wrong: only the act condition (whether a positive is edited), the camouflage map (where it goes), or nothing.
+
+<Solution>
+**(a)** Scaling every price by $f$ multiplies every set's total by $f$, so the order of the sets by price is unchanged and the cheapest set is the same at every $f$. For the first message it stays e3 + e4 + e5 at price $9f$, and $9f < 20$ holds throughout: nothing changes but the price. The second message needs a cut of 8.2; all eight edits cut 8.4, and no edit cuts 0.2 or less, so the only closing set is all eight, at $31f$. The adversary acts once $31f < 20$, that is $f < 20/31 \approx 0.645$. The lemma compares the best ratio, $0.4/f$, with $8.2/20 = 0.41$: it rules the message out only while $0.4/f < 0.41$, that is $f > 0.976$. Between 0.645 and 0.976 the table is needed and says no; below 0.645 it says yes.
+
+**(b)** e1 + e2 now cut 3.6 for 2. No cheaper set closes the gap: the sets priced below 2 are e1, e2 and e7 alone, cutting at most 2.0, and the other sets priced exactly 2 (e1 + e7, e2 + e7, e5 alone, e8 alone) cut at most 2.4. So the cheapest camouflage is e1 + e2 at 2, replacing e3 + e4 + e5.
+
+**(c)** Under a uniform fall the camouflage map is unchanged: the cheapest set of every message is the same, so a classifier with stale prices knows where each spam would go. It is wrong only in the act condition, about *whether* it goes. Below $f = 20/31 \approx 0.645$ the gap-8.2 message is edited, and both quantities built on the act condition are wrong for it: the stale classifier keeps $I = 1$ at that message, as if its spam stayed put, and leaves it out of the pre-image set of its all-eight camouflage, which it has now joined. One comparison, $31f$ against 20, corrects both. The first message needs no correction: it was camouflaged before and still is, by the same set. Under the uneven fall the map itself moves: the first message now arrives by its e1 + e2 edit, not its e3 + e4 + e5 edit, and the stale classifier puts it in the wrong pre-image set, adding spam mass to a message that receives none and missing it where it lands. That error needs the new prices to fix. The move: a uniform change in $W$ moves who acts; a change in the relative prices moves where they go.
+</Solution>
+</Exercise>
+
+<Exercise>
+No adversary this time. In the three-word mailbox, a naive Bayes is fitted on the full labelled first period. From then on, the only labels it receives are those of the messages it flags, as with investigators who check only alerts, and each period it is refitted on all flagged messages so far, with add-one smoothing. The stream does not change. Over the ten periods after the labelled one, compare the training set's spam share and its share of messages containing *offer* with the stream's, and count the spam that never receives a label.
+
+<Solution>
+**The first period after the labelled one.** The model flags *offer* alone: 684 spam and 75 genuine. These are the only new labels.
+
+**From the second period after it on.** The training set holds only *offer*-alone messages: spam share $684/759 = 90.1\%$ against $1{,}000/6{,}000 = 16.7\%$ in the stream; *offer* present in 100% of training messages against 17.5% of the stream; *seminar* and *linguistics* in none. With every training message alike, the refitted model's word contributions come from the smoothing alone. A message without *offer* gets a contribution of $\ln(77/686) \approx -2.19$ for the missing word, the other two words add about $+0.01$ each when absent and $-2.19$ when present, and the prior is $\ln(684/75) = 2.21$: at most about $2.21 - 2.19 + 0.02 \approx 0.05$, below $\mathrm{LT} = 1.70$, so it is called ham. The flagged set is the same every period: 684 caught, 75 false alarms, 316 spam missed.
+
+**What never gets labelled.** The 316 spam a period that the model misses, 200 of them without *offer*, never return as labels, so after ten periods 3,160 spam have passed and the training set has no example of any of them. The training data has drifted far from the stream though nothing in the stream moved: the model chose its own sample. This is sample selection bias. Here the model selects on the message alone, and the messages it never flags have zero chance of a label: <Ref lesson="alert-feedback-selection-bias" id="what-the-weight-needs-and-what-the-alert-loop-withholds">the next lesson</Ref> shows why no reweighting can recover a region with no rows.
+</Solution>
+</Exercise>
+
+<References>
+1. N. Dalvi, P. Domingos, Mausam, S. Sanghai, D. Verma, "Adversarial Classification," *Proceedings of the Tenth ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD '04)*, 2004, pp. 99–108 — Sec. 1 (adaptive adversaries, why drift learners do not cover them), Sec. 2 (the two utilities, Table 1, Theorem 2.1, the single-shot sequential game), Sec. 3 (cost-sensitive naive Bayes, the log threshold), Sec. 4 (the camouflage integer program, Algorithm 1, Lemma 4.1 and the pruning rules), Sec. 5 (Assumptions 3–5, the pre-image likelihood, Lemma 5.1, Theorem 5.2, Corollary 5.3, Theorem 5.4), Sec. 6 (Ling-Spam, the three attacks, Tables 2–3, the repeated game and Fig. 3). The eight-edit example, the three-word mailbox and the utilities computed in the exercises are this course's. https://homes.cs.washington.edu/~pedrod/papers/kdd04.pdf
+2. R. J. Bolton, D. J. Hand, "Statistical Fraud Detection: A Review," *Statistical Science* 17(3), 2002, pp. 235–255 — Sec. 4 (the \$10,000 reporting rule and structuring) and F. Provost's comment, pp. 249–251 (the model changes the phenomenon it models; lying low and paying the first bills; roving calling dens). https://doi.org/10.1214/ss/1042727940
+3. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015 — Ch. 1 (a detection system impairs its own detection power; fraudsters probe detection systems).
+4. J. Gama, I. Žliobaitė, A. Bifet, M. Pechenizkiy, A. Bouchachia, "A Survey on Concept Drift Adaptation," *ACM Computing Surveys* 46(4), 2014 — Sec. 2.5.3 (spammers adapting to filters as a source of drift). https://doi.org/10.1145/2523813
+5. L. Akoglu, H. Tong, D. Koutra, "Graph-Based Anomaly Detection and Description: A Survey," *Data Mining and Knowledge Discovery* 29(3), 2015 — Sec. 1.1 (graph structure as harder to fake than per-record features).
+6. F. Heiding, S. Lermen, A. Kao, B. Schneier, A. Vishwanath, "Evaluating Large Language Models' Capability to Launch Fully Automated Spear Phishing Campaigns: Validated on Human Subjects," arXiv:2412.00586, 2024 — the four randomised arms and click-through rates, the time and cost per target. https://arxiv.org/abs/2412.00586
+7. Financial Action Task Force, *Horizon Scan: Artificial Intelligence and Deepfakes*, 2025 — deepfakes against video-based identity checks and onboarding, algorithmic pattern mimicry.
+8. FinCEN, "FinCEN Alert on Fraud Schemes Involving Deepfake Media Targeting Financial Institutions," FIN-2024-Alert004, 13 November 2024 — the red-flag indicators. https://www.fincen.gov/system/files/shared/FinCEN-Alert-DeepFakes-Alert508FINAL.pdf
+9. Regulation (EU) 2024/1689 (Artificial Intelligence Act), *Official Journal of the European Union*, 12 July 2024 — Art. 15(4)–(5) and Recital 76. https://eur-lex.europa.eu/eli/reg/2024/1689/oj
+</References>

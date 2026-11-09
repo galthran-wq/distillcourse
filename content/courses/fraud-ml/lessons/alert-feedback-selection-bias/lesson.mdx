@@ -1,0 +1,430 @@
+The freshest labels a detector gets are the investigators' verdicts on the hundred cards it ranked highest yesterday. Training on them means training on a sample the model chose, in which fraud is far more common and the features look nothing like the stream. Can the bias be weighted away, and if not, how should yesterday's verdicts and last week's complete labels be combined?
+
+<Ref lesson="fraud-detection-system" id="what-the-model-gets-back-two-kinds-of-label-on-two-clocks">The system lesson</Ref> named the two label streams. The *feedbacks* $F_t$ are the investigators' verdicts on the recent payments of the $k$ cards alerted on day $t$, returned the same day. The *delayed samples* $D_{t-\delta}$ are every payment of day $t - \delta$, labelled by the cardholders' disputes, with silence read as genuine, $\delta$ days late. <Ref lesson="stream-learning-and-adaptation" id="the-fraud-models-memory-and-its-cadence">The stream-learning lesson</Ref> settled the cadence: retrain every night, because labels arrive by the day. Neither said what the nightly model should be trained on.
+
+The obvious answer is everything labelled in the last few weeks, fast and slow together, in one training set. The system lesson left a doubt about that. The hundred cards were chosen by yesterday's model, so every fraud in the feedbacks is one that model already scored high, and a kind of fraud it scores low never reaches an investigator. <Ref lesson="adversarial-classification" id="exercises">The last exercise of the adversarial lesson</Ref> ran that loop on a three-word mailbox: a filter refitted only on what it flagged held 90% spam in its training set against 17% in the stream, and never received a label for the 316 spam a period it missed. Nothing in the stream had changed; the filter had chosen its own sample.
+
+## What the morning's labels are a sample of
+
+A correction can only undo a distortion it can describe: how exactly were the feedbacks chosen, and how does that choice differ from the ones earlier lessons knew how to undo?
+
+### Two training sets at the end of day t
+
+<Task>
+Before reading on, recall from <Ref lesson="fraud-detection-system" id="the-fast-labels-are-a-sample-the-model-chose">the system lesson</Ref>: with $\delta = 7$, which days does the bank hold complete labels for at the end of day $t$, and how many compromised cards does a logistic regression find among its top hundred, against a random hundred? (Days up to $t - 7$; about 15 against a quarter of one.)
+</Task>
+
+Set the two kinds of rows side by side.
+
+- **Size.** A delayed day is a whole day of payments: on the European e-commerce streams studied below, 160,000 to 185,000. A feedback day is a hundred cards and their recent payments, a few hundred rows to a few thousand.
+- **Class mix.** A delayed day is about 0.2% fraud. A feedback day is fraud-rich: the system lesson's logistic regression puts about 15 compromised cards in every hundred it alerts, sixty times the random rate.
+- **Independence.** Delayed rows are a day's payments as they came. Feedback rows come in bundles: one call labels all of a card's recent payments, so the rows of a compromised card enter together, fraud and genuine alike.
+
+The class mix alone is not new. <Ref lesson="undersampling-calibration" id="the-keep-rate-on-a-card-stream-and-when-there-is-one">The undersampling lesson</Ref> trained on sets far richer in fraud than the stream and undid the distortion with one number, the keep rate $\beta$. It also warned, in passing, that a training set built from alerts has no $\beta$, because whether a payment enters it depends on its features. The question is what it depends on instead, and whether that dependence has a correction of its own.
+
+### Three ways a training sample can be chosen
+
+Take a toy day of 100,000 payments in three groups, with numbers chosen for round arithmetic:
+
+- **A**, ordinary daytime payments under €500: 75,000 payments, 50 frauds (0.067%);
+- **B**, payments of €500 or more: 20,000 payments, 100 frauds (0.5%);
+- **C**, payments under €20 between 1 and 5 a.m., a fraud method that started this month: 5,000 payments, 50 frauds (1.0%).
+
+That is 200 frauds, 0.2%. Now label a sample of the day in three ways.
+
+1. **By the label alone.** Keep every fraud and 2% of the genuine payments, the undersampling of the earlier lesson with $\beta = 0.02$.
+2. **By the payment alone.** Label half of the payments of €500 or more and 4% of the rest, drawn at random: a bank that checks large payments more often.
+3. **By the alerts.** Yesterday's model, trained before the night method started, ranks the cards; the investigators call the top hundred and label their recent payments. Say that returns 600 of the day's payments: 300 in B with 35 frauds, 300 in A with 10 frauds, and none in C, whose cards make only night payments of a few euros that the model scores low.
+
+| | Stream | By the label | By the payment | By the alerts |
+|---|---|---|---|---|
+| Rows labelled | 100,000 | 2,196 | 13,200 | 600 |
+| Fraud share overall | 0.20% | 9.1% | 0.41% | 7.5% |
+| Fraud share in A | 0.067% | 3.2% | 0.067% | 3.3% |
+| Fraud share in B | 0.50% | 20.1% | 0.50% | 11.7% |
+| Fraud share in C | 1.0% | 33.6% | 1.0% | no rows |
+| Odds of fraud in the sample ÷ in the stream, per group (A, B, C) | 1, 1, 1 | 50, 50, 50 | 1, 1, 1 | 52, 26, none |
+
+The last row is the one to read. Treat each group as payments a model cannot tell apart. Within a group, labelling by the label raises the odds of fraud by the same factor, 50, everywhere; labelling by the payment leaves them where they were; labelling by the alerts raises them by different factors in different groups, and deletes C.
+
+<Figure
+  src="./figures/three-selections.svg"
+  alt="Three panels of the same scatter of a day's payments, amount on a log axis from 1 to 5,000 euros against hour of day. Group A is a large cloud of daytime payments under 500 euros, group B a cloud of payments above 500 euros, group C a small cluster under 20 euros between 1 and 5 a.m. Frauds are amber dots, genuine payments faint grey dots, labelled payments ringed in blue. Panel 1, by the label: every amber dot ringed and a sprinkle of grey ones everywhere; odds factor 50 in every group. Panel 2, by the payment: half the dots right of a dashed line at 500 euros ringed, few to the left; odds factor 1 in every group. Panel 3, by the alerts: a dense ring of blue in the upper part of B, a few rings in A on dots joined by thin lines to ringed B dots (the same card), none in C; odds factors 52 in A, 26 in B, none in C"
+  caption="The same day, labelled three ways. Only the third leaves a group with no labels at all and moves the odds by different factors in different groups."
+/>
+
+The selection is written with an indicator. For each payment of the day let $s = 1$ if it is labelled into the training sample and $s = 0$ if not.
+
+<Definition title="sample selection bias">
+A training sample is drawn with *sample selection bias* when $P(s = 1 \mid x, y)$ is not the same for all payments. Three kinds are distinguished by what the selection probability depends on:
+
+- *class-prior bias*: $P(s = 1 \mid x, y) = P(s = 1 \mid y)$, the label alone;
+- *covariate shift* (also called feature bias): $P(s = 1 \mid x, y) = P(s = 1 \mid x)$, the payment's features alone;
+- *complete bias*: it depends on both.
+</Definition>
+
+Undersampling is class-prior bias by design. The bank that checks large payments more often produces covariate shift. The table already suggests that alerts produce the third kind.
+
+<Proposition title="the posterior a selected sample teaches">
+At any $x$ where $P(- \mid x) > 0$ and both classes are selected with positive probability, $P(s = 1 \mid x, +) > 0$ and $P(s = 1 \mid x, -) > 0$,
+$$
+\frac{P(+ \mid x, s = 1)}{P(- \mid x, s = 1)} \;=\; \frac{P(+ \mid x)}{P(- \mid x)} \times \frac{P(s = 1 \mid x, +)}{P(s = 1 \mid x, -)} .
+$$
+A model fitted on the sample learns the left side. The factor on the right is 1 under covariate shift, the constant $1/\beta$ under undersampling with keep rate $\beta$ for genuine payments, and under complete bias a function of $x$.
+
+<Proof>
+By Bayes' rule, $P(y \mid x, s = 1) = P(s = 1 \mid x, y)\, P(y \mid x) / P(s = 1 \mid x)$ for $y = +$ and $y = -$. Divide the first by the second; $P(s = 1 \mid x)$ cancels. Under covariate shift $P(s = 1 \mid x, +) = P(s = 1 \mid x, -)$. Under undersampling every fraud is kept and a genuine payment with probability $\beta$, so the ratio is $1/\beta$ at every $x$.
+</Proof>
+</Proposition>
+
+So under covariate shift a model fitted on the sample learns the stream's posterior wherever it has rows. Under class-prior bias it learns the stream's odds times one known number, which <Ref lesson="undersampling-calibration">the undersampling correction</Ref> divides out. Under complete bias the factor changes from one payment to the next, and computing it needs the selection rates of frauds and of genuine payments separately at each $x$.
+
+### Why the alerts select on the label
+
+The table's factors differ between A and B, but a two-group table cannot prove that the alerts depend on the label. Part of the difference could be selection on features finer than the groups: within A, the model may score some payments higher than others. What makes it complete bias is a route from the label to $s$ that no feature of the payment closes.
+
+That route is the card. The investigators label a card's recent payments because one of them was among the day's top hundred cards. Take two A payments with identical features: €42 at a grocer at 11 a.m. One was made by a thief on a card whose €900 electronics purchase an hour later topped the ranking; the other by a cardholder whose card nothing else pointed at. The first is labelled, the second is not, and the first is the fraud. Frauds travel in bundles on compromised cards (about three per card on the Belgian stream of the system lesson), so a fraud payment is far more likely than a genuine one with the same features to share a card with a high-scored payment. In the toy, an A fraud is labelled with probability $10/50 = 0.20$ and an A genuine payment with probability $290/74{,}950 = 0.0039$.
+
+Two more facts complete the description. Whether a card makes the hundred depends on the rest of the day, since the cut is a rank: the same card on a quiet day is called and on a busy day is not. And the selection rule is the model, which is retrained every night, so the feedbacks of different days were chosen by different rules.
+
+<KeyFact>
+Alert feedback is complete bias with a hole in it: the label enters the selection through the card, and a kind of fraud the model scores low, on cards with nothing else it scores high, the toy's group C, has selection probability zero.
+</KeyFact>
+
+## Can the bias be weighted away?
+
+The undersampling correction undid a selection that looked only at the label. A selection that looks only at the payment's features has a standard repair of its own, reweighting the sample. The alerts look at both. Does a weight still help?
+
+### A weight that undoes any selection it can see
+
+Bayes' rule written for the joint distribution gives the repair directly:
+$$
+P(x, y \mid s = 1) = \frac{P(s = 1 \mid x, y)\, P(x, y)}{P(s = 1)}
+\quad\Longrightarrow\quad
+P(x, y) = \underbrace{\frac{P(s = 1)}{P(s = 1 \mid x, y)}}_{w(x,\,y)}\; P(x, y \mid s = 1) .
+$$
+
+<Proposition title="importance weighting">
+If $P(s = 1 \mid x, y) > 0$ wherever $P(x, y) > 0$, then giving each sampled row the weight $w(x, y) = P(s = 1) / P(s = 1 \mid x, y)$ turns averages over the sample into averages over the stream: for any function $g$, $\mathbb{E}[g(x, y)] = \mathbb{E}[\,w(x, y)\, g(x, y) \mid s = 1\,]$. A weighted fit therefore minimises the stream's loss.
+</Proposition>
+
+The condition, called *positivity*, is not decoration: a payment kind with $P(s = 1 \mid x, y) = 0$ has no rows to carry a weight, and the identity divides by zero there.
+
+<Example title="weighting the bank that checks large payments">
+Under labelling by the payment, $P(s = 1) = 13{,}200 / 100{,}000 = 0.132$, $P(s = 1 \mid x) = 0.5$ in B and $0.04$ in A and C. The weights are $0.132 / 0.5 = 0.264$ for a B row and $0.132 / 0.04 = 3.3$ for an A or C row.
+
+- Rows: B weighs $10{,}000 \times 0.264 = 2{,}640$, A $3{,}000 \times 3.3 = 9{,}900$, C $200 \times 3.3 = 660$: 20%, 75% and 5% of 13,200, the stream's mix.
+- Frauds: $50 \times 0.264 + 2 \times 3.3 + 2 \times 3.3 = 26.4$, which is 0.2% of 13,200, the stream's base rate.
+
+The weights were computed from the amount alone, which every payment of the day carries, labelled or not, so they are known the same evening.
+</Example>
+
+Under covariate shift the posterior at each $x$ was already right, by the first proposition. What the weights restore is how much each region counts in the fit. That matters for any model of limited size, which must trade errors in one region against errors in another, and would otherwise spend its capacity on large payments because the sample is full of them.
+
+Under undersampling the weight is $1$ on frauds and $1/\beta$ on genuine rows, up to a constant: the class weights that <Ref lesson="imbalance-techniques-revisited" id="why-every-remedy-moves-the-boundary-the-same-way">the imbalance lesson</Ref> showed are the same move as deleting rows, run backwards.
+
+### What the weight needs, and what the alert loop withholds
+
+Apply the proposition to the feedbacks, and each of its ingredients fails in turn.
+
+**Positivity fails where the model does not look.** Group C has no labelled row, so there is nothing to weight. A quarter of the toy's frauds, the new night method, is missing from the weighted sample exactly as it was from the unweighted one. No reweighting of the rows the model chose can recover payments it never chose.
+
+**The weight needs the labels of the unselected payments.** Under covariate shift $P(s = 1 \mid x)$ is learnt by telling selected from unselected payments by their features, which needs no labels. Under complete bias the selection rate must be known separately for frauds and genuine payments at each $x$, and the label of an unselected payment arrives only with the delayed samples, $\delta$ days later. By then a week of nightly retrains has replaced the rule that did the selecting, and the complete labels the weights needed are themselves the training data the feedbacks were meant to get ahead of.
+
+**Even exact weights hand back the stream's rarity.** Suppose the toy's selection rates were known exactly.
+
+<Exercise>
+For the alert sample of the toy (600 rows, $P(s = 1) = 0.006$), compute $w$ for a fraud and for a genuine payment in A and in B. Then compute the weighted rows and weighted frauds in each group, the weighted fraud share overall, and how much the 45 frauds weigh together. (Write the four selection rates first.)
+
+<Solution>
+**Selection rates.** B: frauds $35/100 = 0.35$, genuine $265/19{,}900 = 0.0133$. A: frauds $10/50 = 0.20$, genuine $290/74{,}950 = 0.00387$.
+
+**Weights** $w = 0.006 / P(s = 1 \mid x, y)$: B fraud $0.0171$, B genuine $0.450$, A fraud $0.030$, A genuine $1.55$.
+
+**Weighted counts.** B: frauds $35 \times 0.0171 = 0.6$, genuine $265 \times 0.450 = 119.4$, so 120 rows at 0.5% fraud, B's stream rate. A: frauds $10 \times 0.030 = 0.3$, genuine $290 \times 1.55 = 449.7$, so 450 rows at 0.067%, A's stream rate.
+
+**Overall.** 570 weighted rows, not 600: C's 5% of the day is missing. Fraud share $0.9 / 570 = 0.16\%$ against the stream's 0.2%, because C held a quarter of the frauds. The 45 frauds together weigh 0.9 of a row, while one genuine A row weighs 1.55. The weighting recovers A and B exactly, and in doing so turns 45 informative frauds into less than one.
+</Solution>
+</Exercise>
+
+The frauds shrink most because the alerts chose them most eagerly: the rows that taught the feedback model what fraud looks like now count least.
+
+<FigureSequence
+  name="reweight"
+  alt="Three frames of one horizontal bar split into the shares of groups A, B and C, with the fraud share of each group printed on its segment and the overall fraud share at the right. Frame 1, the stream: A 75%, B 20%, C 5%; fraud 0.067%, 0.5%, 1.0%; overall 0.20%. Frame 2, the alert sample: A 50%, B 50%, C absent; fraud 3.3%, 11.7%; overall 7.5%. Frame 3, the alert sample with exact weights: A 79%, B 21%, C still absent, marked no row to weight; fraud 0.067%, 0.5%; overall 0.16%, with the note 45 frauds weigh 0.9 rows"
+  caption="Exact weights put A and B back at their stream rates; C stays empty, and the frauds shrink to less than one row."
+/>
+
+<Task>
+Step to frame 3. A model fitted on it is asked tomorrow about a €5 payment at 3 a.m. What fraud rate has it been shown for such payments, and what will it most likely output? (None: frame 3 has no C row. It extrapolates from the small daytime payments of A, the nearest it has, and outputs about A's 0.067%, so the night method scores as ordinary.)
+</Task>
+
+<KeyFact>
+A weight can undo a selection that the payment alone decides, and is known the same day. The alert loop's weight needs labels a week late, is undefined wherever the model never looks, and, even when exact, scales the frauds down to the stream's rarity.
+</KeyFact>
+
+### Choosing the calls to be informative instead
+
+If the selection is the problem, why not change it? <Ref lesson="fraud-detection-system" id="why-the-investigators-cannot-just-sample-at-random">The system lesson</Ref> priced the random version: a random card is compromised about once in four hundred calls. The smarter version is to call the cards whose labels would teach the model most, usually those it is least sure about. That is *active learning*, and it fails on the same arithmetic. Each call has a value in the day's catch, the expected saving of <Ref lesson="economics-of-detection" id="the-value-of-the-next-call">the next call</Ref>, and an uncertain card is one with a middling fraud probability, far below the top cards'. A call spent there buys a better model next week with a fraud not stopped today. The investigators' budget exists to stop fraud, so the feedbacks stay the model's choice, and the model has to be trained on them as they are.
+
+## Two label streams, two models
+
+The feedbacks cannot be made unbiased, and they cannot be dropped either: they are the only labels from the last $\delta$ days. The remaining choice is how they enter training beside the delayed samples.
+
+### Pooling drowns the rows that matter
+
+Pool them, and count what a training set of a fortnight holds. With $\delta = 7$ and eight days of delayed samples on a stream of about 170,000 payments a day, the delayed part is about 1.4 million rows with some 3,000 frauds. The feedback part from the last seven days is a hundred cards a day: if each call returns ten or so recent payments, about 7,000 rows. Two kinds of row in that pool carry what a precise top of the list needs. The fresh frauds tell the model what fraud looks like this week. The genuine payments the investigators cleared, the false alarms, are the genuine payments that look most like fraud, the ones the top of the ranking must learn to push down.
+
+In the pool, the false alarms are a sliver and the fresh frauds a minority. A common fraud learner trains each tree on all the frauds and an equal random draw of genuine rows, the <Ref lesson="imbalance-techniques-revisited" id="balanced-ensembles-the-gain-is-not-the-balance">balanced random forest</Ref>. On this pool each tree draws a few thousand genuine rows from 1.4 million, so a false alarm of last week is in its draw with probability about one in four hundred, and a tree sees a dozen or so of the week's several thousand. Every fresh fraud is in every tree, but they are few: at 15 compromised cards in a day's hundred calls and about three frauds each, a week of feedbacks holds some 300 frauds, and at the 30 or so of the experiment below, some 600, against about 3,000 week-old frauds in the delayed part. The fresh frauds are a tenth to a sixth of each tree's frauds. The fit is decided by the delayed rows, which are a week old.
+
+### What a model of the feedbacks alone learns
+
+Train one model on the feedbacks only, and its training set is the cards earlier models found suspicious: compromised cards and the honest cards that looked compromised. Its task is a narrower one than the stream's: among payments that already look like fraud, tell the frauds from the rest. That is the task the top of the queue poses, so it should be precise there.
+
+It should rank the bulk of the stream badly. An ordinary payment, like the 75,000 in A that no alert touched, is unlike any row of its training set, and what it outputs there is extrapolation: some ordinary payments will score high for no reason the model was ever shown. Two models, then, with opposite strengths: one trained where the queue is and blind elsewhere, one trained on the whole stream a week late.
+
+<Aside>
+The same loop has been run on purpose. To find butterfly stars, stars whose image resembles a butterfly, in a sky survey, astronomers labelled about 300 by hand; a model trained on them proposed the objects most likely to be butterflies, the astronomers said yes or no, and the model was refitted on the larger set, round after round. There the bias was the plan: the goal was to find nearly all members of a rare class with little expert time, which is the investigators' goal too, and a sample concentrated at the top of the ranking is what that goal asks for.
+</Aside>
+
+### Averaging the two posteriors
+
+Keep the two models apart and combine their outputs.
+
+<Definition title="feedback and delayed models, and their average">
+Fix the label delay $\delta$, a window of $K$ days of delayed samples and a window of $Q = \delta + K$ days of feedbacks. After day $t$:
+
+- the *feedback model* is trained on $F_t, F_{t-1}, \dots, F_{t-Q+1}$ and outputs $P_F(+ \mid x)$;
+- the *delayed model* is trained on $D_{t-\delta}, \dots, D_{t-\delta-K+1}$ and outputs $P_D(+ \mid x)$;
+- the *average* scores each payment of day $t + 1$ by
+$$
+P_A(+ \mid x) = \alpha\, P_F(+ \mid x) + (1 - \alpha)\, P_D(+ \mid x), \qquad 0 \le \alpha \le 1,
+$$
+and its top $k$ cards are the day's alerts.
+</Definition>
+
+The feedback window is longer than the delay because $\delta$ days of a hundred cards hold too few frauds to train on. With $Q = \delta + K$ it covers the same $K$ days as the delayed model plus the $\delta$ days since. The delayed model is the nightly Update of the stream-learning lesson: $K$ days of complete labels, ending $\delta$ days back. What the feedback model adds is what that lesson's models never had, labels from the last $\delta$ days.
+
+Two more designs are yardsticks for the average. The *pooled model* is the obvious design, one model on the delayed samples plus the recent feedbacks. The *all-labels model* is trained on every payment of the last $\delta$ days with its true label, which no bank has; it measures what fresh, complete labels would be worth.
+
+<Figure
+  src="./figures/windows.svg"
+  alt="A day axis from t−14 to t, with a dashed line between t−7 and t−6 labelled δ = 7: complete labels to the left, feedbacks only to the right. Five rows. Feedback model: small amber blocks on all fifteen days, Q = 15. Delayed model: full blue blocks on days t−14 to t−7, K = 8. Pooled model: full blue blocks on t−14 to t−7 and small amber blocks on t−6 to t, in one bracket labelled one training set. Average: the feedback row and the delayed row repeated as two separate brackets joined by a plus sign, labelled two models, posteriors averaged. All labels: full grey blocks on t−6 to t, hatched and labelled impossible in a bank, every payment labelled at once"
+  caption="What each model is trained on at the end of day t, with δ = 7, K = 8 and Q = 15."
+/>
+
+With $\alpha = \tfrac12$, the average needs both models to agree before it alerts. The alerts are the top hundred cards, so the cut $c$ is not a fixed threshold: it is the $P_A$ of the hundredth card's best payment, and it moves with the day's traffic. Whatever it is, $P_A \ge c$ means $P_F + P_D \ge 2c$, and since neither exceeds 1, each must be at least $2c - 1$. The higher the cut, the stricter the agreement: at an illustrative $c = 0.95$, both models must say at least 0.9; at $c = 0.62$, each must still say at least 0.24.
+
+<Figure
+  src="./figures/average-plane.svg"
+  alt="A unit square with the feedback model's output P_F on the horizontal axis and the delayed model's output P_D on the vertical. Dashed diagonal lines mark P_A = 0.5, 0.75 and 0.95 for alpha one half. The small triangle above the 0.95 line, in the top right corner, is shaded amber and labelled alerts: both at least 0.9. Three points: a fresh fraud at (0.97, 0.95) inside the triangle; an ordinary payment the feedback model extrapolates on at (0.95, 0.02), outside, labelled vetoed by the delayed model; a payment the delayed model likes and the feedback model has learnt is a typical false alarm at (0.10, 0.96), outside, labelled vetoed by the feedback model. A blue dashed line shows the 0.95 line for alpha = 0.9, steep, reaching P_D = 0.5 at P_F = 1, labelled alpha = 0.9: the feedback model alone almost decides"
+  caption="At α = ½ a payment reaches the queue only if both models rate it high; each vetoes the other's typical mistake."
+/>
+
+The veto runs both ways. The feedback model's typical mistake is the ordinary payment it extrapolates on, which the delayed model, trained on a whole stream of ordinary payments, scores near 0. The delayed model's typical mistake is the false alarm of last week, a genuine payment that looks like fraud, of a kind its training set, a week old and almost all ordinary payments, holds few of; the feedback model was trained on exactly those and scores them low. Separately each model keeps its own training set's proportions, so the feedbacks get half the say however few rows they are.
+
+## What the separation buys on two real streams
+
+The argument predicts a ranking: the average ahead of the pool at the top of the queue, the feedback model alone precise at the top and poor over the whole stream. Testing it needs a stream long enough to retrain on every night and a replay of the loop.
+
+### The experiment, and how a loop is replayed
+
+**Data.** Two stretches of online card payments by European cardholders, processed by one Belgian company: 21.8 million payments over 136 days from September 2013 to January 2014 (0.19% fraud), and 54.8 million over 296 days from August 2014 to May 2015 (0.24%). Two days of the first stretch, anonymised, are <Ref lesson="canonical-datasets" id="the-ulb-card-set-two-days-with-the-card-removed">the ULB card set</Ref>. Each payment carries 51 features, the card's history aggregates among them. The card number was used to compute those aggregates and kept out of the inputs, for the reason <Ref lesson="delayed-labels-prequential" id="why-the-cards-identity-stays-out-of-the-features">the validation lesson</Ref> gave: a model that learns which cards were caught is credited in a replay for frauds the bank's block prevented.
+
+**Loop.** Every day $k = 100$ cards are alerted, $\delta = 7$, $K = 8$, $Q = 15$. The complete labels of the historical stream are known, so the investigators can be replayed: each day every strategy ranks the day's payments, picks its own hundred cards, and receives their labels as its feedbacks. The feedback model inside the average therefore learns from the average's alerts, and the pooled model from the pooled model's.
+
+**Models.** Every model is a random forest of 100 trees, each tree trained on all the frauds of its training set and an equal random draw of genuine rows. $\alpha = \tfrac12$.
+
+**Scores.** Each day, $P@100$ and $CP@100$, the share of the hundred alerted payments and of the hundred alerted cards that are fraud, as defined in <Ref lesson="alert-budget-metrics" id="card-precision-at-k-the-team-calls-cards">the metrics lesson</Ref>, and the day's ROC-AUC over all its payments. Means over the days, ten repetitions. Days differ in difficulty for every model at once (on the 2014–15 stretch every model's level rose and fell with the number of compromised cards, the shared swing of <Ref lesson="worldline-model-comparison" id="what-makes-one-week-unlike-another">the model comparison</Ref>), so the strategies are also compared by their daily ranks, as in <Ref lesson="drift-strategies-on-worldline" id="why-rank-the-days-instead-of-averaging-ap">the drift study</Ref>; every gap between rows of the two tables below passes that paired test, which, as the drift lesson warned, treats days as independent although consecutive training windows overlap.
+
+The replay regenerates feedbacks per strategy, but it cannot regenerate the history. The log was produced under the bank's own detector, which blocked the cards it caught, so the frauds that would have followed on those cards never happened, and a strategy that would have missed them is never charged for it. Any loop replayed on a log of a loop carries this residue: a model that changes which labels exist cannot be judged exactly by replaying data collected under another model.
+
+### Two leaderboards
+
+| Model (2014–15) | $P@100$ | $CP@100$ | ROC-AUC |
+|---|---|---|---|
+| Average of feedback and delayed | **0.77** | **0.37** | 0.94 |
+| Feedback model | 0.73 | 0.32 | 0.87 |
+| All labels (impossible) | 0.63 | 0.30 | **0.96** |
+| Pooled model | 0.61 | 0.25 | 0.91 |
+| Delayed model | 0.57 | 0.25 | 0.94 |
+
+The 2013 stretch orders the rows the same way on all three metrics: $P@100$ 0.75, 0.73, 0.58, 0.54, 0.50 down the table.
+
+<Figure
+  src="./figures/two-leaderboards.svg"
+  alt="Two bar charts side by side for the 2014–15 stream. Left, P at 100: average 0.77, feedback 0.73, all labels 0.63, pooled 0.61, delayed 0.57; the average bar amber, the feedback bar blue. Right, ROC-AUC on an axis from 0.80 to 1.00: all labels 0.96, average 0.94, delayed 0.94, pooled 0.91, feedback 0.87. The feedback model is second on the left and last on the right; all labels is first on the right and third on the left"
+  caption="The two leaderboards of one experiment: the feedback model is second at the queue and last over the whole day."
+/>
+
+Four readings.
+
+**Separating beats pooling.** The average leads the pool by 0.16 in $P@100$ and 0.12 in $CP@100$: about twelve more compromised cards in every hundred calls, from the same call budget and the same delayed samples.
+
+**The feedback model alone is the prediction, on both sides.** It is second in the queue, 0.12 ahead of the pool, and last in ROC-AUC, at 0.87 against 0.91 to 0.96. The rows it was trained on make it precise exactly where the alerts are and poor on the ordinary payments it never saw.
+
+**The best ranker of the day is not the best ranker of the queue.** The all-labels model, trained on every payment of the last week with its true label, has the highest ROC-AUC and stands third in $P@100$, behind a model trained only on the rows of the alerted cards. Complete labels teach the whole stream; the feedbacks teach the region the hundred calls are spent in. <Ref lesson="alert-budget-metrics" id="what-each-disagreement-means">The metrics lesson</Ref> showed that ROC-AUC and the budgeted metrics read different parts of the list; here the training set decides which part a model is good at.
+
+**Fresh labels are worth something.** The all-labels model and the delayed model each train on a week or so of complete labels (seven days and eight); the main difference is that the delayed model's days are a week older. The fresher one wins on every metric, 0.63 against 0.57 in $P@100$: the stream moves within a week. That is the reason the biased feedbacks, the only recent labels a bank has, are worth their bias.
+
+<KeyFact>
+ROC-AUC cannot tell these designs apart where it matters. Among the four a bank can build, it puts the average and the delayed model within a hundredth of each other, though at the queue the average leads by 0.20 in $P@100$, and it ranks the feedback model last, though at the queue it is second. When the calls are what is spent, a design is chosen by $P@k$ and $CP@k$.
+</KeyFact>
+
+### Not the averaging
+
+Is it the separate models that help, or the weight the feedbacks receive? A second version of the experiment separates the two. Replace the delayed model by an ensemble of eight models, one per delayed day, averaged. Then compare two committees with the same nine members, the eight daily models and the feedback model: one averages all nine equally, so the feedbacks get a ninth of the say; the other gives the feedback model half and splits the other half among the eight.
+
+| 2014–15 | $P@100$ | $CP@100$ | ROC-AUC |
+|---|---|---|---|
+| Feedback model at half weight | **0.77** | **0.39** | 0.94 |
+| Feedback model at one ninth | 0.66 | 0.26 | 0.94 |
+
+The members and the delayed samples are the same; the weight is not, and with it the feedbacks are not either. Each committee ranks the cards, picks its own hundred and is trained on their verdicts, so a committee that gives the feedback model a ninth of the say also calls different cards and collects different feedbacks. (Its feedback model is not the one of the first table either: in these runs it scores $CP@100$ 0.36, against 0.32 there.) Half the say for the feedbacks is worth 0.13 of $CP@100$, thirteen cards in a hundred, at a mean ROC-AUC of 0.94 for both, and that 0.13 measures the weight together with the feedbacks the weight brings in. What it rules out is averaging as the explanation: both committees average nine models, so the gap between them cannot come from averaging alone.
+
+### Weighting the feedbacks, measured
+
+The same experiment measured importance weighting on the feedback model, each feedback row weighted by $P(s = 1)/P(s = 1 \mid x, y)$. A bank could not compute these weights in time, as shown above; a replay could in principle, because it holds the complete label of every payment and so knows after the fact how often frauds and genuine payments were selected. How the experiment estimated $P(s = 1 \mid x, y)$ is not reported, so the result below reads as the weighting at its best guess, not as a test of one estimator. A per-row weight needs a learner that accepts one, and the weighted model was a different forest, its trees built to take a weight on each row rather than trained on balanced draws; so the comparison below changes the learner as well as the weights, and is not a clean ablation of the weighting.
+
+| Feedback model | $P@100$, 2014–15 | $P@100$, 2013 | $CP@100$, 2014–15 | $CP@100$, 2013 | ROC-AUC, 2014–15 | ROC-AUC, 2013 |
+|---|---|---|---|---|---|---|
+| Unweighted (balanced forest) | **0.73** | **0.73** | **0.32** | **0.32** | **0.87** | **0.89** |
+| Importance-weighted (weighted forest) | 0.68 | 0.59 | 0.26 | 0.25 | 0.85 | 0.85 |
+
+The weighted model was worse on both streams and on all three metrics. The toy predicts it: the selection probability is highest for the payments most likely to be fraud, so their weights are smallest, and the rows that made the feedback model precise are scaled down. What separates the selection from the learner is a check: the same weighting was applied to a sample of recent payments labelled not by the alerts but at random among payments above €500, in the same number and class proportions, a selection on the payment alone; there the weighted model beat a similar unweighted one. Under covariate shift the weighting worked; under the alerts' selection it did not.
+
+### A later label, a sudden change, a different weight
+
+Three further runs bound the result.
+
+- **A longer delay.** With $\delta = 15$, $K = 15$ and $Q = 30$, the average's $CP@100$ on 2014–15 is 0.38, against 0.37 at $\delta = 7$; the delayed model falls from 0.25 to 0.24. The later the complete labels, the more of the recent stream only the feedbacks describe.
+- **A sudden change.** Ten short streams were built by putting two non-consecutive months of real payments end to end, so each holds an abrupt change at the join. From the first month to the second the average lost 7.7% of its $CP@100$, the delayed model 12.5%: the feedbacks of the new month reach the average a week before its delayed samples do.
+- **A different $\alpha$.** Making $\alpha$ adapt day by day to yesterday's precisions gained nothing. Even choosing each day's best $\alpha$ in hindsight, from 0.1 to 0.9, improved little on $\tfrac12$: the best values clustered around it, with a mean of 0.52, and $P@100$ fell steadily toward either end. At an extreme the average is one model alone, and the other one, given almost no say over the alerts, also stops receiving feedbacks it could learn from.
+
+<Conclusion>
+You can now say what the investigators' verdicts are a sample of: payments on the cards yesterday's model ranked highest, chosen through the card and therefore through the label, with probability zero for a kind of fraud the model scores low on cards with nothing else it scores high. The first proposition reads the three kinds of selection off the factor by which they move the odds: 1 for covariate shift, the constant $1/\beta$ for undersampling, a function of the payment for alerts. Importance weighting undoes a selection decided by the payment alone, the same day; for alerts it needs labels a week late, cannot reach what was never selected, and scales the frauds down to the stream's rarity, and on real feedbacks the weighted model was less precise than the plain one. What works is to keep the two label streams in two models, one trained on $Q = \delta + K$ days of feedbacks and one on $K$ days of delayed samples, and to alert on the average of their posteriors: on 54.8 million real payments that took $P@100$ from 0.61 for the pooled model to 0.77, while the feedback model alone was second at the queue and last in ROC-AUC.
+
+The adversarial lesson and this one each found a way the detector shapes its own data, one through a fraudster who answers the model, one through the labels the model chooses. <Ref lesson="arms-race-replay" /> replays both on the transaction simulator, where the fraudster's knob and the feedback loop can be run side by side, and states where the simulator falls short of the real streams.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+Five payments of tomorrow have the outputs below. (a) With $\alpha = \tfrac12$, rank them by $P_A$ and name the top two. (b) Repeat with $\alpha = 0.9$ and $\alpha = 0.1$; which payment enters the top two at each extreme, and which model's typical mistake is it? (c) Derive, for general $\alpha$, the least value of $P_F$ and of $P_D$ that a payment with $P_A \ge c$ can have, and find the $\alpha$ above which a payment the delayed model scores at 0 can still reach $P_A = 0.9$.
+
+| Payment | $P_F$ | $P_D$ |
+|---|---|---|
+| 1 | 0.96 | 0.92 |
+| 2 | 0.98 | 0.05 |
+| 3 | 0.15 | 0.97 |
+| 4 | 0.85 | 0.88 |
+| 5 | 0.60 | 0.60 |
+
+<Solution>
+**(a)** $P_A = \tfrac12(P_F + P_D)$: 0.94, 0.515, 0.56, 0.865, 0.60. Top two: payments 1 and 4, the two both models rate high.
+
+**(b)** At $\alpha = 0.9$, $P_A = 0.9P_F + 0.1P_D$: 0.956, 0.887, 0.232, 0.853, 0.60. Top two: 1 and 2. Payment 2 is the feedback model's typical mistake, an ordinary payment it rates high with nothing in its training set to say otherwise, which the delayed model scores at 0.05. At $\alpha = 0.1$: 0.924, 0.143, 0.888, 0.877, 0.60. Top two: 1 and 3. Payment 3 is the delayed model's typical mistake, a fraud-like genuine payment of the kind the feedback model has learnt to clear.
+
+**(c)** $\alpha P_F + (1 - \alpha) P_D \ge c$ with $P_D \le 1$ gives $P_F \ge (c - (1 - \alpha))/\alpha$; with $P_F \le 1$, $P_D \ge (c - \alpha)/(1 - \alpha)$. A payment with $P_D = 0$ reaches $P_A = 0.9$ when $\alpha P_F \ge 0.9$, possible only if $\alpha \ge 0.9$. Above that, the feedback model alone can fill the queue, and the veto that justified the average is gone. The move: write the alert condition as a region in the $(P_F, P_D)$ square and read off which corner each $\alpha$ admits.
+</Solution>
+</Exercise>
+
+<Exercise>
+"The feedbacks are just an undersampled training set with a high fraud rate, so the $\beta$ correction restores their probabilities." Refute it on the toy day: compute the keep rate $\beta$ that the correction would need in group A and in group B of the alert sample, and say which step of the proposition on the posterior a selected sample teaches breaks the correction. Then say what the correction would do to a group-C payment.
+
+<Solution>
+**The odds factor per group.** By the proposition, the sample's odds are the stream's odds times $P(s = 1 \mid x, +)/P(s = 1 \mid x, -)$, and the $\beta$ correction assumes that factor is the single number $1/\beta$. In A: $0.20 / 0.00387 = 51.7$, so $\beta = 0.0193$. In B: $0.35 / 0.0133 = 26.3$, so $\beta = 0.038$. One training set, two keep rates, so no single $\beta$ exists.
+
+**The broken step.** The correction rests on undersampling keeping each genuine payment with the same probability $\beta$ at every $x$, so that $P(s = 1 \mid x, -)$ and $P(s = 1 \mid x, +)$ do not depend on $x$. Alert selection depends on the card and the day's ranking, so both rates vary with $x$ and the factor is not constant. Correcting with any one $\beta$ leaves one group's probabilities too high and the other's too low; being monotone, it keeps whatever order the biased sample taught, right or wrong.
+
+**Group C.** There is nothing to correct: the sample has no C rows, so the model's output there is whatever it extrapolates, and a monotone correction of that output moves its value but keeps its rank, so the night method stays wherever extrapolation put it. The move: before correcting a sample's probabilities, compute the odds factor per region; a correction by one number needs one factor.
+</Solution>
+</Exercise>
+
+<Exercise>
+Push the budget to its ends. (a) Let $k$ equal the number of cards that pay on a day, so every card is called. What are $P(s = 1 \mid x, y)$, the importance weights, and the feedback set of day $t$? Which model of the experiment does the feedback model become, and what is left of the reason for averaging? (b) Let $k = 0$. What does the average reduce to, and what value must $\alpha$ take for the definition to make sense?
+
+<Solution>
+**(a)** Every card is called, so every payment of the day is labelled the same day: $P(s = 1 \mid x, y) = 1$ for all payments, every weight is 1, and $F_t$ is the whole day $T_t$ with its labels (the investigators find what disputes would). The selection has no bias of any kind. The feedback model, trained on $Q$ whole days labelled at once, is the all-labels model with a window of $Q$ days instead of $\delta$. The delayed model sees a subset of the same days, a week old, so the average now mixes a fresh complete-label model with a stale one, and the case for it is only freshness against variety; the veto against a biased model has nothing to veto. Which term collapsed: the selection probability, whose dependence on $x$ and $y$ was the whole problem.
+
+**(b)** With no calls there are no feedbacks, the feedback model has no training set, and $P_F$ is undefined. The average makes sense only at $\alpha = 0$, where it is the delayed model alone: the experiment's weakest row in $P@100$. The move: at $k$ = every card the selection disappears; at $k = 0$ the fresh labels do; the strategy is worth something only between.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague wants to know whether the average beats the pooled model on the bank's own log of last year. Their replay trains both strategies each night on the feedbacks the bank's investigators actually produced that day, plus the delayed samples. (a) What does this replay measure, and why is it not the comparison asked for? (b) Describe the replay that is. (c) Name one bias that even the correct replay keeps, and which strategies it flatters.
+
+<Solution>
+**(a)** Both strategies are trained on feedbacks chosen by the bank's deployed detector, not by themselves. In deployment the average's feedback model learns from the cards the average alerts and the pooled model from its own alerts; which labels exist depends on which strategy runs. The colleague's replay measures how each strategy would use someone else's feedbacks, with the loop cut.
+
+**(b)** Use the complete labels that the log holds for every payment once disputes have settled. Each day, let each strategy score the day, pick its own hundred cards, and give it the labels of those cards' recent payments as its feedbacks; delayed samples enter $\delta$ days later for everyone. Remove from each day the cards known from labels and the cards the strategy itself detected earlier, as <Ref lesson="alert-budget-metrics" id="a-detected-card-is-a-blocked-card">the metrics lesson</Ref> and <Ref lesson="delayed-labels-prequential" id="which-test-payments-would-really-be-scored-removing-known-cards">the validation lesson</Ref> require, and keep the card number out of the inputs.
+
+**(c)** The log itself was produced under the deployed detector: cards it caught were blocked, and the frauds that would have followed on them are not in the log. A strategy that would have caught a card the deployed detector missed is credited normally, but a card the deployed detector caught early leaves no later frauds for anyone to catch or miss. So no strategy in the replay is charged for missing those later frauds. A strategy that would have missed the cards the deployed detector caught early is flattered, and the gap between a strong strategy and a weak one is understated whenever the weak one misses more of those cards. The move: a replay can regenerate the labels a strategy would have received, not the events it would have changed.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two explanations fit the average's lead over the pooled model: (i) the feedbacks are fresh and fraud-dense, and the average gives them half the say; (ii) averaging any two forests reduces variance, whatever they were trained on. Design the experiment that decides between them on the replayed streams, using the arms you need, and say which result supports which explanation. Then say what the committee comparison of the lesson (feedback model at half weight against one ninth) already settles.
+
+<Solution>
+**Arms.** (1) The pooled model. (2) The average of feedback and delayed models. (3) A control average: two delayed models trained on the same $K$ days with different random seeds and different random halves of the genuine rows, averaged at $\alpha = \tfrac12$. (4) A second control: the average of the delayed model with a model trained on a random sample of the last $Q$ days of the same size as the feedbacks, labelled with the complete labels (possible in a replay, impossible in a bank): fresh, unbiased, not chosen by any model.
+
+**Readings.** If (3) matches (2), variance reduction explains the lead. If (3) stays near the delayed model and (2) leads, averaging alone is not enough. If (4) matches (2), freshness explains it; if (2) beats (4), the fraud-dense, queue-shaped sample adds something beyond freshness. Scores: $CP@100$ by daily ranks with the paired test; agreement means within the spread across the ten repetitions.
+
+**What the committees settle.** Both committees average nine models, so both get whatever variance reduction averaging over nine gives, and half weight still wins by 0.13 of $CP@100$: the gap cannot come from averaging alone, which rules out (ii) as the whole story. It does not isolate the weight: each committee picks its own hundred cards, so the two feedback models are trained on different alerts, and the 0.13 is the weight together with the feedbacks it brings in. What it leaves open is (4), whether a fresh random sample would do as well as the alerted one. The move: an explanation is tested by the arm that has its cause and lacks the rival's.
+</Solution>
+</Exercise>
+
+<Exercise>
+Train only on feedbacks, every night, on a stream that does not change. The feedback set's fraud share and its mix of payment kinds move from one day to the next. Using <Ref lesson="concept-drift" id="naming-the-three-parts">the three parts of a distribution</Ref>, say which of $p(x)$, the base rate and $p(y \mid x)$ moved in the stream, which moved in the training set, and whether this is drift. What would a label-free distance between yesterday's and today's feedback sets measure?
+
+<Solution>
+**The stream.** Nothing moved: $p(x)$, $\pi$ and $p(y \mid x)$ are as they were, by assumption.
+
+**The training set.** Its distribution is $p(x, y \mid s = 1)$, and $s$ is decided by the model, which changed overnight. So the training set's $p(x \mid s = 1)$ moves (the alerted region moves with the model's ranking), its fraud share $P(+ \mid s = 1)$ moves (the model's precision at the top changes), and its $p(y \mid x, s = 1)$ moves too, since by the proposition it is the stream's posterior times a selection factor that depends on the model.
+
+**Is it drift?** By the definition of the concept-drift lesson, drift is a change in the stream's joint distribution, and that did not change. This is a change of selection. Treating it as drift has a cost: a change detector on the training set's statistics alarms although the stream is calm, and a memory cut on that alarm throws away good labels.
+
+**The label-free distance** between $F_{t-1}$ and $F_t$ measures how far the model's choice moved, the selector rather than the world. It is a monitor of the loop, not of fraud. The move: before calling a change drift, check whether the stream changed or only the sample taken from it.
+</Solution>
+</Exercise>
+
+<Exercise>
+On the 2013 stretch, with $\delta = 15$, the experiment was repeated with the investigators calling more cards a day. The mean normalised card precision $NCP@k$, which divides $CP@k$ by its ceiling $\min(1, \gamma_t / k)$ with $\gamma_t$ the day's compromised cards, came out as follows.
+
+| Model | $k = 100$ | $k = 150$ | $k = 300$ |
+|---|---|---|---|
+| Average | 0.40 | 0.41 | 0.48 |
+| Feedback model | 0.37 | 0.38 | 0.46 |
+| Delayed model | 0.26 | 0.27 | 0.35 |
+
+"Calling more cards produces more feedbacks, and the rise of the average from 0.40 to 0.48 shows the extra feedbacks make a better model." Refute the inference, using the delayed model as a control, and say what the table does show about the value of more investigators.
+
+<Solution>
+**What $NCP@k$ does as $k$ grows.** On a day with fewer compromised cards than either budget, the ceiling is $\gamma_t / k$ for both, so $NCP@k = (\text{cards found}) / \gamma_t$, the share of the day's compromised cards found, and for a fixed ranking that share can only grow with $k$, since a longer list contains the shorter one. On other days the denominator changes too ($k$ on a day with $\gamma_t \ge k$, where $NCP@k = CP@k$ usually falls as the list reaches deeper), and the direction is not fixed. Whether the metric alone moves is therefore an empirical question, and the delayed model answers it.
+
+**The control.** The delayed model is trained on delayed samples only, so its training set does not depend on $k$ at all. It still rises from 0.26 to 0.35. That rise is the metric reading a longer list, and it is as large as the average's (0.09 against 0.08). The average's lead over the delayed model is 0.14, 0.14 and 0.13: the extra feedbacks did not widen it. The table gives no evidence that more feedbacks made a better model.
+
+**What it does show.** More calls find a larger share of the compromised cards, for every strategy, and the average keeps its lead at every budget. The hiring decision rests on the extra cards found per extra call against the cost of a call, <Ref lesson="economics-of-detection" id="the-value-of-the-next-call">the next-call rule</Ref>, which needs $\gamma_t$ and the card counts the table does not give. The move: when a metric's denominator changes with the treatment, find an arm the treatment cannot reach and subtract what it does.
+</Solution>
+</Exercise>
+
+<Exercise>
+On the toy day, the night method of group C started a week ago, so its first frauds have just entered the delayed samples. Tonight the delayed model scores C payments at $P_D = 0.9$. The feedback model has never seen a C row and scores them at $P_F = 0.1$. Yesterday the hundredth alerted card's best payment stood at $P_A = 0.62$. (a) Is a C card alerted tomorrow under $\alpha = \tfrac12$? (b) What would the feedback model need in order to learn C, and how does it get it? (c) The pooled model's training set holds the same C frauds from the delayed samples. Argue which of the two designs is likely to alert C first, and what quantity would decide it.
+
+<Solution>
+**(a)** $P_A = \tfrac12(0.1 + 0.9) = 0.5 < 0.62$: no C card makes the hundred.
+
+**(b)** The feedback model learns C only from C rows in the feedbacks, which arrive only if a C card is alerted. Under the average a C card is alerted only once $P_A$ clears the day's cut, which needs $P_F$ to rise above $2 \times 0.62 - 0.9 = 0.34$. So the feedback model learns C only after it already rates C payments well above what it has seen: the two models' veto, which protected the queue from each model's mistakes, now keeps out a method only the delayed model has learnt. C enters only if a C card also pays elsewhere and one of those payments is alerted for another reason, which the toy's C cards, paying only at night for a few euros, never do, or if a quiet day lowers the cut below 0.5.
+
+**(c)** The pooled model is one forest trained on the delayed samples that hold C, so its output on C rises as soon as those rows are in the pool; nothing caps it at an average with a model that has never seen C. It is therefore likely to alert C first. What decides it is where C payments rank in the pooled model's output relative to the day's hundredth card, against how long the average waits for a lucky C feedback. The replay of the next lesson re-runs the feedback, delayed, pooled and averaged models on the transaction simulator, where a method like C can be started on a chosen day and that delay measured: <Ref lesson="arms-race-replay" />.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Dal Pozzolo, G. Boracchi, O. Caelen, C. Alippi, G. Bontempi, "Credit Card Fraud Detection: A Realistic Modeling and a Novel Learning Strategy," *IEEE Transactions on Neural Networks and Learning Systems* 29(8), 2018 — Sec. II-A5 and II-C (feedbacks of the alerted cards, delayed labels, silence read as genuine), Sec. III Eqs. 1–6 and Fig. 2 (alerts, feedbacks, delayed samples, $P_k$, $CP_k$, $NCP_k$), Sec. IV-C3 (the three kinds of sample selection bias, why active learning is not an option), Sec. V and Algorithm 1 (separate feedback and delayed classifiers, the averaged posterior, $Q = \delta + M$, the sliding-window and ensemble versions, balanced-bootstrap random forests), Sec. VI-A–B (the two datasets, the card identifier removed from the features, $k = 100$, $\delta = 7$, rank-based comparison), Table III, Sec. VI-D (the 15-day $CP_k$ series, the juxtaposed-month streams, 7.7% against 12.5%), Sec. VI-E, Eq. 10 and Table IV (importance weighting, the amount-above-€500 check), Sec. VI-F and Tables V–VI ($\delta = 15$, larger $k$, the adaptive and hindsight-optimal $\alpha$). The toy day, its three samples and weights, and the exercises' payments are this course's. https://boracchi.faculty.polimi.it/docs/2017_FraudsTNNLS.pdf
+2. A. Dal Pozzolo, O. Caelen, R. A. Johnson, G. Bontempi, "Calibrating Probability with Undersampling for Unbalanced Classification," *IEEE Symposium Series on Computational Intelligence (SSCI)*, 2015 — Sec. III (undersampling as sample selection bias introduced by design, against the bias intrinsic to a bank's accepted applicants).
+3. J. Gama, I. Žliobaitė, A. Bifet, M. Pechenizkiy, A. Bouchachia, "A Survey on Concept Drift Adaptation," *ACM Computing Surveys* 46(4), 2014 — Sec. 3.5 (labels that arrive late, biased or at a cost), Sec. 5 (closed-loop systems cannot be evaluated by replaying historical data). https://doi.org/10.1145/2523813
+4. Y. Lucas, J. Jurgovsky, "Credit Card Fraud Detection Using Machine Learning: A Survey," arXiv:2010.06479, 2020 — Sec. 3.3 and Fig. 6 (aggregating a ground-truth classifier with a feedback classifier rather than pooling their examples). https://arxiv.org/abs/2010.06479
+5. R. J. Bolton, D. J. Hand, "Statistical Fraud Detection: A Review," *Statistical Science* 17(3), 2002 — L. Breiman's comment, pp. 252–254 (the butterfly-star search: label the top-scored objects, refit, repeat). https://doi.org/10.1214/ss/1042727940
+</References>

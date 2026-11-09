@@ -1,0 +1,370 @@
+On the simulator, a fraudster who learns the detector's amount threshold and spends just under it, and a detector that retrains only on what its investigators returned, can both be replayed. What does the replay show about how fast each side moves, and where does the simulator fall short of the two papers it imitates?
+
+The two previous lessons each found a way a detector shapes its own data. In <Ref lesson="adversarial-classification" id="two-rounds-that-undo-each-other">the adversarial lesson</Ref> the adversary answered the classifier, and on a spam corpus the repeated game never settled: utility alternated between two values, because each refit on the latest mail handed the spammer back the words he had abandoned. In <Ref lesson="alert-feedback-selection-bias" id="two-leaderboards">the selection-bias lesson</Ref> the labels were the investigators' verdicts on the cards the model chose, and on two confidential card streams a model of the feedbacks averaged with a model of the delayed samples beat one model of both. Each result was measured once, in one setting you cannot rerun on card data.
+
+<Ref lesson="canonical-datasets" id="three-scripted-frauds">The transaction simulator</Ref> is public and its rules are known, and its first fraud scenario is literally a threshold on the amount: every payment above €220 is fraud. That is the simplest rule a fraudster could learn. Running both loops on it lets you change what the published experiments held fixed (the retraining cadence, the fraudster's rule, the inputs) and see what each pattern depends on.
+
+The difficulty is that a replay always produces curves, and a curve that looks like a published one can have another cause. A pattern is therefore credited to a cause only by a control: a second run that removes the supposed cause and keeps everything else. If the pattern survives the control, the cause was something else.
+
+## A fraudster with one knob
+
+### Why scenario 1 has to become an actor
+
+Scenario 1 is a rule, not an actor. It labels every payment above €220 fraud whoever made it, and it never reacts to anything. To replay the game, someone has to choose amounts in reply to the detector.
+
+The obvious candidate is the reply the adversarial lesson derived, the <Ref lesson="adversarial-classification" id="a-knapsack-and-when-the-adversary-bothers">minimum-cost camouflage</Ref>: the cheapest set of feature edits that carries a payment below the threshold. It needs a price for editing each feature, and the simulator has none. Worse, most of the fifteen inputs are not the fraudster's to edit: the card's counts and mean amounts over 1, 7 and 30 days describe the cardholder's past, and the terminal's fraud rate is computed from labels. What a person holding stolen card details controls is how much to spend.
+
+So the fraudster gets one knob, the amount. With one feature the knapsack has one item, and the reply is <Ref lesson="adversarial-classification" id="when-every-word-costs-the-same">the greedy case</Ref>: make the one edit if it closes the gap. A payment that passes is worth its amount to him, so the best reply is the largest amount the detector lets through, just under its split. He does not know the split. He has to read it off his own outcomes.
+
+### The rules of the replay
+
+**The stream.** The simulator's 183 days, 5,000 cards and 10,000 terminals, with scenarios 2 and 3 as scripted and scenario 1's rule switched off: a genuine payment above €220 stays genuine. Five seeds.
+
+**The fraudster.** Five payments a day, as many as scenario 1 produced (978 in 183 days), from day 0. Each uses the details of a different card whose holder pays that day, at the holder's terminal and around the holder's time, so the terminal and time inputs stay ordinary; the card's own windows count the extra payment. The amounts are drawn evenly from a €40 band under a ceiling $T$, which starts at €300. For the first 45 days nothing answers him: he spends €260 to €300 a payment, in the place scenario 1's large frauds used to hold.
+
+**The detector.** A depth-2 tree on the fifteen baseline inputs, the model whose amount split <Ref lesson="ulb-handbook-benchmark" id="what-the-depth-2-tree-found">the benchmark lesson</Ref> read at €218.67. A tree trained on day $t$ learns from the 30 days of labels that end $\delta = 7$ days back, days $t - 37$ to $t - 8$, so a payment reaches its first tree eight days after it is made. Each day the current tree scores the day's payments, and the top 100 cards by their best payment are called. The tree's root splits on the terminal's 7-day fraud rate, and only on the side of terminals without recent fraud does it split on the amount. So two kinds of payment score high: any payment at a terminal with recent fraud, whatever its amount, and a large payment anywhere else. Together they are about 35 payments a day (15 to 57), all of them called. The spare places, the rest of the hundred, go to cards drawn at random from the low leaf, where some 6,800 payments a day share one score. A payment above the split is therefore always called, and one below it is still called now and then: by that draw, or because another payment on the same card that day was made at a terminal with recent fraud. The tree is retrained every $c$ days, starting on day 45: the first day whose window, days 8 to 37, leaves out the stream's first week, when the cards' and terminals' history windows hold almost nothing. That first tree has the fraudster's first month as most of its frauds above €220, so it splits just under his lowest amount: €259 in seed 0.
+
+Cards known from labels are removed from scoring, as in <Ref lesson="delayed-labels-prequential" id="which-test-payments-would-really-be-scored-removing-known-cards">the validation lesson</Ref>, with one change for a half-year replay: a blocked card counts as reissued 28 days later. Without it, the scripted terminal compromises would block most cardholders within the half year, and the stream would empty.
+
+**What he sees, and how he moves.** He learns which of his cards were called. Every $c$ days, one *round*, he updates his ceiling:
+
+1. if fewer than a quarter of the round's payments were called, he raises $T$ by €20, up to €300 (he probes for more money);
+2. otherwise he fits one split $\hat s$ to his own amounts and outcomes and sets $T = \hat s - m$, with a margin $m = €2$. The candidates for $\hat s$ are the amounts he paid that round; each candidate $s$ makes one error for each called payment below $s$ and one for each passed payment at or above $s$, and he takes the candidate with the fewest errors, the lowest of them if several tie.
+
+**What is measured.** The share of his payments called, and what he keeps: the sum of his payments that were not called, per day.
+
+<Example title="reading the split off one round">
+In a round he made eight payments: €224, €229, €236, €241 and €249 passed; €246, €253 and €258 were called. Three of eight called is over a quarter, so he fits a split.
+
+The candidates are his eight amounts. At $s = €246$: no called payment below, one passed payment at or above (€249), so 1 error. At $s = €253$: one called payment below (€246), none passed above, 1 error. Every other candidate does worse: at €249, €246 is called below and €249 passed at it, 2 errors; at €241, €241 and €249 count, 2 errors.
+
+Two splits tie at one error, and the tie goes to the lower, so $\hat s = €246$ and next round's ceiling is $€246 - €2 = €244$, with payments drawn between €204 and €244. The outcomes themselves say where the tree's split is. Every payment above it is called, so the passed €249 puts the split above €249, and the €246 below it was called by one of the other routes: the draw for the spare places, or another payment of that card at a terminal with recent fraud. A payment called that way adds one error to each candidate near it. Here it made €246 tie with €253, and the tie rule set his estimate a few euros under the tree's split, on the safe side.
+</Example>
+
+<Exercise>
+A round of one day: €262, €271 and €259 were called, €255 and €248 passed. (a) Find $\hat s$ and the next ceiling with $m = €2$. (b) The next round's five payments, between €217 and €257, are all passed except one. What is the ceiling after it?
+
+<Solution>
+**(a)** Three of five called, so he fits a split. Sorted: €248 passed, €255 passed, €259 called, €262 called, €271 called. At $s = €259$ no called payment lies below and no passed payment at or above: 0 errors, the minimum. $\hat s = €259$, ceiling €257.
+
+**(b)** One of five is a fifth, under a quarter: he does not fit a split, he probes. The ceiling rises by €20 to €277. The move: below a quarter called, the round says "nothing found", and the rule spends it on more money.
+</Solution>
+</Exercise>
+
+Seed 0 under a weekly refit shows the rules at work. In round 1 every payment is above the tree's split and he fits a split to his outcomes. In round 2 the split has moved, though not because of him: the day-52 refit trains on days 15 to 44, when all his payments were still between €260 and €300, and a new month of genuine and scripted payments fits a split a few euros elsewhere. Across the five seeds that refit moved the split by −€12, +€6, −€4, +€1 and −€7.
+
+<FigureSequence
+  name="one-knob-round"
+  alt="Four frames on one amount axis from 160 to 320 euros. A faint scatter of genuine payments thins out towards the right. Frame 1: round 1, the fraudster's 35 payments between 260 and 300 euros, all filled amber (called), with the tree's split as a blue line at 259 euros. Frame 2: the same payments, with his estimate drawn as a dashed amber line at 263 euros, his lowest called amount, and the note: next ceiling 263 minus m equals 261. Frame 3: round 2, payments between 221 and 261 euros; the day-52 refit, trained before any of his new amounts, has its split at 247 euros, the old split at 259 dashed; 12 of 35 filled: the 11 above 247 and one below it. Frame 4: round 3, payments between 207 and 247 euros; the split at 248 euros; none above it, yet 4 of 35 filled, called by other routes; note: under a quarter called, so he raises the ceiling by 20 euros"
+  caption="Three rounds of the one-knob game in seed 0, weekly refit: he drops under the split, the next refit happens to land €12 lower, he drops under that, then probes up."
+/>
+
+<Task>
+Step to frame 4. Before reading on, predict what share of the next round's payments, under a ceiling of €267, will be called, and what he does after that round. (About half called: the band €227–267 straddles the split at €248, and about half of it lies above; in the run, 49%. Over a quarter called, so he fits a split near €248 and drops below it again.)
+</Task>
+
+## An alternation that needs no refit
+
+### Rounds of a week
+
+With $c = 7$, both sides move once a week. The fraudster's ceiling in seed 0, round by round from day 45: €300, 261, 247, 267, 249, 269, 235, 255, 228, 248, 224, 244, 264, 237, 257, 235, 255, 230, 250. Down, up, down, up. The share of his payments called alternates with it: high in a round he spent above the split, near zero in the round after.
+
+A number makes the pattern checkable. Correlate each round's called share with the next round's: a share that alternates high, low, high gives a strongly negative correlation, a share that drifts gives a positive one. Across the five seeds the correlation is between −0.57 and −0.74. The game alternates with a period of two rounds, which is what the repeated game on spam did.
+
+<Figure
+  src="./figures/alternation.svg"
+  alt="Two panels, rounds 1 to 19 on the horizontal axis, amounts from 200 to 300 euros on the vertical, with grey bars under each panel for the share of the fraudster's payments called. Top panel, tree trained once on day 45: its amount split is a flat blue line at 259 euros; the fraudster's amber ceiling zigzags between about 258 and 278 euros, and the called-share bars alternate between about half and zero. Bottom panel, tree refitted every 7 days: the blue split steps down from 259 to about 225 euros by round 11 and stays in the 230s; the amber ceiling zigzags between about 225 and 270 euros, and the bars alternate too"
+  caption="Seed 0. The alternation is as clear against the frozen tree (top) as against the weekly refit (bottom)."
+/>
+
+### The control: a tree that is never refitted
+
+In <Ref lesson="adversarial-classification" id="two-rounds-that-undo-each-other">the repeated game</Ref> the alternation came from the refit, which, trained on the latest round alone, forgot each edit the spammer abandoned. Take the refit away and that mechanism is gone, so the alternation should go with it.
+
+On the simulator it does not. Train the tree once, on day 45, and never refit it. Its split stays at €259 in seed 0 (€251 to €259 across seeds), and the fraudster's ceiling zigzags between €258 and €278 for the whole half year. The round-to-round correlation of the called share is between −0.73 and −0.89, more negative than with the refit.
+
+The alternation is the fraudster's own rule. A round spent above the split is called, so he drops just under it; a round under it is clean, so he probes €20 up, which lands above the split again. Against any fixed split that rule alternates by itself. The refit's own mechanism could not work at this pace anyway: it is trained on 30 days of labels ending a week back, so a round of the fraudster's play reaches it a week late and then shares the window with three earlier weeks. It cannot forget a move within one round, which the spam refit, trained on the latest round alone, did every round.
+
+<KeyFact>
+A period-two alternation on the simulator is not the repeated game's mechanism: it appears just as clearly against a tree that is never refitted, because a fraudster who drops under a split when caught and probes up when clean alternates against any fixed split. The pattern is attributed by the control that removes its supposed cause, not by its shape.
+</KeyFact>
+
+### What the refit does: it moves, a month late
+
+The refit does move the split, and not only by the few euros a new month of data shifts it either way. Against the probing fraudster it drifts from €259 down to between €226 and €235 over the last ten weeks (five seeds), against €251 to €259 for the frozen tree, and the fraudster's ceiling comes down with it.
+
+How fast each side moves shows most clearly against a fraudster who does not probe: after a clean round he keeps his ceiling. In seed 0, from day 59 his band was €207 to €247, just under the tree's split of €248. The split edged to €246 on day 73, just inside the top of his band, then cut deeper into it, €236 on day 80 and €221 on day 87: three to four weeks after his move. He answered in one round: by day 94 his ceiling was €220.
+
+The delay is built into the label clock. His new amounts enter the tree's training set only once their labels are 7 days old, and then as a few days' payments among 30, beside the old band's frauds that still fill the rest of the window. The split moves only when the new band's frauds weigh enough in the window to pay for a split there.
+
+<Figure
+  src="./figures/settling.svg"
+  alt="One panel, rounds 1 to 19, amounts 200 to 300 euros. The amber ceiling of a fraudster who never probes drops from 300 to 261, 247, holds at 247 for four rounds, drops to 237 and then to 220, and stays at 220 to the end. The blue split steps down from 259 to 247, then to 236 and 221 by round 7, holds near 221 to 225 for four rounds, then climbs back to about 255 from round 12 and stays between 246 and 258. Grey called-share bars are high in round 1, small in rounds 2 to 7, and near zero afterwards"
+  caption="A fraudster who stops probing, against the weekly refit (seed 0). The split chases him down, then gives up the band he settled in."
+/>
+
+Then the split went back up, to between €246 and €258, and stayed there, while he stayed at €220. All five seeds end the same way, with ceilings between €218 and €228. Below about €220 the fraudster is inside the genuine payments: on a simulator day about 53 genuine payments fall between €180 and €220, against his 5. A split under him would call ten genuine cards for each of his, so the split returns to where it separates the remaining large frauds, scenario-3 payments multiplied by five, from the few genuine payments above €240. From day 94 on he is still called on 4% to 8% of his payments (five seeds), most of them by the draw for the spare places.
+
+The race settles there because both sides of the game follow the same rule. The adversary edits only when the edit costs him less than a passing payment is worth to him. The detector puts its split under him only when the frauds it would catch there are worth more than the false alarms it would raise with them, here about ten genuine cards for each of his.
+
+### Retraining faster does not speed the detector up
+
+If the refit is a month late, refit more often. Run the probing fraudster against a tree refitted every day:
+
+- daily refit, fraudster still moving weekly: he keeps €707 a day (€692 to €727 across seeds), against €695 under the weekly refit;
+- daily refit, fraudster also moving daily: €671 (€660 to €682).
+
+Nothing material changes. A daily refit removes only the wait until the next scheduled refit, at most six days of a four-week response; the rest is the 7-day label delay and the time the new frauds need to fill the window, and neither depends on the cadence. Meanwhile the fraudster sees his calls the same day.
+
+## A reference point the knob cannot move
+
+### The habit the fraudster cannot edit
+
+The amount is a good knob because the depth-2 tree judges it against one number for every card. A €240 payment sits at the top of the genuine range overall. For a cardholder whose payments average €100 it is ordinary; for one whose payments average €20 it is twelve times their habit. <Ref lesson="transaction-aggregates" id="an-amount-needs-a-reference-point">The aggregates lesson</Ref> built the card's mean amount over 30 days for that reason, and it is among the fifteen inputs; the depth-2 tree never uses it, because a tree of two splits cannot compare the amount with it across all cardholders.
+
+Give the detector the capacity and the comparison. Two runs against the same probing fraudster, weekly refit:
+
+1. a depth-6 tree on the same fifteen inputs, which can split on the amount within ranges of the card's mean;
+2. a depth-6 tree with one more input, the payment's amount divided by the card's 30-day mean amount.
+
+### What the knob costs him now
+
+The fraudster's knob still works; what changes is its price. Against the first detector he keeps €452 a day, against the second €257. The two differ only in the ratio, so the €195 between them is the ratio's; the €243 from the depth-2 tree's €695 down to €452 is the extra depth. His ceiling falls to about €100 over the last ten weeks (mean across seeds €99), because only an amount close to his victim's habit passes, and the simulator's cardholders average between €5 and €100. About 40% of his payments are still called over the run.
+
+<Figure
+  src="./figures/take.svg"
+  alt="Horizontal bars of what the probing fraudster keeps per day, in euros, over days 45 to 182, with a short line for the range over five seeds. No detector 1,400. Tree trained once 815. Weekly refit 695. Daily refit with the fraudster moving daily 671. Depth-6 tree, weekly refit, 452. Depth-6 tree with the amount divided by the card's 30-day mean, 257. The first three model bars are blue, the last two amber"
+  caption="What the fraudster keeps per day. Retraining daily against his weekly moves gives €707 (no bar), €12 from the weekly refit's €695; the €671 bar has him moving daily as well. The ratio input alone, between the two depth-6 bars, takes €195."
+/>
+
+The "no detector" row is his ceiling of €300 kept forever, five payments a day at an average of €280.
+
+The ratio still moves with his knob: lower the amount and amount ÷ mean falls with it. What he cannot move is the denominator. The card's 30-day mean is the holder's past, and his one payment on the card barely shifts it, so on a card whose holder averages €20 he has to come down near €20 to look ordinary. That is the reply <Ref lesson="adversarial-classification" id="the-fraud-versions-of-the-game">the fraud versions of the game</Ref> pointed to, now measured.
+
+<KeyFact>
+The best reply to an adversary's cheap edit is a feature whose edit is expensive. For a fraudster who sets the amount, the amount alone is his to move; the amount divided by the card's own 30-day mean measures the same knob against a reference point he cannot move, so to pass he must spend near his victim's habit rather than just under the detector's split.
+</KeyFact>
+
+A real fraudster has a second knob the simulator does not give him, the choice of victim: stolen card details from holders who spend €200 a week would buy back most of the margin.
+
+## The feedback loop replayed
+
+### The protocol
+
+The second loop needs no adaptive fraudster: the standard simulator, all three scenarios as scripted. It needs a stream long enough to retrain on every night and a replay in which each design chooses its own labels, as in <Ref lesson="alert-feedback-selection-bias" id="the-experiment-and-how-a-loop-is-replayed">the selection-bias lesson's experiment</Ref>.
+
+**Designs.** The five of <Ref lesson="alert-feedback-selection-bias" id="averaging-the-two-posteriors">that lesson</Ref>, with its settings: $k = 100$ cards a day, $\delta = 7$, $K = 8$ days of delayed samples, $Q = 15$ days of feedbacks.
+
+- the *feedback model*, trained on the last $Q$ days of its own feedbacks;
+- the *delayed model*, trained on $K$ days of complete labels ending $\delta$ days back;
+- the *pooled model*, one model on those delayed samples plus the last $\delta$ days of its own feedbacks;
+- the *average*, $P_A = \tfrac12 P_F + \tfrac12 P_D$, whose feedback model learns from the average's alerts;
+- the *all-labels model*, trained on every payment of the last $\delta$ days with its label, which no bank has.
+
+**Feedbacks.** Each day each design calls its own top 100 cards and receives the labels of those cards' payments of the day. A card found compromised is blocked for that design, reissued 28 days later; cards known from delayed labels are removed as before.
+
+**Learner.** A balanced random forest of 50 trees, each trained on all the frauds of its training set and as many randomly drawn genuine rows: the learner of the real-stream experiment with half its trees, to keep five seeds of nightly retraining of four models short.
+
+**A new method.** On day 100 a fraud method the script does not have starts: each day five card numbers leak, and for 14 days each makes one payment between 1 and 4 a.m., of €20 to €60. It tests the case <Ref lesson="alert-feedback-selection-bias" id="exercises">the selection-bias lesson's last exercise</Ref> left open: a method only complete labels can teach.
+
+**Scores.** The loop starts on day 25 and is scored from day 55, when the 15-day feedback window has been full for two weeks and the first cards each design blocked have been reissued, so every design is in its steady state: $CP@100$ per day, 128 days in each of five seeds, 640 seed-days, and the designs' daily ranks.
+
+### Five designs, one level
+
+| Design | Mean $CP@100$, days 55–182 | Range over seeds | Rank sum (lower is better) |
+|---|---|---|---|
+| Average | 0.219 | 0.212–0.225 | **1,686** |
+| Feedback model | 0.216 | 0.209–0.223 | 1,906 |
+| All labels (impossible) | 0.215 | 0.209–0.221 | 1,939 |
+| Pooled model | 0.215 | 0.209–0.221 | 1,970 |
+| Delayed model | 0.212 | 0.206–0.219 | 2,098 |
+
+In level the five designs tie: their means differ by 0.007, and the seed ranges overlap. The daily ranks are finer. If no design were better, each rank sum would be about $640 \times 3 = 1{,}920$, and how far apart two of them must be to count is <Ref lesson="drift-strategies-on-worldline" id="how-far-apart-must-two-bars-be">the critical difference</Ref>. With $S = 5$ designs ($q = 2.73$) and $D = 640$ seed-days,
+$$
+\text{CD} = 2.73 \sqrt{\frac{5 \times 6}{6 \times 640}} = 2.73 \times 0.0884 = 0.241 \text{ in mean rank}, \qquad 0.241 \times 640 = 154 \text{ on rank sums}.
+$$
+The test assumes independent days. Here the daily gap between two designs' ranks barely carries over from one day to the next (lag-one correlation between −0.08 and +0.04, averaged over seeds, for each of the ten pairs), so the overlapping training windows do not widen the distance much.
+
+Read against 154:
+
+- **The average comes first.** It leads the next design by 220, and its mean $CP@100$ is the highest in every one of the five seeds.
+- **Feedback, all labels and pooled are not shown apart.** Their rank sums lie within 64 of each other.
+- **The delayed model, only partly.** It trails the feedback and all-labels models by 192 and 159, at or just past the distance, and the pooled model by 128, inside it.
+
+So the replay reproduces one thing from the real stream's table firmly, the average on top; the order below it is not shown. And the lead is small: the average is ahead of the pooled model by 0.003 to 0.008 in each seed, less than one card in a hundred calls; on the real stream it led by 0.12, twelve cards.
+
+<Figure
+  src="./figures/loop-leaderboard.svg"
+  alt="Two panels. Left, mean CP at 100 over days 55 to 182 for five designs, bars between 0.212 and 0.219 on an axis from 0 to 0.3, with seed-range lines overlapping: feedback 0.216 (blue), delayed 0.212, pooled 0.215, average 0.219 (amber), all labels 0.215. Right, rank sums over 640 seed-days, axis starting at 1,600: average 1,686, feedback 1,906, all labels 1,939, pooled 1,970, delayed 2,098, with a dashed line at 1,920 labelled no difference and a bracket of length 154 from the end of the average's bar, labelled critical difference"
+  caption="The designs tie in level (left). In daily ranks (right) only the average stands clear of the others by more than the critical difference of 154."
+/>
+
+### Why the lead shrinks to under a card
+
+On the real stream, separating the feedbacks was worth twelve cards in a hundred calls; here it is worth under one. What did the twelve depend on, and which part of it is missing here?
+
+Keeping the feedbacks in a model of their own gives them half the say, where pooling drowns them, as <Ref lesson="alert-feedback-selection-bias" id="averaging-the-two-posteriors">the selection-bias lesson</Ref> showed. Beyond whatever averaging any two models gives, half the say is worth something only if the feedbacks teach what the delayed samples do not. They can teach two things: this week's frauds, which the delayed samples hold only a week later, and this week's false alarms, the genuine payments that look most like fraud.
+
+**This week's frauds.** Their worth is measured by the all-labels model against the delayed model: both train on about a week of complete labels, and the all-labels model's are a week fresher. On the real stream fresher won, 0.30 against 0.25 in $CP@100$, five more compromised cards in a hundred calls. On the simulator the all-labels model scores 0.215 against the delayed model's 0.212, a gap of 0.003, for two reasons in its construction.
+
+- *The script does not change.* Apart from the planted method, scenarios 1 to 3 are the same rules on day 182 as on day 30. A label a week old teaches exactly what yesterday's would.
+- *The freshest fact enters through an input every design shares.* What is new each day on the simulator is which terminals were compromised. That reaches a model only through the terminal's fraud rate, which <Ref lesson="point-in-time-features">the point-in-time lesson</Ref> builds from labels at least $\delta$ days old, the same column for every design. A feedback label that says "this terminal's payments are fraud today" has no input to enter.
+
+So of the two things the feedbacks can teach, the one the real stream showed to be worth five cards in a hundred is nearly absent here, and the lead shrinks with it.
+
+**What the remaining margin is.** The average still leads the pooled model in every seed, by 0.003 to 0.008. No run in this replay removes one cause of that margin and keeps the rest, so what follows is an elimination, not a measurement, and two candidates survive it.
+
+- *This week's false alarms.* These the simulator has: every call returns the day's payments of a card that looked compromised, and most of them are genuine. A separate feedback model learns from them where the queue is spent; a pooled one buries them among the delayed samples.
+- *The averaging itself.* The average is two forests of 50 trees, the pooled model one. An average of two models can rank better than either for that reason alone. On the real stream <Ref lesson="alert-feedback-selection-bias" id="not-the-averaging">two committees that both averaged nine models</Ref> ruled averaging out as the whole story; this replay has no such arm.
+
+The run that would tell them apart gives the pooled model 100 trees, as many as the average's two forests together. If it catches up with the average, the margin was the averaging; if it stays where it is, the margin is what the separate feedback model makes of the false alarms.
+
+<KeyFact>
+Separating feedbacks from delayed samples pays for what the feedbacks teach that the delayed samples do not. On the real stream fresh labels were worth 0.05 of $CP@100$ (all labels 0.30, delayed 0.25); on the simulator 0.003, and the average's lead over pooling falls from twelve cards in a hundred to under one. Where that last card comes from was reached by elimination, not by a control: the feedbacks' false alarms or the averaging of two forests, which no run here tells apart.
+</KeyFact>
+
+### What the feedbacks look like
+
+The simulator can show what the real-stream experiment could only describe: the feedback set beside the day it came from. Over days 55 to 182, the average's feedback rows were 7.8% fraud against 1.3% in the stream, six times richer. Their mean amount was €67 against €54.
+
+<Figure
+  src="./figures/feedback-set.svg"
+  alt="Two time series over days 55 to 182 for seed 0. Top, fraud share of the rows: the feedback rows of the average wander between about 5% and 13%, the day's stream stays near 1% to 2%. Bottom, mean amount of the rows: the feedback rows start around 80 to 90 euros and fall to the stream's level of about 55 euros from around day 115; the stream stays flat near 55 euros"
+  caption="The average's feedbacks against the day they come from (seed 0). Six times the fraud; an amount mix that moves when the alerts move."
+/>
+
+Two things in the figure are the simulator's own. The fraud share is modest for a sample of a hundred compromised-looking cards: about four in five called cards are genuine ($CP@100$ 0.22), and a call labels the card's whole day, about three payments, so most rows are genuine payments of cards called by mistake, the false alarms the margin argument above turned on. And the mean amount falls from about €85 to the stream's €55 around day 115, with nothing in the scripted part of the stream changing: from then on the models call cards of the new night method, whose payments are small, so the training set's amounts follow the model's choices. The same seed run without the night method keeps its feedback amounts between €69 and €80 to the end. That is the selection change <Ref lesson="alert-feedback-selection-bias" id="exercises">the selection-bias lesson's exercise</Ref> told apart from drift: the sample moved, not the stream.
+
+### A new method, and who learns it
+
+<Figure
+  src="./figures/night-method.svg"
+  alt="Lines of the weekly share of the new night method's card-days that were alerted, weeks 1 to 11 after it starts on day 100, five seeds pooled, axis 0 to 40%. Week 1 is shaded: no label yet. All labels (dashed): 18% in week 1, then 27% to 34%. Average (amber), pooled and delayed (grey): 5% to 7% in weeks 1 and 2, 20% to 23% in week 3, then 19% to 30%. Feedback model alone (blue): 8% in weeks 1 and 2, then 12% to 16% to the end"
+  caption="A method only labels can teach: the all-labels model learns it in the first week, the delayed, pooled and average designs in the third, the feedback model alone never fully."
+/>
+
+For two weeks the night payments look like nothing the models were taught, and the bank's designs call 5% to 8% of the method's card-days. The all-labels model, holding every payment's label at once, is at 18% in the first week and near 30% from the second. The delayed, pooled and average designs learn it in the third week, once the method's labels are a week old and enter the delayed samples.
+
+The selection-bias lesson's exercise feared that the average would lock such a method out: the delayed model would learn it, the feedback model would not, and their average would stay under the day's cut. On the simulator it did not. The average learned the method as fast as the delayed and pooled designs: 20% of its card-days in the third week, about a quarter from the fifth. In seed 0 the night payments scored about 0.68 from the delayed model and 0.17 from the feedback model, an average near 0.43, while the hundredth card stood at about 0.50; the spread of the night payments' scores put a quarter of them above the cut. Whether averaging locks a method out depends on where the cut sits, and on the simulator, with about forty compromised cards a day left to find, the hundredth card is a genuine card with a middling score.
+
+The feedback model alone shows the bias directly. It sees the method only through the night cards that some other signal happened to put in its hundred, and it stays at 12% to 16% of the method's card-days for as long as the run lasts, about half of what the all-labels model reaches. A model trained only on what it chose to look at learns a new method at the rate it stumbles on it.
+
+## Where the simulator falls short of the two experiments
+
+A replay is evidence about the experiment it imitates only where it reproduces that experiment's conditions. Six conditions differ, and each one limits a reading above.
+
+| | The published experiments | The simulator replay | What it limits |
+|---|---|---|---|
+| The adversary | Edits many features, each at a price, and acts only when the edit is worth less than the payoff | One knob, the amount, at no price; cannot choose whose card to use | The habit feature's €257 is the limit of this fraudster, not of a fraudster who picks big spenders |
+| When alerts happen | The spam game classified each message as it arrived; the card experiment ranked once a day, as the replay does, but a bank also scores each payment at authorisation | Alerts come once a day from a ranking | Both sides react on the day; a fraudster declined at authorisation learns within minutes |
+| The labels | A constant 7-day delay on the log's final labels, as here; those labels read a fraud nobody disputed as genuine | Complete and exact once the 7-day delay passes | No label noise, so a model is never trained on missed fraud as genuine; neither the experiment nor the replay tests the uneven delays a bank actually has |
+| The stream | Real payments that swing month to month | Stationary genuine behaviour; three fraud scripts that never change | Freshness is worth almost nothing, so the feedback designs tie in level |
+| The other frauds | Real fraud reacts to the bank | Scenarios 2 and 3 never react; only the planted fraudster does | The race involves one actor out of three |
+| What blocking does | In the log the blocked cards' later frauds never happened | The simulator keeps generating them, and the replay removes them by rule (blocked for 28 days, then reissued) | The opposite residue: the rule, not the data, decides what a block prevents |
+
+One adversary is missing altogether: the generator of genuine-looking payment sequences of <Ref lesson="adversarial-classification" id="when-an-edit-costs-almost-nothing">the adversarial lesson</Ref>, a capability with no measured incidence, so there is nothing to replay.
+
+<Conclusion>
+You can now replay both loops and read what the replay shows. Given one knob, a fraudster who drops under the split when caught and probes up when clean alternates with period two against any split, refitted or frozen; the frozen control is what shows that the alternation is his rule, not the refit's forgetting. The refit follows him about a month late, because his new amounts reach the tree only after the label delay and then fill its 30-day window slowly; retraining daily instead of weekly changes what he keeps by under 2%, while a deeper tree with an input that measures the amount against the card's own past cuts it from €695 to €257 a day, €195 of that the input's alone, because the card's past is a denominator his knob cannot move. Replaying the feedback loop, the five designs tie in level; in daily ranks the average comes first, past the critical difference, and the rest are not shown in the real stream's order. Its lead is under a card a day, because separating the feedbacks pays for what they teach that the delayed samples do not, and on the simulator a week-old label teaches what a fresh one would: the fraud never changes and its fresh signal travels through a label-built input every design shares. What the remaining card comes from, the false alarms or the averaging of two forests, is inferred by elimination and would take a pooled model of 100 trees to settle; a planted method shows the feedback model alone learning it, reaching about half the share of the all-labels model.
+
+The replay used labels as they arrived and never recorded which rows were feedbacks and which were delayed samples, or when each label matured; a bank has to. The next module turns the score into a decision under a budget and makes the model a managed asset, monitored for exactly the slow movements this replay produced; <Ref lesson="label-maturation" /> takes up the ledger of labels that mature over weeks.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+Derive the refit's response time. The fraudster moves on day 0 from an old band to a new one, five payments a day. The tree is refitted on days $0, c, 2c, \dots$, each time on the $K = 30$ days of labels ending $\delta$ days back, and suppose it moves its split into the new band once its training window holds at least 60 of the new band's frauds. (a) On which day does the window first hold 60 new-band frauds, and on which day is the split first moved, for $c = 7$ and for $c = 1$? (b) What do $\delta = 0$ and a larger $K$ change? (c) Compare with the three to four weeks measured in seed 0 and with what he keeps against the same weekly-moving fraudster: €695 a day under a weekly refit, €707 under a daily one.
+
+<Solution>
+**(a)** A refit on day $t$ trains on days $t - \delta - K$ to $t - \delta - 1$, so it holds the new band's days $0$ to $t - \delta - 1$: $t - \delta$ days, $5(t - \delta)$ frauds. Sixty frauds need $t - \delta \ge 12$, so $t \ge 19$ with $\delta = 7$. With $c = 7$ the refits fall on days 0, 7, 14, 21: the split moves on day 21, three rounds after his move. With $c = 1$ it moves on day 19. The daily refit gains two days.
+
+**(b)** With $\delta = 0$ the requirement is $t \ge 12$: the label delay is seven of the nineteen days. A larger $K$ changes nothing under a count requirement, as long as $K \ge 12$; if the tree instead needs the new band to be a given share of the window's frauds, against the old band's frauds still in it, the time grows with $K$, since the old band leaves the window only $K + \delta$ days after he abandoned it.
+
+**(c)** The measured response, three to four weeks, runs past day 21: the tree needs more than a fixed count when the new band sits closer to the genuine payments, where a split costs more false alarms. Either way, the daily refit removes only the wait for the next refit, at most $c - 1 = 6$ days of a response of three to four weeks, which is why a daily refit against the same weekly fraudster left what he keeps nearly where it was, €707 a day against €695; the €671 of the take figure needs him moving daily as well. The move: split a response time into the parts each setting controls before tuning the one that is cheapest to change.
+</Solution>
+</Exercise>
+
+<Exercise>
+Shrink the fraudster's band to zero: all five payments of a round at exactly his ceiling $T$. (a) What can his split-fitting rule learn from one round? (b) Suppose the tree's split is fixed at €259, he starts at $T = €300$ and $m = €2$. Write his ceilings until his first clean round and say what happens after it. (c) What does the €40 band buy him, and what does it cost?
+
+<Solution>
+**(a)** All five payments share one amount, so they are all called or all passed. If all are called, the only candidate split is $T$ itself, with no error, so $\hat s = T$: he learns only "$T$ is too high". If none are called, he learns "$T$ passes". One bit per round.
+
+**(b)** All called at €300, so the next ceiling is $300 - 2 = €298$; all called again, €296; and so on, €2 a round. The first ceiling not above €259 is €258, reached after 21 called rounds (300 − 2 × 21 = 258), five months of weekly rounds. It is clean, so he probes up to €278, is called, drops to €276, and walks down again for nine rounds. He spends most rounds caught.
+
+**(c)** With a €40 band his payments in one round straddle the split whenever it lies in the band, and the split fitted to them lands near the tree's split at once: in the replay he went from €300 to €261 in one round. The band is an experiment run on his own money. Its cost is the payments he places below his ceiling, €20 below it on average. The degenerate case shows which part of his rule does the learning: not the margin $m$, the spread of amounts.
+</Solution>
+</Exercise>
+
+<Exercise>
+"On the simulator the fraudster's called share alternates with a period of two rounds, exactly as utility did in the repeated game on spam. The simulator therefore reproduces the repeated game's mechanism." Refute the second sentence with the replay's numbers, and name the step that fails. Then design a run on the simulator that would produce an alternation by the refit's mechanism, and say how you would recognise it.
+
+<Solution>
+**Refutation.** The control removes the refit: a tree trained once on day 45 and never refitted. The alternation survives, stronger: round-to-round correlation of the called share −0.73 to −0.89 against −0.57 to −0.74 with the weekly refit, the ceiling zigzagging between €258 and €278 around a split fixed at €259. So the alternation does not need the refit at all.
+
+**The step that fails** is "same shape, same mechanism". In the spam game the alternation came from the refit seeing only the latest round, so it forgot each abandoned edit within a round. On the simulator it comes from the fraudster's own rule (called: drop under; clean: probe €20 up), which alternates against any fixed split. The simulator's refit cannot forget within a round: its window is 30 days and its labels arrive a week late.
+
+**A run with the refit's mechanism.** Two changes. Make the refit see only the latest round and see it at once: $K = c = 7$, $\delta = 0$ (the simulator's labels can be made instant). And replace the probing fraudster by the spam game's adversary, who knows the deployed model: at the start of each round he is told the current split $s$ and sets $T = s - m$. He never probes, so his rule cannot alternate on its own, and unlike a fraudster who merely stops probing, he sees the split move up as well as down.
+
+Prediction, from the seed-0 numbers above. He sits just under the split at about €250, band €208–248. The next refit trains on that week alone: his 35 frauds lie in a stretch with about six genuine payments a day above €220, so a split near €221 pays, as it did on day 87 of the settling run. He reads €221 and moves to €179–219, among about 53 genuine payments a day. The next refit, trained on that week alone, holds none of his frauds above €220; cutting under him would call ten genuine cards for each of his, so the split returns to about €250, where the scenario-3 frauds separate. He reads it and moves back up. Split and ceiling alternate with period two, €250 and €221 for the split, €248 and €219 for his ceiling, and what he keeps alternates with them. His called share does not alternate: he always stands under the split he was shown, so it stays low. Each refit forgets the band he left, which is the spam game's mechanism.
+
+The control: the same fraudster against a tree trained once and frozen. He reads its split once, sets $T = s - m$, and sits there for the rest of the run, called only now and then, by the draw for the spare places or through a terminal with recent fraud. If the alternation vanishes there and survives the refit, the refit caused it. The move: attribute a pattern by the run that removes its cause.
+</Solution>
+</Exercise>
+
+<Exercise>
+"On the simulator the average beat the pooled model in all five seeds, so the simulator confirms that alert feedback must be kept in a separate model." (a) What does the replay support, and what does it not? (b) Name the two features of the simulator that keep the gap small. (c) Propose one change to the simulator that would let it test the size of the gap, and say what result would support the real-stream finding.
+
+<Solution>
+**(a)** It supports the average coming first: on rank sums it leads the next design by 220, past the critical difference of 154 for five designs over 640 seed-days, and its lead over the pooled model is positive in every seed. It does not support the rest of the real stream's order (pooled and delayed are 128 apart, inside the distance), nor the size: 0.003 to 0.008 in $CP@100$, under one card in a hundred calls, against 0.12 on the real stream. A design choice worth less than a card a day would not be made on this evidence.
+
+**(b)** The fraud scripts never change, so a week-old label teaches what a fresh one would: the all-labels model, which measures the value of fresh complete labels, ties the delayed model. And the one fresh signal, which terminals are compromised now, enters only through the terminal's fraud rate built from labels at least a week old, the same input for every design, so feedback labels cannot carry it.
+
+**(c)** Make the fraud move within a week. For instance, plant a new method every two weeks, each with a different signature (hour, amount band, burst size), each lasting two weeks. Then fresh labels matter, and the all-labels model should pull away from the delayed model. The real-stream finding is supported if, in that run, the all-labels model leads the delayed model and the average's lead over the pooled model grows toward a tenth of $CP@100$; it is weakened if the all-labels model leads but the average does not, which would mean the feedbacks, chosen by the model, rarely contain the new methods. The night-method run already points that way for the feedback model alone.
+</Solution>
+</Exercise>
+
+<Exercise>
+Put the habit-feature detector under <Ref lesson="example-dependent-cost" id="the-decision-that-minimises-expected-cost">the cost rule</Ref> instead of a top-100 queue: a payment is checked if and only if $C_a \le \mathrm{Amt} \cdot p$, with a call costing $C_a = €5$. Suppose its output for the fraudster's payments rises with the amount, $p(a) = 0.0004\, a$ for $a$ in euros (so 0.04 at €100, 0.096 at €240). (a) Up to what amount does a payment of his pass? (b) The fraudster knows the rule. Is the cost rule worse or better for the bank than it looks, given that every payment he places is fraud? (c) What does that say about the probabilities the rule reads, once an adversary chooses where to stand?
+
+<Solution>
+**(a)** He passes while $\mathrm{Amt} \cdot p < C_a$: $a \cdot 0.0004\, a < 5$, so $a^2 < 12{,}500$ and $a < €111.80$. The knob works twice under this rule: a lower amount lowers $p$, and it also raises the threshold $p^* = C_a/\mathrm{Amt}$ the payment must clear.
+
+**(b)** The rule leaves a payment unchecked when its expected loss $\mathrm{Amt} \cdot p$ is below the €5 call, which is right if $p$ is the probability of fraud. A fraudster at €111 has expected loss, by the model, $111 \times 0.0444 = €4.93$; its real loss is the whole €111, because it is fraud. At five such payments a day the bank loses about €560 a day that the rule priced at €25.
+
+**(c)** The model's $p$ was calibrated on payments the fraudster had not yet chosen. Once he chooses to stand just inside the region the rule leaves alone, the payments there are more often fraud than the model says: he has moved $P(x \mid +)$ into the region the rule leaves alone, and with it $P(+ \mid x)$ there, which is the change that answers the classifier from the adversarial lesson. A cost rule on calibrated probabilities is optimal for a stream that does not read the rule. The move: before trusting a threshold derived from probabilities, ask who can move to the side of it that pays.
+</Solution>
+</Exercise>
+
+<Exercise>
+A stability check on a deployed model compares the share of payments in each score bin between a reference week and the current week, $\sum_i (a_i - e_i) \ln (a_i / e_i)$, with $e_i$ the reference share and $a_i$ the current share of bin $i$; a common reading is green below 0.10 and red above 0.25. Take the depth-2 tree's four leaves as the bins, on a day of 6,870 scored payments, the replay's daily mean once known cards are removed. In the reference week the amount leaf holds 13 payments a day (his 5 and 8 others, mostly scenario-3 frauds multiplied by five), the large leaf 6,832, the two terminal leaves 25, unchanged between weeks. In the current week the fraudster has moved under the split: the amount leaf holds 8, the large leaf 6,837. (a) Compute the index. (b) He now keeps about €1,200 a day that he did not keep before. Compute the same index on the amounts of his confirmed frauds, binned below and above €260, before (all five a day in the upper bin) and after (all in the lower), using a share of 0.001 for an empty bin. (c) What should a monitor of this detector look at?
+
+<Solution>
+**(a)** Amount leaf: $e = 13/6{,}870 = 0.001892$, $a = 8/6{,}870 = 0.001164$; the term is $(0.001164 - 0.001892) \ln(8/13) = (-0.000728)(-0.486) = 0.00035$. Large leaf: $e = 0.99447$, $a = 0.99520$; the term is $0.00073 \times 0.00073 \approx 0.0000005$. The terminal leaves do not change. The index is about 0.0004: deep green.
+
+**(b)** Before: shares (0.001, 0.999); after: (0.999, 0.001). Each bin contributes $0.998 \ln 999 = 0.998 \times 6.907 = 6.89$, so the index is about 13.8, far above 0.25.
+
+**(c)** Over the whole day the fraudster's move is five payments in 6,870, invisible to an index of the population, while it moved €1,200 a day. A monitor has to look where the adversary acts: the distributions of the inputs among confirmed frauds, the share of frauds landing in each leaf, what the alerts catch. The index computed on the right population turns red at once. <Ref lesson="model-risk-monitoring" /> builds the stability index and reads it for the population and then per variable, which is where this move shows.
+</Solution>
+</Exercise>
+
+<Exercise>
+The real-stream experiment built ten short streams by putting two non-consecutive months end to end, and found that the average lost 7.7% of its $CP@100$ across the join, the delayed model 12.5%. Design the same test on the simulator. (a) What must differ between the two months for the join to be a sudden change a model has to adapt to, given what the simulator holds fixed? (b) Using this lesson's results, predict the outcome if the second month only re-draws which terminals and cards are compromised, and if it instead changes the fraud methods. (c) What would count as agreement with the real result?
+
+<Solution>
+**(a)** On the simulator a new random seed for the same three scenarios changes which terminals and cards are hit, but not what fraud looks like: amount above €220, a terminal whose recent payments were fraud, a card spending five times its habit. A model fitted before the join applies unchanged after it. For a change the models must adapt to, the second month needs fraud that looks different: new methods (another hour, another amount band, bursts of small payments), or a changed genuine population (new cardholders with other habits), so that the old fit is wrong after the join.
+
+**(b)** Re-drawn compromises only: both designs lose little, and about the same, because the terminal rate is rebuilt from labels for both a week after the join, and the patterns learnt still hold; the feedback designs tie in level, as in the replay. Changed methods: the night-method run predicts the order. The all-labels model recovers first; the delayed, pooled and average designs recover together once the new methods' labels are a week old; the feedback model alone lags. So the average should lose about as much as the delayed model, not 7.7% against 12.5%, unless the new methods happen to share the cards the models already call, so that the feedbacks reach them first.
+
+**(c)** Report each design's relative loss of $CP@100$ over the ten days after the join against the ten before, in ten streams with different seeds, with the spread across streams. Agreement with the real result is a smaller loss for the average than for the delayed model in most streams, by more than the spread. A tie, as predicted for re-drawn compromises, would say the simulator's join is not the kind of change the real months held. The move: before reproducing a number, make sure the replay contains the cause the number measured.
+</Solution>
+</Exercise>
+
+<References>
+1. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 3.2 (the transaction data simulator: customer and terminal profiles, the 100 × 100 grid and radius, the three fraud scenarios and their counts), Ch. 3.3 (the fifteen baseline features, the terminal risk computed with a delay), Ch. 3.4 (the baseline decision trees), and the shared functions (train/test split with the delay and known-card removal, card precision at $k$ with detected cards removed), whose semantics the replay follows. The replay's adaptive fraudster, planted night method, 28-day block and every number above are this course's own runs on a rewrite of the simulator from its stated rules. https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+2. N. Dalvi, P. Domingos, Mausam, S. Sanghai, D. Verma, "Adversarial Classification," *Proceedings of the Tenth ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD '04)*, 2004, pp. 99–108 — Sec. 4 (the minimum-cost camouflage), Sec. 6.1 (its greedy form under unit cost), Sec. 6.3 and Fig. 3 (the repeated game on Ling-Spam: the adversary refits naive Bayes to the deployed classifier each round; utility alternates between two values; the oscillation of a good word's log-odds). https://homes.cs.washington.edu/~pedrod/papers/kdd04.pdf
+3. A. Dal Pozzolo, G. Boracchi, O. Caelen, C. Alippi, G. Bontempi, "Credit Card Fraud Detection: A Realistic Modeling and a Novel Learning Strategy," *IEEE Transactions on Neural Networks and Learning Systems* 29(8), 2018 — Sec. V and Algorithm 1 (feedback and delayed classifiers, the averaged posterior), Sec. VI-A (card identifier out of the features), Sec. VI-B (k = 100, δ = 7, the window lengths, ten repetitions, rank-based comparison), Sec. VI-C and Table III (the order of the strategies), Sec. VI-D (the juxtaposed-month streams, 7.7% against 12.5%). https://boracchi.faculty.polimi.it/docs/2017_FraudsTNNLS.pdf
+4. R. J. Bolton, D. J. Hand, "Statistical Fraud Detection: A Review," *Statistical Science* 17(3), 2002, pp. 235–255 — F. Provost's comment, pp. 249–250 (a deployed model changes the behaviour it models and starts losing effectiveness at once; fraud that reveals itself through a customer's complaint). https://doi.org/10.1214/ss/1042727940
+5. Y. Lucas, J. Jurgovsky, "Credit Card Fraud Detection Using Machine Learning: A Survey," arXiv:2010.06479, 2020 — Sec. 3.3 and Fig. 6 (aggregating a classifier of the delayed ground truth with a classifier of the feedbacks). https://arxiv.org/abs/2010.06479
+6. J. Gama, I. Žliobaitė, A. Bifet, M. Pechenizkiy, A. Bouchachia, "A Survey on Concept Drift Adaptation," *ACM Computing Surveys* 46(4), 2014 — Sec. 5 (systems whose decisions change the data cannot be evaluated by replaying historical data). https://doi.org/10.1145/2523813
+</References>

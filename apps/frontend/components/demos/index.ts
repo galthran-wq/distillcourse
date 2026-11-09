@@ -113,4 +113,5 @@ export const demos: Record<
   IdentifierDegreeCap: () => import("./fraud-ml/IdentifierDegreeCap"),
   RestartWalkPropagator: () => import("./fraud-ml/RestartWalkPropagator"),
   DriftDetectorTuner: () => import("./fraud-ml/DriftDetectorTuner"),
+  CamouflageKnapsack: () => import("./fraud-ml/CamouflageKnapsack"),
 };
