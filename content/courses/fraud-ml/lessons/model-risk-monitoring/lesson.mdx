@@ -1,0 +1,561 @@
+A detector that scored well last quarter is in production now, and the fraudsters, the customers and the products have all changed since. Which numbers should be computed every week to tell whether its inputs have shifted, whether its ranking still works and whether its probabilities still mean what they say — and what happens to the model when a number turns red?
+
+<Ref lesson="change-detectors" id="on-a-payment-stream-which-number-goes-in-and-when-the-alarm-rings">The change detectors</Ref> already watch one stream: the share of compromised cards the model missed, fed day by day to a rule such as CUSUM. That stream answers one question, whether the error has risen, and it answers late. Its labels come from customers' disputes, so a change on day $c$ reaches it on day $c + \delta$ and, for a rise of one standard deviation, rings the alarm about 17 days after the change with the course's $\delta = 7$. It also says nothing about why the error rose, and nothing at all about the probabilities that <Ref lesson="score-to-action" id="zones-that-move-with-the-amount">the decision zones</Ref> multiply by amounts.
+
+A bank's model-risk function, the people who answer for its models, asks three narrower questions every week, each with a traffic light, and states in writing what happens when one of them turns red. They are separate questions because they become answerable at different times.
+
+<Figure
+  src="./figures/three-clocks.svg"
+  alt="Three panels side by side. Inputs, has the population moved: computed from this week's payments, no labels needed; ready the same day; measured by a stability index on the score and on each input; lights 0.10 and 0.25. Ranking, does the order still work: computed from the latest fully labelled week; ready delta days after the week; measured by AP and CP at k against the spread of ordinary weeks; lights: a 99% line and a CUSUM alarm. Probabilities, do they mean what they say: computed from the latest labelled week split into probability pools; ready delta days after the week; measured by observed against predicted fraud rate in each pool; lights 90, 95 and 99%. Below, a time axis: week t scored, week t ends with a blue dot, plus delta its labels complete with amber and green dots."
+  caption="The weekly monitor asks three questions; only the first can be answered before the labels arrive."
+/>
+
+Whether the inputs have moved compares this week's payments with the ones the model was built on, so it needs no label and can be checked the day the payments are scored. The ranking needs labels, so it is checked on the latest week whose labels are complete, $\delta$ days after that week ends. The probabilities need labels too, split by the probability the model gave, because a model can rank as well as ever while every probability it outputs is twice too high.
+
+## The stream every number below comes from
+
+Each of the three questions is easiest to see on a stream where the truth is known, so every measured number in this lesson comes from one setup. The course's <Ref lesson="canonical-datasets" id="the-transaction-simulator-a-world-whose-rules-are-known">transaction simulator</Ref> runs for 133 days with its three scripted frauds: amounts above €220, compromised terminals for 28 days, leaked cards for 14 days with five times the usual amount. A boosted tree ensemble (100 trees of depth 3) is trained on days 35–41, 55,103 payments with 344 frauds, on the fifteen inputs of <Ref lesson="alert-budget-metrics" id="five-models-scored-on-a-test-week">the baseline experiment</Ref>. Days 42–48 are its development week, the held-out week on which it was approved. Twelve weeks are then scored, days 49 to 132. Known cards are removed as in <Ref lesson="delayed-labels-prequential" id="which-test-payments-would-really-be-scored-removing-known-cards">the delay lesson</Ref>, over a 28-day window, because the simulator keeps a customer's identity after the bank would have replaced the card.
+
+The same rules generate three streams. In the **unchanged** stream nothing happens after training. In the **product** stream, on day 84 three cardholders in ten adopt a new way to pay: twice as many payments a day, each half the usual amount. In the **method** stream, from day 84 the leaked-card frauds stop inflating the amount and spend what the cardholder usually spends. The method stream is identical to the unchanged one until day 84 and is scored by the same model. The product stream is a separate draw from the same rules, so it has a model of its own, trained the same way on its own days 35–41 (54,642 payments, 371 frauds), with its own development week and its own reference weeks; its numbers are compared only with each other.
+
+Where a check needs to know how much a number moves on ordinary weeks, the reference is the first five monitored weeks of the stream, days 49 to 83: they come before both changes and are all labelled by day 90. The model's development offers a second candidate reference, its validation folds.
+
+## Has the population moved? A stability index on the score
+
+The first question needs no label: are the payments the model scores this week like the payments it was approved on? The model's score summarises every input in one number, so the score is the place to look first.
+
+### The mean score misses the move
+
+The obvious check is the mean score, this week against the development week. On the product stream it reads 0.0087 in the development week and 0.0082 in the week from day 112, four weeks after the launch: a fall of 6%. In the five unchanged weeks before the launch the weekly mean already ranged from 0.0085 to 0.0093, so the 6% is inside ordinary variation.
+
+The scores did move. Cut the development week's scores into ten bands at their deciles, so that each band holds a tenth of the development payments, and count where the payments of the week from day 112 fall. Band 2 has emptied from 10.0% to 7.5%; bands 8 and 9 have filled from about 10% to 14.0% and 15.6%. Mass has left some bands and piled into others, and the shifts partly cancel in the mean. A mean also has no scale: nothing says how large a change in it should worry anyone.
+
+### Comparing the shares band by band
+
+What is needed is a number that adds up the differences between two sets of band shares, counts a move in either direction, and has an agreed reading. Call the development week's share of band $i$ the *expected* share $e_i$ (expected because it is what the model was built and approved on, not a prediction of anything) and this week's the *observed* share $o_i$.
+
+<FigureSequence
+  name="ssi"
+  alt="Four frames on ten score bands. Frame 1: paired bars, blue for the development week's shares, all near 0.10, amber for the week from day 112, ranging from 0.075 to 0.156. Frame 2: the same bars with the ratio observed over expected under each band: 0.90, 0.75, 1.18, 1.04, 0.81, 0.83, 0.81, 1.36, 1.53, 0.76. Frame 3: one amber bar per band, the term (obs minus exp) times ln(obs over exp): 0.0011, 0.0072, 0.0030, 0.0002, 0.0040, 0.0032, 0.0038, 0.0114, 0.0229, 0.0066. Frame 4: the same terms and, on the right, a stacked bar summing to 0.063, below dashed lines at 0.10 and 0.25 labelled green, yellow and red."
+  caption="The stability index of the week from day 112: one non-negative term per band, summed."
+/>
+
+<Task>
+Step through the four frames. Before frame 3, predict which band contributes most and why; the answer should involve both the size of the move and the ratio.
+</Task>
+
+<Definition title="stability index">
+For a variable cut into bins $i = 1, \dots, B$, with expected shares $e_i$ from the development sample and observed shares $o_i$ from the period being checked,
+$$
+\mathrm{SI} = \sum_{i=1}^{B} (o_i - e_i)\,\ln\frac{o_i}{e_i}.
+$$
+Applied to the model's score it is the population stability index; applied to one input, the stability index of that input.
+</Definition>
+
+Each term is at least zero, because $o_i - e_i$ and $\ln(o_i/e_i)$ always have the same sign; a term is zero only when the band's share has not moved. So the index is zero exactly when every share is unchanged, and it grows with every move, in whichever direction.
+
+<Example title="the week from day 112">
+The bands are the development week's deciles. Ties among the boosted model's scores leave the development shares a few thousandths off a tenth:
+
+| band | expected $e_i$ | observed $o_i$ | $o_i/e_i$ | $\ln(o_i/e_i)$ | term |
+|---|---|---|---|---|---|
+| 1 | 0.100 | 0.090 | 0.90 | −0.105 | 0.0011 |
+| 2 | 0.100 | 0.075 | 0.75 | −0.288 | 0.0072 |
+| 3 | 0.100 | 0.118 | 1.18 | 0.166 | 0.0030 |
+| 4 | 0.099 | 0.103 | 1.04 | 0.040 | 0.0002 |
+| 5 | 0.101 | 0.082 | 0.81 | −0.208 | 0.0040 |
+| 6 | 0.100 | 0.083 | 0.83 | −0.186 | 0.0032 |
+| 7 | 0.095 | 0.077 | 0.81 | −0.210 | 0.0038 |
+| 8 | 0.103 | 0.140 | 1.36 | 0.307 | 0.0114 |
+| 9 | 0.102 | 0.156 | 1.53 | 0.425 | 0.0229 |
+| 10 | 0.100 | 0.076 | 0.76 | −0.274 | 0.0066 |
+
+The terms sum to 0.063. Band 9 alone gives more than a third of it: its share moved by 0.054 and its ratio is the largest, and the term is the product of the two.
+</Example>
+
+The index needs a reading, and the one in use is a convention, not a test:
+
+- below 0.10, no significant shift: green;
+- 0.10 to 0.25, a moderate shift: yellow;
+- 0.25 and above, a significant shift: red.
+
+At 0.063 the score of the product stream is green. In the unchanged stream the same index never exceeds 0.001 in twelve weeks, so 0.063 is a real move, sixty times the noise, and still below the line for yellow.
+
+<Exercise>
+In the week from day 91 of the product stream the observed shares of the ten bands are 0.073, 0.074, 0.085, 0.084, 0.086, 0.100, 0.102, 0.128, 0.159, 0.109, against the expected shares of the table above. Compute the index and its light. Which band contributes most?
+
+<Solution>
+Term by term, $(o_i - e_i)\ln(o_i/e_i)$:
+
+| band | $o_i - e_i$ | $\ln(o_i/e_i)$ | term |
+|---|---|---|---|
+| 1 | −0.027 | −0.315 | 0.0085 |
+| 2 | −0.026 | −0.301 | 0.0078 |
+| 3 | −0.015 | −0.163 | 0.0024 |
+| 4 | −0.015 | −0.164 | 0.0025 |
+| 5 | −0.015 | −0.161 | 0.0024 |
+| 6 | 0.000 | 0.000 | 0.0000 |
+| 7 | 0.007 | 0.071 | 0.0005 |
+| 8 | 0.025 | 0.217 | 0.0054 |
+| 9 | 0.057 | 0.444 | 0.0253 |
+| 10 | 0.009 | 0.086 | 0.0008 |
+
+The sum is 0.056: green. Band 9 again contributes most, nearly half, because it holds both the largest move and the largest ratio. The lowest bands contribute more than in the week from day 112 because they are emptier: the logarithm of a ratio of 0.73 is as large as that of 1.37, so a band that empties counts by its ratio as much as one that fills.
+</Solution>
+</Exercise>
+
+### The index is the information value between two periods
+
+The formula has been met before. <Ref lesson="scorecards-woe" id="which-variables-earn-a-line-information-value">The information value</Ref> of a binned variable is
+$$
+\mathrm{IV} = \sum_i \left(\frac{g_i}{N_g} - \frac{f_i}{N_f}\right)\ln\frac{g_i/N_g}{f_i/N_f},
+$$
+the same sum with the genuine share of bin $i$ in place of $o_i$ and the fraud share in place of $e_i$. The information value measures how far apart the genuine and the fraud distributions of one variable are; the stability index measures how far apart this week's and the development week's distributions are. Only the two groups being compared differ.
+
+The identity gives the thresholds a meaning. The age table of the scorecard lesson has information value 0.65: a week whose population differed from the development week as much as fraudulent applicants differ from genuine ones by age would read 0.65, far into red. A week at 0.25 differs from its reference as much as a variable of medium-to-strong separating power separates fraud from genuine. The reading flips with the use: in variable selection a large value is what is wanted, in monitoring it is what is feared.
+
+Two properties carry over from the scorecard lesson. The number belongs to the binning: other cuts give another value, so the bins are fixed once, at development, and kept. And it is symmetric: swapping $o$ and $e$ leaves every term unchanged. It is the sum of the two Kullback–Leibler divergences, one in each direction, a short derivation left to [the exercises](#exercises).
+
+### Two references: the development week and last week
+
+The index can be taken against two references, and they answer different questions. Against the development week it says how far the population has moved since approval. Against the previous week it says when the move happened.
+
+A change that arrives gradually shows the difference. On the product stream the index of the cards' 30-day payment count against the development week climbs 0.03, 0.21, 0.34, 0.47 and 0.56 over the five weeks after the launch; against the previous week it reads 0.04, 0.08, 0.02, 0.01, 0.01. No single week moved enough to turn yellow, and the input is now as far from its development distribution as the genuine and fraud distributions of a strong scorecard variable are from each other. A monitor that only compared consecutive weeks would never light, so the development week is the reference that decides, and the week-on-week index dates the change once it has been found.
+
+<KeyFact>
+The 30-day count moved over four weeks although the launch happened on one day: a window of 30 days takes 30 days to fill with the new behaviour. Aggregated inputs turn a <Ref lesson="concept-drift" id="how-the-change-arrives-in-time">sudden change</Ref> in the payments into an incremental one in the features, and only the index against the development week adds up the increments.
+</KeyFact>
+
+## Which input moved: the same index per variable
+
+A score index says the scored population differs; it does not say in what. The second step computes the same index for each input, with each input cut at its own development deciles.
+
+### Nine inputs move under a green score
+
+On the product stream the per-input index shows what the score index summarised away.
+
+<Figure
+  src="./figures/heat-strip.svg"
+  alt="A grid of stability indices: rows are the score and eleven inputs, columns the twelve monitored weeks from day 49 to day 126, a vertical line at day 84 labelled launch. Before the launch every cell is green and near 0. After it the score stays green, 0.01 to 0.07. Amount is yellow at 0.12 from day 84. Card count over 1 day is yellow around 0.22; over 7 days yellow 0.20 then red near 0.49; over 30 days 0.03, 0.21, then red 0.34 rising to 0.56. Card averages over 1 and 7 days are yellow around 0.19 and 0.23; over 30 days they climb from 0.02 to a yellow 0.24. Terminal count over 1 day stays green at 0.07; over 7 days red near 0.38 from the third week; over 30 days red, rising to 0.92. Terminal fraud rate over 7 days stays at 0. Legend: green below 0.10, yellow 0.10 to 0.25, red 0.25 and above."
+  caption="After the launch the score index stays green while nine inputs move, five to yellow and four to red; the longer the input's window, the later and the higher it climbs."
+/>
+
+The score never leaves green. The amount turns yellow in the week of the launch, the cards' 1-day count and average with it; the cards' 7-day count is red a week later, their 30-day count in the third week, the terminals' 30-day count in the fourth. The terminals' fraud rate does not move: the launch changed how genuine customers pay, not how much fraud there is.
+
+The score moved far less than its inputs. The likeliest reason is that the simulator's frauds are told apart mainly by the amount and the terminal's fraud rate, which moved least, so the card counts and averages carry little of the score. That is a reason for quiet only until the next retraining, which may give the new behaviour weight, and meanwhile the model is scoring card histories it saw almost none of: four payments in ten fall in the top band of the 7-day count, against one in ten in development. So the per-variable index is computed every week, not only when the score index moves. It costs a histogram per input.
+
+### What a red input means
+
+A red input says the model is being asked about a population that is thin or absent in its training data. In the terms of <Ref lesson="concept-drift" id="naming-the-three-parts">the drift lesson</Ref> it is a change in $p(x)$, virtual drift if $p(y\mid x)$ stays put. It does not say the model is wrong there; that is a question for the labels. On the product stream average precision averaged 0.53 in the seven weeks after the launch against 0.61 in the five before, lower by less than two of the unchanged stream's weekly standard deviations.
+
+It has a second cause that needs no change in the world at all. An input computed by different code at serving time than at training time, the <Ref lesson="point-in-time-features" id="one-definition-for-training-and-serving">training–serving skew</Ref> of the point-in-time lesson, shows as one input whose index jumps on the day the code was deployed while every input built from the same columns stays green. A pipeline that starts filling a column with zeros puts the whole week's values into one bin and reads deep red the same day. The per-variable index is the cheapest test of the serving pipeline a bank has, and it is the first thing to check when a single input turns red overnight.
+
+## What a green index cannot rule out
+
+From a green index one would like to conclude that nothing important changed. The method stream shows the opposite.
+
+<Figure
+  src="./figures/green-index.svg"
+  alt="Three small charts over the twelve weeks from day 49 to day 126, with a dashed vertical line before day 84 labelled a new fraud method. Top: the score stability index, flat at 0.000 throughout, far below a dashed line at 0.10. Middle: card precision at 100, between 0.19 and 0.25 throughout, with no step at the change. Bottom, amber: the share of leaked cards found, 55% to 78% before day 84, then 0% to 10%."
+  caption="On the method stream the leaked cards disappear from the alerts while the score index stays at zero and card precision at 100 does not move."
+/>
+
+From day 84 the leaked-card frauds spend what the cardholder usually spends. The model learned them as large amounts on a card, so it stops finding them: before the change about three in five of the leaked cards that paid on a given day were among that day's hundred alerts, afterwards about one in twenty. The score index stays below 0.001 every week.
+
+It cannot do otherwise. A change that touches only the frauds moves at most the fraud share of the payments, 0.65% a week here, between bands. Move all of it from one decile into another and the index is $0.0065\,[\ln(1.065) - \ln(0.935)] \approx 0.0008$. <Ref lesson="concept-drift" id="what-the-matrix-cannot-see">The drift lesson</Ref> proved the same bound for a classifier that tries to tell two days apart: a population-level comparison measures the cardholders, and the fraudsters are too few to move it.
+
+The ranking metric the team works to does not see it either. Card precision at 100 averages 0.22 in the five weeks before and 0.22 after: the hundred alert slots are filled with compromised-terminal cards that were there all along, and the queue looks as full of fraud as before. The loss shows in average precision, which falls from 0.49 to 0.39 on average, because AP reads the whole ranked list, and in the share of each fraud kind found.
+
+<KeyFact>
+A population index is blind to anything that only the frauds do, by arithmetic: at a fraud share of 0.65% no fraud-only change can lift it above about 0.001. The same index computed on the confirmed frauds alone, a delay later, is not: on the method stream the index of the frauds' amounts jumps from at most 0.06 to 0.32 in the week of the change.
+</KeyFact>
+
+The index on the fraud rows comes with the caution of <Ref lesson="concept-drift" id="per-class-a-delay-later">the per-class comparison</Ref>: on the product stream the frauds' amounts moved too (up to 0.14), because a change in who pays and how carries the frauds along with it. Read both classes. Fraud rows moving with genuine rows still means a change in the mix; fraud rows moving alone, as on the method stream where the genuine amounts stay at 0.001, means the frauds changed.
+
+## Does the ranking still work? A performance backtest
+
+The second question needs labels. *Backtesting* compares what the model said before the outcome was known with the outcome once it is: here, the ranking of a week's payments against their labels, as soon as the week is fully labelled, $\delta$ days after it ends.
+
+### Which number to recompute
+
+The metrics are the ones <Ref lesson="alert-budget-metrics" id="three-numbers-for-three-questions">the evaluation lesson</Ref> settled on: card precision at $k$ for the team's own budget, average precision for the whole top of the list, ROC-AUC beside them. Monitoring reports in the credit tradition list AUC, the accuracy ratio $2\,\mathrm{AUC} - 1$, the Kolmogorov–Smirnov distance between the score distributions of the two classes, and the lift in the top 10% of scores. All four are about cuts the budget never reaches: the top 10% of a simulator day is about 700 payments against 100 alerts. A monitor built on them stays green while the queue fills with genuine cards, so the monitor uses the numbers the budget is measured in, and the method stream adds that it must not use only one of them.
+
+### A fixed percentage fires on ordinary weeks
+
+The simplest rule compares the week's metric with the development value and colours the relative change: below 5% green, 5% to 10% yellow, above 10% red. Apply it to the unchanged stream, where by construction nothing happens:
+
+| metric | development week | twelve unchanged weeks, mean ± sd | yellow or red | red |
+|---|---|---|---|---|
+| AP | 0.575 | 0.506 ± 0.047 | 10 of 12 | 7 of 12 |
+| CP@100 | 0.270 | 0.235 ± 0.022 | 11 of 12 | 7 of 12 |
+| ROC-AUC | 0.857 | 0.853 ± 0.022 | 1 of 12 | 0 of 12 |
+
+The rule is red more often than green on a stream that never changes. Two things cause it, and neither is in the rule. The metric moves from week to week by more than 5%: one standard deviation of weekly AP is 9% of its mean. And the development week was a lucky one, 1.5 standard deviations above the weeks that followed, so every later week looks like a fall. ROC-AUC passes because it barely moves, which is the blindness of <Ref lesson="alert-budget-metrics" id="roc-auc-a-ranking-metric-averaged-over-cuts-the-team-never-makes">the evaluation lesson</Ref>, not stability.
+
+### The bootstrap backtest
+
+A drop means something only against the size of the drops chance produces. AP and CP@$k$ have no convenient formula for their sampling distribution, and the payments of one card are not independent, so the scale is obtained by resampling.
+
+<FigureSequence
+  name="bootstrap"
+  alt="Three frames. Frame 1: two boxes, the development week, days 42 to 48, 4,000 cards and 52,361 payments, AP 0.575, and the week from day 84 on the method stream, 3,876 cards and 49,216 payments, AP 0.359; below, observed difference 0.359 minus 0.575 equals minus 0.216. Frame 2: arrows from both boxes into one pool of 7,876 cards, each card with all its payments, and from the pool to two draws, 4,000 cards and 3,876 cards with replacement, giving an AP difference. Frame 3: a histogram of a thousand such differences centred on zero, with dashed lines at plus and minus 0.096 marked 95% and at plus and minus 0.127 marked 99%, and an amber line at minus 0.216 marked observed, red, outside the whole histogram."
+  caption="The pooled bootstrap asks how far two samples of one stream fall apart by chance; the method week's drop is far outside it."
+/>
+
+<Task>
+Before frame 3, estimate from the twelve unchanged weeks (sd 0.047) roughly where the 95% line should fall for a difference of two weekly APs. Then compare with the histogram and say which source of variation the bootstrap leaves out.
+</Task>
+
+The procedure, for a metric $M$ computed on the development week and on the week being checked:
+
+1. Pool the two weeks' cards, each card carrying all of its payments in the week.
+2. Draw two samples from the pool with replacement, of the two original sizes in cards.
+3. Compute $M$ on each and take the difference.
+4. Repeat 1,000 times or more. The differences show how far two weeks drawn from one stream fall apart.
+
+The light compares the observed difference with them: green if it is not significant at 95%, yellow if significant at 95% but not at 99%, red if significant at 99%. Pooling is what puts the hypothesis of no change into the draws: both samples come from one mixture, so any difference between them is chance. Resampling cards rather than payments keeps a card's three frauds together, as they are in the data.
+
+On the method stream every week from day 84 is red, with differences from −0.13 to −0.23 against 99% lines between ±0.11 and ±0.14. On the unchanged stream two weeks are red and one yellow out of twelve, against the 0.12 red and 0.5 yellow weeks the stated levels promise. The bootstrap is far better behaved than the fixed percentage, and still too eager. It resamples the cards of two weeks, so it knows how much those weeks could differ by drawing other cards; it does not know that weeks differ for reasons of their own, a busier fraud week, a different mix of compromised terminals. <Ref lesson="delayed-labels-prequential" id="how-far-one-validation-week-can-be-trusted-repeated-hold-out-and-prequential-folds">The delay lesson</Ref> met the same gap: resampling one week gave a spread several times smaller than the spread across weeks.
+
+### The reference is a spread, not a week
+
+Both rules compared every week with one development week, and that week was lucky. What a monitored week has to be compared with is the spread of the metric across weeks on which nothing changed, and the mean they scatter around. The development offers a candidate: <Ref lesson="delayed-labels-prequential" id="prequential-folds-a-spread-across-weeks">prequential folds</Ref>, the model's recipe trained on one week and scored on the next, shifted back a week at a time. On the unchanged stream four folds, validating on days 21 to 48, give AP $0.552 \pm 0.022$. The two folds before them, trained on the simulator's first two weeks, are left out: there every input is computed over a history only days long, and AP falls to 0.45 and 0.29. The four kept folds are not clean either. The earliest is trained on days 14 to 20, where a 30-day window holds at most 20 days, while the deployed model is trained from day 35, when every window is full; so the folds measure the recipe on partly filled windows the live weeks never have, one more reason their spread need not be the live weeks'.
+
+A week's metric $x_t$ then becomes a number of standard deviations below the reference mean, $z_t = (\bar x - x_t)/s$, and since a lasting fall shows as a run of moderate weeks rather than one extreme week, the $z_t$ go into <Ref lesson="change-detectors" id="evidence-has-to-accumulate-cusum">CUSUM</Ref>, $g_t = \max(0, g_{t-1} + z_t - v)$, with the settings tuned there for a fall of one standard deviation, $v = 0.5$ and $h = 5$, restarted after each alarm. Against the folds the unchanged stream alarms three times in twelve weeks, in the weeks from days 49, 70 and 105: as eager as the bootstrap.
+
+The folds' numbers are the reason. Their spread is less than half of the 0.047 the live weeks show, and their mean sits a live standard deviation above the 0.506 the live weeks average. <Ref lesson="delayed-labels-prequential" id="prequential-folds-a-spread-across-weeks">The delay lesson</Ref> found the fold spread a floor on the forward one, 0.022 against 0.031; here it falls further short, and four folds are too few to pin a standard deviation anyway. The only thing that measures how live weeks vary is live weeks. So the folds serve while there is nothing else, and a red against them in the first weeks is a reason to look, not to act; once five weeks are labelled, their mean and standard deviation become the reference.
+
+<Example title="the product stream, backtested">
+The reference is the five weeks before the launch, scored by this stream's own model: AP $0.611 \pm 0.051$. The seven weeks after it:
+
+| week from day | 84 | 91 | 98 | 105 | 112 | 119 | 126 |
+|---|---|---|---|---|---|---|---|
+| AP $x_t$ | 0.553 | 0.494 | 0.481 | 0.590 | 0.538 | 0.523 | 0.528 |
+| $z_t$ | 1.14 | 2.32 | 2.57 | 0.42 | 1.43 | 1.73 | 1.64 |
+| $g_t$ | 0.64 | 2.46 | 4.53 | 4.45 | **5.39** | 1.23 | 2.38 |
+
+No single week is below $\bar x - 2.576\,s$, the 99% line. CUSUM crosses $h = 5$ in the week from day 112, which is fully labelled on day 125. Card precision at 100, run the same way against its own five weeks ($0.247 \pm 0.020$), never alarms, and ROC-AUC falls from 0.854 to 0.819.
+</Example>
+
+So the ranking did suffer under the launch, by a moderate amount that lasted: the hundred cards the team calls are as good as before, and the order below them is worse, which is what AP and AUC read and the budget does not. It took five weeks of accumulated evidence to say so. Red inputs and a red ranking together send the model to retraining, and the inputs that moved, the cards' counts and averages, say where the new model has to learn. [The control-chart exercise](#exercises) runs the same rule on the method stream.
+
+The bootstrap stays the tool where no run of weeks exists: a segment too small to have weekly history, or two models scored on the same week, where the week's own events hit both alike.
+
+## Do the probabilities still mean what they say? Calibration pools
+
+The decision zones read the model's probability as a number. <Ref lesson="score-to-action" id="four-expected-costs-and-the-cheapest-of-them">Declining beats reviewing</Ref> above $p = 0.9$; a review is worth its call only where the call costs less than the cheapest automatic action, and the band where it does is set by $p$ together with the amount. A model whose 2% means 4% sends the wrong payments to every zone while ranking them as before, and no ranking metric can see it.
+
+### One number is not enough
+
+The obvious check is the Brier score, the mean squared distance between probability and label,
+$$
+\mathrm{BS} = \frac{1}{n}\sum_{j=1}^{n}(p_j - y_j)^2 .
+$$
+Its use and its limits were met with <Ref lesson="undersampling-calibration" id="what-the-distortion-looks-like-on-a-simulated-card-stream">the undersampled model</Ref>. On the development week the deployed model scores 0.0042, against 0.0073 for a constant at the week's base rate, and the same tree trained on every fraud and 2% of the genuine payments, left uncorrected, scores 0.025. The Brier score separates those three. It cannot say which probabilities are wrong, and with 99% of the payments at the bottom of the scale it is dominated by them, while the decisions that cost money are made higher up.
+
+### Pools and the binomial test
+
+So the payments are grouped by the probability the model gave them into *pools*, here the bands of <Ref lesson="score-to-action" id="the-plane-and-the-table-analysts-read">the banded decision table</Ref>: below 0.001, 0.001–0.01, 0.01–0.1, 0.1–0.5, 0.5–0.9, 0.9 and above. A pool of $n$ payments with mean predicted probability $\hat P$ should hold about $n\hat P$ frauds; the question is how many more is too many.
+
+If the $n$ outcomes were independent, each fraud with probability $\hat P$, the fraud count would be binomial with mean $n\hat P$ and variance $n\hat P(1 - \hat P)$, and for $n\hat P > 5$ and $n(1 - \hat P) > 5$ close to normal. The observed rate $\theta/n$ then exceeds
+$$
+p^* = \hat P + z_\alpha\sqrt{\frac{\hat P(1 - \hat P)}{n}}
+$$
+with probability $1 - \alpha$ only, where $z_\alpha$ is the standard normal quantile at $\alpha$. With three levels the test gives four colours: green if the rate is below $p^*$ at 90%, yellow between the 90% and 95% lines, orange between 95% and 99%, red above the 99% line.
+
+<Example title="a pool of 500 payments at 2%">
+$\hat P = 0.02$, $n = 500$, so $n\hat P = 10 > 5$. The standard error is $\sqrt{0.02 \times 0.98/500} = 0.00626$.
+
+- 90%: $z = 1.282$, $p^* = 0.02 + 1.282 \times 0.00626 = 0.0280$, or 14.0 frauds;
+- 95%: $z = 1.645$, $p^* = 0.0303$, or 15.2 frauds;
+- 99%: $z = 2.326$, $p^* = 0.0346$, or 17.3 frauds.
+
+So 14 frauds or fewer is green, 15 yellow, 16 or 17 orange, 18 or more red. At $n\hat P = 10$ the normal curve is a little lenient in the tail: the exact binomial probability of 18 or more is 1.3%, not 1%.
+</Example>
+
+<Figure
+  src="./figures/pools.svg"
+  alt="Six rows, one per probability pool, on a log scale of fraud rate from 0.0002 to 1. Each row has a blue tick at the predicted rate, a light blue bar up to the 99% critical rate and an amber dot at the observed rate. Below 0.001, 1,039 payments: 0 frauds. 0.001 to 0.01, 47,024 payments: observed on the predicted 0.0022. 0.01 to 0.1, 823 payments: observed 3.5% against predicted 2.4%, at the right end of the bar, labelled 29 frauds. 0.1 to 0.5, 271 payments: observed 0.21 just below predicted 0.23. 0.5 to 0.9, 129 payments: observed 0.63 below predicted 0.74. 0.9 and above, 26 payments: observed 0.92 on predicted 0.94."
+  caption="One monitored week of the deployed model, pool by pool: one pool above its prediction, one below, the rest on it."
+/>
+
+The condition $n\hat P > 5$ and $n(1 - \hat P) > 5$ fails at both ends of the scale, every week. The pool below 0.001 holds about a thousand payments at a mean probability near 0.0009, so it expects about one fraud; the pool at 0.9 and above holds a few dozen payments and expects about two genuine ones. A count whose mean is one is nothing like a normal curve: in the bottom pool of the week from day 49 ($n = 1{,}039$, $\hat P = 0.0009$) it is 0 with probability 0.39, 1 with 0.37, and its upper tail is long. So a sparse pool's light is read off the exact binomial tail instead of $p^*$. There the probability of at least 3 frauds is 6.9%, of at least 4 is 1.5%, of at least 5 is 0.27%: 2 frauds or fewer is green, 3 yellow, 4 orange, 5 or more red. The normal formula puts the 99% line at 3.2 frauds and would call 4 red. In the top pool the same is done with the count of genuine payments. The figure's bars for these two pools come from the normal formula and show only the scale.
+
+### All pools at once: Hosmer–Lemeshow
+
+One test per pool gives six chances a week to light by chance. The *Hosmer–Lemeshow* statistic tests them together:
+$$
+\chi^2_{\mathrm{HL}} = \sum_{i=1}^{K}\frac{(n_i\hat P_i - \theta_i)^2}{n_i\hat P_i(1 - \hat P_i)},
+$$
+with $n_i$ payments, mean predicted probability $\hat P_i$ and $\theta_i$ frauds in pool $i$. Each term is the square of the pool's standardised distance. Under independence and a calibrated model, and with every pool large enough for the normal approximation, each term is close to the square of a standard normal variable and the sum follows a chi-square distribution with $K$ degrees of freedom: $K$, not $K - 2$ as when the statistic checks the data a model was fitted on, because these probabilities were fixed before the week was seen.
+
+The two end pools are not large enough, and in a sum a single heavy-tailed term can decide the colour. In the week from day 119 the bottom pool held 7 frauds against an expected 1.0, a term of 36 in a weekly statistic of 51.5: red on that pool alone, against a 99% point of 16.8 for six pools. So a sparse pool is merged with its neighbour until every pool expects more than five frauds and more than five genuine payments. Here that leaves four pools: below 0.01 (about 105 expected frauds a week), 0.01–0.1, 0.1–0.5, and 0.5 and above (31 to 43 expected genuine payments). For $K = 4$ the 90%, 95% and 99% points are 7.8, 9.5 and 13.3, and the colours follow as for the binomial test. The bottom pool's 7 frauds are not lost: its own light, read off the exact tail, is red that week. What the merge removes is their power to colour the joint test.
+
+On the unchanged stream:
+
+| model | Brier, development week | $\chi^2_{\mathrm{HL}}$, four pools, over the 12 weeks | weeks red |
+|---|---|---|---|
+| trained on all payments | 0.0042 | 3 to 91 | 4 |
+| 2% of genuine kept, uncorrected | 0.025 | 6,600 to 7,100 | 12 |
+| 2% of genuine kept, corrected | 0.0051 | 19 to 104 | 12 |
+
+The uncorrected model is the one <Ref lesson="undersampling-calibration" id="what-the-distortion-looks-like-on-a-simulated-card-stream">the calibration lesson</Ref> warned about: its ranking metrics pass, and its pool at 0.9 and above held 76% and 65% fraud in the development week and the week after, against a predicted 98%. The correction takes the statistic down by two orders of magnitude and still leaves every week red, because the undersampled model is noisy where few genuine payments were kept. A red calibration light with a green ranking light means the probabilities are wrong and the order is right, and the remedy is a recalibration, not a new model: the <Ref lesson="undersampling-calibration" id="where-the-current-base-rate-comes-from">prior factor</Ref> re-estimated from the latest labelled week where only the base rate moved, a calibrator refitted on it otherwise.
+
+### Frauds come in clumps
+
+Both tests assume that the outcomes in a pool are independent. Fraud outcomes are not. A compromised terminal turns every payment made there for 28 days into fraud, and those payments carry the same terminal inputs, so they land in the same pool together; a leaked card produces about three frauds in a week, also scored alike. On the simulator the week from day 49 holds 307 frauds after known cards are removed, in 104 clumps of one card or one terminal each.
+
+A count made of clumps varies more than a count of independent payments. Suppose a pool of $n$ payments is made of clumps of sizes $m_1, \dots, m_J$, with $\sum_j m_j = n$, each clump fraud or genuine as a whole, independently, with probability $\hat P$. The fraud count is $\theta = \sum_j m_j B_j$ with independent $B_j \in \{0, 1\}$, so
+$$
+\mathrm{Var}(\theta) = \hat P(1 - \hat P)\sum_j m_j^2 = n\hat P(1 - \hat P)\cdot\frac{\sum_j m_j^2}{\sum_j m_j}.
+$$
+The binomial variance is multiplied by $\sum_j m_j^2/\sum_j m_j$, the size of the clump a payment picked at random belongs to; with every clump of size $m$ it is simply $m$. On real data the clumps are read off the pool's confirmed frauds, grouped by card or, for a compromised terminal, by terminal. In the simulator's pools that factor came out between 1 and 5.
+
+The deployed model shows the effect on the unchanged stream, and the two causes of excess red can be told apart. With six pools its Hosmer–Lemeshow statistic is red in 4 of the 12 weeks. Merging the sparse pools takes the week from day 119 out of red (51.5 falls to 11.3, orange), and its red came from a sparse pool alone; the week from day 49 crosses the lower line of four pools instead (14.2), so the count stays at 4. The clumps are in every pool, and merging does nothing about them: with each merged pool's variance multiplied by its own clump factor, 2 weeks are red. The twelve weeks pooled together show what the weekly tests could not settle: the pool 0.01–0.1 holds 3.5% fraud (363 of 10,507 payments) against the 2.3% the model predicts, a real miscalibration that one week of 800 payments cannot separate from a clump.
+
+So the binomial and Hosmer–Lemeshow tests, as stated, reject a well-calibrated pool more often than their level says, and the direction of the error is known. They are read as early warnings: yellow and orange are reasons to look, a single red is a reason to look harder, and a red that persists, or the same pool off in the same direction week after week, is the finding.
+
+<Exercise>
+The pool 0.01–0.1 of the week from day 49 holds 823 payments, mean predicted probability $\hat P = 0.0242$, and 29 frauds, a rate of 3.5% that sits between its 95% and 99% lines: orange. (a) Suppose the pool keeps holding 3.5% fraud against the same prediction, with about 820 payments a week. If outcomes are independent, how many weeks must be pooled before the gap passes the 99% line? (b) That week the pool's frauds had a clump factor of 1.76. What colour is the week then, and how many weeks does (a) need?
+
+<Solution>
+(a) Pooling $n$ payments, the gap $29/823 - 0.0242 = 0.0110$ passes the 99% line once $2.326\sqrt{\hat P(1 - \hat P)/n} \le 0.0110$, that is
+$$
+n \ge \left(\frac{2.326}{0.0110}\right)^2 \times 0.0242 \times 0.9758 \approx 1{,}050 .
+$$
+That is 1.3 weeks of the pool, so two weeks pooled are red under independence.
+
+(b) The standard error of the week becomes $\sqrt{1.76}$ times the independent one, $\sqrt{0.0242 \times 0.9758/823} = 0.00536$, so $0.00536 \times 1.327 = 0.00711$, and the gap is $0.0110/0.00711 = 1.55$ standard errors: past the 90% line (1.282), short of the 95% line (1.645). The orange becomes yellow. The payments needed grow by the same factor, to $1.76 \times 1{,}050 \approx 1{,}850$, 2.3 weeks: three weeks pooled. A gap of this size is never settled by one week of this pool, and a run of a few weeks in the same direction settles it.
+</Solution>
+</Exercise>
+
+## The weekly backtest against a daily detector
+
+The method change can be seen only through labels, and two label-based checks are now on the table: the weekly backtest of this lesson and <Ref lesson="change-detectors" id="on-a-payment-stream-which-number-goes-in-and-when-the-alarm-rings">a change detector</Ref> on the daily share of compromised cards the model missed. Which one rings first?
+
+<Figure
+  src="./figures/clocks.svg"
+  alt="A day axis from 80 to 120 with a dashed vertical line at day 84 labelled a change. Three lanes. Input index: a blue bar from day 84 to day 90, labelled product launch, 1-day inputs yellow in the week it happens, end of week, day 90. Weekly backtest: an amber bar from 84 to 97, labelled fraud method, week 84 to 90 fully labelled, AP red, day 97. Daily detector: an amber bar from 84 to 95 with a hollow mark at day 91, labelled fraud method, daily missed share, first label day 91, CUSUM alarm, day 95."
+  caption="The input index sees a change in the payments the week it happens; a change in the frauds alone waits for the labels, and the daily detector beats the weekly report by two days."
+/>
+
+The weekly backtest has a fixed wait: the week from day 84 must end and then be fully labelled, so its red comes on day 97. The detector needs a level and a spread for the missed share, and for the same reason as the backtest it takes them from labelled days rather than from the development week alone: here days 42 to 83, the development week and the five weeks after it, all labelled by day 90: a mean of 0.35 and a standard deviation of 0.10. After the change the share rises to about 0.48, 1.2 standard deviations. With $v = 0.5$ and $h = 5$, CUSUM sees its first post-change label on day 91 and alarms on the label of day 88, which arrives on day 95, eleven days after the change. On the unchanged stream the same rule never alarms from day 84 to day 132. Fixed from the development week alone, whose spread was 0.077, it would have false-alarmed there twice, first on the label of day 57.
+
+The detector is quicker because it adds evidence every day instead of waiting for a week to close. It says only that more compromised cards are missed; which fraud changed is read off the backtest's share found per fraud kind and the index on the fraud rows.
+
+## What happens at red: the model's life cycle
+
+The obvious answer to a red light is to retrain. It is incomplete in both directions: some red lights are not cured by retraining, and a retrained model is a new model, which has to pass the checks the old one passed before it can act on a payment.
+
+### From a light to an action
+
+Each light points at a different repair, and the pattern of lights says which:
+
+| inputs | ranking | probabilities | most likely cause | action |
+|---|---|---|---|---|
+| one input red overnight, its siblings green | any | any | serving pipeline | fix the pipeline, not the model |
+| red | green | green | new population, virtual drift | watch; check the next labelled weeks |
+| any | green | red | base rate or calibration moved | recalibrate in place |
+| green | red | any | the frauds changed | retrain a challenger |
+| red | red | any | both | retrain a challenger; the input index says on what |
+
+Read as a <Ref lesson="score-to-action" id="completeness-and-consistency-checked-by-a-program">decision table</Ref>, with each light taken as red or not red (a yellow or orange light counts as green here: it is a reason to look, as the calibration section reads it, not to act), it has a gap and three overlaps, which the check of the score-to-action lesson finds mechanically. Three green lights, the ordinary week, match no row and need an explicit "no action". And one input red overnight is also a red input, so with the other two lights it matches the first row and one more: the second if both are green, the third if the probabilities are red, the last if the ranking is red. A written priority, the pipeline first, resolves all three, because a broken input can itself be what moved the ranking or the probabilities, and a retrained challenger fed the same broken input would inherit the fault.
+
+### Five stages
+
+A model passes through five stages, each closed by a gate.
+
+<Figure
+  src="./figures/lifecycle.svg"
+  alt="Five boxes left to right with arrows: development, fitted and selected on prequential folds; testing, latency, missing and extreme inputs, dummy cases; staging, highlighted amber, champion acts, challenger scores the same payments; production, the weekly monitor runs; retirement, kept in a repository. A long arrow from production back to development labelled ranking red, a retrained challenger starts over; a small loop on production labelled calibration red, recalibrate in place. Below, three small plots of weight on the new model against time: direct, a single step from 0 to 1; phased by segment, three steps; parallel over months, a straight ramp."
+  caption="A red ranking light sends a challenger back through every gate; a red calibration light is repaired in production."
+/>
+
+**Development** fits and selects the model on prequential folds and records its metrics with their spread, the backtest's provisional reference until live weeks replace it.
+
+**Testing** checks what the folds cannot. The model must return a score within <Ref lesson="fraud-detection-system" id="the-deadline-splits-the-work-in-two">the time the system allows</Ref>, under load. It must behave on missing and extreme inputs: a card with no history, an amount of a million. And dummy fraud cases, payments built to match each known fraud pattern, must come out with high scores, so that a broken feature is caught before a customer is.
+
+**Staging** runs the new model, the *challenger*, beside the one in production, the *champion*, on the same live payments for a set period. Only the champion's scores act; the challenger's are recorded.
+
+**Production** is where the weekly monitor runs.
+
+**Retirement** takes a model out of production and keeps it, with its documentation and the scores it produced, in a repository. A retired model is a benchmark for its successors and the only way to answer a supervisor who asks, two years later, why a payment was declined: <Ref lesson="alert-explanations" id="the-supervisor-a-record-that-can-be-re-computed">the decision record</Ref> names a model version, and that version must still be able to recompute the score.
+
+### Champion and challenger on the champion's labels
+
+Staging has a trap that the alert loop sets. The investigators work the champion's alerts, so the fast labels exist only for <Ref lesson="alert-feedback-selection-bias" id="why-the-alerts-select-on-the-label">the cards the champion chose</Ref>. A card that only the challenger ranks in its top hundred is not called; until the customer disputes, its label is silence, read as genuine. Scored on the fast labels, the challenger loses every disagreement it is right about.
+
+So champion and challenger are compared only on labels that do not depend on either: the complete labels of a week, $\delta$ after it ends. A staging period is therefore the number of labelled weeks the comparison needs, plus $\delta$. How many weeks is that?
+
+The obvious scale is the week-to-week spread of CP@100 on the unchanged stream, 0.022, about two cards a day. Two models scored on different weeks would differ with a standard deviation of $0.022\sqrt 2 = 0.031$ a week, and the mean of $n$ weekly differences with $0.031/\sqrt n$. A difference is resolved when it exceeds two standard deviations of that mean, about the 95% line, so a difference of two cards a day, 0.02, would need $n$ weeks with $2 \times 0.031/\sqrt n \le 0.02$, about ten. But staging does not compare different weeks. Both models score the same payments, so a week with more compromised terminals, or an easy mix of frauds, lifts both, and that part cancels in the difference. What is left is the cards on which the two disagree.
+
+The card-level bootstrap of the backtest section measures it, run on one week and with both models scored on each draw: resample the week's cards with replacement, compute CP@100 for champion and challenger on the same sample, and take the difference. On the unchanged stream, with a challenger trained on days 35 to 48 instead of 35 to 41, the standard deviation of that paired difference is about 0.0043 for one week, under half a card a day, averaged over the ten weeks from day 63. Here, unlike against the development week, the bootstrap is not too eager: the actual weekly differences vary by 0.004, because the week's own events cancel.
+
+Over $n$ labelled weeks the mean difference has standard deviation $0.0043/\sqrt n$, and the same two-standard-deviation rule gives the weeks needed:
+
+| comparison | sd of one week's difference | weeks to resolve 0.02 (two cards a day) | weeks to resolve 0.005 (half a card a day) |
+|---|---|---|---|
+| unpaired, different weeks | 0.031 | 10 | 154 |
+| paired, same payments | 0.0043 | 1 | 3 |
+
+A difference of two cards a day is nearly five standard deviations in a single week. A month of staging with $\delta = 7$ gives three labelled weeks, which resolve $2 \times 0.0043/\sqrt 3 \approx 0.005$, half a card a day. This challenger's actual advantage is that size: 0.006 over its first three weeks, 2.5 standard deviations, and positive in nine of the ten weeks. A month is enough for any difference worth a card a day; a smaller one needs a longer stage, or is not worth a changeover.
+
+### Changing over
+
+When the challenger wins, there are three ways to hand over:
+
+- **Direct**: the challenger replaces the champion on a set day. Simplest, and every payment is exposed to the new model's untested errors at once.
+- **Phased**: the challenger takes one segment first, such as payments below an amount or one channel, then the next. Errors stay small and contained, and each phase is monitored on a segment with fewer frauds, so its lights are noisier.
+- **Parallel**: both models stay in production and the score is a weighted combination whose weight moves from the champion to the challenger over a transition of months. Nothing changes abruptly, and the score being acted on is a third model, an average of two, whose calibration pools must be checked before the zones read it.
+
+### Retraining every night is a change agreed in advance
+
+The course's system <Ref lesson="fraud-detection-system" id="how-often-the-model-changes-a-nightly-retrain-beside-hand-edited-rules">retrains every night</Ref>, and no bank runs a month of staging for every night. The resolution is to approve the procedure rather than each model. The features, the algorithm, the hyperparameters or the search that sets them, the training window and the automated gates are fixed and documented once; each nightly model is checked by the gates without a person: the testing checks above, its score index against the champion's, and its backtest on the latest labelled week within the reference spread. A nightly model that fails a gate does not deploy, and yesterday's stays. Anything outside the procedure, a new input, a new learner, a longer window, is a new model and goes through all five stages.
+
+## Written down: the monitoring plan and the documentation test
+
+A light that turns red at night has to lead to the same action whoever is on duty. That needs the monitor written down: for each number, how it is computed, against which reference, with which thresholds, what each colour triggers and who decides.
+
+### What the plan holds
+
+The three questions are the core of it, and earlier lessons added quantities that belong on the same weekly page:
+
+- the surcharge $\lambda$ that <Ref lesson="score-to-action" id="capacity-acts-as-a-surcharge-on-the-call">capacity puts on a call</Ref>, which rises when the queue outgrows the team and pushes cases into decline;
+- the rate of overrides per decision-table cell, and the false-positive rate of each action in each customer group, from <Ref lesson="score-to-action" id="measuring-the-harm-group-by-group">the score-to-action lesson</Ref>;
+- the mix of top attributions among the alerts, the index of <Ref lesson="alert-explanations" id="exercises">the explanations lesson's last exercise</Ref>, which moves when the model starts alerting for different reasons;
+- where a language model drafts narratives, the share of drafts <Ref lesson="llms-in-the-investigation-queue" id="the-grounding-check">the grounding check</Ref> sends back and the investigators' edit rate.
+
+The design of the model belongs in the same document: when and by whom it was built, its perimeter (which payments, channels and countries it scores), its inputs and output, its strengths and known weaknesses, the data and the time span it was trained on and how the sample was drawn, and where human judgement enters. The test of the whole is the *documentation test*: could a newly hired team, given only the documents, continue to run, monitor and retrain the model? A document that passes it is also the one a supervisor can audit, because a supervisor reads the documents, not the code.
+
+### Where the law fixes the gates
+
+Most of this plan the bank sets for itself: its thresholds, its references, how long it stages. Two gates it may not set, because European law fixes them, and a third where the model is high-risk; each is tied to a stage of the life cycle.
+
+- A bank that skips strong customer authentication on the strength of its own risk model must have "the methodology, the model and the reported fraud rates" audited at least yearly, by an external auditor in the first year and at least every three years after (the regulatory technical standards under PSD2, Art. 3(2)). The fraud rate it reports is the value of fraud among its remote payments of one type, those it exempted and those it sent to authentication alike, divided by their total value over a rolling 90 days (Art. 19), and it must stay at or below a reference rate. Since the model decides which of these payments skip authentication, that rate is a backtest in money of how it routed them, checked against a legal line rather than against the model's own predictions. It is taken up in <Ref lesson="psd2-sca-tra" />.
+- Before launching a new product, or using a new or developing technology with new or existing products, a bank identifies and assesses the money-laundering risk it brings (AMLR Art. 10(1)). A new payment product is a new product, so its assessment has to be done before it goes live: it is part of the testing gate. Whether a model counts is a reading, not the text: a detector built on a technology the bank has not used before, such as its first machine-learned model or a language model drafting narratives, is arguably a new technology; a retrained challenger of the same kind is not.
+- A model the AI Act classes as high-risk needs a post-market monitoring plan in its technical documentation (Art. 72), and changes to a system that keeps learning are not a substantial modification if they "have been pre-determined by the provider at the moment of the initial conformity assessment" and are described in that documentation (Art. 43(4)): the nightly retraining agreed in advance, in law. Credit scoring of natural persons is high-risk; fraud detection is carved out of that line by one clause, so a fraud detector like this one is not bound by this gate unless it is put to a high-risk use. The carve-out is taken up in <Ref lesson="eu-ai-act-fraud" />.
+
+<Conclusion>
+You can now compute the three weekly numbers a deployed detector needs and say what each can and cannot see. The stability index $\sum (o_i - e_i)\ln(o_i/e_i)$, the information value with two periods in place of two classes, needs no labels: taken on the score and on every input against the development week, it caught the product launch the week it happened, nine inputs moving under a green score. It is blind to a change in the frauds alone, so the same index runs on the confirmed frauds a delay later. The ranking is backtested on the latest labelled week as a distance from the spread of ordinary live weeks, accumulated by CUSUM, not as a fixed percentage off one lucky week; the paired bootstrap shows that a month of staging resolves half a card a day. The probabilities are backtested pool by pool, as early warnings, because frauds arrive in clumps. Each pattern of lights leads to a written action: a pipeline fix, a recalibration in place, or a challenger that passes testing and staging on complete labels.
+
+What this lesson takes for granted is a monitor that is built as designed. <Ref lesson="fraudfinder-monitoring-read" /> reads a published cloud reference pipeline whose monitoring job watches nine of its twenty-five inputs and whose deployment gate is an accuracy that a model which never alerts would pass, and asks how far it is from the monitor set out here.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+A score is cut into five bins with development shares $(0.40, 0.30, 0.15, 0.10, 0.05)$; this week's shares are $(0.35, 0.30, 0.15, 0.12, 0.08)$. (a) Compute the stability index and its light. (b) Show that for a small move $o_i = e_i + \Delta_i$ the term is close to $\Delta_i^2/e_i$, and use it to say which bins a given shift of mass affects most. Why does that matter for a fraud model's score?
+
+<Solution>
+(a) Term by term: $(0.35 - 0.40)\ln(0.35/0.40) = (-0.05)(-0.1335) = 0.0067$; the next two bins are unchanged, 0; $(0.12 - 0.10)\ln 1.2 = 0.02 \times 0.1823 = 0.0036$; $(0.08 - 0.05)\ln 1.6 = 0.03 \times 0.4700 = 0.0141$. The index is 0.0244: green.
+
+(b) $\ln(1 + x) = x - x^2/2 + \dots$, so with $x = \Delta_i/e_i$,
+$$
+\Delta_i \ln\!\left(1 + \frac{\Delta_i}{e_i}\right) = \frac{\Delta_i^2}{e_i} - \frac{\Delta_i^3}{2e_i^2} + \dots \approx \frac{\Delta_i^2}{e_i}.
+$$
+The same move of mass weighs inversely to the bin's expected share. In (a) the last bin gained 0.03 and the first lost 0.05, and the last contributes twice as much, because it is eight times smaller. For a fraud model the alerts come from the top of the score, the smallest bins if the bins are cut finely there. A move into the top bins, where the decisions are made, therefore lifts the index more than the same move among the ordinary payments, which is the weighting a monitor wants. Equal-frequency deciles, as in the lesson, give every bin the same weight and spend most of their resolution on scores no decision reads.
+</Solution>
+</Exercise>
+
+<Exercise>
+A variable's development week has no payments in its top bin, and this week 1% of payments fall there. (a) What is the stability index? (b) Practitioners replace a zero share by a small floor. Compute the bin's term with floors of 0.0001 and 0.001. (c) What does the floor hide, and how should the bins be built so that the case cannot arise?
+
+<Solution>
+(a) The term $(0.01 - 0)\ln(0.01/0)$ is infinite, so the index is undefined, however small the rest.
+
+(b) Floor 0.0001: $(0.01 - 0.0001)\ln(0.01/0.0001) = 0.0099 \times 4.605 = 0.046$. Floor 0.001: $0.009 \times \ln 10 = 0.009 \times 2.303 = 0.021$. The floor, chosen by whoever wrote the code, decides whether the bin adds 0.02 or 0.05, and the same 1% would add even more with a smaller floor.
+
+(c) It hides the most important move a population can make: values the model was never trained on. A bin empty at development means no training payment looked like this, so the model's score there is an extrapolation. With a floor, 1% of payments in unseen territory counts for less than a modest drift between well-filled bins. The bins should be cut on the development sample with open outer bins (everything below the smallest and above the largest development value falls into the end bins), so no bin is empty at development; and the share of payments outside the development range is reported as a number of its own. <Ref lesson="concept-drift" id="a-cheaper-distance-one-column-at-a-time">The Hellinger distance</Ref> has no such problem, since it takes square roots of shares instead of logs of their ratio; it is a reasonable second number beside the index.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague says: "The stability index of the score and of every input has been green for six months, so the model is still valid." (a) Refute the claim with the method stream. (b) Bound the score index for any change that alters only the frauds, when frauds are a share $\pi$ of the payments and the bins are deciles. (c) Name two numbers that would have seen the method change, and the delay of each.
+
+<Solution>
+(a) On the method stream, from day 84 the leaked-card frauds spend the cardholder's usual amount. The score index stayed below 0.001 every week, the inputs did not move, card precision at 100 stayed at 0.22, and the share of leaked cards that reached the alerts fell from about 60% to about 5%. The model lost a whole kind of fraud under a green index.
+
+(b) If only the frauds change, each bin's share changes by at most the frauds' share in it, and the changes sum to at most $\pi$ in each direction. The largest index for a given total move comes from moving all of it between two bins, since, by the first exercise's approximation, the index grows like the square of the move in each bin. Moving $\pi$ from one decile to another gives
+$$
+\pi\ln\frac{0.1 + \pi}{0.1} + \pi\ln\frac{0.1}{0.1 - \pi} \approx \frac{2\pi^2}{0.1} = 20\pi^2 .
+$$
+At $\pi = 0.0065$ that is about 0.0008. To reach 0.10 the frauds would have to be several per cent of the payments: the approximation says 7%, the exact two-bin expression 6.5%. A population index can only see the population, and the fraudsters are not enough of it.
+
+(c) The stability index of the confirmed frauds' amounts, against the development week's frauds: 0.32 in the week of the change, available once the week is labelled, $\delta$ after it ends (read beside the genuine rows' index, which stayed at 0.001). Average precision in the weekly backtest: 0.36 against 0.42 to 0.54 in the five weeks before, red in the bootstrap from the first labelled week, on day 97; and the share of compromised cards missed, fed daily to <Ref lesson="change-detectors" id="evidence-has-to-accumulate-cusum">CUSUM</Ref>, alarms on day 95, eleven days after the change, from labels that start arriving on day 91. All three need labels; nothing without labels can see this change.
+</Solution>
+</Exercise>
+
+<Exercise>
+(a) Show that the stability index equals the information value of the scorecard lesson when the two periods are taken as the two classes. (b) Show that it equals $\mathrm{KL}(o \,\|\, e) + \mathrm{KL}(e \,\|\, o)$, where $\mathrm{KL}(a \,\|\, b) = \sum_i a_i \ln(a_i/b_i)$. (c) The age table of the scorecard lesson has information value 0.65. Read it as a stability index: what kind of week would produce it? (d) Why is symmetry the property a monitor wants?
+
+<Solution>
+(a) With $g_i/N_g$ written as $o_i$ and $f_i/N_f$ as $e_i$, the information value $\sum_i (g_i/N_g - f_i/N_f)\ln\bigl((g_i/N_g)/(f_i/N_f)\bigr)$ is $\sum_i (o_i - e_i)\ln(o_i/e_i)$ term for term. The weight of evidence is the log-ratio; the information value weights it by the difference in shares.
+
+(b) Expand: $\sum_i (o_i - e_i)\ln(o_i/e_i) = \sum_i o_i\ln(o_i/e_i) - \sum_i e_i\ln(o_i/e_i) = \sum_i o_i\ln(o_i/e_i) + \sum_i e_i\ln(e_i/o_i)$, which is $\mathrm{KL}(o\,\|\,e) + \mathrm{KL}(e\,\|\,o)$.
+
+(c) A week whose applicants had the fraudsters' age mix while the reference had the genuine applicants' mix: in the table, 18–22-year-olds are 8.4% of genuine applicants and 24.7% of frauds, those of 35 and over 26.9% and 7.2%. A week in which the under-23s tripled their share and the over-35s lost three quarters of theirs would read 0.65, far into red; an onboarding campaign aimed at students could produce it.
+
+(d) Each Kullback–Leibler divergence alone is asymmetric: it weighs the log-ratio by one distribution's shares, so a bin that empties counts differently from one that fills by the same amount. A monitor compares a week with a reference and has no reason to treat "the share in this bin fell from 10% to 5%" differently from "rose from 5% to 10%". The sum weighs both directions alike, and it makes the comparison of the development week with this week the same number as the comparison the other way, so the choice of which period to call "expected" changes nothing.
+</Solution>
+</Exercise>
+
+<Exercise>
+(a) Derive the binomial critical rate $p^*$ from the normal approximation, and say where independence enters. (b) A calibrated pool with $\hat P = 0.02$ and $n = 500$ is made of clumps of $m = 3$ payments that are fraud or genuine together. Using the clump variance of the lesson, find the 99% critical rate, and the probability that the uncorrected test turns red on this pool.
+
+<Solution>
+(a) The fraud count $\theta$ in a pool of $n$ payments, each fraud with probability $\hat P$ independently, is binomial with mean $n\hat P$ and variance $n\hat P(1 - \hat P)$, the sum of $n$ independent variances. For $n\hat P$ and $n(1 - \hat P)$ above about 5, $(\theta - n\hat P)/\sqrt{n\hat P(1 - \hat P)}$ is close to standard normal, so $P(\theta \geq n\hat P + z_\alpha\sqrt{n\hat P(1 - \hat P)}) \approx 1 - \alpha$. Dividing by $n$ gives $p^* = \hat P + z_\alpha\sqrt{\hat P(1 - \hat P)/n}$. Independence enters in the variance: the variance of a sum is the sum of the variances only when the covariances are zero.
+
+(b) With every clump of size $m = 3$ the variance is $3\,n\hat P(1 - \hat P)$, so the standard error of the rate becomes $\sqrt{3 \times 0.02 \times 0.98/500} = 0.0108$ and the 99% critical rate $0.02 + 2.326 \times 0.0108 = 0.0452$, or 22.6 frauds, against 17.3 under independence. The uncorrected test calls 18 or more frauds red. With clumps of three, $\theta = 3Y$ with $Y$ binomial over 167 clumps at 0.02, so $\theta \geq 18$ means $Y \geq 6$, which has probability about 0.12. The test meant to be wrong in one week in a hundred is wrong in one week in eight.
+</Solution>
+</Exercise>
+
+<Exercise>
+The weekly average precision of the deployed model on the unchanged stream, weeks from day 49 to day 126, is 0.417, 0.505, 0.497, 0.506, 0.540, 0.508, 0.571, 0.439, 0.528, 0.526, 0.566, 0.469. On the method stream the first five weeks are the same and the next seven are 0.359, 0.402, 0.346, 0.401, 0.431, 0.443, 0.358. Use the first five weeks as the reference spread, as the lesson's monitor does. (a) Flag every later week whose AP lies more than 2.576 standard deviations below the reference mean. (b) Run CUSUM on $z_t = (\bar{x} - x_t)/s$ with $v = 0.5$ and $h = 5$ on each stream. (c) Compare the two rules, and say what a reference of five weeks costs.
+
+<Solution>
+The reference is 0.417, 0.505, 0.497, 0.506, 0.540: mean $\bar x = 0.493$, standard deviation $s = 0.046$.
+
+(a) The line is $0.493 - 2.576 \times 0.046 = 0.375$. On the unchanged stream no later week falls below it (the lowest is 0.439). On the method stream three of seven do: 0.359, 0.346 and 0.358. Four weeks of the lost fraud kind pass.
+
+(b) Unchanged stream, $z_t$ for the seven later weeks: −0.33, −1.71, 1.18, −0.76, −0.73, −1.60, 0.52. CUSUM $g_t = \max(0, g_{t-1} + z_t - 0.5)$: 0, 0, 0.68, 0, 0, 0, 0.02. No alarm. Method stream: $z_t$ = 2.92, 2.00, 3.21, 2.01, 1.35, 1.09, 2.95; $g_t$ = 2.42, 3.92, 6.63: the alarm rings in the third week, the week from day 98. Restarted from zero, $g_t$ = 1.51, 2.36, 2.95, 5.40: a second alarm in the week from day 126, because the fall has not ended.
+
+(c) The single-week line misses more than half the bad weeks, because each week of the new regime is only one to three standard deviations down. CUSUM adds the evidence of consecutive bad weeks and alarms on the third, with no false alarm on the unchanged stream, the reason <Ref lesson="change-detectors" id="evidence-has-to-accumulate-cusum">the change-detector lesson</Ref> built it. A reference of five weeks is itself an estimate: its standard deviation is uncertain by about a third, and a reference that happens to be tight makes every rule eager, as the four development folds (0.552 ± 0.022) did. A reference that grows with each green week narrows it. Against the weeks from day 84, the bootstrap of the lesson, built on the single development week, flagged the unchanged weeks from days 98 and 126; the five-week reference flags neither.
+</Solution>
+</Exercise>
+
+<Exercise>
+Return to the toy day of <Ref lesson="alert-feedback-selection-bias" id="three-ways-a-training-sample-can-be-chosen">the selection-bias lesson</Ref>: group A, 75,000 ordinary payments with 50 frauds; group B, 20,000 payments of €500 or more with 100 frauds; group C, 5,000 small night payments with 50 frauds, a method the model never alerts. A model trained on the 600 alerted rows alone learns the alert sample's rates: 3.3% in A, 11.7% in B, and for C it extrapolates from A. (a) Treat A and B as two calibration pools on the next day's stream, with the same composition, and compute each pool's standardised distance and the Hosmer–Lemeshow statistic over the two. (b) Would the stability index of the inputs have warned? (c) Is this drift? What repairs it?
+
+<Solution>
+(a) Pool A: $n = 75{,}000$, $\hat P = 0.033$, expected frauds $n\hat P = 2{,}475$, observed 50. The variance is $75{,}000 \times 0.033 \times 0.967 = 2{,}393$, standard deviation 48.9, so the distance is $(50 - 2{,}475)/48.9 = -49.6$. Pool B: $n\hat P = 20{,}000 \times 0.117 = 2{,}340$, observed 100, variance $2{,}340 \times 0.883 = 2{,}066$, standard deviation 45.5, distance $-49.2$. The statistic is $49.6^2 + 49.2^2 \approx 4{,}880$ on 2 degrees of freedom, against a 99% point of 9.2: red, with the two pools predicting 50 and 23 times the fraud they hold.
+
+(b) No. The stream on the next day has the same composition as the day before; the index compares this week's inputs with the development week's, and neither moved. The model was trained on a sample that was never like the stream, and the index does not compare the stream with the training sample.
+
+(c) It is not drift: $p(x, y)$ on the stream did not change. The training sample was <Ref lesson="alert-feedback-selection-bias" id="why-the-alerts-select-on-the-label">selected on the label</Ref>, with an odds factor of 52 in A and 26 in B, so no single factor can be divided out as the undersampling correction does. A recalibration fitted on complete delayed labels can repair the probabilities in A and B, a monotone map per pool; it cannot repair C, which the feedback sample never contained. The repair for C is a model trained on the delayed samples, and the calibration light is what exposes the problem, weeks before any loss shows.
+</Solution>
+</Exercise>
+
+<Exercise>
+A bank exempts remote card payments of up to €100 from strong customer authentication on the strength of its risk model. To use the exemption it must keep the value of fraud among all its remote card payments, exempted or authenticated, divided by their total value, at or below 0.13% over a rolling 90 days. Remote card volume and fraud value by month: January €40M and €44,000; February €42M and €50,000; March €45M and €70,000; April €44M and €80,000. (a) Compute the 90-day rate at the end of March and at the end of April, taking a month as 30 days. (b) Which weekly number of this lesson does this rate resemble, and how does it differ? (c) What would you monitor weekly to see April coming?
+
+<Solution>
+(a) End of March, January to March: $164{,}000/127{,}000{,}000 = 0.129\%$, just under the line. End of April, February to April: $200{,}000/131{,}000{,}000 = 0.153\%$, above it.
+
+(b) It is a backtest in money: the realised fraud value among the payments the model routed, the ones it judged safe enough to exempt and the ones it sent to authentication, against a fixed limit rather than against the model's own predictions. It differs from the lesson's backtests in three ways: it weights by amount, not by count; its reference is a legal number, not the development sample or the spread of ordinary weeks; and the frauds among the payments the model let through without a second check are labelled by dispute, so the rate for the last weeks is incomplete and grows as disputes come in.
+
+(c) The monthly fraud rate rose from 0.11% in January to 0.16% in March before the 90-day rate crossed: the expected fraud value of the exempted payments, $\sum_j p_j\,\mathrm{Amt}_j$ over the exempted payments, is available the day they are scored; added to the fraud value the authenticated payments usually carry and divided by the total value, it can be compared weekly with the line, which is the calibration pool turned into money; the realised rate on the latest fully labelled weeks backtests it. A rise in either is the early warning the rolling 90 days gives only after a month. What the law does when the line is crossed, and how a bank keeps a margin under it, is the subject of <Ref lesson="psd2-sca-tra" />.
+</Solution>
+</Exercise>
+
+<References>
+1. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques: A Guide to Data Science for Fraud Detection*, Wiley, 2015 — Ch. 6: "The Analytical Fraud Model Life Cycle", pp. 280–281 and Fig. 6.1 (testing, staging, champion–challenger, direct, phased and parallel changeover, retirement); "Backtesting Analytical Fraud Models", pp. 302–311 (system stability index and its thresholds, Tables 6.6–6.8; performance report and absolute-change lights; the pooled bootstrap backtest; binomial and Hosmer–Lemeshow calibration tests and the network-dependence caveat); "Model Design and Documentation", pp. 311–312 (design questions, the documentation test). Ch. 2, "Variable Selection" (information value).
+2. G. Loterman, M. Debruyne, K. Vanden Branden, T. Van Gestel, C. Mues, "A Proposed Framework for Backtesting Loss Given Default Models," *Journal of Risk Model Validation* 8(1), 2014 — the pooled bootstrap test of a performance metric between a development and an out-of-time sample.
+3. D. W. Hosmer, S. Lemeshow, R. X. Sturdivant, *Applied Logistic Regression*, 3rd ed., Wiley, 2013 — Ch. 5, "Assessing the Fit of the Model" (the Hosmer–Lemeshow goodness-of-fit test).
+4. J. Gama, I. Žliobaitė, A. Bifet, M. Pechenizkiy, A. Bouchachia, "A Survey on Concept Drift Adaptation," *ACM Computing Surveys* 46(4), 2014 — Sec. 2.4 (the adaptive loop with delayed feedback), Sec. 3.4 (loss estimation on windows and fading factors), Sec. 4.1 (criteria for change detectors).
+5. A. Dal Pozzolo, O. Caelen, R. A. Johnson, G. Bontempi, "Calibrating Probability with Undersampling for Unbalanced Classification," IEEE Symposium on Computational Intelligence and Data Mining, 2015 — Sec. V, Eq. 13 (Brier score as the calibration measure) and Figs. 5–6.
+6. R. J. Bolton, D. J. Hand, "Statistical Fraud Detection: A Review," *Statistical Science* 17(3), 2002 — Sec. 8 (performance assessment: time to detection; the frauds that are never found).
+7. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 3 (the transaction data simulator and its three fraud scenarios, the baseline features). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+8. Commission Delegated Regulation (EU) 2018/389 (RTS on strong customer authentication), *Official Journal* L 69, 13.3.2018 — Art. 3(2) (yearly audit of the transaction-risk-analysis methodology, model and fraud rates; external audit in the first year and every three years), Art. 19 (fraud rate over a rolling 90 days), Annex (reference fraud rates). https://eur-lex.europa.eu/eli/reg_del/2018/389/oj
+9. Regulation (EU) 2024/1689 (Artificial Intelligence Act), *Official Journal* L, 12.7.2024 — Art. 43(4) and Recital 128 (pre-determined changes of systems that continue to learn), Art. 72 (post-market monitoring plan), Annex IV (technical documentation). https://eur-lex.europa.eu/eli/reg/2024/1689/oj
+10. Regulation (EU) 2024/1624 (AMLR), *Official Journal* L, 19.6.2024 — Art. 10(1) (risk assessment before launching new products, practices and technologies). https://eur-lex.europa.eu/eli/reg/2024/1624/oj
+</References>

@@ -1,0 +1,490 @@
+An alert that says 'score 0.93' tells the investigator nothing to act on, tells the customer nothing they can contest, and tells the supervisor nothing about the logic. What form of explanation does each of the three need, which methods produce them from a boosted ensemble, a network or a scorecard, and which explanations are honest about what the model did?
+
+<Ref lesson="score-to-action" id="the-alert-as-a-case">The previous lesson</Ref> turned a calibrated probability and an amount into one of four actions and sent the review cases to a person, with an audit trail recording who did what and on what grounds. The case arrives with a number. The investigator has a few minutes and one phone call, and needs to know what to ask the cardholder about. The cardholder whose payment was stopped is owed reasons. The supervisor who audits the bank a year later wants to know whether the decision followed the logic the bank approved, and whether it can be reproduced.
+
+The obvious answer is to show the model's inputs beside the score, or the list of inputs the model relies on most. Neither works. An input's value is not a reason: fourteen payments today is alarming for a card that pays twice a day and ordinary for one that pays twenty times. And the list of inputs a model relies on most is the same for every alert, so it cannot say why this one scored high. What each reader needs is a statement about this payment, measured against something, and in a form that reader can use. The three forms differ, and so do the methods that produce them from a boosted ensemble, a network or a points scorecard.
+
+## What the score leaves out
+
+Take one alert from the simulator and ask what each reader could do with it.
+
+### One alert from the simulator
+
+The model is the XGBoost detector of <Ref lesson="alert-budget-metrics" id="five-models-scored-on-a-test-week">the five-model baseline</Ref>: 100 boosted trees of depth at most six at library defaults, trained on the simulator's payments of 25–31 July 2018 with its fifteen inputs, scored on the test week 8–14 August after removing cards the bank already knew. Re-run for this lesson under a current library version, it scores AUC 0.848 and AP 0.598 on the test week, a little below the 0.862 and 0.639 quoted there. Every number below comes from that re-run.
+
+On 8 August at 17:34, card 2648 paid €102.55 at terminal 1773. The booster gave it a fraud probability of 0.929, the 29th highest of the day's 8,739 payments, so it is among the hundred the team works. At the previous lesson's prices it is also declined at the till: a wrong decline is expected to cost $(1 - 0.929) \times €50 = €3.55$, less than a €5 call, and less than a step-up, which would let through the one fraudster in ten who passes the second factor, $0.929 \times 0.1 \times €102.55 \approx €9.53$ of expected fraud. A case is opened on top of the decline. Its inputs:
+
+| input | value |
+|---|---|
+| amount | €102.55 |
+| card's payments in the last 1 / 7 / 30 days | 3 / 12 / 60 |
+| card's average amount over 1 / 7 / 30 days | €46.78 / €34.93 / €20.63 |
+| terminal's fraud rate, three windows ending a week ago | 0 / 0 / 0 |
+| weekend, night | no, no |
+
+The table answers none of the three readers. Is €102.55 large? For the training week as a whole it is not: one payment in eight was larger. The terminal is clean. The card's averages rise from €20.63 over a month to €46.78 over a day, which may or may not matter to the model. A reader has to know which of these values moved the score, by how much, and compared with what.
+
+### Three readers, three tasks
+
+Each reader has a different job to do with the alert, and the job decides what the explanation has to contain.
+
+| reader | must decide | needs | form |
+|---|---|---|---|
+| investigator | what to check, whom to call, what to ask | which facts about this payment drove the score, against this card's own past | a few sentences, numbers attached |
+| cardholder | whether the refusal was a mistake, and how to have it corrected | the main reasons in words they can check, and the way to contest them | a short notice |
+| supervisor | whether the decision followed the approved logic and can be reproduced | model version, inputs as served, score, the explanation, the action, who overrode what | a record |
+
+The global list of important inputs fails all three for the same reason: it describes the model, not the alert. Averaged over the test week, the inputs that move the booster's score most are the card's 30-day average, the amount and the card's 1-day and 7-day averages. That list happens to fit this alert, and it is printed unchanged beside a payment at a compromised terminal, which the terminal's fraud rate decides almost alone.
+
+## Splitting the log-odds into contributions
+
+The investigator's question, "which facts about this payment drove the score, and by how much?", asks for the score to be split into one share per input. A boosted ensemble does not compute such shares: it adds the outputs of a hundred trees, each of which reads several inputs at once.
+
+### The attribution, restated
+
+The Shapley attribution of classical machine learning answers exactly this question for any model, and it is recalled here rather than derived. Fix the payment $x$ and a reference sample of payments. For any subset $S$ of the inputs, let $v(S)$ be the model's average output when the inputs in $S$ keep their values from $x$ and the others take their values from the reference payments. The empty set gives the *base value* $\phi_0 = v(\varnothing)$, the model's average output over the reference; the full set gives the model's output for $x$. Input $j$'s attribution $\phi_j$ is the change in $v$ when $j$ joins, averaged over every order in which the inputs could join. The split adds up exactly (*local accuracy*), gives equal shares to inputs that play identical roles (*symmetry*), and gives nothing to an input that never changes any $v(S)$; these properties, with one more about how credit follows the model, single it out among all additive splits.
+
+For a boosted tree classifier the output that gets split is the log-odds, $g(x) = \ln\bigl(p/(1-p)\bigr)$, because that is what the trees add up; the probability is $p = \sigma(g(x)) = 1/(1 + e^{-g(x)})$, applied once at the end. A split of the probability also adds up, but it no longer follows the trees: $\sigma$ bends, so a step of one unit of log-odds moves $p$ from 0.0004 to 0.001 at the base value and from 0.5 to 0.73 in the middle. Every input's share of $p$ then depends on where the other inputs have put the payment on the curve, even for two inputs the trees add separately. Splitting the log-odds keeps the sum the trees actually compute.
+
+<Definition title="attribution of an alert">
+For a model with log-odds output $g$, a payment $x$ and a reference sample $R$, the attribution of $x$ is the base value $\phi_0$ (the average of $g$ over $R$) and one Shapley value $\phi_j(x)$ per input, with
+$$
+g(x) = \phi_0 + \sum_{j} \phi_j(x).
+$$
+A positive $\phi_j$ pushes the alert toward fraud, a negative one away from it, both measured against $R$.
+</Definition>
+
+With fifteen inputs there are $2^{15} = 32{,}768$ subsets, few enough to compute every $v(S)$ exactly for one alert; that is how the numbers below were obtained, with 300 training payments drawn at random as $R$. For a deployed system the cost matters, because every alert needs its attribution within seconds. Tree ensembles have an exact algorithm that walks each tree once (TreeSHAP), at the price of using the trees' own training data as the reference; other models are explained by averaging over a few randomly drawn orderings (sampled Shapley). Cloud machine-learning services offer both, and one returns the top five contributions with every prediction.
+
+### The 0.929 alert, decomposed
+
+<Example title="the alert's log-odds, input by input">
+Against the 300 training payments, the base value is $\phi_0 = -7.83$, a probability of 0.0004. That is far below the training week's fraud share of 0.89%, because $\phi_0$ averages the log-odds, and most payments get very negative log-odds while a few get very positive ones.
+
+Two inputs carry almost the whole score:
+
+$$
+\phi_{\text{30-day average}} = +6.13, \qquad \phi_{\text{amount}} = +4.32 .
+$$
+
+Three card terms are next in size: the 7-day count $-0.46$, the 7-day average $-0.34$, the 1-day average $+0.25$, together $-0.55$. The other ten inputs, the terminal's six and the calendar flags among them, add $+0.50$ between them. The sum checks:
+
+$$
+-7.83 + 6.13 + 4.32 - 0.55 + 0.50 = 2.57, \qquad \sigma(2.57) = 0.929 .
+$$
+
+Read in words: compared with an ordinary training payment, the model scores this one high mainly because the card's 30-day average is low (€20.63) and the amount is high (€102.55). The terminal, clean for a month, contributes almost nothing.
+</Example>
+
+<FigureSequence
+  name="waterfall"
+  alt="Four frames of a horizontal waterfall on a log-odds axis from minus 8 to plus 3, with probabilities 0.001, 0.01, 0.1, 0.5 and 0.9 marked along the top. Frame 1: a blue mark at the base value minus 7.83, labelled an average training payment. Frame 2: an amber bar of plus 6.13 for the card's 30-day average amount of 20.63 euros. Frame 3: an amber bar of plus 4.32 for the amount of 102.55 euros. Frame 4: a small blue bar of minus 0.55 for three small card terms and a small amber bar of plus 0.50 for the other ten inputs, ending at 2.57, marked as p equals 0.929"
+  caption="One alert's log-odds built from the base value, one contribution per step: two inputs carry it from 0.0004 to 0.9."
+/>
+
+<Task>
+Step through the frames and read the probability scale along the top after each one. After frame 2 the payment would score about 0.15; the amount alone takes it past 0.9. Check that the five numbers in frame 4 sum to 2.57.
+</Task>
+
+A service that returns the top five contributions would list the 30-day average, the amount and the three small card terms, and fold the other ten into "other". Here the five cover all but $+0.50$ of a score of 2.57 above $-7.83$, so nothing material is hidden. On an alert whose score is spread over many inputs, the folded remainder can be as large as any listed term, and the record has to keep it.
+
+<Exercise>
+The scorecard lesson's worked payment, <Ref lesson="scorecards-woe" id="the-simulator-card">€8.65 on 14 August at terminal 79</Ref>, scored 208 points there, a probability of about 0.46. The booster scores it too. Against the same 300 training payments ($\phi_0 = -7.83$) its five largest contributions are: terminal 7-day fraud rate (0.70) $+16.72$, card 30-day average (€11.62) $+2.99$, amount (€8.65) $-2.23$, terminal 7-day count (10) $+1.54$, terminal 30-day fraud rate (0.22) $-1.31$; the other ten add $+0.52$. Compute the booster's log-odds and probability, and write the investigator's one-sentence reading of the alert. Which input does it share with the scorecard's reading?
+
+<Solution>
+Sum: $-7.83 + 16.72 + 2.99 - 2.23 + 1.54 - 1.31 + 0.52 = 10.40$. Then $p = \sigma(10.40) = 1/(1 + e^{-10.40}) \approx 0.99997$.
+
+Reading: "The terminal's payments from eight to fourteen days ago were 70% fraud, which on its own takes the score from 0.0004 to near certainty; the small amount counts against fraud, and the card's own past matters little."
+
+Both models put the terminal's 7-day fraud rate first: on the scorecard it is 131 of the 208 points. They disagree about the probability, 0.46 against 0.99997. The attribution explains how the booster's number arose; it says nothing about which number is calibrated, which is a separate check (a reliability diagram on unselected payments).
+</Solution>
+</Exercise>
+
+## What an attribution does not say
+
+The example's reading, "the card's 30-day average is low", is odd. A low average is not a reason to suspect a payment; a payment far above the average is. The oddity comes from two choices the attribution made silently, and the investigator has to know both.
+
+### The reference is a choice, and it changes every number
+
+The base value $\phi_0$ and every $\phi_j$ are measured against the reference sample. The 300 training payments describe an ordinary payment of an ordinary card: their mean amount is €52, and their 30-day card averages are spread around €52 as well. The model reads the amount against the card's average, and that is why the low average earns credit against this reference: putting an ordinary card's average of about €52 in place of €20.63 makes €102.55 about twice the average instead of five times, and the score falls. The investigator's question is different: is this payment unusual *for this card*? That question has its own reference, the card's own recent payments.
+
+Take as reference the 59 payments card 2648 made in the 30 days before the alert, as the bank saw them on the morning of 8 August, with no labels. The model, the payment and the score are unchanged; the attribution is not.
+
+<Figure
+  src="./figures/baselines.svg"
+  alt="Paired horizontal bars for five inputs of one alert, blue for the reference of 300 training payments with base value minus 7.83, amber for the reference of the card's own 59 payments in the last 30 days with base value minus 6.33. Amount 102.55 euros: plus 4.32 blue, plus 9.39 amber. Card 30-day average 20.63 euros: plus 6.13 blue, minus 1.23 amber. Card 1-day average 46.78 euros: plus 0.25 blue, plus 0.74 amber. Card 7-day average 34.93 euros: minus 0.34 blue, plus 0.66 amber. Card 7-day count 12: minus 0.46 blue, minus 0.46 amber"
+  caption="Same model, same payment, same score of 2.57: against ordinary payments the low card average earns credit; against the card's own past the amount carries the score."
+/>
+
+Against its own past the card's base value is $-6.33$, and the amount takes $+9.39$ of the rise to 2.57. The 30-day average now counts slightly against fraud ($-1.23$). Each of the card's earlier payments carried a 30-day average of its own, between €16 and €19, below the alert's €20.63; putting one of those in place of €20.63 makes €102.55 a larger multiple of the average and raises the score, so against this reference the input pulls the score down. The 1-day and 7-day averages count for fraud ($+0.74$, $+0.66$), because they have risen above the card's usual level. That is the reading an investigator can use: €102.55 on a card whose 59 earlier payments in a month averaged €19.24, only two of them above €40, both in the last week. The input's €20.63 is higher because its 30-day window includes the alert itself: $(59 \times €19.24 + €102.55)/60 = €20.63$.
+
+Neither reference is the true one. The training sample answers "why does the model score this payment above an ordinary payment?", which is the supervisor's question about the model. The card's own past answers "what about this payment is new for this card?", which is the investigator's. A record that stores attributions must store the reference with them, or the numbers cannot be read.
+
+### Two inputs that act together share the credit
+
+The second oddity is that the model's real signal here is one quantity, the amount compared with the card's average, and the attribution reports it as two. Trees can form such a comparison: one split on the amount, a later split on the average, and the leaf holds the combination. Shapley values then split the credit for the combination between the two inputs, half and half, because symmetry treats them as playing the same role in it.
+
+The exact tree algorithm can separate what an input does alone from what it does only together with another. Its reference is the trees' own training data, so its totals differ from those above: $+4.78$ for the amount and $+4.98$ for the 30-day average. Each total splits into three parts:
+
+| | alone | joint with the other | with the other thirteen inputs | total |
+|---|---|---|---|---|
+| amount | $+1.37$ | $+3.35$ | $+0.05$ | $+4.78$ |
+| 30-day average | $+1.83$ | $+3.35$ | $-0.20$ | $+4.98$ |
+
+The rows add up to rounding. The joint effect of the pair is $6.71$, and each input is credited half of it. Of the two inputs' combined $9.76$, that is about two thirds: the comparison between them, which the attribution has no single line for.
+
+The same splitting happens between inputs that carry the same information. The terminal's fraud rates over 1, 7 and 30 days all rise on a compromised terminal, and a model that leans on all three spreads the credit among them; drop one from the model and the others absorb its share. A reason code that names the input with the largest attribution can therefore change when an input that carries nothing new is added or removed, which the exercise on a duplicated input works through.
+
+### A description of the model, not of the payment
+
+An attribution splits what the model computed. It does not say whether the model was right, or why the payment really is fraud. The simulator can test this, because it records which script made each fraud: scenario 2 compromises terminals, scenario 3 leaks cards and multiplies a third of their payments by five, scenario 1 marks every amount above €220.
+
+On the test week the booster's 700 alerts (its top 100 payments a day) held 242 frauds. For each alert, take the input with the largest positive attribution, computed with the exact tree algorithm. On all 160 terminal-script frauds but one, it was a terminal fraud rate; on all 62 leaked-card frauds, it was the amount or one of the card's average amounts; on all 20 large-amount frauds, the amount. The attributions name the script's mechanism almost every time.
+
+The other 458 alerts were genuine payments, and their attributions read the same way: 226 led by a card average amount, 126 by the amount, 74 by a terminal fraud rate. An explanation of a false alert looks exactly like an explanation of a true one, because both describe what the model reacted to. What the explanation gives the investigator is where to look; whether the card was stolen is settled by the call.
+
+<KeyFact>
+An attribution is honest about the model and silent about the world: on the simulator its top input names the fraud script for 241 of 242 alerted frauds, and reads just as plausibly on the 458 false alerts.
+</KeyFact>
+
+## A scorecard needs no explanation method
+
+The booster's explanation took a method computed after the score, a reference sample that changed every number, and a split of the amount-to-average comparison into two lines that each tell half of it. Is there a model whose score can be read as it stands, with no method and no sample? <Ref lesson="scorecards-woe" id="the-simulator-card">The simulator scorecard</Ref> turns each input into a few bins, gives each bin a number of points, and scores a payment by adding one bin's points per line; the points were scaled so that 212.87 points mean odds of 1 to 1, and 20 more points double the odds of fraud.
+
+### The same alert, read off the card
+
+The card has seven lines, among them the ratio of the amount to the card's 30-day average, which was built into the card because a line on the raw average would have pointed the wrong way. For the €102.55 payment:
+
+| line | value | points |
+|---|---|---|
+| amount | €102.55 | 7 |
+| amount ÷ card's 30-day average | 4.97 | **185** |
+| card's average, 1 day | €46.78 | 9 |
+| card's average, 7 days | €34.93 | 5 |
+| terminal fraud rate, 1 day | 0 | 8 |
+| terminal fraud rate, 7 days | 0 | −4 |
+| terminal fraud rate, 30 days | 0 | 5 |
+| **total** | | **215** |
+
+215 points are log-odds $(215 - 212.87)/28.85 = 0.07$, a probability of 0.52. The scorecard is less sure than the booster, and its reason is a single line: the payment is five times the card's monthly average. The comparison that the booster's attribution had to split between two inputs is one line here, because the card was built with the ratio as an input.
+
+Every reader reads the same table. The investigator sees which line carried the score; the cardholder can be told it in words; the supervisor can check every bin against the counts it was fitted on and recompute the score by hand. Nothing in it is an approximation of the model, because it is the model.
+
+The points still have a reference, and it is not "an ordinary payment". The card spread the intercept and the scaling offset evenly over the seven lines, a convention, so a line's points are measured from an arbitrary zero. On the ratio line almost every payment gets −2 points, so this payment's 185 points stand about 187 above an ordinary payment's. The Shapley attribution of the same card against a reference sample is each line's points minus that line's average points over the sample, which the exercise on scorecard points derives; it ranks the lines in the order an investigator needs.
+
+### Reason codes
+
+The cardholder does not read log-odds or points. Lenders have long told rejected applicants why with short standard phrases, each tied to one line of the scorecard and chosen per case, and the same device serves a payment refusal.
+
+<Definition title="reason code">
+A short fixed phrase attached to one input or one scorecard line, such as "amount far above this card's usual spending". For each decision, the inputs are ranked by their contribution against a stated reference, and the phrases of the top few are reported, worded for the customer.
+</Definition>
+
+For the €102.55 payment, ranked against the card's own past, the codes are "amount far above what this card usually spends" (the amount, $+9.39$) and "follows a recent rise in this card's spending" (the 1-day and 7-day averages). Two rules constrain the list beyond the ranking. A code must name something the customer can check or correct; "the terminal's fraud rate over the 30 days ending a week ago" is a fact about other people's payments. And a code may never disclose what the bank is not allowed to say.
+
+## Explaining an opaque model by a readable one
+
+Attributions are computed one alert at a time. A supervisor asks a broader question: what does the model do, as a whole, in terms a person can check? For a network or an ensemble there are three older answers, each built from a readable stand-in for the opaque model.
+
+### What the weights show
+
+A network's first-layer weights connect each input to each hidden unit, and they can be drawn as a grid of squares whose area is the weight's size and whose colour is its sign, a *Hinton diagram*. An input whose squares are all tiny feeds little into any unit and is a candidate for removal.
+
+<Figure
+  src="./figures/hinton.svg"
+  alt="A Hinton diagram for a network with four hidden units and five inputs: amount, card 30-day average, card 1-day count, terminal 7-day fraud rate, night flag. Squares are amber for positive weights and blue for negative, area proportional to the weight's size. The night flag column, boxed in amber, has the largest squares, including the largest of all on unit 1. Below each column, the average precision of the network refitted without that input: amount 0.34, card 30-day average 0.42, card 1-day count 0.52, terminal 7-day fraud rate 0.18, night flag 0.53, against 0.49 with all five"
+  caption="Large squares on an input the network does not need: the night flag carries the biggest weights, and dropping it costs nothing, while dropping the terminal's fraud rate costs most of the precision."
+/>
+
+The diagram above is a network with four hidden units, trained for this lesson on five of the simulator's inputs over the training week, 25–31 July, and scored on the test week 8–14 August. The night flag has the largest weights of all, and yet no simulator script uses the hour: on the training week the fraud share is 0.91% by day and 0.78% at night. Refitting the network on the training week without each input in turn measures what the diagram only suggests. Without the terminal's fraud rate the test week's AP falls from 0.49 to 0.18; without the night flag it is 0.53, no worse than with it (single runs vary by about 0.05 here, over four seeds). The diagram cannot say why the flag's weights are large; the refit shows that the network does not need them.
+
+Repeating the refit, dropping the input whose removal hurts least each time, is *backward elimination*: it finds which inputs the network needs, the step a Hinton diagram is used to shortcut. Neither says how the network combines the inputs it keeps.
+
+### Rule extraction and fidelity
+
+To say how, one fits a readable model, a short list of if-then rules or a shallow tree, to the opaque model's behaviour. There are two routes. A *decompositional* method opens the network: it groups each hidden unit's activations into a few levels, writes rules from the levels to the output and from the inputs to the levels, and merges the two rule sets. A *pedagogical* method does not open the model at all: it treats the model as a labeller, scores a set of payments with it, and fits a tree to those scores.
+
+The pedagogical route needs only the model's outputs, so the payments it learns from need no labels. On the simulator that makes the delay week usable, 1–7 August, whose labels the training set may not use. Score its 66,975 payments with the booster, mark the 700 in each day's top 100 as the model's alerts, and fit a depth-2 tree to those marks.
+
+<Figure
+  src="./figures/extracted-tree.svg"
+  alt="A depth-2 decision tree fitted to the booster's alerts on the delay week. Root: terminal 7-day fraud rate at most 0.55. Yes branch: amount at most 218.79 euros; yes leads to no alert, 325 of 66,464 payments being model alerts; no leads to ALERT, 126 of 126. No branch: terminal 30-day rate at most 0.67; yes leads to ALERT, 228 of 228; no leads to no alert, 21 of 157. Below: on the test week the model raised 700 alerts and the rules 195, all among the model's; agreement on all 58,264 payments 99.13 percent; a rule that never alerts 98.80 percent"
+  caption="The two rules the tree extracts are two of the simulator's scripts, and they reproduce 195 of the booster's 700 alerts."
+/>
+
+The tree states two rules: alert when the terminal's 7-day fraud rate is above 0.55 (and its 30-day rate not above 0.67), and alert when the amount is above €218.79. They are the terminal script and the large-amount script. Every payment the rules flag on the test week is also one the booster flagged, and 95% of them are fraud.
+
+How much of the booster do the rules represent? The measure is the share of payments on which the rule set and the model decide the same way.
+
+<Definition title="fidelity">
+For a rule set extracted from a model, with $a$ the payments neither flags, $d$ those both flag, $b$ those only the rules flag and $c$ those only the model flags, the fidelity is
+$$
+\text{fidelity} = \frac{a + d}{a + b + c + d}.
+$$
+It compares the rules with the model, not with the labels; agreement with the labels is the rules' accuracy, a different number.
+</Definition>
+
+On the test week $a = 57{,}564$, $b = 0$, $c = 505$, $d = 195$: fidelity $57{,}759 / 58{,}264 = 99.13\%$. A rule that never flags anything scores $57{,}564 / 58{,}264 = 98.80\%$. At one alert per eighty payments, fidelity over all payments is dominated by the payments nobody flags, exactly as <Ref lesson="economics-of-detection" id="accuracy-prices-every-mistake-the-same">accuracy is dominated by genuine payments</Ref>. The numbers that describe the rule set are the alert-level ones: the rules reproduce $d/(c+d) = 195/700 = 28\%$ of the model's alerts, and $d/(b+d) = 100\%$ of the rules' alerts are model alerts.
+
+Deeper trees do not help here: at depths 3 and 4 the extra leaves all keep the "no alert" majority, and the same 195 alerts come out. The other 505 model alerts, the leaked cards among them, sit in a leaf where model alerts are a minority. The 0.929 alert is one of them: its terminal is clean and its amount is €102.55, so the rule set flags it as nothing and has nothing to say about it.
+
+<Exercise>
+A depth-3 tree extracted the same way from a different model flags 400 test-week payments, 300 of which the model also flagged; the model flagged 700 in all. Compute the fidelity over the 58,264 payments, the share of the model's alerts the rules reproduce, and the share of the rules' alerts that are model alerts. Which of the three would you report to a supervisor asking whether the rules describe the model's alerts?
+
+<Solution>
+$d = 300$, $b = 400 - 300 = 100$, $c = 700 - 300 = 400$, $a = 58{,}264 - 300 - 100 - 400 = 57{,}464$.
+
+Fidelity $= (57{,}464 + 300)/58{,}264 = 57{,}764/58{,}264 = 99.14\%$, almost exactly the extracted tree's 99.13%, although this rule set reproduces more of the model's alerts and also adds 100 of its own.
+
+Model alerts reproduced: $300/700 = 43\%$. Rule alerts that are model alerts: $300/400 = 75\%$.
+
+The supervisor's question is about the model's alerts, so the two alert-level shares go in the report, with the fidelity beside them only as context. The fidelity cannot tell this rule set from the depth-2 one, or either of them from a rule that never alerts (98.80%).
+</Solution>
+</Exercise>
+
+### The two-stage model: a readable part and a correction
+
+A third route builds the readability in: fit a logistic regression first, then fit a flexible model to the regression's errors, and add the two. The score is the regression's probability plus a correction, so the readable part can be shown and the correction reported as one number. On a toy portfolio of four customers, a regression that outputs 0.44, 0.76, 0.18 and 0.88 against labels 0, 1, 0, 1 leaves errors $-0.44$, $+0.24$, $-0.18$, $+0.12$; a network fitted to those errors adds $+0.14$ to a new customer the regression puts at 0.68, for a score of 0.82.
+
+The explanation is only as good as the correction is small. On the simulator, fit the logistic regression of <Ref lesson="alert-budget-metrics" id="five-models-scored-on-a-test-week">the five-model baseline</Ref> on the training week, then fit a booster on the same week to the regression's errors. The two-stage model scores the 0.929 alert at $0.06 + 1.03 = 1.09$. The readable part says the payment is unremarkable, the correction supplies 1.03 of the 1.09, and the sum is not even a probability. Rank the test week by the two-stage score and take its top 100 payments a day: on 59% of those 700 alerts the correction exceeds the regression's share. A two-stage explanation is honest when it reports the correction beside the readable part; shown alone, the readable part explains a model that did not make the decision.
+
+## Explanations built into the model: attention and walks
+
+Two kinds of model compute, on the way to the score, a set of weights that looks like an explanation: an attention network weights a card's earlier payments, a graph score weights the paths from the confirmed frauds. Is a weight the model computes itself an explanation of the score?
+
+### Attention weights
+
+<Ref lesson="sequence-models-for-transactions" id="which-payment-did-the-model-lean-on-attention">The sequence lesson</Ref> built attention as a set of weights over a card's last few payments: a context vector built from the scored payment is compared with the network's state after each earlier payment, and a softmax turns the comparisons into weights that sum to 1.
+
+Once trained, the weights are part of the forward pass: the model really did mix the states in those proportions. That is what makes them honest, and also what limits them. They weight positions, not inputs, so they can say "the payment two steps back counted most" but not which of its fields. And the mixed state still passes through further layers before the score, so a position with weight 0.6 may move the score little. To split the score itself over positions and fields, the network is explained like any other model, by an attribution.
+
+### Exposure scores: the explanation is the path
+
+A score propagated through a graph has a different problem. <Ref lesson="guilt-by-association" id="restarting-at-the-known-fraud-the-exposure-score">The exposure score</Ref> is the probability that a walker who keeps restarting at the confirmed frauds is found at a node. To a booster it is one input among many, so an attribution can say "the exposure column added 3 to the log-odds", and stop there. The investigator needs to know where the exposure came from: which confirmed fraud, through which shared merchant or device.
+
+The exposure score has an exact answer to that. It solves $\xi = \alpha Q \xi + (1-\alpha) e$, so $\xi = (1-\alpha)(I - \alpha Q)^{-1} e$ is linear in the restart vector $e$. With several confirmed frauds, a node's exposure is the sum of the exposures it would have from each fraud alone, weighted by that fraud's share of $e$: an attribution whose inputs are the confirmed frauds. And within one fraud's share, the nodes every walk must pass through name the connection.
+
+<Figure
+  src="./figures/exposure-path.svg"
+  alt="The card toy graph: cardholders c1, c2, c3 on the left, payments p1 to p5 in the middle, merchants m1, m2, m3 on the right, each node labelled with its exposure. p1 is filled blue as the confirmed fraud, the only restart node, exposure 0.324. c2 is filled amber, exposure 0.052. The edges p1 to m1, m1 to p3 and p3 to c2 are thick amber. Text beside: every walk from p1 to c2 passes through m1 and p3, so the amber path is in every one of them; the shortest walk alone contributes 0.011, the rest comes from longer walks, all through m1 and p3"
+  caption="The explanation of a propagated score is the subgraph its mass came through: cardholder c2 is exposed because it paid at m1, where the confirmed fraud p1 was made."
+/>
+
+On <Ref lesson="guilt-by-association" id="labels-on-payments-weights-that-fade-the-card-graph">the card toy</Ref>, with the fraud p1 as the only restart node, cardholder c2 has exposure 0.052. Every walk from p1 that reaches c2 goes through the merchant m1 and the payment p3, because c2's only other link leads to a corner of the graph that connects to nothing else. So every walk that brings c2 its exposure crosses m1 and p3, and the explanation is one sentence: c2 paid at m1, where a stolen card paid. The single shortest walk contributes 0.011; the rest comes from longer walks: walks that go back and forth on these three edges, and walks that wander through c1, p2 and m2, or into the far corner, before or after. Every one of them crosses m1 and p3, so the sentence covers them.
+
+For a set of suspects, the useful object is the small subgraph that links them all: the merchant, device or account most of them share. Finding it from a few query nodes in a large graph is a search problem with known methods, the *connection subgraph* for two nodes and its generalisation to several. The review budget makes it matter: a team that works a hundred cases a day has minutes for each, and a suspect that arrives without the subgraph explaining it spends those minutes on finding out why it was flagged.
+
+A weight the model computes itself is therefore an honest explanation, because it is part of the computation, and one that answers a narrower question than the investigator's.
+
+## One alert, three readers
+
+An attribution table, a points table, a rule set, a path: none of them is yet something the investigator can act on in a few minutes, the cardholder can contest, or the supervisor can re-run. What does each reader actually receive for the 0.929 alert?
+
+<Figure
+  src="./figures/three-readers.svg"
+  alt="Three panels for the same alert. Investigator, what to check against this card: 102.55 euros at 17:34 on 8 August; this card in the last 30 days made 59 payments, mean 19.24 euros, two above 40 euros, 70.90 on 2 August and 88.15 on 3 August; against this card's own past the amount contributes plus 9.39 to the log-odds; call the holder and ask about 8, 3 and 2 August. Cardholder, why in words they can contest: your card payment of 102.55 euros was stopped; main reasons: the amount is far above what this card usually spends, and it follows a recent rise in this card's spending; how to confirm it was you and how to have it corrected. Supervisor, what ran and can it be re-run: payment 1245017 on 8 August 17:34; model booster trained 25 to 31 July; the 15 input values served; score 2.57 log-odds, p 0.929; base minus 7.83 from the training sample; average 30-day plus 6.13, amount plus 4.32; the other 13 minus 0.05, sum checks; zone and action taken; overrides, who, when, grounds; the disposition when it arrives"
+  caption="The same alert as three objects: a narrative against the card's past, a notice in plain words, and a record that can be re-computed."
+/>
+
+### The investigator: departures from this card's past
+
+The investigator's object is a short narrative of what is new for this card, with sizes attached, computed against the card's own recent payments. For the 0.929 alert that is the reading the card's own past gave above, with one fact from the card's history added: the two other payments above €40 were made on 2 and 3 August. That fact turns one question for the cardholder into three. On the bank's records those two payments were still unlabelled; both were in fact frauds of the leaked-card script.
+
+Turning attributions into sentences is work a language model is now asked to do, and its sentences can misstate the numbers they were given. <Ref lesson="llms-in-the-investigation-queue" /> measures how often, and what has to check them; the attribution table, not its prose rendering, is the object the narrative must agree with.
+
+### The cardholder: reasons, and what the law requires of them
+
+The bank that refuses a payment must tell the customer, with reasons where possible, and say how a factual mistake can be corrected (PSD2 Art. 79(1), met in <Ref lesson="score-to-action" id="the-legal-limits">the previous lesson</Ref>). Two further texts shape the reasons when the decision is automated. Under the General Data Protection Regulation (GDPR), a person may not be subject to a decision based solely on automated processing that significantly affects them, unless an exception applies, such as a contract or a law that permits it with safeguards (Art. 22). Where such a decision is made, the person must be told of it and given
+
+<Quote source="GDPR, Art. 15(1)(h); the same words in Arts. 13(2)(f) and 14(2)(g)">
+meaningful information about the logic involved, as well as the significance and the envisaged consequences of such processing
+</Quote>
+
+and the safeguards include the right "to obtain an explanation of the decision reached after such assessment and to challenge the decision" (Recital 71). Reason codes ranked from an attribution are the usual way to meet this for a single payment: they say which features of this payment led to this outcome, in words the customer can dispute.
+
+Anti-money-laundering law adds the same right and a limit on it. The 2024 Anti-Money Laundering Regulation (AMLR) lets a bank make automated decisions about customers if the customer "may obtain an explanation of the decision reached by the obliged entity, and may challenge that decision, except in relation to a report" of a suspicious transaction (Art. 76(5)(c)). And it forbids telling the customer that a transaction is being assessed as suspicious or reported (Art. 73(1), the ban on tipping off). A reason code like "unusual pattern of transfers to new beneficiaries" on a payment that is also under laundering review would breach it. So the list of codes a bank may print is itself a decision, made by the people responsible for these duties, and a model's top attribution is mapped to a code only if the code is on that list.
+
+The EU's AI Act grants a right to "clear and meaningful explanations of the role of the AI system in the decision-making procedure and the main elements of the decision taken" (Art. 86) only for high-risk systems, and its credit-scoring category explicitly excludes systems used to detect financial fraud; <Ref lesson="eu-ai-act-fraud" /> reads where that leaves a fraud detector.
+
+### The supervisor: a record that can be re-computed
+
+The supervisor's object is the row in the audit trail. It holds what the previous lesson recorded (the action, who overrode it, on what grounds, and the disposition when it arrives) and, for the explanation, enough to recompute it: the model version, the input values as they were served, the score, the reference sample, and the attribution with its base value. Two requirements follow from the earlier lessons.
+
+**Served values, not rebuilt ones.** The attribution has to be computed on the inputs the model actually scored. Rebuilding them later from the training tables can give different values, by the <Ref lesson="point-in-time-features" id="one-definition-for-training-and-serving">training–serving skew</Ref> of the feature lessons or by labels that arrived afterwards, and then the record explains a payment the model never saw.
+
+**The record is the bank's evidence.** When a cardholder denies having made a payment, the bank's record that the card was used "shall in itself not necessarily be sufficient to prove" that the payment was authorised (PSD2 Art. 72(2)); the bank has to bring evidence of fraud or of the customer's gross negligence. The alert's record, with its explanation and the investigator's findings, is part of that evidence.
+
+## Which explanations are honest
+
+Seven objects now claim to explain an alert. Which of them can a reader trust, and by what test?
+
+The first test: would the explanation have been different if the model had been different? An attribution, the points, the attention weights and the exposure path all change when the model changes, because they are computed from it. A rule set that reproduces 28% of the alerts would come out the same for any model that catches the two scripted patterns, so on its own it says little about this model. A reason code that names an input the model did not use fails the test outright; it is a justification written after the fact.
+
+The second test is what each object leaves out, and whether that is said beside it:
+
+| method | what it reports | reference | what it leaves out | honest when |
+|---|---|---|---|---|
+| Shapley attribution | each input's share of this payment's log-odds | a stated sample of payments | joint effects split in half; credit spread over copies; whether the model was right | reported with its reference and the folded remainder |
+| scorecard points | the model itself, line by line | a convention (offset spread over lines) | nothing about the model; joint effects only if built into a line | always, read as points from a fixed zero |
+| Hinton diagram | first-layer weight sizes | none | how the inputs combine; whether a large weight matters | checked by refitting without the input |
+| extracted rules | a readable model of the model's decisions | the extraction set | the model alerts the rules miss | reported with the alert-level shares of agreement |
+| two-stage model | the readable part's score | the readable model | the correction | the correction is reported beside it |
+| attention weights | how the model mixed its states | none | inputs within a position; the layers after the mix | read as weights over positions, not as a split of the score |
+| exposure path | where a propagated score's mass came from | the confirmed frauds | everything outside the graph | the share of the score each path carries is stated |
+
+Read down the last column: every method can be honest, and only the scorecard is honest by construction, because it is the model. An explanation is honest when it reports what the model computed for this payment, names its reference, and states what it leaves out: the folded remainder, the reference sample, the 72% of alerts the rules miss, the correction beside the readable part.
+
+<Conclusion>
+You can now produce an explanation for a single alert and say which reader it serves. An attribution splits a model's log-odds into one share per input that sums from a base value to the score; on the simulator alert at 0.929, the amount and the card's low 30-day average carry it against ordinary payments, and the amount alone carries it against the card's own past, because the reference is a choice that changes every number. The attribution splits joint effects between inputs, describes the model rather than the world, and reads as plausibly on a false alert as on a true one. A scorecard is its own explanation, and reason codes turn either into words a customer can contest, within the limits GDPR and AMLR set, including the ban on tipping off. For a supervisor, readable stand-ins come with a number that says how much of the model they cover: an extracted rule set reproduced 195 of the booster's 700 alerts while agreeing with it on 99.13% of payments, and the two-stage model's correction outweighed its readable part on 59% of its test-week alerts. Attention weights and exposure paths are honest about the model and answer narrower questions. Each reader gets a different object: the investigator a narrative against the card's past, the cardholder a reason code, the supervisor a record that can be recomputed from the served inputs.
+
+What none of these methods does is write the investigator's narrative or the suspicious-activity report. <Ref lesson="llms-in-the-investigation-queue" /> asks which of those language tasks a language model may be given, measured on real payment data, and what must check its output before a person reads it.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+The booster behind the 0.929 alert was trained on all payments. Suppose instead it had been trained after keeping every fraud and 2% of genuine payments ($\beta = 0.02$), with its outputs corrected afterwards as in <Ref lesson="undersampling-calibration">the undersampling lesson</Ref>. Show that the correction changes the base value of every attribution and none of the $\phi_j$. Then say whether the same is true of an attribution that splits the probability rather than the log-odds.
+
+<Solution>
+The correction recalled from the undersampling lesson multiplies the odds by $\beta$: in log-odds, $g'(x) = g_s(x) + \ln \beta$ for every $x$, where $g_s$ is the undersampled model's log-odds. A constant $c = \ln\beta = -3.91$ is added to every output.
+
+Every coalition value is an average of outputs over the reference, so each gains the same $c$: $v'(S) = v_s(S) + c$ for every subset $S$, including the empty one. The base value becomes $\phi_0' = \phi_{0,s} + c$. Each $\phi_j$ is an average of differences $v(S \cup \{j\}) - v(S)$, and the constant cancels in every difference, so $\phi_j' = \phi_{j,s}$. Local accuracy still holds: $\phi_0' + \sum_j \phi_j = g_s(x) + c = g'(x)$.
+
+So an undersampled model's attributions can be used as they are, and only the base value and the score need the correction. The ranking of reason codes is unchanged.
+
+For a split of the probability, it fails. The correction $p' = \beta p_s / (\beta p_s - p_s + 1)$ is not a shift on the probability scale; it bends that scale by different amounts at different points, so each difference $v(S \cup \{j\}) - v(S)$ changes by an amount that depends on where on the curve it sits. The shares change, and can change order. This is one more reason the split is done in log-odds.
+</Solution>
+</Exercise>
+
+<Exercise>
+A data engineer adds a second copy of the card's 30-day average to the booster's inputs, under another column name, and retrains. Suppose the retrained booster is exactly the average of two copies of the old model, one reading the 30-day average from the first column and the other from the second; on every real payment the two columns agree, so it computes the same log-odds as before. Against the 300 training payments, what do the two copies receive for the 0.929 alert, and which input does a reason code built from the top attribution now name? A different retrained booster that reads only the first column also computes the same log-odds on every real payment: what does it give the two copies? Is any of these reason codes dishonest?
+
+<Solution>
+The copies agreeing on real payments is not enough to settle the split. A coalition value $v(S)$ evaluates the model on mixed payments: when $S$ holds the first copy but not the second, the first column takes the alert's €20.63 and the second takes each reference payment's own average. On those mixed payments the two columns differ, and what the model does with them decides the split. That is why the exercise pins the model down.
+
+Shapley values are linear in the model. If $g' = \tfrac12 g_A + \tfrac12 g_B$, then for every subset $S$ the coalition value of $g'$ is $\tfrac12 v_A(S) + \tfrac12 v_B(S)$, because $v$ is an average of outputs; and each $\phi_j$ is a fixed weighted sum of differences of $v$, so $\phi_j' = \tfrac12\phi_j^A + \tfrac12\phi_j^B$.
+
+Take $g_A$, the old model reading the first column. The reference payments carry the same value in that column as in the old one, so every coalition value is the old model's, and the first copy gets $+6.13$, the amount $+4.32$. The second copy never changes any $v_A(S)$, because $g_A$ does not read it, so it gets $0$. $g_B$ is the mirror image. Averaging: each copy gets $\tfrac12(6.13 + 0) \approx +3.07$, and the amount keeps $\tfrac12(4.32 + 4.32) = +4.32$; the other inputs keep theirs too.
+
+Before the copy, the top attribution was the 30-day average ($+6.13$ against $+4.32$); now it is the amount ($+4.32$ against $+3.07$ for each copy). A reason code built from the top attribution switches from "low usual spending on this card" to "high amount".
+
+The booster that reads only the first column is $g_A$ itself: the first copy gets $+6.13$, the second $0$, and the reason code stays "low usual spending". Two models that compute the same log-odds on every real payment name different top reasons, because they differ on the mixed payments the attribution builds.
+
+No code is dishonest about its model's arithmetic; each follows from the definition. What is unreliable is ranking single inputs when several carry the same information. Two remedies: group inputs that measure the same thing (the copies, or the card's three averages) and rank groups, reporting the group's summed attribution; or drop the copy, since the model does not need it. The general point is the one made for joint effects: the split between inputs that move together is set by what the model does on combinations of values that never occur, which nobody chose with explanations in mind.
+</Solution>
+</Exercise>
+
+<Exercise>
+A vendor's report says: "Our extracted rule set has 99.1% fidelity to the production model on last month's payments, so it explains the model." Refute the claim, using the numbers of the depth-2 tree extracted in the lesson, and say what the report should contain instead.
+
+<Solution>
+The claim fails at the step from "agrees on 99.1% of payments" to "explains the model". On a stream where the model alerts on about one payment in eighty, a rule set that never alerts already agrees with the model on 98.8% of payments (57,564 of 58,264 on the simulator's test week). The depth-2 tree's 99.13% is only 0.33 points above that, and almost all of its agreement is on payments neither of them flags.
+
+On the alerts, which are what the model is for, the tree reproduces 195 of the model's 700 (28%). It describes the model's terminal and large-amount alerts exactly (every rule alert is a model alert) and says nothing about the other 72%, among them every leaked-card alert. A supervisor reading "99.1% fidelity" would believe the rules account for the model's behaviour; they account for just over a quarter of what the team actually works.
+
+The report should give the 2×2 table of rule decisions against model decisions, the share of the model's alerts the rules reproduce, the share of the rule alerts that are model alerts, and the fidelity of the trivial rule beside the rule set's own. It should also say on which payments the extraction was fitted and on which the agreement was measured; here they were different weeks.
+</Solution>
+</Exercise>
+
+<Exercise>
+The simulator scorecard is a logistic regression on weight-of-evidence columns, rescaled to points: line $j$ gives $\text{points}_j(x) = \text{Factor}\cdot\bigl(\beta_j\,\mathrm{WOE}_j(x) + \beta_0/J\bigr) + \text{Offset}/J$, where $\text{Factor} = 20/\ln 2$ is the number of points per unit of log-odds, $\text{Offset} = 212.87$ and $J = 7$. Let the reference be a sample $R$ of payments, and write $\overline{\text{points}}_j$ for the average points line $j$ gives over $R$. Show that the Shapley attribution of the scorecard's log-odds, in points, is $\text{points}_j(x) - \overline{\text{points}}_j$ for every line. Then say why no such formula exists for the booster.
+
+<Solution>
+The scorecard's log-odds are $g(x) = \beta_0 + \sum_j \beta_j\,\mathrm{WOE}_j(x)$, a sum of terms each of which reads one line only.
+
+For a subset $S$ of lines, the coalition value keeps $x$'s bins on the lines in $S$ and takes the reference payment's bins on the others, averaged over $R$:
+$$
+v(S) = \beta_0 + \sum_{k \in S} \beta_k\,\mathrm{WOE}_k(x) + \sum_{k \notin S} \beta_k\,\overline{\mathrm{WOE}}_k ,
+$$
+where $\overline{\mathrm{WOE}}_k$ is the average of $\mathrm{WOE}_k$ over $R$. Adding line $j$ to any $S$ changes exactly one term:
+$$
+v(S \cup \{j\}) - v(S) = \beta_j\bigl(\mathrm{WOE}_j(x) - \overline{\mathrm{WOE}}_j\bigr),
+$$
+the same for every $S$. Its average over all orders is itself, so $\phi_j = \beta_j(\mathrm{WOE}_j(x) - \overline{\mathrm{WOE}}_j)$ in log-odds. Multiplying by Factor to express it in points, and noting that the constant parts $\text{Factor}\cdot\beta_0/J + \text{Offset}/J$ are the same for $x$ and for every reference payment,
+$$
+\text{Factor}\cdot\phi_j = \text{points}_j(x) - \overline{\text{points}}_j .
+$$
+The base value in points is $\sum_j \overline{\text{points}}_j$, the average score over $R$.
+
+So for an additive model the attribution is the points minus a constant per line, and the card can be turned into Shapley values by subtracting one average per line. The ranking can differ from the ranking by raw points: a line on which every payment scores high has large points and small attributions. For the €102.55 payment, the ratio line's 185 points become about 187 above a reference on which almost every payment scores −2.
+
+The derivation used one fact: each line's term reads only that line, so the difference in the second display did not depend on $S$. In the booster a tree reads several inputs at once, the difference depends on which other inputs are already in $S$ (the amount's step is larger once the low average is present), and the Shapley value is a genuine average over orders, with no per-line constant to subtract.
+</Solution>
+</Exercise>
+
+<Exercise>
+On the simulator's test week the booster's 700 alerts were cross-tabulated by the family of their top attribution (computed with the exact tree algorithm) and by the script that made the payment fraud (0 = genuine):
+
+| top attribution | genuine | scenario 1 (amount above €220) | scenario 2 (terminal) | scenario 3 (leaked card) |
+|---|---|---|---|---|
+| amount | 126 | 20 | 0 | 30 |
+| card average amount | 226 | 0 | 1 | 32 |
+| card count | 17 | 0 | 0 | 0 |
+| terminal count | 15 | 0 | 0 | 0 |
+| terminal fraud rate | 74 | 0 | 159 | 0 |
+
+(a) For each script, compute the share of its alerted frauds whose top attribution names the script's mechanism. (b) Can the top attribution be used to tell true alerts from false ones? Compute the precision of the alerts led by a terminal fraud rate, and of those led by a card average amount. (c) Real data has no script column. Design an experiment that checks whether a bank's attributions name the cause of its frauds.
+
+<Solution>
+(a) Scenario 1 makes amounts above €220 fraud: 20 of 20 led by the amount (100%). Scenario 2 compromises terminals: 159 of 160 led by a terminal fraud rate (99.4%); the one exception was led by a card average. Scenario 3 multiplies a leaked card's amounts by five: its mechanism is the amount against the card's usual level, and 30 + 32 = 62 of 62 are led by the amount or a card average (100%). Overall 241 of 242.
+
+(b) Terminal-led alerts: 159 frauds of 74 + 159 = 233, precision 68%. Card-average-led alerts: 33 frauds of 226 + 33 = 259, precision 13%. Amount-led: 50 of 176, 28%. The family of the top attribution does carry information about precision on the simulator, because the terminal script is easier to separate than leaked cards. But every family contains many false alerts, so the explanation tells the investigator where to look, not whether the alert is true.
+
+(c) Use the investigators' findings as the script column. After each case is closed, the investigator records the confirmed fraud mechanism from a fixed list (compromised terminal or merchant, stolen card used in a burst, account takeover, and so on), without seeing the attribution, so the record is not shaped by it. Over a few months, cross-tabulate the top attribution family against the recorded mechanism on confirmed frauds, as in the table. Agreement well above what the marginal shares would give by chance supports the attributions naming causes; systematic disagreement in one cell (say, account takeovers led by the amount) shows what the features cannot see. Two cautions: the cases are the model's own alerts, a selected sample, and closed cases arrive with the label delay, so the table describes last quarter's model.
+</Solution>
+</Exercise>
+
+<Exercise>
+On <Ref lesson="guilt-by-association" id="labels-on-payments-weights-that-fade-the-card-graph">the card toy</Ref> (follow probability $\alpha = 0.85$), the exposure of cardholder c2 is 0.0516 when the fraud payment p1 is the only restart node, and 0.0277 when p5 is. Now both p1 and p5 are confirmed frauds, each with half of the restart vector. Compute c2's exposure, split it between the two frauds, and name the subgraph that carries each share. Why could an attribution of a booster that takes c2's exposure as one input never produce this split?
+
+<Solution>
+The exposure solves $\xi = \alpha Q\xi + (1-\alpha)e$, so $\xi = (1-\alpha)(I - \alpha Q)^{-1}e$: a fixed matrix times $e$, hence linear in $e$. With $e = \tfrac12 e_{p1} + \tfrac12 e_{p5}$,
+$$
+\xi_{c2} = \tfrac12(0.0516) + \tfrac12(0.0277) = 0.0258 + 0.0139 = 0.0397 .
+$$
+So 65% of c2's exposure comes from p1 and 35% from p5.
+
+The p1 share comes through m1 and p3: every walk from p1 to c2 passes the merchant m1 and c2's payment p3 there, as in the lesson. The p5 share comes through the merchant m3 and c2's payment p4: p5 links cardholder c3 and m3, and from m3 the only way to c2 is through p4. The explanation reads: c2 paid at m1, where one stolen card paid, and at m3, where another did.
+
+A booster sees c2's exposure as a single number, 0.0397. Its attribution can split the log-odds among its inputs, so it can say how much the exposure column contributed, but the column has no parts it can see: which seeds and which paths produced 0.0397 was decided inside the walk, before the booster read the value. The split over frauds exists only because the walk is linear in its restart vector, and only the graph computation can report it.
+</Solution>
+</Exercise>
+
+<Exercise>
+The same booster, never retrained, scored the simulator's payments for five more weeks. For the 700 alerts of one week (its top 100 payments a day, with no known-card removal), count the alerts by the family of their top attribution. The counts for 15–21 August and four weeks later, 12–18 September:
+
+| family | 15–21 Aug | 12–18 Sep |
+|---|---|---|
+| terminal fraud rate | 300 | 322 |
+| amount | 202 | 187 |
+| card average amount | 186 | 177 |
+| card count | 8 | 7 |
+| terminal count | 4 | 7 |
+
+Turn the counts into shares, and compute $\sum_k (b_k - a_k)\ln(b_k/a_k)$ over the five families, with $a_k$ the August share and $b_k$ the September share. What would a large value say about the model or the stream, and why might the simulator keep it small?
+
+<Solution>
+Shares, August → September: terminal fraud rate 0.429 → 0.460; amount 0.289 → 0.267; card average 0.266 → 0.253; card count 0.0114 → 0.0100; terminal count 0.0057 → 0.0100.
+
+Terms $(b - a)\ln(b/a)$: $0.031 \times 0.071 = 0.0022$; $(-0.022)(-0.078) = 0.0017$; $(-0.013)(-0.050) = 0.0006$; $(-0.0014)(-0.13) = 0.0002$; $(0.0043)(0.56) = 0.0024$. Sum $\approx 0.007$. Every term is non-negative, because $b - a$ and $\ln(b/a)$ always have the same sign, and the sum is zero only when the shares are equal.
+
+A large value would mean the model is alerting for different reasons than a month ago: a new fraud pattern caught through other inputs, a pattern gone quiet, or an input whose meaning changed (a pipeline that started filling a column with zeros would shift its family's share abruptly). None of these needs labels, so it shows weeks before the precision does. The simulator keeps the value small because its three scripts run unchanged every week, and the model sees the same mix of frauds.
+
+This sum is the stability index that <Ref lesson="model-risk-monitoring" /> applies to a model's inputs and score, with its thresholds for a change worth acting on; applied to the explanations, it is how a monitoring pipeline watches for drift in what the model attributes its alerts to.
+</Solution>
+</Exercise>
+
+<References>
+1. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015 — Ch. 4, "Opening the neural network black box" pp. 150–155 (Hinton diagram, backward variable selection, decompositional and pedagogical rule extraction, accuracy, conciseness and fidelity, two-stage models; the fidelity formula is printed there as $(a+d)/(b+c)$, a misprint for $(a+d)/(a+b+c+d)$); scorecard points per attribute pp. 131–133; Ch. 6, "Selecting the sample to investigate" pp. 286–290 (inspectors reading the score drivers behind a high score).
+2. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 3, "Transaction data simulator", "Baseline feature transformation" and "Baseline fraud detection system" (the simulator, the fifteen inputs and the train/delay/test split re-run for this lesson); "Real-world data" (the depth-two tree on real payments); Ch. 7, "Sequential modeling", section "Attention". https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+3. S. M. Lundberg, S.-I. Lee, "A Unified Approach to Interpreting Model Predictions," *Advances in Neural Information Processing Systems 30*, 2017 — Sec. 2–4 (additive feature attributions, the uniqueness of Shapley values, sampling approximations). https://arxiv.org/abs/1705.07874
+4. S. M. Lundberg, G. Erion, H. Chen, et al., "From Local Explanations to Global Understanding with Explainable AI for Trees," *Nature Machine Intelligence* 2, 2020, pp. 56–67 — exact Shapley values for tree ensembles (TreeSHAP) and Shapley interaction values. https://doi.org/10.1038/s42256-019-0138-9
+5. M. W. Craven, J. W. Shavlik, "Extracting Tree-Structured Representations of Trained Networks," *Advances in Neural Information Processing Systems 8*, 1996, pp. 24–30 — pedagogical extraction of a tree from a network's predictions, and fidelity to the network.
+6. L. Akoglu, H. Tong, D. Koutra, "Graph Based Anomaly Detection and Description: A Survey," *Data Mining and Knowledge Discovery* 29(3), 2015, pp. 626–688 — Sec. 4, "Graph-based anomaly description" (the description problem, the review budget, connection subgraphs and centre-piece subgraphs for a set of suspects). https://arxiv.org/abs/1404.4679
+7. C. Faloutsos, K. S. McCurley, A. Tomkins, "Fast Discovery of Connection Subgraphs," *Proceedings of the 10th ACM SIGKDD Conference*, 2004, pp. 118–127; H. Tong, C. Faloutsos, "Center-Piece Subgraphs: Problem Definition and Fast Solutions," *Proceedings of the 12th ACM SIGKDD Conference*, 2006, pp. 404–413.
+8. Google Cloud Platform, *FraudFinder*, 2023 — notebooks `bqml/04` (batch prediction with explanations: the top five feature attributions per prediction) and `bqml/06` (explanation specification with sampled Shapley for attribution skew and drift monitoring). https://github.com/GoogleCloudPlatform/fraudfinder
+9. Regulation (EU) 2016/679 (General Data Protection Regulation), *Official Journal* L 119, 4.5.2016 — Art. 13(2)(f), 14(2)(g), 15(1)(h) (meaningful information about the logic involved), Art. 22 (decisions based solely on automated processing), Recital 71 (an explanation of the decision reached, the right to challenge it). https://eur-lex.europa.eu/eli/reg/2016/679/oj
+10. Regulation (EU) 2024/1624 on the prevention of the use of the financial system for money laundering or terrorist financing (AMLR), *Official Journal* L, 19.6.2024 — Art. 73(1) (prohibition of disclosure), Art. 76(5) (automated decisions: meaningful human intervention, explanation and challenge, except for a suspicious transaction report). https://eur-lex.europa.eu/eli/reg/2024/1624/oj
+11. Regulation (EU) 2024/1689 (Artificial Intelligence Act), *Official Journal* L, 12.7.2024 — Art. 86 (right to explanation of individual decision-making), Annex III point 5(b) (creditworthiness and credit scoring, excepting systems used to detect financial fraud). https://eur-lex.europa.eu/eli/reg/2024/1689/oj
+12. Directive (EU) 2015/2366 on payment services in the internal market (PSD2), *Official Journal* L 337, 23.12.2015 — Art. 72(2) (recorded use of a payment instrument not in itself proof of authorisation), Art. 79(1) (notification of refusal with reasons). https://eur-lex.europa.eu/eli/dir/2015/2366/oj
+</References>

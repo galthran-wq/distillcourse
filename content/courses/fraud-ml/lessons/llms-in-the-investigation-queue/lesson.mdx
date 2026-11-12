@@ -1,0 +1,475 @@
+An investigator opens an alert: a score, ten feature values and a page of transactions. A model that can read and write plain language could be asked to decide the alert, to explain it, or to draft the report that follows. Each of the three has been tried and measured. Which can be handed over, what must check the output before an investigator reads it, and which decisions may never leave a person?
+
+<Ref lesson="alert-explanations" id="one-alert-three-readers">The previous lesson</Ref> ended with three objects for one alert: a narrative of what is new for this card, a reason code for the cardholder, and a record the supervisor can recompute. All three are still written by people. So is the report filed when a case is escalated on suspicion of laundering, which goes to the financial intelligence unit (<Ref lesson="financial-crime-typology" id="where-the-laundering-label-comes-from">a statement of suspicion, not a verdict</Ref>); in the United States the regulator puts the final stages of one such report at between 25 minutes and more than five hours. That is writing, and writing is what a language model produces.
+
+A *large language model* is the next-token predictor of <Ref lesson="generative-pretraining-and-tokenisation" id="what-a-language-model-reads">the tokenisation lesson</Ref>, a transformer with billions of weights trained on a large share of the public web's text, then tuned to follow instructions. It is used through a *prompt*: a text that states the task and holds the material, to which the model answers in text. Nothing in that interface limits it to one of the three jobs, so the obvious plan is to give it the alert and let it decide, explain and draft.
+
+The plan hides three different problems. Deciding an alert is a classification under a base rate: the model must put a cut where this stream's frauds and genuine payments separate. Explaining an alert is a translation: the numbers already exist in the attribution table, and the narrative must say them correctly. Drafting a report is an assembly of a record that a regulator reads and a court may read later. A model can be good at one and useless at another, and the measurements of the three were taken on different data: real payment orders from one company, public tabular datasets, synthetic laundering alerts, a bank's own mule queue, a vendor's case library. A number from one of these says nothing about another.
+
+## Can a language model score the payment?
+
+Scoring comes first because it decides everything after it: if a model that reads an order's whole record could rank payments better than a boosted tree, the tree's attribution would be explaining the wrong score.
+
+### Eight models on 5,000 real orders
+
+The test is a direct one. A payment company handling e-commerce orders for merchants wrote each order as a structured text record: the order and its items, the buyer's IP address with what an IP-intelligence service says about it (hosting server, proxy, VPN, Tor), identity checks on the email, phone and address, the card's fingerprint and type, distances such as the IP's location to the shipping address, and the earlier orders linked to this one by a shared email, phone, card or IP. The card issuers' labels mark each order fraud or legitimate. The orders from January to June 2024 form the test set: 5,000 of them, 480 fraud, a base rate of 9.6%.
+
+Eight large general models, four from commercial providers and four large open ones, were given each test order with an instruction to list the risk and trust signals it shows and then give a verdict, fraud or legitimate. No repeated runs or intervals are reported. Each model's verdicts give one recall and one false-positive rate.
+
+<Figure
+  src="./figures/frontier.svg"
+  alt="Scatter of recall against false-positive rate, both from 0 to 1. Eight blue points, one per large general model, lie on or very near the dashed diagonal labelled precision 0.096 equals the base rate, from recall 0.21 at false-positive rate 0.24 up to recall 0.60 at false-positive rate 0.54. Three amber points, small models tuned on 4,900 labelled orders, sit at recall about 0.43 to 0.46 and false-positive rate about 0.10 to 0.13, on or near a steeper dashed amber line labelled precision 0.28 to 0.31. Note: 5,000 later orders, 480 of them fraud."
+  caption="Every general model sits on the diagonal, where precision equals the 9.6% base rate, wherever it puts its cut; tuning on labels moves three small models off it."
+/>
+
+Every blue point lies on the diagonal, where recall equals the false-positive rate. The points are spread along it: one model flags 54% of the genuine orders and catches 60% of the frauds, another flags 20% and catches 23%.
+
+### Precision on the diagonal is the base rate
+
+<Ref lesson="economics-of-detection" id="bayes-rule-and-why-the-error-rates-cannot-rescue-precision">Bayes' rule</Ref> gives the precision of a cut from its recall $R$, its false-positive rate $F$ and the base rate $\pi$:
+$$
+P = \frac{\pi R}{\pi R + (1-\pi)F}.
+$$
+
+<Example title="two models at opposite thresholds">
+The model that flags the most has $R = 0.602$ and $F = 0.538$. With $\pi = 0.096$:
+$$
+P = \frac{0.096 \times 0.602}{0.096 \times 0.602 + 0.904 \times 0.538} = \frac{0.0578}{0.0578 + 0.4864} = 0.106,
+\qquad
+F_1 = \frac{2PR}{P + R} = \frac{2 \times 0.106 \times 0.602}{0.708} = 0.180 .
+$$
+The model that flags the least has $R = 0.225$ and $F = 0.197$:
+$$
+P = \frac{0.0216}{0.0216 + 0.904 \times 0.197} = \frac{0.0216}{0.1997} = 0.108,
+\qquad
+F_1 = \frac{2 \times 0.108 \times 0.225}{0.333} = 0.146 .
+$$
+Both precisions are within about a point of the base rate. If $R = F$ exactly, the formula reduces to $P = \pi R/(\pi R + (1-\pi)R) = \pi$: a cut on the diagonal flags fraud and genuine orders at the same rate, so the flagged set has the stream's own mix.
+</Example>
+
+Across the eight models precision runs from 0.086 to 0.108 and F1 from 0.12 to 0.18. F1 cannot rank them. It is a <Ref lesson="alert-budget-metrics" id="a-threshold-metric-judges-a-cut-nobody-chose">threshold metric</Ref>: it judges one cut, and here each model chose its own. On the diagonal precision is pinned at $\pi$, so $F_1 = 2\pi R/(\pi + R)$ rises with recall alone, and the model that flags the most scores the highest F1 without separating fraud any better.
+
+What a cut contributes, wherever it sits, is measured by the ratio $R/F$. In the <Ref lesson="economics-of-detection" id="bayes-rule-and-why-the-error-rates-cannot-rescue-precision">odds form of Bayes' rule</Ref>, the odds of fraud among the flagged orders are $R/F$ times the stream's prior odds $\pi/(1-\pi)$, so $R/F$ is everything a cut adds to the base rate. For the eight models $R/F$ runs from 0.88 to 1.14. The best of them multiplies the odds of fraud by 1.14, and two multiply them by less than 1: they flag genuine orders slightly more often than frauds.
+
+<KeyFact>
+A coin weighted to flag half the orders, knowing nothing about them, has $R/F = 1$ and precision 0.096. Plausible reasons in the verdicts do not move a point off the diagonal; only $R/F$ away from 1 does, and only $R/F$ above 1 helps, because $R/F$ is what multiplies the prior odds of fraud.
+</KeyFact>
+
+### What the models lack: the stream's threshold
+
+The models' reasoning shows why. They name sensible signals: the IP is a proxy, the shipping address is far from the IP, the email is new. What they cannot know is how much each signal means on this stream. Whether 500 km between IP and address is alarming depends on the merchant's customers, and a boosted tree learns exactly that from labels: a split point on the distance, a weight on its combination with a new email, the base rate in its intercept. A general model saw none of these labels.
+
+Giving it the labels is the obvious repair, and it was measured too: fine-tuning, training a pretrained model's weights further on the task's own labels, as the <Ref lesson="transaction-foundation-models" id="low-rank-adapters-a-small-change-inside-the-encoder">foundation-models lesson</Ref> did with a transaction encoder. Here three small open models (4, 8 and 14 billion weights) were tuned by reinforcement learning on 4,900 labelled orders from June to December 2023: for each order the model writes several answers, those whose verdict matches the label are rewarded, with a smaller reward, two-fifths as large, for listing the signals in the required form before the verdict, and the weights are moved toward the rewarded answers. On the same 5,000 test orders the tuned models reach F1 0.35 to 0.36, recall 0.43 to 0.46 at a false-positive rate of 0.10 to 0.13, precision 0.28 to 0.31: the amber points of the figure. That is three times the base rate, from models that learned the stream's labels.
+
+The tuning had a second effect. Each answer lists the signals behind the verdict, and a much larger model, acting as judge, read the answers beside their orders' records and failed it for any amount, address or claim about past orders that the record does not support. The 4B model passed that check on 93% of answers before tuning and 79% after, the 8B model on 87% and 89%. The 14B model, the largest, fell from 89% to 43%, a drop of 46.7 percentage points, while its F1 doubled. The fall is measured; its cause is not. It is consistent with a reward that paid for the right verdict and for listing signals, but nothing for whether the signals were in the record: a model fluent enough to write plausible signals that are not in the record could raise its reward that way, and a fall of that size appeared only in the largest model (the 4B fell 14 points, the 8B not at all). The study ran no boosted tree on the same orders, so it cannot say how far 0.31 is from what the payment company's own model reaches.
+
+## Labelled neighbours in the prompt
+
+A second repair keeps the model untouched and puts the labels in the prompt instead. That is *retrieval*: before the model answers, a search over a store of past cases picks the ones most like the case at hand, and their text, labels included, is added to the prompt.
+
+### Twenty past payments and their labels
+
+The scorer that was measured builds the prompt in four steps. A random forest fitted on the store ranks the features by importance and keeps the top ten. For the payment to be scored, the store is filtered to past payments with the same values on the most important categorical fields, dropping the least important condition whenever the filter leaves nothing. Among those, the twenty with the highest cosine similarity on the standardised numeric features are taken. Each is written as one sentence ending "It is a fraud." or "It is not a fraud.", the payment to score is written the same way without a label, and the model gives a risk score from 1 to 5, with 4 or 5 counted as fraud.
+
+<FigureSequence
+  name="retrieval"
+  alt="Three frames. Frame 1: a box for the payment to score, written as one sentence of ten features with no label, and an arrow labelled similar to a grid of twenty empty squares, the twenty nearest past payments found by matching key categorical fields then cosine similarity on standardised numbers. Frame 2: the squares are filled, thirteen amber and seven blue, with the text: It is a fraud, times 13; It is not a fraud, times 7; labels written into the prompt. Frame 3: an arrow to an amber box: risk score 4 of 5, fraud; 13 of 20 neighbours fraud, 0.65."
+  caption="Retrieval as the model receives it, for an illustrative payment: twenty similar past payments, each with its label, then a score."
+/>
+
+<Task>
+Step through the frames and note what the model has in front of it at frame 3 that a general model scoring the bare payment does not: a count of labels among similar payments. Before reading on, predict how far the score can stray from that count.
+</Task>
+
+### What retrieval buys, measured on public data
+
+The measurement used four public datasets. On each, a random 8,000 rows at the dataset's own fraud share were held out as the test set, 2,000 more for validation, and the rest became the store. Tuned boosted trees and a tabular neural network were fitted on the store with all features; the language models received the retrieval prompt; each figure is the mean of three runs. The tuned boosted trees reached F1 0.74 on IEEE-CIS, a set of e-commerce payments released for a 2019 public competition (3.5% fraud, so about 280 frauds in the test rows) and 0.89 on <Ref lesson="canonical-datasets" id="the-ulb-card-set-two-days-with-the-card-removed">the ULB card set</Ref> (0.172% fraud, about 14 frauds in the test rows).
+
+| scorer | IEEE-CIS F1 | ULB F1 |
+|---|---|---|
+| 14B open model, payment alone | 0.04 | 0.00 |
+| 14B open model, with twenty neighbours | 0.62 | 0.31 |
+| best language model with neighbours | 0.66 | 0.79 |
+| boosted trees, tuned | 0.74 | 0.89 |
+| tabular neural network, tuned | 0.82 | 0.85 |
+
+Without neighbours every model is near zero, no better than chance, as on the real orders. With them a 14B model reaches 0.62 on the e-commerce set, twelve points below the trees. The change in the model's reasoning is visible in its answers. On one fraudulent e-commerce payment of about \$12, a model of 20 billion weights, a different one from the table's 14B, alone wrote that the amount is low, Gmail is a reputable provider and only a missing address field is a red flag, and scored it 2. With neighbours it scored the same payment 4: most Gmail payments by credit card with a high value on one anonymised count among the examples were fraud, "e.g., examples 1, 4, 9, 11, 16".
+
+### The model is tallying the neighbours
+
+That answer reads like reasoning about features; the PaySim results show what it is. The mobile-money simulator's test rows held only 13 frauds. For 11 of them all twenty retrieved neighbours were frauds, and for the other 2 all twenty were genuine. Every language model, from 12 to 120 billion weights, scored a recall of 0.85 there, which is $11/13$: on the 13 frauds each followed the neighbours' unanimous labels and nothing else. On the genuine payments they differed widely, with precision from 0.05 to 0.65, so the tally is what they lean on, not all they do. (The PaySim balance columns also <Ref lesson="canonical-datasets" id="where-the-fraud-label-came-from">give away the label</Ref>, which is why the neighbourhoods were so pure.) The model family that scored best on the ULB set was the one whose answers leaned most openly on the share of frauds among its neighbours, and it did no better than the others where neighbourhoods were mixed.
+
+A scorer that finds the $k$ nearest labelled points and reads off their fraud share is a $k$-nearest-neighbour classifier, the supervised twin of <Ref lesson="density-and-distance-scores" id="distance-to-the-k-th-neighbour-a-first-score">the distance score of the anomaly module</Ref>. Retrieval turns the language model largely into the tally of such a classifier, written in sentences. Its features were chosen by a random forest, its neighbours found by cosine similarity, its labels read from the store; the model adds a judgement at the margin, where neighbours disagree.
+
+Two consequences follow for a deployed scorer. The store is a label channel: a neighbour whose label arrived after the payment being scored was decided puts tomorrow's label into today's score, the <Ref lesson="delayed-labels-prequential" id="where-the-training-set-must-end-the-delay-block">delay block</Ref> problem in a new place. And the ceiling of the tally is set by the neighbours: a payment whose nearest past cases are mislabelled, or which has no similar past cases at all, gets nothing from them.
+
+<KeyFact>
+The measured store was drawn at random from the whole period, so a test payment's neighbours could include payments made after it. A deployed store may hold only labels known when the payment is scored, which removes the most recent and most similar cases. Every F1 in the table above, the trees' included, is therefore likely optimistic for that setting; none was measured on a time-ordered store.
+</KeyFact>
+
+### Seconds, not milliseconds
+
+Speed settles the matter on its own. The retrieval prompt is about ten times longer than the bare payment, roughly 1,500 to 3,000 tokens against about 200, and every token of the answer is generated one at a time. Some models also *reason*: before the answer they generate intermediate text, a worked line of argument the user may never see, and how much of it they generate is a setting. Those reasoning tokens cost generation time and money like any others. Measured one query at a time on data-centre GPUs, a model that does not reason took 1.3 to 1.6 seconds to answer, a model reasoning at moderate length 1.4 to 2.6 seconds, and one reasoning at length 10 to 20 seconds; the search for neighbours was not included.
+
+<Ref lesson="fraud-detection-system" id="the-deadline-splits-the-work-in-two">The authorisation deadline</Ref> leaves the issuer a few milliseconds per payment before the answer, hundreds of times less than the fastest of these. After the answer, <Ref lesson="fraud-detection-system" id="a-hundred-cases-a-day-the-models-output-is-a-ranking">the Belgian card stream</Ref> of 400,000 payments a day at 1.5 seconds each is 600,000 seconds of generation, a week of one machine's time for every day of payments, unless queries are batched many at a time. A tree scores the same payment within the deadline.
+
+## After detection: triage against retrieved evidence
+
+Once the tree has ranked the payments and the hundred alerts of the day are in the queue, the question changes. The alert has been chosen; somebody must now decide what to do with it, and write down why. In laundering monitoring that decision is *triage*: dismiss the alert, keep the customer under watch, or escalate it to a full investigation that may end in a report. Could a model propose the disposition, with its reasons?
+
+### The output contract
+
+A free-text answer cannot be checked, so the design that was measured fixes the shape of the answer first. The alert is sent with an *evidence bundle*: the clauses of the bank's policy and typology guidance that match the alert type, the customer's file, the rule or score that fired, the transactions of the alert window, and similar past cases with their dispositions. Every item carries a stable identifier, such as e4, and items the investigator would not be entitled to see are filtered out before the model reads anything. The model must return a fixed record: the disposition, a confidence, a short rationale in which every material claim names the items it rests on, the items that support and the items that contradict the disposition kept apart, what is missing, and the next step it recommends.
+
+The record is the unit an investigator reviews and a supervisor audits. Its citations make every claim traceable to an item the bank holds.
+
+### Measured on synthetic alerts
+
+The triage design was measured on SynthAML10, about 20,000 monitoring alerts over 16 million transactions sampled from a probabilistic model fitted to one bank's confidential data. Alerts were sorted by time: the earliest 70% for training, the next 10% for validation, the last 20% for testing. Alerts labelled suspicious became "escalate", clearly normal ones "dismiss". The past cases in the bundles were drawn from training alerts only, so that retrieval could not carry a test label.
+
+Six systems were compared on precision–recall area for the escalate class. Three use no language model: rules thresholding the alert's score; a boosted tree on alert-level aggregates (amount statistics, counterparty counts, how bursty the activity is in time); and a <Ref lesson="graph-neural-networks" id="message-passing-gather-aggregate-update">graph network</Ref> on the transactions around the alert's customer. The language model alone receives only the alert summary and the alert window's transactions. The fifth system gives it the evidence bundle and passes its record through a *verifier*, a program that rejects any citation not in the bundle and any amount or date that disagrees with the item cited for it, and sends the record back for repair. (Whether the model alone also passed through the verifier is unclear: the setup says every language-model system did, and its citation numbers below say otherwise.) The sixth adds counterfactual checks: it reruns the model with a cited item removed or a central fact edited, and tests whether the call responds.
+
+<Figure
+  src="./figures/triage-ladder.svg"
+  alt="Horizontal bars of PR-AUC for six systems with two further columns. Blue bars: rules on the alert score 0.41, boosted tree on alert aggregates 0.63, graph network 0.69. Amber bars: language model alone 0.52, with retrieved evidence and verifier 0.71, plus counterfactual checks 0.75. A dashed line marks the boosted tree's 0.63. Column cited ids that exist: dashes for the three blue rows, then 0.62, 0.96, 0.98. Column policy invented: dashes, then 0.14, 0.05, 0.02. Note: synthetic alerts, one bank's data as template; no repeated runs or intervals reported."
+  caption="Alone, the language model ranks alerts below a boosted tree and cites evidence that does not exist; with the bundle, a verifier and checks, the system ranks above it."
+/>
+
+Read against <Ref lesson="reading-foundation-model-claims" id="six-questions-and-the-courses-own-numbers">the six questions</Ref>, the table supports less than its best row suggests. The data is synthetic, and synthetic laundering data <Ref lesson="canonical-datasets" id="which-question-each-one-can-answer">labels what its generator injected</Ref>. The language models are not named and no repeated runs or intervals are reported. The full system saw policy text, the customer file and past cases that no baseline saw, so the comparison is between inputs as much as between models. What survives: the model alone ranks alerts worse than a tree, as on the real orders; and each layer added around it, evidence and then checks, raised both ranking and the share of citations that hold up. The gain over the tree belongs to the system, not to the model.
+
+## How a rationale fails, and two tests that catch it
+
+The two columns on the right of the figure measure what the triage record is for. A disposition with a rationale is an audit record, and a record with one fabricated policy reference cannot be defended to a supervisor even when the disposition was right.
+
+### Citations that point at nothing
+
+Alone, the model's *citation validity*, the share of its cited identifiers that exist in what it was given, was 0.62: nearly four citations in ten pointed at nothing. Claims citing policy that is not in the bank's policy library occurred at a rate of 0.14, and amounts, dates or orders of events contradicting the evidence at 0.11. With the bundle and the verifier, citation validity rose to 0.96 and invented policy fell to 0.05; with the counterfactual checks added, to 0.98 and 0.02.
+
+A citation that exists can still mislead. The rationale may cite the right items and rest its call on something else.
+
+<Definition title="decorative citation">
+A citation that does not carry the decision it is attached to: with the cited item removed, the record keeps the same call on the same stated grounds, still naming the removed item or the fact only it supplied, instead of either changing the call or resting it on other items it names.
+</Definition>
+
+### Removing the evidence, editing the facts
+
+The sixth system's two counterfactual tests probe for it, each costing another model run. The *evidence counterfactual* removes from the bundle the item the record leans on most, runs the model again, and compares. The *decision counterfactual* makes the smallest plausible change to a fact the record calls central, such as moving the deposits above the reporting line or removing one link to a high-risk counterparty, and checks that the disposition flips.
+
+<Figure
+  src="./figures/decorative.svg"
+  alt="Three panels. Full bundle: call escalate; cites e1 policy structuring, e4 nine cash deposits of 9,400 to 9,900 euros in 12 days, e7 profile student with no declared income. Green panel, e4 removed, faithful: call monitor; cites e1 and e7; unknown, the deposits the policy describes. Amber panel, e4 removed, decorative: call escalate; cites e1, e4 struck through, e7; note: keeps the call on the same grounds, citing an item it was not given. Footer: evidence counterfactual, remove the item the record leans on, run again, compare."
+  caption="An illustrative escalation run twice: a faithful record changes its call when the deposits it rests on are removed; a decorative one keeps the call on grounds it no longer has."
+/>
+
+The evidence counterfactual was scored on the synthetic alerts as follows. A rerun passed if the record stopped citing the removed item and its rationale or its call moved the way the removal should push it; a record that kept its call but rested it on what remained could therefore pass, as a faithful record should. The measurement does not say whether a program or a person judged the direction. The share of records that passed was 0.39 for the model alone, 0.57 with the bundle and verifier, and 0.76 for the sixth system, which ran the tests on each answer. One record in four still failed. The two tests do different work: removing evidence catches citations the call does not need; editing the facts catches a call that does not follow its stated driver. Neither is free; a cap of one or two per alert is a suggested deployment budget, not part of what was measured.
+
+## Narratives from a tree's attributions
+
+Explaining is the second job, and the one with the clearest place to start: an alert that already carries its <Ref lesson="alert-explanations" id="splitting-the-log-odds-into-contributions">attribution</Ref>, the split of its log-odds into one contribution per input. The investigator reads the alert; does a narrative written from the attribution read better, and does it stay true to it?
+
+### The bank's pipeline
+
+One bank's detector of <Ref lesson="financial-crime-typology" id="mules">money mules</Ref>, accounts that receive and pass on the proceeds of fraud, scores between 20,000 and 30,000 customers a week with a boosted-tree model on about 280 features: counts, sums and ratios over 7 to 180 days, network features such as links to customers already reported, and account demographics. An alert is raised above a calibrated probability of 0.8, the cut with the best F1, and one that keeps the queue within what its analysts can work. For each alert the exact tree algorithm computes the attribution, and the ten largest contributions go into the prompt as tuples: the feature's name, its value, its contribution and its direction, beside the customer's score and its percentile and reference percentiles for each feature's value. The model runs on the bank's own hardware, so no customer data leaves the bank. It must answer in a fixed JSON schema of red flags, each with a pattern, a reason, and the names of the features it rests on, and it may cite only the ten features it was given.
+
+<Figure
+  src="./figures/narrative.svg"
+  alt="Pipeline of six boxes: 280 features per customer; boosted trees, alert at p at least 0.8; attribution, top ten, with the note name, value, contribution, direction; self-hosted language model, highlighted amber; fixed JSON red flags; analyst. A dashed amber line from the model lists where it fails: contribution exaggerated, at times tenfold; contribution invented and percentile misstated, both attributed to the runner-up model; credit-to-debit ratio, meaning misread. Below, an input row txn_credit_p7d_p180d_ratio_sum plus 0.34, with an arrow to the narrative: a sudden spike in inflows relative to the account's longer-term baseline."
+  caption="The narrative is a translation of ten attribution rows, and every failure measured at the bank happened in the translation."
+/>
+
+The translation is what the analysts wanted. Earlier versions of the pipeline showed the attribution as a waterfall plot beside the score, and analysts found it slow to read: it required knowing what each of 280 feature names meant. A row such as `txn_credit_p7d_p180d_ratio_sum` with contribution $+0.34$ became "a sudden spike in inflows relative to the account's longer-term baseline", and the analysts reported forming a first view of the alert faster.
+
+### How often the translation is wrong
+
+Three self-hosted models were compared on 20 confirmed mule alerts, each narrative scored 1 to 5 by raters who did not know which model wrote it. Factual accuracy, meaning every number and percentile as given and every cited feature among the ten, averaged 4.20 for the model the bank chose, 3.65 and 2.55 for the others; the chosen model was also the fastest, 5.7 seconds per alert against 20 and 40. Across all three the commonest failures were contributions reported larger than they were, sometimes by a factor of ten, and a credit-to-debit ratio whose meaning was misread; the runner-up model also invented contributions that appear nowhere in the table and misstated percentiles. The rate of the tenfold errors is not reported, and 20 narratives cannot estimate a rare one.
+
+### What the rise in yield measures
+
+In one month of live use with three analysts, the share of alerts confirmed as mules, the yield, was 89%, against 61% for the rule system it replaced, while monthly alerts rose from 211 to 302. That is a measured operational number, and it measures the detector: the boosted trees and their 0.8 cut against hand-written rules. Narratives accompanied every alert, and no arm worked the same alerts without them, so the yield says nothing about what the narrative added. The narrative's effect rests on what the analysts said in feedback sessions.
+
+<KeyFact>
+To measure the narrative, the same analysts must work comparable alerts with and without it, timed to a decision and checked against the confirmed outcome. A yield taken with the narrative on every alert cannot separate it from the detector.
+</KeyFact>
+
+## The grounding check
+
+The failures share a cause. The narrative restates numbers the pipeline already holds in structured form, and the model sometimes restates them wrongly. The generator cannot be its own check: the tuned 14B model of the first section got better at the verdict and worse at the facts. What can check it is the record it was drafted from.
+
+<Definition title="grounding check">
+A program, independent of the model that wrote a draft, that reads every amount, date, identifier, feature name, contribution and percentile in the draft and compares it with the structured record the draft was written from: the attribution table, the transactions, the customer file. A mismatch sends the draft back with the specific failure; after a fixed number of failed repairs the draft is discarded and the investigator receives the table alone.
+</Definition>
+
+### One red flag, checked
+
+<Example title="a red flag against its attribution table">
+The table holds the row: feature `txn_credit_p7d_p180d_ratio_sum`, value 6.8, contribution $+0.34$, percentile 97. A drafted red flag reads: "Inflows in the last 7 days are 6.8 times the 180-day norm (97th percentile), adding +3.4 to the risk score", with evidence reference `txn_credit_p7d_p180d_ratio_sum`.
+
+1. The reference names a feature in the table: pass.
+2. Each number in the reason is matched to the field of the cited feature that the sentence names. "6.8 times the 180-day norm" states the value: 6.8, a match. "97th percentile" states the percentile: 97, a match. "Adding +3.4 to the risk score" states what the feature adds to the score, which is its contribution: the table gives $0.34$, a factor of ten.
+3. The check fails and the draft returns with the failure stated: "contribution of txn_credit_p7d_p180d_ratio_sum given as +3.4; the table says +0.34."
+
+Step 2 is mechanical because the schema forced the model to name the feature behind each claim, and the sentence names the field. A reason that cites no feature has nothing to be matched against, and the check rejects it for that.
+</Example>
+
+Numbers are the easy part. The misread credit-to-debit ratio passes a numeric check: the value is right and the sentence misstates what it means, for instance which way the ratio points. The fix is the one <Ref lesson="alert-explanations" id="reason-codes">reason codes</Ref> already use: for each feature and each sign of its contribution, the bank writes one approved phrase, and the narrative may describe that feature only with that phrase. The model then chooses which approved phrases to combine and in what order, and the meaning of each comes from the bank.
+
+## Drafting the report: a rating is not a time
+
+The third job is the report that follows an escalated case: a narrative of who moved what, when, through which accounts, and why it is suspicious. It is assembled from the same structured data, and one described drafting system shows the pieces: tree-ensemble classifiers rank the likely typologies of the case and decide which specialised drafting steps run; a separate entity-recognition model masks identifying and confidential details before any data reaches an external model, and unmasks them only when the draft is assembled for the investigator; and a validation step checks the draft's amounts, dates, jurisdictions and identities against the parsed data, the grounding check applied to a longer text.
+
+### The rated 61%
+
+The system's report concludes that it saves investigators "around 61%" of their time. <Ref lesson="reading-foundation-model-claims">The claims lesson</Ref> took that number apart in an exercise: six investigators rated "efficiency gains" at 3.06 on a scale of 1 to 5, and $3.06/5 = 0.61$. It is a rating renormalised to a percentage, with no stopwatch and no group of investigators writing the same reports without the system.
+
+The same report records, earlier, why its design is modular: a first attempt that simply prompted a model to draft the narrative invented transactions and interactions even when told not to, and "the required manual validation and correction nullified any time benefits". That sentence is the other side of the ledger, and it is the side a rating leaves out.
+
+<Definition title="measured time saving">
+For one report, the minutes an investigator spends without a draft, minus the minutes spent with one: reading the draft, checking each of its facts against the record, correcting what is wrong, and writing what it left out. It is measured by timing both, on comparable cases, by the same investigators.
+</Definition>
+
+<Example title="when a 70% draft saves two minutes">
+Suppose an investigator writes a report by hand in $M = 60$ minutes. A draft covers 70% of the content, so writing the rest takes $0.3 \times 60 = 18$ minutes. The draft states $n = 40$ facts, each checked against the record in half a minute: 20 minutes. If one fact in twenty is wrong and each takes 10 minutes to find the truth of and fix, that is $40 \times 0.05 \times 10 = 20$ minutes. Total: $18 + 20 + 20 = 58$ minutes, a saving of 2 minutes, or 3%.
+
+The investigator might well rate the draft 3 of 5 for efficiency: most of the text was written for them. The saving is in the 18 minutes of writing; the cost is in the checking, which a draft makes necessary and a rating does not see.
+</Example>
+
+The checking cannot be skipped, because the investigator signs the report and the facts in it are the bank's statement to the authorities.
+
+## Can the model make the analyst's call?
+
+The last measurement asks for the whole of the first job, done as an analyst does it. A vendor that investigates monitoring alerts for banks took 79 real, anonymised cases its analysts had decided, 34 escalated and 45 dismissed, and gave them to nine frontier models, the newest large models of five providers. Each model worked as an *agent*: a model that issues actions, such as opening a screen, reading a record or filling a field, in a loop, and sees each result before choosing the next. Here the agent worked in a replica of the case-management application, through a browser. On each case it read the queue, the customer profile, a month of ledger and the alert details, and then submitted a decision.
+
+The decision had to come with the record the analysts produce: a line for each counterparty giving its role, its relationship to the customer, the count and total of its transactions, and whether it was suspicious; and a judgment on each of the alert's scenarios, the monitoring rules that fired, such as structuring. A run on a case passed if it made the analyst's call and its *reasoning score*, $0.8 \times$ the counterparty score $+\ 0.2 \times$ the scenario score, was at least 0.8. In the counterparty score each of the analyst's counterparties counts only if the run found it with exactly the same alerted count and total, earns credit for the right relationship and suspicious flag, is halved if the run's full-period totals for it are wrong, and is weighted by its share of the alerted value, so a missed or misgrouped large transfer costs the most.
+
+Each model ran at every reasoning setting it accepted, 43 model-and-setting configurations in all, and each configuration ran every case three times; each such run is a *rollout*. That should give $43 \times 79 \times 3 = 10{,}191$ rollouts; the benchmark reports 10,095, about a hundred short, mostly because one configuration finished only 142 of its 237.
+
+<Figure
+  src="./figures/bench.svg"
+  alt="Horizontal bars. Dismiss every case, no model: right call 57%, grey. All 10,095 rollouts, right call: 66%, blue. All 10,095 rollouts, pass: 28%, amber. Best configuration, pass: 42%, amber. Note: 79 analyst-decided cases, 34 escalated and 45 dismissed; pass equals the analyst's call and a reasoning score of at least 0.8, the reasoning score being 0.8 times the counterparty score plus 0.2 times the scenario score."
+  caption="Two thirds of rollouts made the analyst's call, nine points above a rule that dismisses everything; at most 42% also produced a record that holds up."
+/>
+
+### Right calls, wrong records
+
+The bars need the base rate beside them. A rule that dismisses all 79 cases makes the analyst's call 45 times, 57%; the models' 66% is nine points above that. At each model's best setting, between 42% and 66% of its right calls fell below 0.8 on the reasoning score, most often because it grouped transactions into the wrong counterparties. The best configuration passed 42% of its rollouts, and 25 of the 79 cases were never passed by any rollout of any model.
+
+Three further findings bear on how such a model could be used. More reasoning bought little: the highest reasoning level used 8 to 21 times the reasoning tokens of the lowest and moved pass rates by $-1$ to $+5$ points for most models. Six of the nine models erred more often by dismissing what the analyst escalated than the reverse. And the failures were not random: the three rollouts of a configuration reached the same decision on 79% of cases, so running a model several times and taking a vote does not rescue a case it gets wrong.
+
+### The 81-year-old's account
+
+One escalated case shows the lenient failure. A retired customer of 81 received a lump sum of \$10,468 from the Social Security Administration (SSA), the US federal agency that pays retirement benefits, and their monthly benefit rose. A new payee on a payment app received \$915 over five weeks. Two alerts fired, a change in behaviour and elder abuse, and nothing in the file tied the lump sum to a benefit adjustment for this customer or identified the payee. The vendor's page shows the file with further rows it marks as illustrative, such as new subscriptions to a people-search site and a VPN and a change of address, and an elder-abuse card that says to weigh such signs together. At their best settings, all 21 rollouts of seven models dismissed the case. The answer of one read: the lump sum "matches an SSA retroactive adjustment", and there is "no specific exploitation indicator". Each sign had been found and each had been explained away alone.
+
+A right call with a wrong counterparty record still fails the next reviewer, who inherits the record. A wrong dismissal is worse: an alert that should have become a report never reaches anyone. The benchmark is the vendor's own, its cases are private and the full method is not yet published, so it is one measurement, not a settled rate; but it measures the task on real cases against the people who do it, which nothing else in this lesson does.
+
+## What may never leave a person
+
+The measurements leave a model that drafts usefully and decides badly. The law reaches a similar line by another route, and it fixes the line regardless of how well a model performs.
+
+### What the AML Regulation reserves
+
+From 10 July 2027 the EU's Anti-Money Laundering Regulation lets a bank outsource many of its duties to service providers, but not these:
+
+<Quote source="Regulation (EU) 2024/1624 (AMLR), Art. 18(3)(c)–(f)">
+(c) decision on the risk profile to be attributed to the customer; (d) the decision to enter into a business relationship or carry out an occasional transaction with a client; (e) the reporting to FIU of suspicious activities […]; (f) the approval of the criteria for the detection of suspicious or unusual transactions and activities.
+</Quote>
+
+A vendor's agent that decided which customers are high risk, or filed reports, would be a service provider performing exactly these tasks. A model the bank runs itself is not outsourcing, but its decisions fall under Art. 76(5), which <Ref lesson="alert-explanations" id="the-cardholder-reasons-and-what-the-law-requires-of-them">the explanations lesson</Ref> met: an automated decision to take on, refuse or keep a customer, to carry out or refuse a transaction, or to change the depth of due diligence must be "subject to meaningful human intervention", and the customer may obtain an explanation and challenge it, except where a report is concerned. <Ref lesson="aml-automated-decisions-and-supervision" /> reads both articles in full.
+
+### What the supervisor's draft expects
+
+The new EU anti-money-laundering authority, AMLA, published draft guidelines on ongoing monitoring in June 2026; the consultation closed on 3 September 2026 and the final text is announced for the end of the year. They are a draft and may change. Four of their sentences address tools like these:
+
+<Quote source="AMLA, Consultation Paper: Draft Guidelines on ongoing monitoring under Art. 26(5) AMLR, 3 June 2026, paras. 87, 88, 90, 91">
+The deployment of such tools should not, in itself, be considered an indicator of effectiveness. […] They should ensure that the outputs of such tools can be reviewed and, where necessary, challenged, and that responsibility for monitoring decisions remains clearly assigned. […] Obliged entities should be able to demonstrate and explain, upon request, the role, functioning and outputs of such tools to competent authorities […] without requiring full technical interpretability of the underlying model. Where obliged entities rely on third-party providers, they should ensure that sufficient information is available to meet the requirements set out above. Where this is not the case, obliged entities should not rely on such tools for monitoring functions that materially influence monitoring outcomes or decisions.
+</Quote>
+
+The same draft limits automatic closure of alerts to cases which, "following automated analysis, do not indicate suspicious or unusual transactions and activities or other material ML/TF risk indicators", never where "there are indicators of heightened risk, including in relation to higher-risk customers", and asks for sampling of closed cases to find suspicious activity that was missed (paras. 78–79). A model's "dismiss" on an alert whose indicators it explained away, as with the 81-year-old, is exactly the closure the draft rules out.
+
+The bank of the mule pipeline reached the same line on its own: its narrative "is not treated as an independent basis for adverse action; final decisions remain with trained financial-crime analysts".
+
+## Where the model sits in the queue
+
+The measurements and the rules fix the design together.
+
+<Figure
+  src="./figures/queue.svg"
+  alt="Six boxes left to right with arrows: score, noted payments ranked in milliseconds; attribution, top ten; routing to the referral band, noted about 100 alerts a day reach here; language model drafts, highlighted amber; grounding check, with a curved arrow back to the model labelled mismatch, sent back; investigator decides and signs, highlighted blue, noted triage, narrative, report approved. Every box has an arrow up to a bar labelled the record: score, attribution, evidence bundle, draft, check failures, edits, time spent, who signed. Amber text below: the model never sets the score, the zone or the action, and never signs."
+  caption="The language model works after the score and before the person, on the alerts already chosen, behind a check that reads its output against the record."
+/>
+
+**After the score, never as the score.** The tree ranks every payment in milliseconds and its attribution is computed with it; a language model ranks at the base rate alone and largely as a slow nearest-neighbour vote with retrieval. Nothing the model writes enters <Ref lesson="score-to-action" id="zones-that-move-with-the-amount">the decision zones</Ref>; the zone and the action are fixed before it runs.
+
+**Only the alerts that reach a person.** The model runs on the referral band, the payments the zones already send to an investigator, about a hundred a day, plus the cases being written up as reports. At that volume, a draft at 6 seconds, one or two counterfactual reruns and two repairs at most cost at most about a minute of machine time per alert, under two hours a day for the queue, against the week a day that scoring every payment would cost.
+
+**Behind a check it does not control.** Every draft passes the grounding check against the record, triage rationales also the evidence counterfactual, and descriptions of features come from the bank's approved phrases. The checks verify only what they can parse, so an experienced investigator also reads a periodic sample of drafts, which catches what the checks miss and gives a measured failure rate.
+
+**Inside the bank, or masked.** The model runs on the bank's hardware, as the mule pipeline's does, or with confidential details masked before any external call, as in the drafting system.
+
+**A person decides and signs.** The investigator sets the disposition, approves or rewrites the narrative, and signs the report. The model's suggestion of "dismiss" never closes an alert on its own, and no draft reaches the customer: a narrative about suspected laundering is the content <Ref lesson="alert-explanations" id="the-cardholder-reasons-and-what-the-law-requires-of-them">the ban on tipping off</Ref> forbids disclosing.
+
+**Both costs on the ledger.** The record keeps the draft, every check failure, the investigator's edits and the time spent, so the saving can be measured rather than rated, and the failure rates monitored. <Ref lesson="score-to-action" id="the-record-overrides-grounds-and-the-label">The audit trail</Ref> gains these fields; it already held who decided and on what grounds.
+
+<Conclusion>
+You can now say where a large language model may sit in a detection pipeline and defend the placement with measurements. As a scorer it fails: on 5,000 real orders at 9.6% fraud, eight general models flagged fraud and genuine orders at nearly equal rates, so their precision was the base rate whatever cut they chose; tuning on the stream's labels lifted precision to about 0.31 and cut the largest tuned model's rate of answers free of factual errors from 89% to 43%; and twenty labelled neighbours in the prompt turn the model largely into a nearest-neighbour vote (11 of 13 frauds caught by every model where the neighbours were unanimous) that answers in seconds and still trails tuned trees on the two sets compared here. After detection it is useful and fallible: as a triage assistant it ranks below a tree alone and above it only inside a system of retrieved evidence, a verifier and counterfactual checks; as a narrator of a tree's attributions it was adopted where plots were not and still misreports contributions, sometimes tenfold; as a report drafter its benefit has been rated, never timed. A grounding check reads every number back against the record, an evidence counterfactual exposes decorative citations, and a person decides and signs, because the call, the risk profile, the onboarding decision and the report are the bank's, and the supervisor's draft guidance says a tool's presence proves nothing.
+
+What the design leaves open is whether it keeps working. The bank's yield of 89% was measured over one month; the failure rate of narratives, the share of drafts the check sends back and the detector's own ranking all move as customers, fraud and models change. <Ref lesson="model-risk-monitoring" /> takes up the numbers that are computed every week to tell whether a deployed model still does what it did when it was approved.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+On the 5,000 test orders (9.6% fraud), one general model had recall 0.308 and false-positive rate 0.297, another recall 0.210 and false-positive rate 0.238. (a) Compute each model's precision and F1. (b) Show from the odds form of Bayes' rule how large the ratio of recall to false-positive rate must be for precision to reach 0.5 at this base rate, and compare it with the tuned 8B model's recall 0.425 at false-positive rate 0.0998.
+
+<Solution>
+(a) First model: $\pi R = 0.096 \times 0.308 = 0.0296$, $(1-\pi)F = 0.904 \times 0.297 = 0.2685$, so $P = 0.0296/0.2981 = 0.099$ and $F_1 = 2 \times 0.099 \times 0.308/(0.099 + 0.308) = 0.0611/0.407 = 0.150$.
+
+Second model: $\pi R = 0.096 \times 0.210 = 0.0202$, $(1-\pi)F = 0.904 \times 0.238 = 0.2152$, so $P = 0.0202/0.2353 = 0.086$, below the base rate because its recall is below its false-positive rate; $F_1 = 2 \times 0.086 \times 0.210/0.296 = 0.122$.
+
+(b) In odds, the posterior odds of fraud among flagged orders are the likelihood ratio times the prior odds:
+$$
+\frac{P}{1-P} = \frac{R}{F}\cdot\frac{\pi}{1-\pi}, \qquad \frac{\pi}{1-\pi} = \frac{0.096}{0.904} = 0.106 .
+$$
+Precision 0.5 means odds 1, so $R/F = 1/0.106 = 9.4$. The general models have $R/F$ between 0.88 and 1.14. The tuned 8B model has $R/F = 0.425/0.0998 = 4.26$, odds $4.26 \times 0.106 = 0.452$, precision $0.452/1.452 = 0.31$: well off the diagonal, and still less than halfway to even odds in the ratio it would need.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague argues: "With twenty retrieved neighbours a 14B model already reaches F1 0.62 against the trees' 0.74 on public e-commerce data. Models improve every year; in a year or two the gap closes and the tree scorer can be retired." Refute the argument, naming each step that fails.
+
+<Solution>
+**What the model does.** Where the neighbours were unanimous (PaySim, 13 test frauds), every model's recall was exactly 11/13, the count of frauds whose neighbours were all fraud. On those frauds the model is the tally of a nearest-neighbour classifier whose features were ranked by a random forest and whose labels come from the store. A larger model tallies more carefully at the margin; it does not get information the neighbours lack. The ceiling is set by what the neighbours carry, and on the two sets in the table a tuned tree on all features already exceeds the language models' best (0.74 against 0.66, 0.89 against 0.79).
+
+**The tree is still inside it.** The feature ranking that makes retrieval work came from a forest fitted on labels. Retiring the tree leaves the retrieval without its features.
+
+**The comparison is thin where it looks closest.** On the ULB set, where the best language model's 0.79 approaches the trees' 0.89, the 8,000 test rows hold about 14 frauds: one fraud more or less found moves recall by 0.07. If the three runs reused one test sample, they average out the model's randomness, not the test sample's.
+
+**Time.** With retrieval a query took about 1.3 to 20 seconds of generation, not counting the search. The deadline before the answer is milliseconds; after it, 400,000 payments a day at 1.5 seconds is a week of one machine's time per day. A better model of the same kind is not faster by three orders of magnitude.
+
+**Labels in time.** The store drew neighbours at random from the whole period, including payments later than the one scored. A deployed store may hold only labels known at scoring time, which removes the most recent and most similar cases; the measured F1, the trees' included, is likely optimistic for that setting.
+
+So the argument extrapolates a number that measures a different thing (a nearest-neighbour vote), on samples too small at the closest point, at a speed that rules out the job.
+</Solution>
+</Exercise>
+
+<Exercise>
+A vendor's triage system reports citation validity 1.0 on a month of alerts: every evidence identifier its rationales cite exists in the bundle. An auditor suspects that the citations are decorative throughout. (a) Explain why citation validity cannot detect that. (b) Which of the two counterfactual tests detects it, and how? (c) Describe a case where the evidence counterfactual raises a false alarm on a faithful record, and how the test should be run to avoid it.
+
+<Solution>
+(a) Citation validity checks each identifier against the bundle: does e4 exist? A decorative citation is a real item the decision does not use. It exists, so it passes. Validity measures fabrication, not dependence. A check that the cited item contains the number or entity the sentence states passes it too: the item does contain it.
+
+(b) The decision counterfactual detects it directly. Take the fact the rationale calls central, say "nine deposits just under the reporting line", and change it minimally (move the deposits well below the line, or make them one deposit). If the call stays "escalate", the stated driver was not what drove the call. The evidence counterfactual detects it too, if the rerun's disposition is compared: remove e4 and run again; a record that keeps the same call and still says the deposits are the reason, or cites e4, which it was not given (caught by the existence check, since validity is now computed against the reduced bundle), is decorative.
+
+(c) Two items can each suffice for the call: e4 (the deposits) and e9 (a past report on the same customer). Remove e4 and a faithful model escalates on e9, citing e9 instead. The disposition is unchanged, yet nothing was decorative. To avoid the false alarm, judge the rerun by its citations as well as its call: a faithful record drops e4 and names what now carries the call; or remove all cited supporting items together and require the call to change. The test needs the record's own statement of which items support it, which is why the output contract keeps supporting and contradicting evidence apart.
+</Solution>
+</Exercise>
+
+<Exercise>
+Write the time ledger for one report drafted with a model: $M$ minutes by hand; a draft that covers a share $c$ of the content; $n$ facts in the draft, each checked in $r$ minutes; a share $e$ of the facts wrong, each costing $f$ minutes to correct. (a) Derive the saving and the condition under which it is zero. (b) With $M = 60$, $c = 0.7$, $n = 40$, $r = 0.5$, $f = 10$, find the error rate at which the draft saves nothing, and say what the drafting system's earlier observation ("the required manual validation and correction nullified any time benefits") implies about $e$ for plain prompting. (c) Design the study that would replace "61%" by a measured saving.
+
+<Solution>
+(a) With the draft the investigator writes the uncovered share, $(1-c)M$, checks every fact, $nr$, and corrects the wrong ones, $enf$. The saving is
+$$
+S = M - \bigl[(1-c)M + nr + enf\bigr] = cM - n(r + ef).
+$$
+It is zero when $cM = n(r + ef)$: the writing the draft spares equals the checking and correcting it creates. The checking term $nr$ is paid even if every fact is right.
+
+(b) $cM = 42$. Zero saving needs $40(0.5 + 10e) = 42$, so $0.5 + 10e = 1.05$ and $e = 0.055$: about one fact in eighteen wrong. At $e = 0.05$ the draft saves 2 minutes, at $e = 0.10$ it costs 18. Plain prompting invented transactions and interactions; if a quarter of the stated facts needed correction, $S = 42 - 40(0.5 + 2.5) = -78$ minutes. At these values, "nullified any time benefits" is consistent with $e$ above roughly 5%; a large checking load $nr$ alone could also have done it. This is why the validation step, which finds the wrong facts before the investigator does, sits inside the measured system: it lowers the investigator's $e$ and, by marking which facts were verified, can lower $r$.
+
+(c) Take a set of escalated cases of mixed complexity and assign them at random to two arms: investigators writing from scratch and investigators given the checked draft, each investigator working cases in both arms. Time each report from opening to signature. Log every edit to the draft and classify it (added content, corrected fact, removed fabrication). Have a second investigator, blind to the arm, grade each final report for completeness and accuracy, since a faster report that misses facts is not a saving. Report the mean difference in minutes with an interval from a bootstrap over cases and investigators, beside the correction counts. The 25 to 315 minutes the regulator gives for finishing a report shows how wide the case mix is, so the arms must be matched on complexity or stratified by it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce the retrieval scorer without a language model, on the ULB card set. Hold out 8,000 random rows at the natural fraud share as the test set and use the rest as the store. Rank the 30 features with a random forest fitted on the store, keep the top ten, standardise them with the store's means and standard deviations, and for each test row take the 20 store rows of highest cosine similarity. Score each test row by the fraud share among its neighbours, flag it if more than half are fraud, and compare F1 and average precision with a boosted tree fitted on the store with all 30 features. Repeat over ten random splits. What does the result say about the language model's F1 of 0.31 to 0.79 on this set?
+
+<Solution>
+**The run.** Ten splits (seeds 0 to 9) of the 284,807 rows: 8,000 test rows, 276,807 in the store. The forest (100 trees, balanced class weights, leaves of at least 5) picked nearly the same ten features every time, led by V14, V10, V12 and V4. The boosted tree: 200 trees of depth 6, learning rate 0.1, untuned, flagged above 0.5. Results over the ten splits:
+
+| | mean | lowest split | highest split |
+|---|---|---|---|
+| frauds in the test rows | 14.6 | 9 | 20 |
+| neighbour vote: precision | 0.89 | 0.64 | 1.00 |
+| neighbour vote: recall | 0.74 | 0.62 | 0.88 |
+| neighbour vote: F1 | 0.80 | 0.64 | 0.92 |
+| neighbour vote: average precision | 0.79 | 0.65 | 0.92 |
+| boosted tree: F1 | 0.87 | 0.74 | 0.94 |
+| boosted tree: average precision | 0.83 | 0.68 | 0.94 |
+
+**Reading.** The plain vote, with no language model, scores F1 0.80, the same as the best language model given neighbours chosen the same way (0.79) and far above the 14B model's 0.31. The language model at its best reproduces the tally; at its worst it loses most of what the neighbours carry. The untuned tree on all features beats the vote by about 0.06 in F1, and the tuned tree of the measured study scored 0.89. And the spread between splits, 0.64 to 0.92 for the same vote, is wider than every gap in the comparison: with 9 to 20 frauds per test sample, one fraud moves recall by 0.05 to 0.11. A difference of a few points between scorers on this set is not evidence of anything.
+
+The research lesson: before crediting a language model with a score on labelled neighbours, compute the score of the neighbours alone. Here the model added nothing to them, and on average took something away.
+</Solution>
+</Exercise>
+
+<Exercise>
+The tuned models of the first section were trained on 4,900 orders of which 2,314 (47.2%) were fraud, kept that way so that a reward for accuracy would not be won by calling everything legitimate; the test stream is 9.6% fraud. (a) Treat the training set as the stream with genuine orders kept at rate $\beta$, as in <Ref lesson="undersampling-calibration" />, and compute $\beta$. (b) A model rewarded for accuracy on the training set calls an order fraud when its training-set probability exceeds one half. What probability of fraud on the test stream does that cut correspond to, and what does it predict for precision? (c) Why can the undersampling correction not be applied to these models' outputs, and what would make it possible?
+
+<Solution>
+(a) Undersampling multiplies the odds of fraud by $1/\beta$: $\pi_s/(1-\pi_s) = \pi/\bigl(\beta(1-\pi)\bigr)$. With $\pi_s = 0.472$ and $\pi = 0.096$,
+$$
+\beta = \frac{\pi/(1-\pi)}{\pi_s/(1-\pi_s)} = \frac{0.106}{0.894} = 0.119 .
+$$
+
+(b) The training-set probability is $p_s = p/(p + \beta(1-p))$. Setting $p_s = 1/2$ gives $p = \beta(1-p)$, so $p = \beta/(1+\beta) = 0.119/1.119 = 0.106$. A verdict of fraud at the training set's even odds means a probability of only about 0.11 on the test stream. Every order the model flags is one it believes has at least an 11% chance of fraud on the stream, and many flagged orders sit just above that, so precision should be low, somewhere above 0.11 but far from 0.5. The measured precisions of 0.28 to 0.31 fit: they average over flagged orders with probabilities from 0.11 upward.
+
+(c) The correction maps a probability to a probability. The tuned models output a verdict, fraud or legitimate, with no probability attached, so there is nothing to map; the cut was fixed in training by the reward. Two changes would make it possible: ask for a graded score (the retrieval scorer's 1 to 5 is a coarse one) and calibrate it on a held-out sample at the stream's base rate; or reward the training verdicts with weights that reproduce the stream's costs, so that the cut the model learns is the one the bank wants. Either way the operating point becomes the bank's choice rather than a side effect of how the training set was balanced.
+</Solution>
+</Exercise>
+
+<Exercise>
+A mule narrative contains the red flag "Inflows over the last 7 days relative to 180 days are far above normal (contribution +3.4)", citing `txn_credit_p7d_p180d_ratio_sum`, while the attribution table gives that feature value 6.8, contribution $+0.34$, percentile 97. (a) Write the grounding check for one red flag as a function of the flag and the table, in pseudocode, and show its output on this flag. (b) Which part of the narrative's meaning can your function not check, and what closes that gap? (c) If the draft were signed unchanged, which records would then contradict each other?
+
+<Solution>
+(a)
+```
+check_flag(flag, table):
+    failures = []
+    for name in flag.evidence_references:
+        if name not in table: failures.append(f"{name} not among the ten attributions")
+    rows = [table[n] for n in flag.evidence_references if n in table]
+    if not rows: failures.append("claim cites no attribution")
+    for number in numbers_in(flag.reason):
+        field = field_named_near(number, flag.reason)  # "value", "contribution", "percentile" or None
+        if field:
+            for row in rows:
+                if not close(number, getattr(row, field)):
+                    failures.append(f"{field} of {row.name} given as {number}; "
+                                    f"the table says {getattr(row, field)}")
+        elif not any(close(number, x) for row in rows
+                     for x in (row.value, row.contribution, row.percentile)):
+            failures.append(f"{number} matches no field")
+    for row in rows:
+        if sign_words(flag.reason, row.name) != sign(row.contribution):
+            failures.append(f"direction of {row.name} misstated")
+    return failures
+```
+Here `close` allows the rounding the schema permits (say 1% relative). `field_named_near` reads the words around the number: "contribution", "adds to the risk score" name the contribution, "percentile" the percentile. Matching each number to the field the sentence names, rather than to whichever field it happens to sit closest to, is what makes the check exact: 3.4 is nearer the value 6.8 than the contribution 0.34 by ratio. On this flag the reference exists; "7" and "180" are window lengths, which the function must recognise as part of the feature's name and skip; "3.4" is labelled a contribution, and the table's contribution is 0.34, a factor of ten. Output: `contribution of txn_credit_p7d_p180d_ratio_sum given as 3.4; the table says 0.34`. The draft goes back to the model.
+
+(b) Whether "far above normal" means what the feature means. A ratio feature whose meaning the model misreads, for instance which way it points (the bank's credit-to-debit failure), passes every numeric test. The sign check catches only the wording of more or less risk, and only if the sentence uses words the function recognises. The gap is closed by restricting descriptions to approved phrases per feature and sign, as reason codes are, and by sampling narratives for an investigator to read.
+
+(c) The attribution in the alert's record says $+0.34$, recomputable from the served inputs as the explanations lesson requires of the supervisor's record; the signed narrative says $+3.4$. The bank's own file then holds two statements of the grounds for the same alert that cannot both be true, and the record of the assessment, which the bank must retain with the information considered and its result whether or not a report is filed, would carry the false one under an investigator's name.
+</Solution>
+</Exercise>
+
+<Exercise>
+At the bank of the mule pipeline, the yield rose from 61% under rules to 89% under the model, while monthly alerts rose from 211 to 302. (a) Compute the confirmed mules per month before and after. (b) What does the yield not tell you about the mules the bank missed, and why? (c) The pipeline has run one month. List the numbers you would compute every week to know whether 89% holds, and what change in each would make you act.
+
+<Solution>
+(a) Before: $0.61 \times 211 = 129$ confirmed mules a month. After: $0.89 \times 302 = 269$. About 140 more a month, more than double, with 91 more alerts to review.
+
+(b) Yield is the precision of the alerts reviewed. Mules that were never alerted are not in either number, so recall is unknown: 269 found says nothing about how many exist. And the labels are the analysts' own confirmations of alerts the model chose, the <Ref lesson="alert-feedback-selection-bias">selected feedback</Ref> of the adversary module, so a mule type the model never flags never appears as a miss.
+
+(c) The weekly yield with its interval: 302 alerts a month is about 70 a week, and at 0.89 that gives a standard error of $\sqrt{0.89 \times 0.11/70} = 0.037$. A single week at 0.82 is within two standard errors of 0.89, so one bad week proves little; two consecutive weeks below 0.82 are worth investigating. The distribution of scores and of the main inputs against the training period, to see a shift before labels arrive. The mix of the alerts' top attributions, which moves when the model starts alerting for different reasons. The grounding check's failure rate and the investigators' edit rate on narratives, which rise when the model or its inputs change. And a random sample of unalerted customers reviewed each month, the only window onto recall. These are the stability indices and performance backtests with their thresholds for acting that <Ref lesson="model-risk-monitoring" /> develops.
+</Solution>
+</Exercise>
+
+<References>
+1. C. Lin, Y. Zhang, M. Ran, W. Xue, H. Fan, Y. Xu, Z. Wan, S. Han, Y. Guo, J. Song, "Reinforcement Learning of Large Language Models for Interpretable Credit Card Fraud Detection," arXiv:2601.05578, 2026, preprint — Sec. 4.1 and Table 1 (the payment company's e-commerce orders, chronological split, 5,000 test orders at 9.6% fraud), Table 2 (recall, specificity, precision and F1 of eight general models and three tuned ones; no repeated runs reported, no tree baseline), Sec. 4.2 (the hallucination test: a 235B judge model, any factual error fails), Sec. 4.3.1 and Fig. 6 (the calibration-gap reading; hallucination pass rates before and after tuning, 0.929/0.790, 0.866/0.885, 0.893/0.426; the authors' reward-hacking interpretation of the 14B model's 46.7-point fall). https://arxiv.org/abs/2601.05578
+2. X. Tan, Y. Ma, X. Zhang, "Understanding Structured Financial Data with LLMs: A Case Study on Fraud Detection," arXiv:2512.13040v2, 2026, preprint — Sec. 3 (importance-ranked features, categorical back-off filter, cosine retrieval, labelled neighbours as sentences, 1–5 risk score), Sec. 4.1 and Table 1 (8,000-row test samples, three runs, tuned tree and tabular-network baselines), Fig. 4 (one payment scored with and without neighbours), Sec. 4.3 (the PaySim recall of 11/13 from unanimous neighbourhoods), App. A and D (datasets; prompt lengths and generation latency, retrieval excluded). https://arxiv.org/abs/2512.13040
+3. D. Torres, W. Cheng, K. Hu, "Explainable AML Triage with LLMs: Evidence Retrieval and Counterfactual Checks," arXiv:2604.19755, 2026, preprint on synthetic data — Sec. 2.3 and 3.3 (the output contract and the verifier-and-repair loop), Sec. 3.2 (access-filtered evidence bundles), Sec. 3.4 (decision and evidence counterfactuals; decorative citations), Sec. 4.4 (case memory from training alerts only), Table 1 (ranking, citation validity, faithfulness under removal, numerical and policy errors), Sec. 4.6 (verifier stated for all LLM systems), Sec. 7.5 (routing; the suggested cap of 1–2 counterfactuals per alert). https://arxiv.org/abs/2604.19755
+4. Y. Zhang, Y. Zhang, Y. Jin et al., "Detection, Attribution, Narration: An End-to-End Pipeline for Explainable Money Mule Identification," KDD 2026 Workshop on Machine Learning in Finance (arXiv:2607.17586) — Sec. 3 (280 features, boosted trees, top-ten attributions, self-hosted model, fixed JSON schema), Sec. 4.2 (the 0.8 cut and analyst capacity), Table 4 and Sec. 4.4 (20 rated narratives; failure modes), Table 5 (yield 61% to 89%, one month, three analysts), Sec. 5.2 and 5.4 (waterfall plots slow to interpret; the narrative not a basis for adverse action). https://arxiv.org/abs/2607.17586
+5. P. V. Naik, N. K. Dintakurthi, Z. Hu, Y. Wang, R. Qiu, "Co-Investigator AI: The Rise of Agentic AI for Smarter, Trustworthy AML Compliance Narratives," arXiv:2509.08380v2, 2025, industry preprint — Sec. 1 (25 to 315 minutes per report), Sec. 3.2 (plain prompting: invented details, correction nullifying the time benefit), Sec. 5 (masking round trip; typology classifiers gating the drafting steps), Sec. 8 (validation of amounts, dates, jurisdictions and identities), Sec. 10 and Table 1 (six raters; 3.06 of 5 shown as 61%). https://arxiv.org/abs/2509.08380
+6. Bretton Applied AI, "Financial Crime Bench: Evaluating AI agents on risk-based anti-money laundering decisions under regulatory guidance and incomplete information," vendor benchmark post, October 2026 — coverage (79 cases, 34 escalated), scoring (pass = right call and reasoning score ≥ 0.8; 0.8 × counterparties + 0.2 × scenarios), sample task (the 81-year-old's case; further rows and the card wording marked illustrative), results (pass rates, reasoning levels, lenient failures, agreement across rollouts); full methodology announced, not yet published. https://www.bretton.com/financialcrimebench
+7. Anti-Money Laundering Authority (AMLA), *Consultation Paper on Draft Guidelines on Ongoing Monitoring of a Business Relationship under Article 26(5) of Regulation (EU) 2024/1624*, 3 June 2026, draft — paras. 78–79 (automated closure and its oversight), 87–91 (use of technology). https://www.amla.europa.eu/
+8. Regulation (EU) 2024/1624 on the prevention of the use of the financial system for money laundering or terrorist financing (AMLR), *Official Journal* L, 19.6.2024 — Art. 18(3) (tasks that may not be outsourced), Art. 77(1)(b) (retention of the record of each suspicion assessment), Art. 76(5) (automated decisions: meaningful human intervention, explanation and challenge). https://eur-lex.europa.eu/eli/reg/2024/1624/oj
+</References>

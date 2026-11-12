@@ -1,0 +1,553 @@
+A model gives a payment a 0.93 probability of fraud. The bank can let it through, ask the customer for a second factor, decline it, or send it to an investigator — and each action has a cost, a legal limit and a queue behind it. How does a probability and an amount become one of four actions, and how are the rules that do it checked for conflicts and gaps?
+
+Until now the model's output had one use. <Ref lesson="fraud-detection-system" id="ranking-then-cutting-at-the-capacity">The layered system</Ref> ranked the day's cards and the team called the top hundred, and <Ref lesson="example-dependent-cost" id="the-decision-that-minimises-expected-cost">the per-payment rule</Ref> chose between two actions, a call or nothing: call when $C_a \le \mathrm{Amt}\cdot p$, with $C_a$ the cost of a call, $\mathrm{Amt}$ the payment's amount and $p$ its calibrated probability of fraud. The bank in the opening has four actions, and they differ in more than price. A decline is final and falls on the customer at the till. A second factor costs the customer a few seconds and stops most fraudsters. A call costs an investigator's time and exists only a hundred times a day.
+
+The obvious move is to keep one threshold and attach actions to it: approve below, decline above. It uses two of the four actions and gives the 0.93 payment the same answer at €10 and at €10,000. And if the threshold is the call rule's, carried over with the decline put where the call was, it charges a wrongly declined customer $C_a$, the price of a call, when what the bank risks there is losing the customer. The rest of the policy comes from three questions it skips: which action is cheapest for one payment, which payments get the few calls, and how the rules that implement the answer are kept from contradicting themselves. The fraud team writes those rules by hand, beside the model, and a list of hand-written rules can send one payment two ways or leave a common case with no rule at all, without anyone reading the list noticing.
+
+## Four actions, two clocks, four prices
+
+All four actions are chosen at the same moment, before the customer gets an answer, but one of them, the call, is carried out later, and each action charges a different party. Both facts constrain the policy before any arithmetic.
+
+### What each action costs, and whom
+
+A *step-up* asks the customer to prove they hold the card's second factor before the payment goes through: a code sent to their phone, or an approval in the bank's app. A genuine customer passes after a few seconds, though some give up and the sale is lost. A fraudster with only the card number usually cannot pass; one who has also taken over the phone, or talks the holder into reading out the code, can.
+
+| action | decided | if the payment is genuine | if it is fraud | limit |
+|---|---|---|---|---|
+| approve | before the answer | nothing | the amount, refunded by the bank | none |
+| step-up | before the answer | friction, a few lost sales: $c_S$ | the amount if the fraudster passes (share $q$) | the customer's patience |
+| decline | before the answer | a refused customer: $c_D$ | nothing | must be justified and notified |
+| review | before the answer; the call comes after it | a call: $C_a$ | a call: $C_a$, the fraud stopped | about 100 cases a day |
+
+The review row keeps the convention of <Ref lesson="example-dependent-cost">the lesson on example-dependent cost</Ref>: a call costs $C_a$ whatever the card turns out to be, and a caught fraud costs nothing more. That needs a reason here, because a payment sent to review is approved at the till and the call comes only afterwards: the payment itself is gone. What the call stops is the card. A confirmed fraud gets the card blocked before the fraudster's next payments, and a stolen card that is not stopped goes on spending, often more than its first fraud, as <Ref lesson="economics-of-detection" id="what-a-miss-costs-the-amount-or-more">the economics of detection</Ref> showed. The convention values what the call saves at the payment's amount, a stand-in for that further spending. The decline row prices a wrong refusal at $c_D$, which is not a call: <Ref lesson="economics-of-detection" id="what-an-alert-costs-the-call-and-sometimes-the-customer">the economics of detection</Ref> showed that a refused genuine customer may take their spending to another card. For the examples below, suppose
+
+$$
+C_a = €5, \qquad c_S = €0.50, \qquad q = 0.1, \qquad c_D = €50 .
+$$
+
+These four prices are the bank's assumptions, not measurements. Two of them, $q$ and $c_S$, are in no log the bank keeps: the bank sees which challenges were passed and which abandoned, but a fraudster who is not challenged never shows how he would have fared, and an abandoned challenge is never labelled fraud or genuine.
+
+### Why the second factor makes a score before the answer worth computing
+
+<Ref lesson="fraud-detection-system" id="could-the-model-refuse-payments">The layered system</Ref> concluded that a model gains nothing by scoring before the answer, because the only action available there was refusal, and a refusal must be nearly always right. The step-up changes that. A wrong step-up costs fifty cents, not a customer, so it can be taken on a moderate score. A model scored inside the deadline, on features kept ready before the request arrives, now has something to do with every score that is not near certain.
+
+So the policy runs on two clocks. All four actions, review included, are chosen in the milliseconds before the answer, on a score computed from stored profiles; that score is the $p$ in everything below. A payment sent to review is approved at the till and goes into the investigators' queue. Only afterwards does the full model rescore it on the card's recomputed history. That second score sets the case's place in the queue, as <Ref lesson="score-to-action" id="block-call-or-leave">the alert as a case</Ref> works out, and is what the investigator reads first; it cannot send the payment to another action, because the payment has already gone through. The four expected costs below compare four mutually exclusive answers to one payment. A bank may also open a case on a payment it has already declined or stepped up, to block the card and question the customer, as in <Ref lesson="score-to-action" id="the-alert-as-a-case">the alert as a case</Ref>; that is a further step taken after the choice, and its cost is not part of the four-cost comparison.
+
+### The legal limits
+
+Three provisions of the EU's Payment Services Directive (PSD2) bear on the table's rows. A bank that refuses a payment order must tell the customer, with the reasons where possible and the way to correct a factual mistake behind the refusal (Art. 79(1)). It may block the card itself only for objectively justified reasons, such as suspected fraud, must inform the holder before the block or immediately after, and must unblock it once the reasons are gone (Art. 68(2)–(4)). And it must refund an unauthorised payment by the end of the next business day (Art. 73(1)), which is why an approved fraud costs the bank its amount. For most online payments in the EU, the second factor is the default and the model decides when it may be skipped; <Ref lesson="psd2-sca-tra" /> works out that inversion.
+
+## The cheapest action for one payment
+
+With the four prices fixed, the question for a single payment is arithmetic: which action has the lowest expected cost at its $p$ and $\mathrm{Amt}$?
+
+### The 0.93 payment, at €400 and at €10
+
+<Example title="one probability, two amounts">
+The payment has $p = 0.93$. For each action, weight the cost if fraud by $p$ and the cost if genuine by $1 - p = 0.07$.
+
+**At €400.**
+- approve: $0.93 \times €400 = €372$;
+- step-up: $0.07 \times €0.50 + 0.93 \times 0.1 \times €400 = €0.04 + €37.20 = €37.24$;
+- review: $€5$;
+- decline: $0.07 \times €50 = €3.50$.
+
+Decline is cheapest. Seven in a hundred such declines refuse a genuine customer, at €50 each; that is still cheaper than a call, and far cheaper than letting one fraudster in ten through the second factor on €400.
+
+**At €10.**
+- approve: $€9.30$;
+- step-up: $€0.04 + 0.93 \times 0.1 \times €10 = €0.97$;
+- review: $€5$;
+- decline: $€3.50$.
+
+Step-up is cheapest: a fraudster who passes takes only €10, and a refused customer would cost €50 in seven cases out of a hundred.
+</Example>
+
+Same probability, different action: the amount enters every row that lets money out (approve, step-up) and none of the rows that do not.
+
+<Exercise>
+Take a payment with $p = 0.05$. Find the cheapest action at €300 and at €2,000.
+
+<Solution>
+**At €300.** Approve $0.05 \times 300 = €15$. Step-up $0.95 \times 0.50 + 0.05 \times 0.1 \times 300 = €0.48 + €1.50 = €1.98$. Review €5. Decline $0.95 \times 50 = €47.50$. Step-up.
+
+**At €2,000.** Approve €100. Step-up $€0.48 + 0.05 \times 0.1 \times 2{,}000 = €10.48$. Review €5. Decline €47.50. Review: the 10% of fraudsters who would pass the second factor put €10 at stake per payment, more than a call.
+</Solution>
+</Exercise>
+
+### Four expected costs, and the cheapest of them
+
+The example generalises line by line. For a payment with calibrated probability $p$ and amount $\mathrm{Amt}$:
+
+$$
+\begin{aligned}
+\mathbb{E}[\text{approve}] &= p\,\mathrm{Amt}, &
+\mathbb{E}[\text{step-up}] &= (1-p)\,c_S + p\,q\,\mathrm{Amt}, \\
+\mathbb{E}[\text{review}] &= C_a, &
+\mathbb{E}[\text{decline}] &= (1-p)\,c_D .
+\end{aligned}
+$$
+
+<Definition title="four-action policy">
+The *four-action policy* gives each payment the action with the lowest of the four expected costs above. Its *decision zones* are the sets of $(p, \mathrm{Amt})$ on which each action is the cheapest.
+</Definition>
+
+This is the Bayes minimum-risk decision of <Ref lesson="example-dependent-cost" id="the-decision-that-minimises-expected-cost">example-dependent cost</Ref> with four actions instead of two: the day's expected cost is a sum of one term per payment, so it is minimised payment by payment.
+
+<Task>
+Set the step-up and decline rows aside and compare only approve with review. Write the condition under which review is cheaper; it should be the per-payment rule you already know.
+</Task>
+
+Review beats approve when $C_a \le p\,\mathrm{Amt}$: the two-action rule is one boundary of the four-action policy. Fix the amount at €300 and plot the four costs against $p$:
+
+<Figure
+  src="./figures/envelope.svg"
+  alt="Expected cost of four actions against the probability of fraud on a log-odds axis, for a 300-euro payment, on a log cost axis from 0.10 to 400 euros. Approve, a green curve 300p, rises from 0.12 to 300. Step-up, a blue curve 0.5(1−p)+30p, rises from 0.5 to 30. Review, an amber horizontal line at 5 euros. Decline, a dark curve 50(1−p), falls from 50 to near 0. A thick line traces the lowest of the four. A strip under the axis is coloured approve up to 0.0018, step-up to 0.15, review to 0.90, decline above 0.90"
+  caption="At €300 the cheapest action changes three times as p rises: approve, step-up, review, decline."
+/>
+
+Each crossing of the thick line solves one equation. Approve gives way to step-up where $300p = 0.5(1-p) + 30p$, at $p \approx 0.0018$; step-up to review where its cost reaches €5, at $p \approx 0.15$; review to decline where $50(1-p) = 5$, at $p = 0.9$. That last equation has no amount in it. Decline beats review exactly when
+
+$$
+(1-p)\,c_D < C_a \iff p > 1 - \frac{C_a}{c_D} = 0.9 ,
+$$
+
+whatever the amount, because both stop the fraud, one at the till and the other by blocking the card, so neither cost contains the amount: a decline costs $c_D$ on a genuine customer, a call $C_a$ on every case. Whether decline also beats the step-up does depend on the amount: the step-up's leak $p\,q\,\mathrm{Amt}$ shrinks with the payment, so on a small one the step-up stays cheaper past 0.9. At €10 it loses to decline only where $(1-p)\,€0.50 + p \times €1 = (1-p)\,€50$, at $p \approx 0.98$.
+
+### Zones that move with the amount
+
+Read along the probability axis, the policy is a bar of coloured bands. Repeating it at three amounts shows how much the amount moves the bands:
+
+<Figure
+  src="./figures/zones.svg"
+  alt="Three horizontal bars over the probability axis on a log-odds scale. At 10 euros: approve up to 0.053, step-up to 0.98, decline above. At 300 euros: approve up to 0.0018, step-up to 0.15, review to 0.90, decline above. At 2,000 euros: step-up up to 0.023, review to 0.90, decline above; approve only below 0.0003"
+  caption="The bands slide left as the amount grows; at €10 there is no review band at all."
+/>
+
+At €10 no probability makes a call worthwhile: the most a call can save is €10, and the step-up saves almost all of it for fifty cents. At €2,000 the review band starts at 0.023 and almost nothing is approved.
+
+The review band is the *referral band*: the payments the policy hands to a person instead of settling them automatically. An analyst who opens a referred case may overrule what the score suggests, in either direction, and that judgement is what the investigators' hours buy. On either side of the band an automatic action costs less than a call: below it a step-up or an approval, above it a decline. Bands like these are often shown to staff as a traffic light, green to approve, amber to refer, red to decline, but three colours cannot carry four actions: the step-up is automatic like an approval, yet unlike an approval it asks something of every genuine customer it touches, so the bars give it a colour of its own. What the bars add besides is that the band edges are not constants but functions of the amount.
+
+### The plane, and the table analysts read
+
+Taking every amount at once turns the bars into regions of a plane:
+
+<Figure
+  src="./figures/plane.svg"
+  alt="A plane with the probability of fraud on a log-odds scale from 0.0004 to 0.996 across and the amount from 1 to 10,000 euros on a log scale up, divided into four regions: approve (green) at low probability and amount, a diagonal band of step-up (blue) above it, review (amber) at the top from probability about 0.02 for large amounts to 0.9, bounded below by a curve that reaches about 55 euros at 0.9, and decline (grey) to the right of 0.9 above a falling line. Dots mark eight groups G1 to G8; G1 and G2 lie in approve, G3, G4, G5 and G6 in step-up, G7 and G8 in review. Two amber rings at probability 0.93 mark 10 euros in step-up and 400 euros in decline"
+  caption="The four-action policy over the whole plane; the dots are the eight groups of the day used below."
+/>
+
+The approve–step-up boundary is a diagonal: approve wins while $p\,\mathrm{Amt}(1-q) < (1-p)\,c_S$, which for small $p$ is a line of constant expected amount, about €0.55. The review region's lower edge is not such a line. For small $p$ it is where the step-up's leak $p\,q\,\mathrm{Amt}$ reaches the call; near $p = 0.9$ it bends down to about €55, below which the step-up is cheap enough to keep.
+
+A risk analyst cannot read a curve in a log-odds plane, and a rule engine cannot execute one. Cutting both axes into bands gives a table, with each cell taking the cheapest action at a point inside it:
+
+<Figure
+  src="./figures/banded.svg"
+  alt="A 6-by-6 table, probability bands below 0.001, 0.001–0.01, 0.01–0.1, 0.1–0.5, 0.5–0.9 and at least 0.9 across, amount bands below 50, 50–200, 200–1,000, 1,000–2,000, 2,000–5,000 and at least 5,000 euros down. Approve fills the top-left corner, step-up a diagonal band, decline the last column below the first row, and review a staircase of cells from the 0.5–0.9 column at 50–200 euros down to the 0.01–0.1 column at 2,000 euros and more, outlined in amber. G1 to G8 are written in the cells their groups fall in"
+  caption="The plane cut into bands: the review cells form a staircase, the investigation frontier."
+/>
+
+The amber staircase is the *investigation frontier*: the boundary of the cells sent to review. In a policy with only two actions it would be the staircase of constant expected amount $p\,\mathrm{Amt}$ of <Ref lesson="economics-of-detection" id="-which-alerts-first-expected-amount-not-probability">the ranking by expected amount</Ref>, where a case was worth a call while its expected amount exceeded the call's cost, whatever its probability. Here two other actions bite into it: the step-up takes its low-probability side and the decline its high-probability side.
+
+Banding costs accuracy at the cell edges, since every payment in a cell gets one action. The band edges were chosen so that each of the eight groups below lands in a cell with its own cheapest action; with a single €1,000–5,000 band, G5 (€1,200 at 0.03) would land in a review cell, although for it the step-up is cheaper. The table is also only as good as the probabilities it is read with: it multiplies $p$ by euros, and <Ref lesson="example-dependent-cost" id="the-rule-reads-probabilities-as-numbers">a model fitted on undersampled data and never corrected</Ref> puts payments in the wrong columns.
+
+<KeyFact>
+The investigation frontier is not a line of constant expected amount once a step-up and a decline exist: a call is worth making only where it beats the next-cheapest action, not where it beats approving.
+</KeyFact>
+
+## A hundred calls a day: capacity moves the frontier
+
+The policy so far sends every payment in the review zone to a person. The team has a fixed number of calls, and the review zone of a busy day can hold more payments than that.
+
+### The step-up empties most of the review band
+
+<Ref lesson="example-dependent-cost" id="a-day-in-eight-groups">The day of 10,000 payments in eight groups</Ref> is the test case: each group shares an amount and a calibrated probability, and its fraud count is the one the probability predicts. With only a call or nothing, the per-payment rule called G5, G7 and G8: 140 calls, and a day's cost of €5,356 against €15,056 for doing nothing.
+
+| group | payments | amount | $p$ | two-action rule | four-action policy |
+|---|---|---|---|---|---|
+| G1 | 4,100 | €15 | 0.001 | approve | approve |
+| G2 | 3,000 | €80 | 0.002 | approve | approve |
+| G3 | 2,400 | €300 | 0.005 | approve | step-up |
+| G4 | 300 | €20 | 0.05 | approve | step-up |
+| G5 | 100 | €1,200 | 0.03 | review | step-up |
+| G6 | 60 | €6 | 0.6 | approve | step-up |
+| G7 | 30 | €400 | 0.4 | review | review |
+| G8 | 10 | €250 | 0.8 | review | review |
+
+<Example title="the eight groups under four actions">
+Price each group at its realised frauds.
+
+- G1, G2 approved: the frauds go through, $4 \times €15 + 6 \times €80 = €540$.
+- G3 stepped up: $2{,}388$ genuine customers at €0.50 and 12 frauds of which a tenth pass, $€1{,}194 + 1.2 \times €300 = €1{,}554$.
+- G4: $285 \times €0.50 + 1.5 \times €20 = €172.50$. G5: $97 \times €0.50 + 0.3 \times €1{,}200 = €408.50$. G6: $24 \times €0.50 + 3.6 \times €6 = €33.60$.
+- G7, G8 reviewed: $40 \times €5 = €200$.
+
+Total €2,908.60, against €5,356 for the two-action rule: savings rise from 64.4% to 80.7% of the €15,056 of fraud. The team makes 40 calls instead of 140. The price is 2,794 genuine customers asked for a code, three in ten of the day's payments.
+</Example>
+
+G5 left the review band because at $p = 0.03$ the step-up lets through only €3.60 of expected fraud per €1,200 payment, less than a €5 call. The step-up resolves most of the middle of the plane at once, for fifty cents a case, and leaves the calls for the payments where one fraudster in ten passing the second factor would still cost more than an investigator.
+
+### When calls run short, rank by the saving over the next-best action
+
+Suppose the team can take only 30 of this day's cases, while the zone holds 40. Which ten go back to an automatic action?
+
+The tempting ranking is by expected fraud amount, $p\,\mathrm{Amt}$: G8 puts €200 per payment at stake, G7 €160, so G8 is called first and ten payments of G7 are dropped. That ranking compares the call with approving. But a dropped payment is not approved: it gets the cheapest automatic action, and the call is worth only what it saves over that.
+
+<Example title="thirty calls for forty cases">
+**What a call saves.** For G7 the cheapest automatic action is step-up at €16.30 per payment, so a call saves $€16.30 - €5 = €11.30$. For G8 it is decline at $0.2 \times €50 = €10$, so a call saves $€10 - €5 = €5$.
+
+**By saving.** Call all 30 of G7, decline G8: $30 \times €5 + 10 \times €10 = €250$ of expected cost.
+
+**By expected amount.** Call G8 and 20 of G7, step up the other 10: $30 \times €5 + 10 \times €16.30 = €313$.
+
+Ranking by saving costs €63 a day less. G8's frauds are the likeliest and the largest at stake, and a call is worth least on them, because a decline handles an 80% case almost as well.
+</Example>
+
+### Capacity acts as a surcharge on the call
+
+Write $\Delta_i$ for what a call on payment $i$ saves over its cheapest automatic action:
+
+$$
+\Delta_i = \min\{\mathbb{E}[\text{approve}]_i,\ \mathbb{E}[\text{step-up}]_i,\ \mathbb{E}[\text{decline}]_i\} - C_a .
+$$
+
+<Proposition title="the review budget">
+Let a day's payments have calibrated probabilities and let at most $k$ of them be reviewed. The day's expected cost is minimised by reviewing the $k$ payments with the largest positive $\Delta_i$ and giving every other payment its cheapest automatic action. Equivalently, with $\lambda \ge 0$ the $k$-th largest $\Delta_i$ (or $\lambda = 0$ if fewer than $k$ are positive), every payment takes the four-action policy with the call priced at $C_a + \lambda$.
+
+<Proof>
+Write $m_i$ for the cheapest automatic cost of payment $i$. If $R$ is the set reviewed, the expected cost of the day is
+$$
+\sum_{i \notin R} m_i + \sum_{i \in R} C_a = \sum_i m_i - \sum_{i \in R} \Delta_i .
+$$
+The first sum does not depend on $R$, so the cost is minimised by making $\sum_{i \in R}\Delta_i$ as large as possible with $|R| \le k$: take the $k$ largest $\Delta_i$, leaving out any that are negative, since those raise the cost. For the second form, payment $i$ is in that set exactly when $\Delta_i \ge \lambda$, that is when $C_a + \lambda \le m_i$, which is the condition for review to be cheapest when a call costs $C_a + \lambda$. (Ties at $\lambda$ are broken arbitrarily.)
+</Proof>
+</Proposition>
+
+The surcharge $\lambda$ is the price of an investigator's slot on that day: a binding capacity behaves exactly as if each call cost more. On the eight-group day with 30 calls, any $\lambda$ between €5 and €11.30 separates G7 from G8.
+
+<FigureSequence
+  name="surcharge"
+  alt="Three frames of the probability-by-amount plane with the eight groups as dots; only the review region changes. Frame 1, call cost 5 euros: review covers G5's corner down to the step-up band and G7 and G8, decline starts at 0.9. Frame 2, surcharge 8 euros (cost 13): the review region has shrunk, G8 now lies in decline, which starts at 0.74, G7 lies near the review edge. Frame 3, surcharge 25 euros (cost 30): review keeps a wedge at the top, between about p = 0.03 and 0.4, above an edge falling from 10,000 euros to about 750; G7 has left it for step-up; decline covers everything right of 0.4 above a falling line"
+  caption="A shorter team raises the surcharge λ: the review region shrinks, and the decline region grows into what it gives up."
+/>
+
+<Task>
+Step through the three frames and watch the grey region. Before the third frame, predict which group leaves review for decline first and which for step-up, from the costs computed above.
+</Task>
+
+The payments a scarce team gives up go two ways: those with high $p$ to decline, those with low $p$ to step-up. The decline edge sits at $p = 1 - (C_a + \lambda)/c_D$, so it moves from 0.9 at full staffing to 0.74 at $\lambda = €8$ and to 0.4 at $\lambda = €25$. Understaffing the team turns into refused customers.
+
+In real time the bank cannot sort the day before acting, because each payment must be answered as it arrives. It sets $\lambda$ from recent days, at the value whose review zone held about $k$ cases a day, and moves it when the volume or the fraud mix changes. That makes $\lambda$ a number to monitor: a rising $\lambda$ on a steady team means more cases are being pushed into automatic actions. How large the team should be is the staffing question <Ref lesson="economics-of-detection" id="how-many-alerts-to-pay-for-the-budget-that-maximises-value">the economics of detection</Ref> answered, by adding calls while the next one saves more than it costs; the surcharge is what a team below that size pays on every call.
+
+## What a wrong decline costs, and who pays it
+
+The policy minimises the day's total expected cost. A total can be low while the friction behind it falls almost entirely on one kind of customer, and nothing in the total shows that.
+
+### Friction goes where $p$ is high, and $p$ is high for whole groups
+
+<Example title="one €80 payment, two cards">
+A card in use for years buys something for €80 and the model gives $p = 0.002$: approve costs $€0.16$, step-up $€0.52$, so the payment goes through. A card issued two weeks ago makes the same purchase; new cards are stolen in the post and opened in false names more often, and a calibrated model gives it $p = 0.02$. Approve now costs $€1.60$ and step-up $0.98 \times €0.50 + 0.02 \times 0.1 \times €80 = €0.65$: the payment is stepped up. Every €80 purchase on a new card is challenged, and 98 in a hundred of those customers are genuine.
+</Example>
+
+Nothing here is a miscalibration: the probabilities are right, and the policy is the cheapest one at the stated prices. If every probability in the eight-group day were ten times higher (capped at 0.95), as for a book of new cards, the share of genuine payments asked for a code would double, from 28% to 57%, and G7 and G8 would be declined outright. The same holds for any feature the model reads that is shared by a group: customers who travel, who are new to the country, who shop at hours or places the model associates with fraud.
+
+### Measuring the harm group by group
+
+The cost-minimising policy needs a second report beside its total cost.
+
+<Definition title="false-positive harm per group">
+For a group of customers $g$ and an automatic action $a$ (step-up, decline, block), the *false-positive rate of $a$ in $g$* is the share of $g$'s genuine payments that receive $a$. The *false-positive harm* of a policy is the set of these rates, reported per group and per action beside the total cost.
+</Definition>
+
+A group's rate out of line with the others has three remedies, each with a different owner. A better model for the group (more history, features that separate its genuine payments from its frauds) lowers its probabilities honestly. A cheaper action for it, a step-up where the policy declines, lowers the harm per mistake. A different $c_D$ for the group is a business and legal decision about whose refusal costs what, not a modelling choice, and it belongs in the record with its reasons.
+
+Scale turns small rates into crowds. On a book of a million accounts, a false-alarm rate of 1% a day is 10,000 false alarms a day. As calls those are an impossible queue; as automatic declines or blocks they are 10,000 customers a day who cannot pay, which is why <Ref lesson="fraud-detection-system" id="why-a-block-has-to-be-nearly-always-right">automatic refusal was kept for near-certain patterns</Ref> from the start. The four-action policy honours that: at full staffing it declines only above $p = 0.9$, and the zone's false-positive count is $\sum (1 - p_i)$ over the payments in it, small when few payments score that high.
+
+### The law reads declines one customer at a time
+
+Each refused payment must be notified with its reasons where possible (PSD2 Art. 79(1)), and each blocked card must rest on objectively justified grounds (Art. 68(2)). A pattern of refusals that falls on a category of customers has a name in EU anti-money-laundering law: *de-risking*, restricting or ending relationships with categories of customers to avoid risk rather than manage it. Recital 114 of the 2024 anti-money-laundering directive (AMLD6) warns that it pushes those customers to less secure channels and can amount to financial exclusion, and asks supervisors to watch for it. The recital speaks of relationships, not payments, but a decline zone that falls mostly on one group does at the payment level what it describes.
+
+<KeyFact>
+A policy that minimises the total expected cost puts its friction where $p$ is high, and $p$ is high for whole groups of genuine customers; only the false-positive rates per group and per action show it, and a team too small for its queue raises them, because the cases it gives up move into decline.
+</KeyFact>
+
+## Rules written by people: the decision table
+
+The policy has to run somewhere, and in a bank it runs as rules: the banded table becomes one rule per cell, and the fraud team adds rules of its own beside it, <Ref lesson="fraud-detection-system" id="rules-beside-the-model-two-tools-with-different-upkeep">written and deleted by hand</Ref>. Each rule is checked when it is written. Whether the set still makes sense as a whole is a different question.
+
+### Four rules, one conflict, one gap
+
+A team writes four rules over three yes-or-no conditions: the device is new to the card, the amount is above €500, and the card has had more than three failed attempts in the last hour.
+
+- **R1.** IF new device AND amount > €500 AND failed attempts > 3 THEN decline.
+- **R2.** IF new device AND amount ≤ €500 THEN step-up.
+- **R3.** IF known device AND amount > €500 THEN approve.
+- **R4.** IF new device AND failed attempts ≤ 3 THEN approve.
+
+<Task>
+Before reading on, find a payment for which two rules give different actions, and a payment for which no rule fires.
+</Task>
+
+Read as a list, each rule looks sensible. The problems live in combinations of conditions no single rule names, so the check has to list the combinations.
+
+### Laying the rules out as a table
+
+<Definition title="decision table">
+A *decision table* has *conditions* as rows, each with a set of states that cover its possible values without overlap (yes/no; ≤ €500/> €500), and *actions* below them. Each column is a combination of states, one per condition, with a mark on the action taken there. The table is *expanded* when there is one column for every combination of states.
+</Definition>
+
+Three yes/no conditions give $2^3 = 8$ columns. Each rule marks every column it covers: R2 says nothing about failed attempts, so it marks both columns with a new device and an amount of €500 or less.
+
+<Figure
+  src="./figures/verify.svg"
+  alt="An expanded decision table with rows device (new, known), amount above 500 euros (yes, no) and failed attempts above 3 (yes, no), giving eight columns, and action rows approve, step-up, decline. Column 1 is marked decline (R1), column 2 approve (R4), column 3 step-up (R2), column 4 both step-up and approve (R2 and R4), shaded amber, columns 5 and 6 approve (R3), columns 7 and 8 empty, shaded blue. Notes: column 4 is a conflict, columns 7 and 8 a gap"
+  caption="The four rules as an expanded table: one column with two actions, two columns with none."
+/>
+
+Column 4 is a new device, €500 or less, few failed attempts: R2 steps it up and R4 approves it. Columns 7 and 8 are a known device and €500 or less: no rule fires. That gap is the most common payment the bank sees, a customer on their usual phone buying something ordinary.
+
+### Completeness and consistency, checked by a program
+
+<Definition title="complete and consistent">
+A rule set is *complete* if every column of its expanded table has at least one action, and *consistent* if no column has two different actions. A column with no action is a *gap*; a column with two is a *conflict*.
+</Definition>
+
+Both properties belong to the table, not to any rule, and a program checks them by walking the columns. A real rule engine hides both failures. A gap falls through to the engine's default, usually approve, and that default is a decision nobody wrote down. A conflict is resolved by the engine's order of evaluation, first match or most severe action, and that order becomes a policy nobody chose. The fix is to make both explicit: a final column, or an "otherwise" rule, that states the default; and a written priority among actions, kept with the rules.
+
+Two details make the walk exact. A numeric condition's states come from every cut point any rule uses: if one rule tests amount > €500 and another amount > €2,000, the amount condition has three states, and every rule is read against all three. And the number of columns is the product of the state counts, which grows fast: thirty yes/no conditions give about a billion. A conflict needs only a pair of rules with different actions whose conditions can all hold at once, so it can be found by checking pairs of rules instead of columns. A gap is a column no rule covers, and finding one still means looking at combinations.
+
+<Exercise>
+The team adds **R5**: IF amount > €500 AND failed attempts > 3 THEN decline. Which columns does it mark? Does it remove the conflict, remove the gap, or add a problem?
+
+<Solution>
+R5 says nothing about the device, so it marks columns 1 and 5. In column 1 it agrees with R1 (decline): two rules with the same action are redundant, not in conflict. In column 5 (known device, more than €500, more than three failed attempts) R3 says approve and R5 says decline: a new conflict. The old conflict in column 4 and the gap in columns 7–8 are untouched. A rule added to fix one case is checked against the whole table, because it covers every column its conditions allow.
+</Solution>
+</Exercise>
+
+### Contracting and minimising: what eight rules really say
+
+A rule set can be complete and consistent and still say something nobody can see. Take eight rules over three conditions: whether the merchant is on the team's watch list, whether the amount exceeds €1,000, and whether the card is present at a terminal (as opposed to a payment online or by phone). Each rule names all three, one combination each, and assigns approve or step-up. Which of the three conditions actually change the action, and where? Eight rules side by side do not say.
+
+<FigureSequence
+  name="contract"
+  alt="Three decision tables for the same eight card rules. Frame 1, expanded: eight columns over merchant on watch list, amount, card present; approve in columns 1, 5 and 7, step-up in the other five. Frame 2, contracted: five columns, with columns 3 and 4 merged (watch list, more than 1,000 euros, card present irrelevant), 5 and 7 merged, 6 and 8 merged, a dash marking each irrelevant condition. Frame 3, minimised: card present asked first, four columns; when the card is not present, a single column with dashes for both other conditions says step-up, shaded blue"
+  caption="Eight rules, contracted to five columns, then minimised to four by changing the order of the questions."
+/>
+
+Read top-down, an expanded table is a tree of questions asked in a fixed order: here the watch list first, then the amount, then the card. Each column is one path through the tree and ends in an action. A question does not matter at a point of the tree when every answer to it leads to the same thing below: the same actions under the same remaining questions. *Contracting* the table drops each such question, marks it with a dash and merges the columns beneath it. Working from the last question up, merged columns can merge again.
+
+In frame 1 that happens twice. With a watch-listed merchant and more than €1,000, columns 3 and 4 both say step-up, card or no card: the card question is dropped there, giving column 3+4. With a merchant off the watch list, both amounts lead to the same pair, approve with the card present (columns 5 and 7) and step-up without it (6 and 8): the amount question is dropped and 5 merges with 7, 6 with 8, the card question kept below. Nothing else merges. With a watch-listed merchant the two amounts lead to different things (below €1,000 the card decides, above it the answer is step-up either way), and at the top the two answers about the watch list lead to different subtrees. Frame 2 holds five columns.
+
+Which questions can be dropped depends on the order they are asked in. *Minimising* a table means choosing the order that leaves the fewest columns. Ask about the card first, and the four payments without one (columns 2, 4, 6 and 8) all say step-up: after that answer no other question matters, and the four become one column. With the card present, the watch list and the amount leave columns 1, 3 and 5+7: four in all, frame 3. The condition that belongs first is the one with an answer that settles the action by itself. Merging pairs of columns that differ in one condition without fixing any order reaches the same four (2 with 4 and 6 with 8 on the amount, then those two on the watch list), and read as questions the result asks about the card first: it is the minimised table, found the other way.
+
+The minimised table says what the list did not: **every payment without the card is stepped up**, whatever the merchant and the amount, and a card-present payment at a merchant off the watch list is always approved. Whether the team meant the first is a question it can now ask. In the EU it largely matches the default for remote payments; for a team that thought it had written a rule about watch-listed merchants, it is a surprise.
+
+### The model's table and the hand rules in one table
+
+The banded policy of the previous sections is itself a decision table with two conditions, the probability band and the amount band, and each cell is one column. It is complete and consistent by construction, because every cell got exactly one action. Adding the team's rules beside it multiplies the conditions, and the combined table is where conflicts appear: a hand rule that approves known devices below €500 overrides the model's step-up cells for exactly those payments. Writing the combined table out, with the priority between model and rule as an explicit row, is what turns "the rule engine decides" into a policy someone can read and sign.
+
+## The alert as a case
+
+A payment in the review zone becomes a case for a person. What happens to it, and in what order, is set by the same constraints as the rest of the policy: money keeps moving while the case waits, the customer is owed an explanation, and the outcome is the label the model learns from next.
+
+### Block, call or leave
+
+By the time anyone can act on a case, the payment has gone through and the full model has given it a second score $p'$, on the card's recomputed history. The step-up went with the payment. The card can still be blocked without a call, though: that is the decline's counterpart after the till, and it is priced like one, $(1-p')\,c_D$ on a genuine card and nothing on a fraud, whose further spending it stops just as a call would. So the second score chooses among three actions, leave the card alone, block it, or call, and the call is worth
+
+$$
+\Delta'_i = \min\{p'\,\mathrm{Amt},\ (1-p')\,c_D\} - C_a ,
+$$
+
+the saving $\Delta_i$ of <Ref lesson="score-to-action" id="capacity-acts-as-a-surcharge-on-the-call">a hundred calls a day</Ref> with the step-up row dropped and the decline row read as a block. That sorts the queue three ways. Where $p' > 1 - C_a/c_D = 0.9$, a block costs less than a call, and less than leaving the card alone at any amount above a few euros: the card is blocked at once, and the customer is told, as a block requires (PSD2 Art. 68(3)). Where $p'\,\mathrm{Amt} < C_a$, the second score has cleared the case and it leaves the queue. The rest are called in order of $\Delta'_i$. A case the day's calls do not reach takes the cheaper of the other two, block or leave: for G8 that is the block, €10 against €200, just as its payment was declined in the thirty calls for forty cases. If the second score agrees with the first, a case of G7 is worth $\min\{€160, €30\} - €5 = €25$ and one of G8 $\min\{€200, €10\} - €5 = €5$; ranking by expected amount would put G8 first, the mistake of the thirty calls for forty cases made again.
+
+Below 0.9, a case that will be called is not blocked first. Most cards in the review band are genuine (at €300 it runs from $p = 0.15$ to 0.9, and six in ten of G7's cards are genuine), and a block before anyone has looked would charge each of them the refused-customer cost $c_D$, which the review row's price of $C_a$ leaves out. At $C_a + (1-p)\,c_D$ a review would cost more than a decline at every $p$, and the referral band would vanish. So a called case starts with the question, "was it you?". Contact can begin automatically, with a text message, and escalate to a call if there is no answer after a few minutes. A "yes, that was me" usually settles the case. On a "no", the money is stopped before anything else: block the card, freeze the account, hold a pending transfer. A compromised card keeps paying while an investigator reads the case, and <Ref lesson="economics-of-detection" id="what-waiting-costs-value-falls-as-evidence-grows">the economics of detection</Ref> showed that the saving left on a card falls with every payment, so the block comes before the investigation, though not before the question. Dealing with the fraudster, by prosecution or settlement, comes last and is outside the model's loop.
+
+One more rule acts on the case before anyone opens it: its routing, a small decision table on the case's type and amount that picks a desk: card fraud, high-value transfers, a team that can file a suspicious-activity report. Routing rules are rules like any other, checked for gaps the same way, because a case type no rule routes waits in no one's queue.
+
+<Figure
+  src="./figures/case.svg"
+  alt="A row of eight boxes from left to right: second score (p′ on the card's recomputed history), then numbered 1 triage (block at once if p′ above 0.9; otherwise call, or, for a case no call reaches, block or leave, whichever costs less), 2 priority (the call's saving over a block or over leaving the card), 3 routing (type and amount pick a desk), 4 contact (ask the customer: was it you?), 5 mitigation, shaded amber (on a no: block the card, hold a transfer), 6 investigation (case screen, linked entities), 7 disposition (fraud or genuine, with grounds). A blue arrow runs from disposition back to the score, labelled the disposition returns to the model as a fast label. Beneath, a dashed strip joined to every box spans all steps: audit trail, every step records who acted, when, and on what grounds"
+  caption="A card is blocked before anyone asks only where a block is so rarely wrong that it costs less, on average, than a call (p′ above 0.9); a case that will be called is asked first, and the money is stopped the moment the answer is no."
+/>
+
+### What the investigator sees
+
+<Figure
+  src="./figures/investigator-link-screen.png"
+  alt="Screenshot of an investigator's link-analysis screen for insurance claims. Icons for claims (folders), claimants (person silhouettes), addresses (houses), cars, phones and companies are joined by solid and dashed lines into one tangled network of about thirty entities. Two claim nodes are red, flagged as fraud; two are yellow and the rest blue. Several claims share the same people, addresses, phones and cars. Along the bottom, a timeline slider sits at its right end, labelled Dec 31, 2013."
+  caption="One case, opened: the claims around it and the people, addresses, cars and phones they share, with the fraud-flagged claims in red. The slider replays the network up to the date shown."
+  float="right"
+  width="m"
+/>
+
+A case is more than the payment that raised it. The investigator's screen shows the card's recent payments and the entities around the case: the accounts, addresses, phones and devices it shares with other cases, as a graph that can be replayed over time. A shared entity can raise a case by itself. If one insurance claimant shares an address, a car, a bank account and a phone with another who has already filed a fraudulent claim, the two are most likely the same person, and every new claim by the second should be flagged; <Ref lesson="guilt-by-association" /> turned that reasoning into scores. The screen also shows why the model scored the case high: the reasons behind a score, and what each reader of a case needs from them, are the subject of <Ref lesson="alert-explanations" />.
+
+### The record: overrides, grounds and the label
+
+Every step writes to the case's *audit trail*: who acted, when, what they did and on what grounds. Three uses make it more than bookkeeping.
+
+**Overrides are data.** An analyst who approves a case the policy referred, or escalates one it would have stepped up, is disagreeing with a cell of the table. A cell whose cases are overruled most of the time has the wrong action, or the model is wrong there; either way the rate of overrides per cell is a quantity to watch, beside the surcharge $\lambda$.
+
+**The disposition is the label.** The case's outcome returns to the model as a fast label, the <Ref lesson="alert-feedback-selection-bias">alert feedback</Ref> whose selection bias the previous module measured. The record has to say which labels came from cases and when, or the next training set cannot tell feedbacks from delayed samples.
+
+**The grounds are what the law reads.** A refusal must be explained to the customer and a block justified, and a supervisor auditing the system reads the same record; <Ref lesson="aml-transaction-monitoring-duty" /> sets out what anti-money-laundering law requires it to hold. A language model may draft a rationale that travels with the case into review, as <Ref lesson="llms-in-the-investigation-queue" /> examines; it does not change which zone the case is in.
+
+<Conclusion>
+You can now turn a calibrated probability and an amount into one of four actions and defend the choice. Each action has an expected cost: $p\,\mathrm{Amt}$ to approve, $(1-p)c_S + pq\,\mathrm{Amt}$ to step up, $C_a$ to review, $(1-p)c_D$ to decline. The cheapest one splits the probability-by-amount plane into zones, and at the example's prices the 0.93 payment is stepped up at €10 and declined at €400. The step-up resolves most of the middle of the plane for cents a case: on the eight-group day it cut the calls from 140 to 40 and the cost from €5,356 to €2,909. When calls are scarce, the payments to review are the ones whose call saves most over their next-best action, not those with the largest expected amount, and the capacity acts as a surcharge $\lambda$ on every call, which pushes the cases it gives up into decline. The same policy's friction falls on whole groups of genuine customers, which only per-group false-positive rates reveal. Written as rules, the policy is checked as an expanded decision table for gaps and conflicts, and merging its columns shows what the rules really say. A referred case is rescored and triaged: its card is blocked at once only where the expected cost of a wrong block, $(1-p')\,c_D$, is below a call's, above $p' = 0.9$; otherwise the customer is asked first, in order of what the call saves over a block or over leaving the card, and the card is blocked on a "no"; a case the calls do not reach is blocked or left, whichever costs less. Each case is investigated and recorded, and its outcome becomes the model's next label.
+
+The case reaches an investigator with a score of 0.93 and an action, and nothing that says why. <Ref lesson="alert-explanations" /> asks what the investigator, the customer and the supervisor each need to be told about that score, and which methods can produce it honestly from a boosted ensemble, a network or a scorecard.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+At the lesson's prices ($C_a = €5$, $c_S = €0.50$, $q = 0.1$, $c_D = €50$), give the four-action policy's action for each payment below, and the action of a flat rule that declines at $p \ge 0.5$ and approves below. List the payments on which the two disagree.
+
+$(0.93, €10)$, $(0.6, €2{,}000)$, $(0.02, €80)$, $(0.004, €5{,}000)$, $(0.97, €300)$, $(0.001, €40)$.
+
+<Solution>
+Expected costs (approve / step-up / review / decline) and the cheapest:
+
+| payment | approve | step-up | review | decline | policy | flat rule |
+|---|---|---|---|---|---|---|
+| 0.93, €10 | €9.30 | €0.97 | €5 | €3.50 | step-up | decline |
+| 0.6, €2,000 | €1,200 | €120.20 | €5 | €20 | review | decline |
+| 0.02, €80 | €1.60 | €0.65 | €5 | €49 | step-up | approve |
+| 0.004, €5,000 | €20 | €2.50 | €5 | €49.80 | step-up | approve |
+| 0.97, €300 | €291 | €29.12 | €5 | €1.50 | decline | decline |
+| 0.001, €40 | €0.04 | €0.50 | €5 | €49.95 | approve | approve |
+
+They disagree on four of six. The flat rule declines a €10 payment that a code would settle and a €2,000 case worth a call, and it approves a €5,000 payment whose expected fraud is €20. It agrees on the last two because each probability is extreme for its amount, and the same probabilities at another amount split again: 0.97 at €10 is stepped up (decline starts only near 0.98 there), and 0.001 at €5,000 is stepped up too (€1.00 against €5 to approve). The move: compute all four rows before reading the probability against a cut.
+</Solution>
+</Exercise>
+
+<Exercise>
+Take away the investigators ($k = 0$).
+
+(a) If the second factor is also unavailable (an old terminal that cannot ask for one), show that the policy declines exactly when $p \ge c_D/(c_D + \mathrm{Amt})$, and identify this as the two-action Bayes minimum-risk rule with which costs.
+
+(b) With the second factor available, show that at every $p$ the step-up zone spans the amounts between two boundaries whose ratio does not depend on $p$, and compute that ratio at the lesson's prices.
+
+(c) In the proposition on the review budget, what value of $\lambda$ describes $k = 0$?
+
+<Solution>
+**(a)** Decline beats approve when $(1-p)c_D \le p\,\mathrm{Amt}$, that is $c_D \le p(c_D + \mathrm{Amt})$, or $p \ge c_D/(c_D + \mathrm{Amt})$. This is the general two-action threshold $\tau = (c_{FP} - c_{TN})/\big((c_{FP} - c_{TN}) + (c_{FN} - c_{TP})\big)$ of <Ref lesson="example-dependent-cost" id="exercises">example-dependent cost</Ref> with $c_{FP} = c_D$, $c_{TN} = 0$, $c_{FN} = \mathrm{Amt}$ and $c_{TP} = 0$: a declined fraud costs nothing, a declined genuine customer costs $c_D$. At €10 it is $50/60 \approx 0.83$; at €2,000 it is $50/2{,}050 \approx 0.024$, so a large payment is refused at odds of forty to one that the customer is genuine.
+
+**(b)** Step-up beats approve when $(1-p)c_S + pq\,\mathrm{Amt} < p\,\mathrm{Amt}$, i.e. $\mathrm{Amt} > \frac{(1-p)c_S}{p(1-q)}$. It beats decline when $(1-p)c_S + pq\,\mathrm{Amt} < (1-p)c_D$, i.e. $\mathrm{Amt} < \frac{(1-p)(c_D - c_S)}{pq}$. The ratio of the upper to the lower boundary is
+$$
+\frac{(c_D - c_S)(1-q)}{q\,c_S} = \frac{49.5 \times 0.9}{0.1 \times 0.5} = 891,
+$$
+the same at every $p$: on a log-amount axis the step-up band has constant width, almost three decades. At $p = 0.1$ it runs from €5.00 to €4,455.
+
+**(c)** $\lambda = \infty$, or any $\lambda$ above every $\Delta_i$: the call is priced out and the review row disappears from the minimum. The move: a constraint on an action is a price on it, and its limiting cases are the policies without that action.
+</Solution>
+</Exercise>
+
+<Exercise>
+"A rule set in which no two rules ever fire on the same payment is complete." Refute the claim with two yes/no conditions and two rules, and show where the decision table exposes the failure. Then show that the converse fails too.
+
+<Solution>
+Conditions: card present (yes/no), amount > €1,000 (yes/no). Rules: R1, IF card present AND amount > €1,000 THEN step-up; R2, IF card not present THEN step-up. No payment fires both, because R1 needs the card present and R2 needs it absent: the set is consistent.
+
+The expanded table has four columns: (present, > €1,000) R1; (present, ≤ €1,000) none; (absent, > €1,000) R2; (absent, ≤ €1,000) R2. The second column is empty: a gap, and it is the everyday card-present purchase. Contracting merges the two absent columns into (absent, –), and leaves the empty column standing.
+
+The claim confuses two properties. Consistency is about pairs of rules (no column with two actions); completeness is about all the rules together (no column with none). Neither implies the other: adding R3, IF amount ≤ €1,000 THEN approve, makes the set complete and creates a conflict at (absent, ≤ €1,000), where R2 says step-up and R3 approve. The move: check the two properties separately, column by column.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the investigation frontier when only approve, review and decline exist, and show where ranking by expected amount goes wrong.
+
+(a) Write $\Delta$ for a payment with probability $p$ and amount $\mathrm{Amt}$. Show that if decline were impossible ($c_D \to \infty$), ranking by $\Delta$ is ranking by $p\,\mathrm{Amt}$, and the frontier under capacity is $p\,\mathrm{Amt} \ge C_a + \lambda$.
+
+(b) With $c_D = €50$, show that at a fixed amount $\Delta$ first rises and then falls in $p$, find the $p$ where it peaks, and compute $\Delta$ at the peak and at $p = 0.8$ for a €2,000 payment.
+
+<Solution>
+**(a)** Without step-up, $\Delta = \min\{p\,\mathrm{Amt},\ (1-p)c_D\} - C_a$. As $c_D \to \infty$ the minimum is $p\,\mathrm{Amt}$ for every $p < 1$, so $\Delta = p\,\mathrm{Amt} - C_a$: ranking by $\Delta$ is ranking by expected amount, and review happens when $\Delta \ge \lambda$, i.e. $p\,\mathrm{Amt} \ge C_a + \lambda$. Banded, this is the staircase of constant expected amount; with $\lambda = 0$ it is the per-payment rule.
+
+**(b)** The first term $p\,\mathrm{Amt}$ rises in $p$ and the second $(1-p)c_D$ falls, so their minimum rises until they meet and falls after: the peak is at $p\,\mathrm{Amt} = (1-p)c_D$, $p = c_D/(c_D + \mathrm{Amt})$. For €2,000: $p = 50/2{,}050 \approx 0.024$, where both terms are $\approx €48.80$ and $\Delta \approx €43.80$. At $p = 0.8$: $\min\{€1{,}600, €10\} - €5 = €5$. A near-certain fraud is a poor use of a call, because a decline handles it for the price of the few genuine customers it refuses. Ranking by $p\,\mathrm{Amt}$ puts the 0.8 case first, by a factor of 33. The move: value a scarce resource by what it adds over the best alternative, not over doing nothing.
+</Solution>
+</Exercise>
+
+<Exercise>
+The policy rests on $q$, the share of fraudsters who pass the second factor, and $c_S$, the cost of asking a genuine customer. Neither is in any log the bank already has. Design the measurement of both: what is randomised, on which payments, what is recorded, how long it runs, what it costs, and what estimate of $q$ and $c_S$ it yields. Name one way the estimate goes stale.
+
+<Solution>
+One possible design.
+
+**Randomise inside the step-up zone.** For a small random share of payments the policy would step up (say 1%, chosen by a coin that looks at nothing but the payment's identifier), approve without asking. The rest are stepped up as usual. Both arms are drawn from the same zone, so they have the same fraud rate before the challenge.
+
+**Record** for each payment the arm, whether a challenge was sent, whether it was passed, abandoned or failed, the amount, and, once the label delay has passed, whether it was fraud.
+
+**Estimate $q$.** In the holdout arm the fraud rate $f_h$ is the zone's rate. In the challenged arm, frauds can only appear among the passed payments; with $N_c$ challenged and $F_p$ confirmed frauds among the passed, $\hat q = F_p / (f_h N_c)$. Frauds among the abandoned and failed are never labelled, which is why the denominator comes from the holdout.
+
+**Estimate $c_S$.** The abandonment rate among genuine challenged customers is $(N_c - N_{\text{passed}} - \text{expected frauds stopped})/(\text{genuine challenged})$, with the expected frauds stopped $= (1 - \hat q) f_h N_c$; multiply by the value of a lost sale, add the cost of sending the challenge, and compare the later spending of challenged and holdout customers for any lasting effect.
+
+**Duration and cost.** Long enough to collect a few dozen frauds in the holdout arm, plus the label delay: with a zone fraud rate of 0.5% and 1,000 holdout payments a day, about a week of collection, then weeks of waiting. The cost is the fraud let through in the holdout, budgeted in advance.
+
+**Staleness.** $q$ is set by the fraudsters: a wave of phishing for one-time codes or of phone takeovers raises it without any change in the bank's data, so the experiment has to keep running at a low rate, and $\hat q$ is monitored like any other model input. The move: when a log only records outcomes the policy allowed, buy a small random sample of the outcomes it did not.
+</Solution>
+</Exercise>
+
+<Exercise>
+Return to the fraudster of <Ref lesson="arms-race-replay">the arms-race replay</Ref>, who keeps five payments a day just under the depth-2 tree's amount split. Suppose payments under the split land in the tree's low leaf with $p = 0.003$, and take the lesson's prices.
+
+(a) Under the two-action per-payment rule with $C_a = €5$, which of his payments are called?
+
+(b) Under the four-action policy, which are stepped up? What is now the most he can place per payment without a challenge, and what sets it?
+
+(c) What does this cost the bank's genuine customers, and why does the amount now constrain him twice?
+
+<Solution>
+**(a)** A call needs $p\,\mathrm{Amt} \ge €5$, i.e. $\mathrm{Amt} \ge €1{,}667$ at $p = 0.003$. None of his payments in the €200–€300 band is called by the rule; in the replay he was called only by other routes.
+
+**(b)** Step-up beats approve when $\mathrm{Amt} > (1-p)c_S/(p(1-q)) = 0.997 \times 0.5/(0.003 \times 0.9) \approx €185$. Every payment he makes above €185 is challenged, whatever the tree's split, and nine in ten of those he cannot pass. His ceiling is now €185, set by the step-up boundary at the low leaf's probability, not by the split: lowering his amount below the split no longer clears it.
+
+**(c)** Every genuine payment above about €185 that lands in the low leaf is also challenged: on the simulator, roughly fifty a day between €185 and the split, about €25 a day of friction at €0.50, against his five payments. The amount constrains him twice: once in the model, where staying under the split keeps $p$ low, and once in the expected cost $p\,\mathrm{Amt}$, which grows with the amount even at a fixed $p$. He can control the first by reading the split; the second is a boundary in the plane, which moves only if his $p$ falls further. The move: a cheap action placed by expected cost reaches the low-score region a call never touches.
+</Solution>
+</Exercise>
+
+<Exercise>
+A bank has a million accounts and a review team in which each analyst closes about 50 cases a day.
+
+(a) How many false alarms a day does a false-alarm rate of 1%, 0.1% and 0.01% of accounts produce, and how many analysts would it take to clear them as calls?
+
+(b) The bank reports a false-alarm rate of 0.1%. Half of its false alarms fall on accounts opened in the last three months, which are 2% of the book. What is the false-alarm rate in that group and in the rest, and how many times higher is the first?
+
+(c) Which of these numbers would appear in a report of the policy's total expected cost, and what would the bank have to add to its report to see (b)?
+
+<Solution>
+**(a)** 10,000, 1,000 and 100 a day; at 50 per analyst-day, 200, 20 and 2 analysts just for the false alarms. Only the last fits a team of the size this course has assumed. If the same alerts were automatic blocks, they would be 10,000, 1,000 or 100 customers a day unable to pay.
+
+**(b)** 1,000 false alarms a day, 500 on the 20,000 new accounts and 500 on the other 980,000. New accounts: $500/20{,}000 = 2.5\%$. The rest: $500/980{,}000 \approx 0.051\%$. The ratio is about 49.
+
+**(c)** None of them: the total cost sums $c_D$ (or $c_S$, or $C_a$) over the false positives and cannot say whose they are. Seeing (b) needs the false-positive rate per action and per group, the false-positive harm defined in the lesson, reported beside the total. The move: whenever a policy is optimised for a total, report the rates of its mistakes by the groups it might concentrate on.
+</Solution>
+</Exercise>
+
+<Exercise>
+The 0.93 payment of €400 has been declined and, as a further step after the decline, its card blocked and a case opened for an investigator. For each of three readers, list what they need to know about the decision before they can act on it: the investigator who opens the case, the cardholder whose payment was refused, and a supervisor auditing the bank's monitoring a year later. Which items does the score of 0.93 supply?
+
+<Solution>
+Possible answers.
+
+**The investigator** needs to know what about the payment and the card made the score high (which features, against the card's own past), what is linked to it (other cases on the same device, merchant or account), what has already been done (the block, the notification and the customer's answer), and the decision options and their deadlines.
+
+**The cardholder** needs to know that the payment was refused and the card blocked, the reasons in terms they can check ("an unusual purchase from a new device"), and how to correct a mistake and get the card unblocked, which PSD2 requires where possible.
+
+**The supervisor** needs the policy itself (zones, prices, the surcharge in force that day, the rule table and its priority order), evidence that this case followed it, who overrode what and on which grounds, and how the model behind the probability was validated and is monitored.
+
+The score supplies none of these. It says how likely fraud is, not why, not what the customer can do about it, and not whether the policy that acted on it was the one the bank approved. <Ref lesson="alert-explanations" /> takes the three audiences in turn and the methods that produce each kind of explanation.
+</Solution>
+</Exercise>
+
+<References>
+1. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques*, Wiley, 2015 — Ch. 6, "Model representation" pp. 281–283 (traffic-light bands, hard cut-off versus semi-automated mode with a referral zone, analysts who may overrule); "Decision tables" pp. 283–286 (expanded, contracted and minimised tables for eight card rules; rule verification exposing a conflict and missing entries); "Selecting the sample to investigate" pp. 286–290 (hit rate, utilities of the four outcomes, expected fraud amount and the stepwise investigation table); "Fraud alert and case management" pp. 290–295 (priority, routing by business rules, mitigation before notification, escalating notification, audit trail, link analysis and the shared-entity ring rule, feedback of case outcomes).
+2. B. Baesens, R. Setiono, C. Mues, J. Vanthienen, "Using Neural Network Rule Extraction and Decision Tables for Credit-Risk Evaluation," *Management Science* 49(3), 2003, pp. 312–329 — decision tables as a representation of extracted rules, and their completeness and consistency.
+3. R. J. Bolton, D. J. Hand, "Statistical Fraud Detection: A Review," *Statistical Science* 17(3), 2002, pp. 235–255 — Sec. 8, p. 246 (graded investigation: immediate expensive review for the highest scores, cheaper observation for the next); with F. Provost, "Comment," pp. 249–251 (automatic intervention only on very strong evidence; a 1% daily false-alarm rate on a million accounts is 10,000 false alarms; case lists sorted by probability or expected loss; comprehensible rules for analysts). https://doi.org/10.1214/ss/1042727940
+4. A. Dal Pozzolo, O. Caelen, Y.-A. Le Borgne, S. Waterschoot, G. Bontempi, "Learned Lessons in Credit Card Fraud Detection from a Practitioner Perspective," *Expert Systems with Applications* 41(10), 2014, pp. 4915–4928 — Sec. 5 (accept, refuse or block the card; blocking only on near-certain patterns; a false alert priced as a phone call; too many false alerts or a wrongly blocked card as a loss for the customer). https://doi.org/10.1016/j.eswa.2014.02.026
+5. C. Elkan, "The Foundations of Cost-Sensitive Learning," *Proceedings of the 17th International Joint Conference on Artificial Intelligence (IJCAI)*, 2001, pp. 973–978 — Sec. 2 (the optimal decision as the action with the lowest expected cost under a cost matrix, for any number of actions).
+6. Directive (EU) 2015/2366 on payment services in the internal market (PSD2), *Official Journal* L 337, 23.12.2015 — Art. 68(2)–(4) (blocking a payment instrument on objectively justified grounds, informing the payer, unblocking), Art. 73(1) (refund of an unauthorised payment by the end of the following business day), Art. 79(1) (notification of a refused payment order with reasons), Art. 97(1)–(2) (strong customer authentication for electronic payments). https://eur-lex.europa.eu/eli/dir/2015/2366/oj
+7. Directive (EU) 2024/1640 on the mechanisms to be put in place by Member States for the prevention of the use of the financial system for money laundering or terrorist financing (AMLD6), *Official Journal* L, 19.6.2024 — Recital 114 (de-risking as avoiding rather than managing risk, its push to less secure channels and financial exclusion, supervisors' role). https://eur-lex.europa.eu/eli/dir/2024/1640/oj
+</References>

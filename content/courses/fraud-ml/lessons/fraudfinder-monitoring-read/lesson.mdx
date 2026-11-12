@@ -1,0 +1,407 @@
+A cloud vendor publishes a reference pipeline for real-time fraud detection: feature store, training pipeline, endpoint, monitoring job. It gates deployment on accuracy above 0.95 and monitors nine of its twenty-five features. Read against this module, where does it do what the theory says and where would it pass a model that never alerts?
+
+The module has built three things a deployed detector needs. <Ref lesson="score-to-action" id="four-expected-costs-and-the-cheapest-of-them">The decision zones</Ref> turn a calibrated probability and an amount into approve, step-up, review or decline. <Ref lesson="alert-explanations" id="one-alert-three-readers">An explanation per alert</Ref> gives the investigator, the cardholder and the supervisor each their own object. And <Ref lesson="model-risk-monitoring">the weekly monitor</Ref> asks whether the inputs moved, whether the ranking still works and whether the probabilities still hold, with a life cycle that says what happens at red. All of it was argued on the course's simulator, where the monitor was built as designed.
+
+A published pipeline is the first chance to see what a working system ships. The one read here, the FraudFinder lab series, is a teaching artifact on synthetic data, and that is what makes it readable end to end: every notebook, every query and the serving code are public. The obvious way to read it is as a checklist: it has a monitoring job, so monitoring is done; it has a deployment gate, so bad models are stopped. The audit asks a harder question of every gate and every monitor: which result of this module does it implement, and if it does not, what gets through?
+
+## The artifact: one stream, four paths
+
+A payment is scored by one service, the endpoint, but the pipeline has four paths around it: which of them touch a payment, and what does each do to it?
+
+### What runs where
+
+<Figure src="./figures/fraudfinder-architecture.png" alt="The vendor's architecture diagram, in blue panels. Live transactions go to Pub/Sub subscribers, then to a BigQuery data warehouse, then to notebooks for exploratory analysis. Pub/Sub also feeds a Dataflow streaming feature pipeline. Feature curation feeds batch feature engineering in BigQuery, scheduled by a Cloud Composer pipeline. The streaming and batch features both feed the Vertex AI Feature Store. The store feeds model training (AutoML, BigQuery ML or custom), and from there the model goes to the model registry and a Vertex AI endpoint, with Vertex AI Pipelines alongside. The store also feeds Cloud Run inference, which calls the endpoint. The endpoint feeds Vertex AI Model Monitoring, whose output loops back to the data warehouse." caption="The pipeline under audit, as the vendor draws it: one transaction stream, two feature paths into one store, training to an endpoint, and a monitoring job reading what the endpoint serves." />
+
+A simulated card stream publishes one message per payment. From there the pipeline runs four paths.
+
+- **Data.** Payments and their labels land in a warehouse. A nightly batch job computes card and terminal features over 1, 7 and 14 days; a streaming job computes the same kinds of features over 15, 30 and 60 minutes. Both write to one feature store, the time-keyed log of <Ref lesson="point-in-time-features" id="one-log-written-once-read-two-ways">the point-in-time lesson</Ref>.
+- **Training.** A training table is read from the store as of each payment's timestamp, a model is fitted on it, registered, and deployed to an *endpoint*: a hosted service that takes a feature vector and returns a score. Each track also trains and deploys a model by hand in its notebooks.
+- **Serving.** For each new message a small web application looks up the card's and the terminal's latest features, assembles the 25 inputs (the amount plus 24 features), sends them to the endpoint, and prints the raw message, the inputs and the response to its service log.
+- **Monitoring.** A scheduled job reads the logged requests and compares the distribution of each watched input with a reference, emailing when a distance passes a threshold.
+
+The training path is written as a *pipeline*: a fixed sequence of steps (train, evaluate, deploy) that runs end to end without a person. One of its steps is a *condition gate*: the deployment steps run only if a number computed by the evaluation step clears a threshold. The gate is the only place where the pipeline decides anything about the model.
+
+The training path is built twice, as two *tracks* that share the data path: the first trains a logistic regression inside the warehouse, the second a boosted tree in a managed training job.
+
+### What the data are, and what the pipeline gets right
+
+The data are synthetic, with about 2% of payments fraudulent, and the features are the ones <Ref lesson="canonical-datasets">the course's simulator</Ref> uses: counts and average amounts per card and per terminal over windows, and the terminal's fraud risk. Two facts about them shape everything below.
+
+The labels are instant: a payment's fraud flag is in the warehouse as soon as the payment is. The notebook says so, and says that a bank's labels arrive days later and that a real training table must "time-travel" back far enough for its labels to have settled; for simplicity it trains on yesterday. The training table of each track is therefore **one day of payments**, read from the store as of each payment's moment.
+
+The terminal's fraud risk is computed the way <Ref lesson="point-in-time-features" id="the-delayed-terminal-risk-a-window-that-ends-δ-days-ago">the delayed terminal risk</Ref> prescribes: the batch query counts frauds in a window that ends seven days before the payment, as the difference of two rolling sums, with the count of payments kept beside it. The as-of read from the store is the point-in-time join. Both are the module's own answers, implemented correctly, and they are the reason the pipeline is worth auditing at all: its data path was built by people who knew the leaks.
+
+## The deployment gate: a constant model clears accuracy 0.95
+
+The first track trains a logistic regression inside the warehouse, evaluates it on rows the warehouse held out at random, and deploys only if the reported accuracy exceeds 0.95. A gate is meant to stop a model that should not run. What is the weakest model that passes this one?
+
+### The arithmetic of a 2% stream
+
+Take the most useless model there is, the *constant model*: it gives every payment the same score, below 0.5, so it never alerts and ranks nothing. On a test set at the stream's 2% fraud rate it is right on the 98% that are genuine and wrong on the 2% that are fraud. Its accuracy is **0.98**, three points above the gate. Any model that never alerts gets the same 0.98, whatever order its scores are in, because accuracy reads only the side of 0.5 each score falls on.
+
+<Figure
+  src="./figures/two-gates.svg"
+  alt="Two bar charts on a 0 to 1 scale. Left, gate on accuracy, deploy if accuracy above 0.95: a bar for a constant score, which never alerts, reaches 0.98, above a dashed gate line at 0.95, marked passes. Right, gate on average precision, deploy if AP above 0.2: the same constant score reaches 0.02, far below a dashed gate line at 0.2, marked fails. A note: test set at the pipeline's 2% fraud rate; a constant score has accuracy 1 minus the base rate and average precision equal to the base rate."
+  caption="The constant model against the two tracks' gates: it clears accuracy 0.95 and fails average precision 0.2."
+/>
+
+This is <Ref lesson="economics-of-detection" id="accuracy-prices-every-mistake-the-same">the accuracy argument of the economics lesson</Ref> with a gate attached: accuracy counts a missed fraud and a false alarm as one mistake each, and with 49 genuine payments per fraud the majority decides the number. The gate passes the constant model at any fraud rate below 5%, which covers every card stream there is, so a model that ranks well and a model that never alerts both clear it, and the gate cannot tell which one it is deploying.
+
+<KeyFact>
+A gate is a threshold on a metric, and it can only stop a bad model if the metric moves when the ranking fails. Accuracy at a 2% fraud rate does not: a model that never alerts sits three points above the line.
+</KeyFact>
+
+In this series the gate stops nothing for a second reason: the model that serves never meets it. The pipeline deploys its gated model to the endpoint it has just created, which nothing calls. The endpoint the serving application calls, and the monitoring job watches, receives in the sixth notebook the model trained by hand in the fourth, deployed by a notebook cell with no threshold in front of it. The arithmetic above is a reading of the recipe: what the gate would let through if the pipeline's endpoint were the one serving.
+
+### The sibling track gates on average precision
+
+The second track, which trains a boosted tree in a managed training job, gates on a different number: deploy if the test set's average precision exceeds 0.2. This is the right kind of gate. <Ref lesson="alert-budget-metrics" id="what-a-ranking-with-no-information-scores">A ranking with no information</Ref> scores the base rate on average precision: a constant score is one tied block and scores exactly the fraud share, here 0.02, and a random order scores a hair above it. So 0.2 is **ten times random**, and the constant model fails it. A model whose scores all sit below 0.5 but put the frauds first also never alerts, and it passes, as it should: average precision judges the order of the scores, not the 0.5 cut, and where to cut is a separate decision ([the threshold section](#the-threshold-the-right-question-answered-with-equal-costs)).
+
+Two limits remain. The gate is a floor, not a choice: it says the model ranks better than chance, not that it is the best candidate or better than the model already deployed. And average precision is the number for the whole top of the list, while deployment is judged at the team's budget, by card precision at $k$ (<Ref lesson="alert-budget-metrics" id="three-numbers-for-three-questions">the three-numbers rule</Ref>).
+
+## What the gate's number is measured on
+
+Both gates read their number off a "held-out test set". Does that set resemble the payments the model will score next week? The three evaluation splits in the two tracks show what the phrase covers.
+
+### Three splits in two tracks
+
+<FigureSequence
+  name="split"
+  alt="Three frames sharing one layout. Frame 1: one day of payments drawn as a strip from 00:00 to 24:00 with amber ticks for frauds, labelled one day of payments, 2% fraud; the training table of either track is yesterday, labels already final. Frame 2 adds the notebook's split below: every fraud kept and as many genuine payments, rows mixed across the day, cut 60/20/20 into training, test and validation blocks, each half amber for half fraud; note: every block is half fraud and spans the whole day, a card's frauds land in all three. Frame 3 adds the deployment geometry beneath on a time arrow: a blue training block, a dashed delay block, and an amber test block at 2% fraud; note: neither track has the delay block, and the notebook's test set is not at the stream's fraud rate."
+  caption="The notebook balances the day before splitting it at random; deployment scores a later stretch at the stream's own fraud rate, after a delay."
+/>
+
+<Task>
+Before the last frame, say for each of the notebook's three blocks what share of it is fraud and which hours of the day it covers. Then name the two properties of a live test set that none of the three blocks has.
+</Task>
+
+- **The warehouse track** holds out a random share of the one training day, at the day's 2% fraud rate. The accuracy gate is computed there.
+- **The second track's notebook** balances the day first: it keeps every fraud and draws as many genuine payments, then shuffles and cuts 60/20/20. The test block is half fraud. The threshold sweep below is computed there.
+- **The second track's pipeline** splits the day at random 80/10/10 and undersamples only the training part, so its test block keeps the 2% rate. The average-precision gate is computed there.
+
+### Why none of them describes the live stream
+
+Each split misses a different part of <Ref lesson="delayed-labels-prequential" id="a-shuffled-split-tests-a-model-that-cannot-exist">the deployment geometry</Ref>.
+
+**Time order.** All three are random within one day, so a card's or a terminal's frauds fall on both sides of the cut, and the test set rewards the model for recognising payments it has already seen the siblings of. The delay lesson measured what that buys on the course's simulator: an 80/20 shuffle puts most of a leaked card's other frauds into training.
+
+**Prevalence.** A balanced test set changes every number that depends on the fraud share. <Ref lesson="economics-of-detection" id="the-same-detector-on-different-streams">Precision belongs to the stream it was measured on</Ref>: a detector that catches 80% of frauds and flags 10% of genuine payments has precision 0.89 on a balanced set and 0.14 at 2% fraud. Accuracy on a balanced set no longer rewards the constant model, but it no longer describes the stream either.
+
+**The delay.** None of the tracks leaves a delay block, because with instant labels none is needed; the notebook says as much. On a bank's data the same code would train on a day whose frauds are mostly still labelled genuine.
+
+The notebook itself warns that its metrics "may be unexpectedly high (e.g., a perfect ROC AUC score of 1.0)" because the data are synthetic, and that it "focuses on the overall architecture". That honesty is accurate, and it is also the problem with the gates: on a set where a model can reach an AUC of 1.0, both thresholds are cleared by almost anything that ranks, and a number measured on a shuffled day of a generator says nothing about next week, so a gate set on it decides nothing.
+
+<KeyFact>
+A deployment gate inherits every flaw of its test set. To stop a model that will fail next week, the gate's metric has to be computed where next week stands: a later block, after a delay the width of the label latency, at the stream's own fraud rate.
+</KeyFact>
+
+## The threshold: the right question, answered with equal costs
+
+The second track's notebook then turns the score into a decision. Its prose states the problem correctly: the cut-off "determines the True Positive (TP), False Positive (FP)" counts and should be chosen on "your business tolerance for accepting the cost of FP or FN cases". The code sweeps thresholds 0.1 to 1.0 and draws ten confusion matrices, then picks, over the ROC curve's own thresholds, the one that maximises the true-positive rate minus the false-positive rate, "if we believe the optimal threshold for our use case offers the highest TPR and minimum FPR".
+
+### Youden's point is the cost rule with one price ratio
+
+That maximum is *Youden's point*: on the ROC curve, the point farthest above the diagonal, where the curve's slope is 1. The <Ref lesson="example-dependent-cost" id="the-decision-that-minimises-expected-cost">minimum-cost rule</Ref> also picks a point on the ROC curve, and its slope there is set by the prices. With the course's convention (a call costs $C_a$ whether or not the payment is fraud, a missed fraud costs its amount), the expected cost per payment at a point with rates TPR and FPR is
+
+$$
+\pi\bigl[\mathrm{TPR}\cdot C_a + (1-\mathrm{TPR})\,\mathrm{Amt}\bigr] + (1-\pi)\,\mathrm{FPR}\cdot C_a ,
+$$
+
+and it is smallest where the curve's slope equals $\dfrac{(1-\pi)\,C_a}{\pi\,(\mathrm{Amt} - C_a)}$. The reason is a trade at the margin: a small step along the curve adds $(1-\pi)\,C_a\,d\mathrm{FPR}$ in calls on genuine payments and saves $\pi\,(\mathrm{Amt} - C_a)\,d\mathrm{TPR}$ on frauds caught rather than missed, so the cost falls while $d\mathrm{TPR}/d\mathrm{FPR}$ exceeds that ratio and stops falling where the two are equal. The [exercise on Youden's point](#exercises) carries the derivation through.
+
+<Example title="Youden's point against the cost point at 2% fraud">
+Take the pipeline's $\pi = 0.02$, the course's call price $C_a$ = €5, and give every payment the simulator's typical amount, €54. The optimal slope is
+
+$$
+\frac{0.98 \times 5}{0.02 \times 49} = \frac{4.9}{0.98} = 5 .
+$$
+
+On an illustrative ROC curve (two normal score distributions two standard deviations apart), slope 1 falls at TPR 0.84, FPR 0.16 and slope 5 at TPR 0.58, FPR 0.036. Per 10,000 payments, 200 of them fraud:
+
+- **Youden's point**: $0.16 \times 9{,}800 \approx 1{,}555$ false alarms and 168 frauds caught, so 1,723 calls at €5 and 32 missed frauds at €54, about **€10,330**.
+- **Cost point**: 348 false alarms and 115 frauds caught, 464 calls and 85 misses, about **€6,880**.
+- **Flag nothing**: 200 misses at €54, **€10,800**.
+
+Youden's point spends almost all of what it saves on calls.
+</Example>
+
+<Figure
+  src="./figures/youden.svg"
+  alt="A ROC curve with false-positive rate and true-positive rate on 0 to 1 axes and the diagonal dashed. A blue point at FPR 0.16, TPR 0.84 with a tangent of slope 1, Youden's point; an amber point at FPR 0.036, TPR 0.58 with a tangent of slope 5, the cost-weighted point. A side panel per 10,000 payments at 2% fraud, call 5 euros, every payment worth 54 euros: Youden's point, 1,723 alerts, 168 frauds caught, cost 10,330 euros; cost-weighted point, 464 alerts, 115 frauds caught, cost 6,880 euros; flag nothing, 200 frauds missed, 10,800 euros. Note: illustrative curve, two normal score distributions two standard deviations apart."
+  caption="Youden's point is the cost-minimising point only for one ratio of prices; at 2% fraud and a €5 call it buys nearly four times the calls the costs justify."
+/>
+
+Youden's point treats a false-positive rate and a true-positive rate as equally valuable, which at 2% fraud is a strong statement about prices: one missed fraud worth 49 false alarms. Slope 1 in the minimum-cost rule means the net loss on a missed fraud, $\mathrm{Amt} - C_a$, equals 49 calls, so $\mathrm{Amt} = 50 \times$ €5 = €250 (derived in [the exercises](#exercises)). The notebook writes down the module's question and answers it with a price ratio nobody chose. And a single cut on the score is still <Ref lesson="example-dependent-cost" id="reading-the-threshold">the fixed threshold of the cost lesson</Ref>, optimal for one amount only; the per-payment rule flags where $p \cdot \mathrm{Amt} \ge C_a$, on calibrated probabilities, which a model trained on a balanced sample does not output until <Ref lesson="undersampling-calibration">the undersampling correction</Ref> is applied.
+
+### Which model the threshold belongs to
+
+The sweep is run on the scores of whichever model the notebook saved. The hyperparameter loop fits eight configurations and logs each one's validation F1 to an experiment table, which the notebook then sorts. The model it saves is `models[f"ff-xgboost-local-run-t-{i}"]`, where `i` is the loop variable after the loop has ended: the eighth configuration, whatever the table says. The selection the module asked for, <Ref lesson="delayed-labels-prequential" id="what-prequential-selection-picks">a deployment metric on prequential folds</Ref>, is replaced by the order of a Python list.
+
+<Aside>
+The second track's training script reports a log-loss computed on hard 0/1 predictions rather than on probabilities. The probability of the true class is clipped at a tiny $\varepsilon$ before the logarithm ($10^{-15}$ in older versions of the library, machine precision, about $2.2 \times 10^{-16}$, in current ones), so each wrong prediction costs $-\ln \varepsilon$, 34.5 or 36.0 nats, and each right one nothing. The reported "log-loss" is about 35 times the error rate: accuracy again, under another name. The notebook's prose also says it will "skip the data balance process", and the next cell balances the data.
+</Aside>
+
+## The monitoring job: a label-free input check on nine features
+
+The sixth notebook of the first track sets up the monitoring the opening counted: nine of twenty-five features. Before judging the nine, the job has to be read for what it computes, because its words, skew and drift, are not used the way the course used them.
+
+### What the job computes
+
+<Figure
+  src="./figures/monitor-job.svg"
+  alt="A flow diagram. The training table, yesterday's payments, histogram per feature, feeds a blue box: skew, hourly, this hour against training, distance above 0.5. Endpoint requests, each payment's 25 inputs and its score, pass through a random half, sample rate 0.5, logged to a table, into both the skew box and a second blue box: drift, hourly, this hour against earlier serving, above 0.05. Both blue boxes feed an email that names the feature. Above the blue boxes: per feature, 9 of the 25. Below, a dashed box marked missing: labels, none joined; no ranking backtest, no calibration pools, no index on the frauds. Footer: distance is Jensen–Shannon between two histograms on equal-width bins; inputs and their attributions both watched."
+  caption="The monitoring job: two label-free comparisons per watched feature, run every hour on a random half of the requests."
+/>
+
+The service needs three things, and the notebook supplies each.
+
+- **A reference for skew**: the training table, one day of payments, whose histogram per feature is computed once when the job is created.
+- **Logged requests**: a random half of the endpoint's requests (`sample_rate=0.5`), written to a table, read every hour.
+- **Thresholds per feature**: 0.5 for skew, 0.05 for drift, the same for every feature and with no stated reason, plus the same pair for each feature's attributions, computed by the explanation specification the endpoint is deployed with ([read below](#the-explanation-and-the-request-log)).
+
+In the job's terms, *skew* compares this hour's serving values with the training data and *drift* compares them with earlier serving data. Neither is the course's usage: <Ref lesson="point-in-time-features" id="two-implementations-of-the-same-feature">training–serving skew</Ref> is the same payment getting two values from two computations, and <Ref lesson="concept-drift">concept drift</Ref> is a change in the joint distribution. In the module's terms the job's skew plays the role of <Ref lesson="model-risk-monitoring" id="two-references-the-development-week-and-last-week">the stability index against the development sample</Ref>, and its drift the role of the same comparison against a recent window. The first says how far the inputs are from what the model was built on, the second when they moved. The job runs both, which is what the module asks for.
+
+### Where 0.05 and 0.5 sit on the stability scale
+
+The job's distance is not the stability index. For a numerical feature the service cuts the range into bins of equal width and computes the *Jensen–Shannon divergence* between the two histograms: with $m_i = (o_i + e_i)/2$ the average of the two shares in bin $i$,
+
+$$
+\mathrm{JS} = \tfrac12 \sum_i o_i \ln\frac{o_i}{m_i} + \tfrac12 \sum_i e_i \ln\frac{e_i}{m_i} .
+$$
+
+Each half is a Kullback–Leibler divergence from the average histogram, so empty bins cause no trouble, and the value is at most $\ln 2 \approx 0.69$, reached when the two histograms share no bin. The numbers here are in nats; the service's documentation does not say whether its logarithm is natural or base 2, and in bits every value is 1.44 times larger ([the exercise on the two distances](#exercises) carries the conversion through), which changes none of the conclusions below. The stability index is the sum of the two Kullback–Leibler divergences between $o$ and $e$ themselves (<Ref lesson="model-risk-monitoring" id="the-index-is-the-information-value-between-two-periods">the identity of the monitoring lesson</Ref>). For small moves the two are in a fixed ratio.
+
+<Example title="the product stream's week, on both scales">
+The score bands of the product stream's week from day 112 (<Ref lesson="model-risk-monitoring" id="comparing-the-shares-band-by-band">the monitoring lesson's worked index</Ref>) give a stability index of 0.063. The same two histograms give $\mathrm{JS} = 0.0079$, a ratio of 8.0.
+
+That ratio is general for small moves: writing $o_i = e_i + \Delta_i$, the stability index is close to $\sum \Delta_i^2/e_i$ and the Jensen–Shannon divergence to $\sum \Delta_i^2/(8 e_i)$ (derived in [the exercises](#exercises)). So the job's drift threshold of 0.05 corresponds to a stability index of about 0.4, past the red line of 0.25, and its skew threshold of 0.5 lies outside the small-move range altogether: most of the two histograms must have stopped overlapping.
+</Example>
+
+The thresholds are not wrong because they differ from 0.10 and 0.25, which are a convention too. They are unexplained: nothing in the job says what change they were set to catch, and on the stability scale they sit beyond the point where the monitoring lesson already called for action.
+
+Two choices of the job weaken it further. Equal-width bins on a heavy-tailed input such as the amount put almost all payments in the first bin or two, where a move in ordinary payments shows little; the stability index is cut at development deciles for that reason. And an hourly drift check compares each hour with recent hours, the week-on-week comparison of <Ref lesson="model-risk-monitoring" id="two-references-the-development-week-and-last-week">the monitoring lesson</Ref> at a finer grain: a change that builds up over weeks, as the 30-day features did after the product launch, moves too little from one hour to the next to fire.
+
+### Nine of twenty-five, and the known skew
+
+Which nine? The amount, and the 15-minute and 1-day versions of the card's count and average amount and of the terminal's count, plus the terminal's 15-minute average amount and 1-day fraud risk.
+
+<Figure
+  src="./figures/watchlist.svg"
+  alt="A grid of the 25 inputs: rows card count, card average amount, terminal count, terminal average amount, terminal fraud risk; columns 15 min, 30 min, 60 min, 1 day, 7 days, 14 days; plus the payment amount below. Watched cells are filled amber: amount; card count and card average amount at 15 min and 1 day; terminal count at 15 min and 1 day; terminal average amount at 15 min; terminal fraud risk at 1 day. The 15, 30 and 60-minute columns are hatched blue, meaning 0 in every training row. Legend: watched by the job, 9; not watched, 16; 0 in every training row, 12."
+  caption="The job watches the shortest window of each feature; the 7- and 14-day windows, which move latest and furthest under a gradual change, are not watched."
+/>
+
+The sixteen unwatched inputs are the 30- and 60-minute features and every 7- and 14-day feature. On the product stream of the monitoring lesson it was exactly the long windows that moved most, <Ref lesson="model-risk-monitoring" id="nine-inputs-move-under-a-green-score">red weeks after the launch</Ref> while the short ones stayed yellow. The watch list keeps the inputs that move first and drops the ones that move furthest.
+
+The list does include four of the minute features, and those carry the pipeline's one known skew. <Ref lesson="point-in-time-features" id="two-implementations-of-the-same-feature">The point-in-time lesson</Ref> showed the batch job writing 0 into every minute column so that the training table has the serving payload's shape: every training row has 0 there, every live payment its real count. A monitor whose skew reference is that training table should flag those four columns first. How far does a column that was always 0 have to move before it does?
+
+<Example title="a column that was 0 in every training row">
+All the training mass is in the bin that holds 0. Say a share $s$ of this hour's payments has a non-zero value, spread over other bins. Those bins are empty in training, so in the formula their average share is $s/2$ and the zero bin's is $1 - s/2$:
+
+$$
+\mathrm{JS}(s) = \tfrac12\Bigl[(1-s)\ln\frac{1-s}{1-s/2} + s\ln 2\Bigr] + \tfrac12 \ln\frac{1}{1-s/2}.
+$$
+
+At $s = 0.3$: $\tfrac12[0.7 \ln(0.7/0.85) + 0.3 \ln 2] + \tfrac12 \ln(1/0.85) = \tfrac12(-0.136 + 0.208) + \tfrac12(0.163) = 0.117$.
+
+The skew line of 0.5 is crossed only at $s \approx 0.88$: nine payments in ten would need a card payment in the preceding 15 minutes before the job reports the skew it was built on.
+</Example>
+
+<Figure
+  src="./figures/zero-baseline.svg"
+  alt="A curve of the Jensen–Shannon distance in nats against the share of this hour's payments with a non-zero value, for a feature that was 0 in every training row. The curve rises from 0 at 0% to ln 2, about 0.69, at 100%. Dashed lines: drift threshold 0.05, crossed at 14%; skew threshold 0.5, crossed at 88%."
+  caption="Against an all-zero training column the skew distance passes 0.5 only when nearly every live payment has a non-zero value."
+/>
+
+The line is out of reach because of the distance, not the reference. Jensen–Shannon compares each histogram with the average of the two, so a bin that was empty in training enters with a ratio of at most 2 and the whole value stays below $\ln 2$. The module's stability index compares the two histograms directly, and its term $(o_i - e_i)\ln(o_i/e_i)$ grows without limit as a bin's development share goes to zero.
+
+That unbounded term is why the module does not lean on it. The monitoring lesson's <Ref lesson="model-risk-monitoring" id="exercises">empty-bin exercise</Ref> cuts the bins on the development sample with open outer bins, so that no bin is empty at development, and reports the share of live values outside the development range as a number of its own. Here the development range is the single value 0, so every non-zero live value is outside it, and that share reads 5% from the first week on a stream where 5% of payments follow another of the same card within 15 minutes. The out-of-range share is the module's detector of this skew.
+
+The index itself does not settle the case. With open bins an all-zero development column is a single bin that holds every live value too, and the index reads 0. Counted instead as a bin whose development share is replaced by a floor $f$, the 5% contributes
+
+$$
+(0.05 - f)\ln\frac{0.05}{f},
+$$
+
+which is $0.0499 \times \ln 500 = 0.31$ at $f = 0.0001$, red, and $0.049 \times \ln 50 = 0.19$ at $f = 0.001$, yellow. The colour is whatever the floor makes it, which is why the exercise reports the share instead.
+
+So the module's monitor finds the skew, through the out-of-range share. What it cannot do is date it. The monitoring lesson's signature of a code fault is <Ref lesson="model-risk-monitoring" id="what-a-red-input-means">a single input that turns red the day code deploys</Ref>. This skew was built into the pipeline before the model scored its first payment, so the out-of-range share reads 5% from the first week and has no jump to tie to a deployment, and the index against last week, where both weeks carry the same 5%, sees nothing at any time. A finding with no date points at the feature rather than at a change in the code. <Ref lesson="point-in-time-features" id="the-parity-check">The parity check</Ref>, a replay of past payments through the serving path joined to their training rows, names the cause: every non-zero row is a disagreement between the two computations. The pipeline has neither the share nor the replay.
+
+<Exercise>
+On a stream where 5% of payments follow another payment of the same card within 15 minutes, compute the job's skew distance for the card's 15-minute count against its all-zero training column, and compare it with the floored index of 0.31 above. Of four checks (the job's skew and drift, the module's out-of-range share against the development sample, and its index against last week), which report the column, and which could say when the skew began?
+
+<Solution>
+With $s = 0.05$: $(1-s)\ln\frac{1-s}{1-s/2} = 0.95 \ln\frac{0.95}{0.975} = 0.95 \times (-0.0260) = -0.0247$; $s \ln 2 = 0.0347$; $\ln\frac{1}{1-s/2} = \ln\frac{1}{0.975} = 0.0253$. So $\mathrm{JS} = \tfrac12(-0.0247 + 0.0347) + \tfrac12(0.0253) = 0.0050 + 0.0127 = 0.0177$, about a seventeenth of the index with a floor of 0.0001 on the same two histograms. That is far below the skew line of 0.5, and below 0.05 as well, so the job's skew check stays silent at either line. Its drift check compares live hours with live hours, both with 5% non-zero, and reads near 0 by construction; so does the module's index against last week. The module's out-of-range share reads 5% from the first week, while the index beside it reads 0 with open bins, or 0.19 to 0.31 depending on the floor. The share is the only one of the four that reports the column, and none of them can date it, because the skew has no start inside the monitored period: it began with the pipeline. The cause comes from a parity replay, which finds every non-zero row a disagreement from the first day on.
+</Solution>
+</Exercise>
+
+### What no label means
+
+The job reads only requests. No label is ever joined to a logged payment, so of the module's three questions it can answer only the first.
+
+- **Ranking**: no backtest. The <Ref lesson="model-risk-monitoring" id="the-reference-is-a-spread-not-a-week">CUSUM on weekly AP against the spread of ordinary weeks</Ref> needs each week's payments with their labels, $\delta$ days later.
+- **Probabilities**: no calibration pools, so nothing would notice the probabilities of a model trained on a balanced sample, or a base rate that doubled.
+- **The frauds alone**: no stability index on the confirmed frauds. A change in the fraudsters' method, which <Ref lesson="model-risk-monitoring" id="what-a-green-index-cannot-rule-out">no population index can see</Ref> because 2% of the payments cannot move it, passes every hour in silence.
+
+The attribution checks are the job's one step toward the module's monitor: an hourly distance on each watched feature's attributions is the <Ref lesson="alert-explanations" id="exercises">explanation-mix index</Ref> at a finer grain, a label-free sign that the model is alerting for different reasons. It moves when inputs move, and it inherits the same lines and the same nine features.
+
+## Serving and the record
+
+The serving application is where the model's score was supposed to become an action and a record. What happens to a payment once the endpoint has scored it, and what is kept of it?
+
+### One zone: every payment is approved
+
+The handler sends the payload to the endpoint, prints the result, and returns an empty response with status 204 to the message queue. The score goes nowhere else: no payment is declined, stepped up or queued for a call. In the module's terms the handler is a policy with <Ref lesson="score-to-action" id="zones-that-move-with-the-amount">one decision zone</Ref>, approve. The queue only learns that the message was delivered, so a model that never alerts and a model that alerts on every payment produce the same outcome for every customer. That is acceptable in a teaching pipeline whose subject is the plumbing. It also means the score decides nothing, so even a gate that stood in front of the served model, which here none does, would guard a decision nobody takes; and whoever builds on this pipeline adds the zones, the capacity surcharge and the case queue of the score-to-action lesson themselves.
+
+### Missing becomes zero, and nothing tests it
+
+The handler replaces every missing feature value with 0.0, so a card the store has never seen is scored as a card with no activity (<Ref lesson="point-in-time-features" id="two-implementations-of-the-same-feature">met in the point-in-time lesson</Ref>). The module placed that case at a specific gate: <Ref lesson="model-risk-monitoring" id="five-stages">the testing stage</Ref> checks how the model behaves on missing and extreme inputs and on dummy fraud cases built to each known pattern, before any customer is scored. The pipeline has no testing stage, so the fill value is chosen by the serving code and never checked against what the training table did with the same case. The 25 feature names, typed out by hand in the notebooks, the serving application, the training script's schema and, in part, the monitoring thresholds, are the same problem one level up: lists that nothing compares.
+
+### The explanation and the request log
+
+The endpoint is deployed with an explanation specification: sampled Shapley, averaging over 10 random orderings of the inputs (<Ref lesson="alert-explanations" id="the-attribution-restated">the attribution of the explanations lesson</Ref>). The warehouse track's batch explanation returns the top five attributions per prediction together with the base value and the prediction, so the folded remainder is recoverable. Read against the explanations lesson, two things are missing. The specification names no reference sample, so the attributions are taken against the service's default, and nothing records which one; <Ref lesson="alert-explanations" id="the-reference-is-a-choice-and-it-changes-every-number">the reference changes every number</Ref>. And the handler calls the endpoint's plain prediction, not its explanation, so the attributions feed the monitoring job and never reach a person.
+
+The pipeline keeps two traces of a scored payment. For every message the handler prints three lines to its service log: the raw message, with the payment's, the card's and the terminal's identifiers and the amount; the 25 inputs as sent; and the endpoint's response. And the monitoring job writes a table row for a random half of the requests, because its sample rate is also the logging rate: the endpoint, the id of the deployed model that answered, a logging time, and the request and response, which hold the 25 inputs and the score but no payment identifier. Set beside <Ref lesson="alert-explanations" id="the-supervisor-a-record-that-can-be-re-computed">the supervisor's record</Ref>, the two hold the served inputs and the score, the part that would otherwise be rebuilt later from the training tables and could differ from what the model saw.
+
+Neither is that record. The printed lines cover every payment, but they are free text with no schema, three separate lines of which only the first names the payment, kept for as long as the logging service keeps them, and nothing joins them to a label or a decision. The table has columns, but holds half the payments and no identifier to join them by: a record kept for the supervisor cannot be a sample. And both lack the attribution and its reference, the action taken, any override and its grounds, and the disposition when it arrives.
+
+## The life cycle the pipeline implements
+
+Which of the module's stages stand between a newly trained model and a customer here? <Ref lesson="model-risk-monitoring" id="five-stages">The five stages</Ref> are development, testing, staging, production and retirement, each closed by a gate. Each track's pipeline runs development, one automated gate and a deployment, but to an endpoint of its own that nothing calls. The model that reaches customers takes another route: trained by hand in the fourth notebook, deployed by hand in the sixth to the endpoint the serving application calls. Development, then production, with no gate between.
+
+- **Testing**: absent. No latency check under load, no missing or extreme inputs, no dummy cases.
+- **Staging**: absent. There is no champion: each run of the first track's pipeline replaces the warehouse model of the same name and deploys it to an endpoint, and the deploy step picks the endpoint in the project that was updated most recently, which is the one just created unless something else was touched in between. Since that endpoint is, as a rule, not the served one, a nightly run would not reach a customer. No challenger is ever scored beside the model that serves, so the <Ref lesson="model-risk-monitoring" id="champion-and-challenger-on-the-champions-labels">paired comparison on complete labels</Ref> has nothing to compare.
+- **Retirement**: partial. The model registry keeps earlier versions of each model, and both traces name the deployment that answered: each row of the monitoring table carries the deployed model's id, and the printed response carries the same id and, with a current version of the vendor's client library, the registry model and version as well. That printed line is the only per-payment link to a registry version, and it is free text that lives as long as the log's retention. The deployment id in the table leads to a version only through the endpoint, and only while that deployment is still on it; the pipeline writes the mapping nowhere. Once the log has expired and the deployment is replaced, nothing the pipeline kept traces a decision to the model that made it.
+
+The shape of the pipeline is the right one for <Ref lesson="model-risk-monitoring" id="retraining-every-night-is-a-change-agreed-in-advance">nightly retraining agreed in advance</Ref>: a fixed recipe, run without a person, deploying only through automated gates. Two things are missing. The route: here the recipe deploys beside the served model rather than in its place. And the content of the gates, which the module's version adds: the testing checks, a score index against the champion, and a backtest within the reference spread.
+
+## The audit, gate by gate
+
+Each component, set against the module result it implements, the result it leaves out, and what that lets through:
+
+| gate or monitor | implements | omits | what gets through |
+|---|---|---|---|
+| feature store, as-of training read, delayed terminal risk | point-in-time correctness | — | nothing found |
+| minute features, 0 in batch, real in serving | one log read two ways | the share outside the development range, the parity replay | a skewed column, every day |
+| deployment gate, first track | a gate in the life cycle | a prevalence-aware metric | any model that never alerts, the constant one included; and the served model never meets it |
+| deployment gate, second track | AP as the metric | time order, delay block, CP at $k$, comparison with production | any model better than random on a shuffled day |
+| serving route | — | a gate in front of the served endpoint | the hand-trained model, held to no threshold |
+| threshold from the notebook | an ROC cut | prices, amounts, calibration | a cut that costs about what doing nothing costs |
+| monitoring job, skew and drift | stability index on inputs, two references | deciles, stated lines, 16 inputs, labels | gradual change, the known skew, any change in the frauds alone, any loss of ranking or calibration |
+| explanation specification | sampled Shapley, top five | a named reference, delivery to the investigator | an attribution against an unrecorded reference |
+| serving handler | — | decision zones, the testing stage | every payment approved; a cold card scored as an idle one |
+| request table and service log | served inputs and score | a structured row for every payment with its identifier; action, override, disposition | a decision that cannot be reconstructed |
+
+The pipeline's defects are what a reader of any pipeline should look for, not a verdict on what the vendor intended.
+
+Were the model one the EU's AI Act classes as high-risk, what this table finds missing would meet three legal requirements: the accuracy metrics a system was tested against must be declared in its instructions for use, with the circumstances that change them (Art. 13(3)(b)(ii), Art. 15(3)); its technical documentation must state the "metrics used to measure accuracy, robustness" and compliance with the Act's other requirements, "as well as potentially discriminatory impacts" (Annex IV 2(g)); and it needs a post-market monitoring plan (Art. 72). A gate on accuracy at 2% fraud is a declared metric that a constant model meets. Whether a fraud detector is high-risk at all is <Ref lesson="eu-ai-act-fraud">the AI Act lesson</Ref>'s question.
+
+<Conclusion>
+You can now read a deployed fraud pipeline against the module with three questions: for each gate, what is the weakest model that passes it; for each monitor, what change would it miss; for each record, what decision can it not reconstruct. On this pipeline the answers sort themselves in one way. The parts that need no labels and no prices, the feature store, the as-of join and an input monitor, are present, and the first two are built as the module asks. The parts that need them, the metric a gate is computed on, the threshold that turns a score into an action and the backtest that says the ranking still works, are the ones that are weak or missing, and neither of the two gates stands in front of the model that serves. That is where to look first in any pipeline.
+
+The request table and the service log are the closest things the pipeline has to a record of what happened to each payment, and they were designed for monitoring and debugging, not for a regulator. From July 2027 European law fixes what a monitoring system must look at and which record must exist for every alert, the ones closed as nothing included; <Ref lesson="aml-transaction-monitoring-duty" /> reads that duty.
+</Conclusion>
+
+## Exercises
+
+<Exercise>
+Compute the accuracy of the constant model (one score below 0.5 for every payment) at fraud rates of 2%, 0.8%, 0.25% and 6%, and say at which of them the gate "accuracy above 0.95" passes it. At which of the four rates does the same model pass the gate "average precision above 0.2"?
+
+<Solution>
+The constant model is right on every genuine payment and wrong on every fraud, so its accuracy is $1 - \pi$: 0.98, 0.992, 0.9975 and 0.94. The accuracy gate passes it at 2%, 0.8% and 0.25%, and fails it only at 6%, because $1 - \pi > 0.95$ exactly when $\pi < 0.05$. The rarer the fraud, the more comfortably the useless model passes. A constant score is one tied block, so its average precision is exactly $\pi$: 0.02, 0.008, 0.0025 and 0.06. It fails the AP gate at all four rates, and would pass only on a stream where more than a fifth of the payments were fraud. The two gates react to the base rate in opposite directions: the accuracy gate gets easier as fraud gets rarer, the AP gate's margin over random (a factor $0.2/\pi$) gets larger.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague proposes setting the AP gate at the test set's fraud share, "so that anything better than random deploys". (a) Using the expected average precision of a random order, $\mathbb E[\mathrm{AP}] = \frac{H_n}{n} + \frac{m-1}{n-1}\bigl(1 - \frac{H_n}{n}\bigr)$ with $H_n = \sum_{i=1}^n 1/i$, show that a random ranking clears that gate on average. (b) For a test set of 100,000 payments with 2,000 frauds, find by simulation the gate that a random ranking clears only one time in twenty. What does the answer say about the 0.2 the pipeline uses?
+
+<Solution>
+(a) With $\pi = m/n$, the expected AP minus $\pi$ is $\frac{H_n}{n} + \frac{m-1}{n-1} - \frac{m-1}{n-1}\frac{H_n}{n} - \frac{m}{n}$. Since $\frac{m-1}{n-1} < \frac{m}{n}$ for $m < n$, write it as $\frac{H_n}{n}\bigl(1 - \frac{m-1}{n-1}\bigr) - \bigl(\frac{m}{n} - \frac{m-1}{n-1}\bigr)$. The second bracket is $\frac{n-m}{n(n-1)}$, and the first term is $\frac{H_n}{n}\cdot\frac{n-m}{n-1}$, which is $H_n$ times larger. Since $H_n > 1$ for $n > 1$, the difference is positive: a random order scores above $\pi$ on average, by about $(H_n - 1)/n$. A gate at exactly $\pi$ lets random rankings through more often than not.
+
+(b) Draw 2,000 fraud positions at random among 100,000, sort them to get the ranks $r_j$, compute $\mathrm{AP} = \frac1m\sum_j j/r_j$, and repeat. Two thousand repetitions give a mean of 0.0201 (the formula gives 0.02011), a standard deviation of 0.00046, a 95th percentile of 0.0209 and a 99th of 0.0212; 58% of random orders score above 0.02. A gate of 0.021 already excludes random rankings at 95% on this test size. The pipeline's 0.2 is about four hundred standard deviations above random: it does not guard against chance, which a gate a few thousandths above the base rate would do, but sets a level of usefulness. Whether that level is right is a business statement about precision at the budget, which is the argument for gating on card precision at $k$ instead.
+</Solution>
+</Exercise>
+
+<Exercise>
+"Monitoring the nine most important features covers the risk: the other sixteen barely move the score, so a change in them cannot matter." Refute the claim for this pipeline. Name the step that fails.
+
+<Solution>
+The step that fails is "barely move the score, so cannot matter". Importance is measured on the training data. Twelve of the inputs, the minute features, were 0 in every training row; a column that is constant in training cannot be used by the model, so its importance is zero by construction, not because the feature is irrelevant. In service those columns carry real counts, and the next retraining on a table where the stream did fill them can give them weight; the skew is invisible to the importance ranking exactly because it is a skew. The 7- and 14-day features are the second failure: a feature can carry little of the score today and still be where a gradual change shows first and furthest, as the 30-day count of the monitoring lesson's product stream went red while the score stayed green. Monitoring is meant to show that the population differs from the one the model was built on, which matters for every input the next model may use, not only for the inputs this model happens to lean on. The cost of watching all 25 is 25 histograms an hour.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the condition under which Youden's point is the cost-minimising point on the ROC curve. (a) Starting from the expected cost per payment in the body, show that the optimum is where the ROC slope equals $\frac{(1-\pi)C_a}{\pi(\mathrm{Amt} - C_a)}$. (b) Show that Youden's point is optimal exactly when $\mathrm{Amt} = C_a/\pi$, and evaluate it at $\pi = 0.02$, $C_a$ = €5. (c) In the general four-cell form, with a false alarm costing $c_{FP}$ and a missed fraud $c_{FN}$ net of a caught fraud's cost, show the condition is $c_{FP}(1-\pi) = c_{FN}\,\pi$, and give the implied cost ratio at 2% fraud.
+
+<Solution>
+(a) Write the cost as a function of the false-positive rate $u$ along the curve, $\mathrm{TPR} = R(u)$: $K(u) = \pi[R(u)C_a + (1 - R(u))\mathrm{Amt}] + (1-\pi)u\,C_a$. Then $K'(u) = \pi R'(u)(C_a - \mathrm{Amt}) + (1-\pi)C_a$. On a concave ROC curve $K$ is convex, so the minimum is at $K'(u) = 0$: $R'(u) = \frac{(1-\pi)C_a}{\pi(\mathrm{Amt} - C_a)}$, for $\mathrm{Amt} > C_a$.
+
+(b) Youden's point maximises $R(u) - u$, so $R'(u) = 1$ there. It is the cost optimum when $(1-\pi)C_a = \pi(\mathrm{Amt} - C_a)$, that is $\mathrm{Amt} = C_a(1-\pi)/\pi + C_a = C_a/\pi$. At $\pi = 0.02$ and $C_a$ = €5: €250. Youden's point is right for a stream in which every payment is worth €250; for the €54 payments of the body's example it calls far too many.
+
+(c) With costs $c_{FP}$ for a false alarm and $c_{FN}$ for a missed fraud (counted relative to catching it), the cost is $\pi(1 - R(u))c_{FN} + (1-\pi)u\,c_{FP}$, and the optimum is at $R'(u) = \frac{(1-\pi)c_{FP}}{\pi c_{FN}}$. Slope 1 means $c_{FP}(1-\pi) = c_{FN}\pi$, a ratio $c_{FN}/c_{FP} = (1-\pi)/\pi = 49$ at 2% fraud. The general move: a threshold rule that ignores prices still assumes some, and the assumed ratio can be read off the slope at the point it picks.
+</Solution>
+</Exercise>
+
+<Exercise>
+Show that for small moves the Jensen–Shannon divergence is about an eighth of the stability index. Write $o_i = e_i + \Delta_i$ with $\sum_i \Delta_i = 0$, expand both to second order in $\Delta_i$, and check the ratio against the body's week-from-day-112 numbers. Then use the ratio to translate the job's two thresholds into stability indices, and say where the approximation stops being trustworthy for the skew line.
+
+<Solution>
+**Stability index.** Each term is $\Delta_i \ln(1 + \Delta_i/e_i) \approx \Delta_i(\Delta_i/e_i - \ldots) = \Delta_i^2/e_i$ to second order, so $\mathrm{SI} \approx \sum_i \Delta_i^2/e_i$.
+
+**Jensen–Shannon.** The average is $m_i = e_i + \Delta_i/2$. For a Kullback–Leibler divergence between close histograms, $\mathrm{KL}(a\|b) \approx \frac12\sum_i (a_i - b_i)^2/b_i$ (the first-order terms vanish because both sum to 1). Here $o_i - m_i = \Delta_i/2$ and $e_i - m_i = -\Delta_i/2$, and $m_i \approx e_i$ to this order, so each of the two divergences is about $\frac12 \sum_i \Delta_i^2/(4e_i)$. Half their sum is $\mathrm{JS} \approx \frac12 \cdot 2 \cdot \frac18 \sum_i \Delta_i^2/e_i = \frac18 \sum_i \Delta_i^2/e_i \approx \mathrm{SI}/8$.
+
+**Check.** Week 112: SI 0.063, JS 0.0079, ratio 8.0.
+
+**Thresholds.** Drift 0.05 corresponds to $\mathrm{SI} \approx 0.4$, beyond the 0.25 red line. Skew 0.5 would correspond to $\mathrm{SI} \approx 4$, which is outside the range where a second-order expansion holds: the approximation assumes every $|\Delta_i|$ is small next to $e_i$, while a Jensen–Shannon value of 0.5 against a maximum of $\ln 2 \approx 0.69$ needs histograms that barely overlap. For the skew line, use the exact formula, as the body's all-zero example does. If the service reports the divergence in bits rather than nats, every value is larger by $1/\ln 2 \approx 1.44$ and the drift line corresponds to SI ≈ 0.28: still past red.
+</Solution>
+</Exercise>
+
+<Exercise>
+The monitoring job has no labels in its loop. Design the label join that would let the same pipeline run the ranking backtest of the monitoring lesson. Say (a) which identifier the monitoring table's rows must carry and why the current 50% sample is a problem, (b) when a week's backtest can first be computed, with the course's $\delta = 7$, (c) which payments are removed before scoring, and (d) what the backtest is compared with in the first weeks and later.
+
+<Solution>
+(a) The table row needs the payment's identifier, so that it can be joined to the label table once the label arrives, and the card's, without which card precision at $k$ has no cards to count. Today only the printed raw message carries them, as free text; the row has the inputs and the score but nothing to join on. The row already names the deployed model, which is what splits a week scored by two deployments. A 50% random sample still gives an unbiased weekly AP, but card precision at $k$ is computed on each day's top $k$ cards among all payments: on a half sample the day's top 100 are a different set, and a card's payments are split across logged and unlogged. The log for the backtest must keep every payment (or at least every card it keeps, whole).
+
+(b) A week is fully labelled $\delta$ days after it ends: the week of days $t$ to $t+6$ can be backtested on day $t + 6 + 7$, about two weeks after its first payment. On this stream the labels are instant, but the join has to be written for the bank's clock or it will compute numbers on incomplete labels.
+
+(c) Known-card removal, as in the delay lesson: on day $d$, drop the payments of cards with a fraud on a day up to $d - \delta - 1$, and detected-card removal for cards already in an earlier day's top $k$.
+
+(d) In the first weeks, the spread of the model's development folds, read as provisional (a red against them is a reason to look). Once five live weeks are labelled, their mean and standard deviation of AP and CP@100 become the reference, each week's $z_t$ goes into CUSUM with $v = 0.5$, $h = 5$, and an alarm triggers the action table. The same join, grouped by probability band, gives the calibration pools.
+</Solution>
+</Exercise>
+
+<Exercise>
+The drift check runs every hour on half the requests. (a) For a feature cut into $B$ bins, two independent samples of $n_1$ and $n_2$ payments from the same distribution give a stability index of about $(B-1)(1/n_1 + 1/n_2)$ by chance. Use the one-eighth ratio between the two distances to find how many sampled payments an hour, with $B = 10$ and equal samples, make noise alone reach the drift line of 0.05. (b) Hourly volume on a card stream falls at night. What does the answer imply for the nights of a small issuer? (c) A fraud wave doubles the fraud share from 2% to 4% for one hour. Estimate the largest stability index the score could show that hour, and say whether the job could see it.
+
+<Solution>
+(a) Chance gives $\mathrm{JS} \approx \frac{(B-1)}{8}\bigl(\frac1{n_1} + \frac1{n_2}\bigr) = \frac{9}{8}\cdot\frac{2}{n} = \frac{2.25}{n}$. This equals 0.05 at $n = 45$ sampled payments, so about 90 payments an hour at a sample rate of 0.5.
+
+(b) An issuer whose night hours carry fewer than about a hundred payments gets drift distances near or above 0.05 from sampling noise alone, every night, on every watched feature: the emails come from the clock, not from the stream. Equal-width bins with most mass in one bin lower the effective $B$ and soften this, but the scale is right. The fix is a window sized by count rather than by hour, or a line read against the distance's own spread on ordinary hours, the same move as the monitoring lesson's reference spread.
+
+(c) First, the job has no score check at all: it watches nine inputs and their attributions, never the endpoint's response. A score check would not help either. The wave changes only the frauds, adding at most 2% of the hour's payments to the score bands where frauds sit. Moving a share $f$ of the mass out of one decile into another gives $f \ln\frac{1 + 10f}{1 - 10f}$, which is the monitoring lesson's two-bin bound, about $20f^2$: at $f = 0.02$, $0.02 \ln 1.5 \approx 0.008$, a Jensen–Shannon value near 0.001. Nothing the job could be given would see it at a threshold above noise. A fraud wave is visible only on labels or on a fraud-rate controller, which this pipeline has neither of.
+</Solution>
+</Exercise>
+
+<Exercise>
+List every field the pipeline keeps about one scored payment (the logged request and response, the batch explanation where it exists), and then every field an investigator's decision on an alerted payment would need to leave behind so that, five years later, someone could see what was alerted, what was done and why. Which fields are missing, and for which payments is no row kept at all?
+
+<Solution>
+**Kept.** For every payment, three printed lines in the serving application's log: the raw message (payment, card and terminal identifiers, amount), the 25 inputs as sent, and the endpoint's response (the score, the deployed model's id and, with a current client library, the registry model and version), as free text kept for the log's retention period. For a random half of the payments, a row in the monitoring table: the endpoint, the deployed model's id, a logging time, the 25 inputs and the score, with no payment identifier. For the warehouse track's batch explanation: the top five attributions, the base value and the prediction.
+
+**Needed for a decision.** The payment and customer identifiers; the model version; the served inputs and score; the attribution with its reference; the decision zone and the action taken (approve, step-up, decline, review); whether an alert was raised and when; who looked at it, what they checked and concluded, with the grounds; any override of the model's zone; whether a report was filed, and if not, why not; the disposition when the label arrives. And the row must exist for every alert, including the ones closed as false alarms.
+
+**Missing.** Everything from the action onward, the attribution in the served record, the reference, a durable, structured link from each decision to the registry version that made it, and a structured row for the unsampled half: for those payments only the free-text lines exist. A monitoring table is a statistical sample of inputs and a service log is a debugging trace; a record of decisions is a complete, structured list of what was decided and on what grounds. <Ref lesson="aml-transaction-monitoring-duty" /> reads the provision that makes the second one a legal duty: an assessment record kept for every alert, whether or not a report followed.
+</Solution>
+</Exercise>
+
+<References>
+1. Google Cloud Platform, *FraudFinder: a comprehensive lab series on how to build a real-time fraud detection system on Google Cloud*, 2023 — README (architecture); `01_exploratory_data_analysis` (2% fraud, the note on simulated data); `02_feature_engineering_batch` (terminal risk with a 7-day delay; minute features initialised to 0); `bqml/04_model_training_and_prediction` (training table read from the feature store, the note on label delay, `ML.EVALUATE`, top-five attributions from `ML.EXPLAIN_PREDICT`); `bqml/05_model_training_pipeline_formalization` (the accuracy > 0.95 condition, deployment to the most recently updated endpoint); `bqml/06_model_deployment` (the hand-trained `bqml_fraud_classifier` deployed to the `_monitored` endpoint; sampled Shapley specification, skew and drift thresholds on nine features, hourly schedule, sample rate 0.5, email alerts); `bqml/07_model_inference` and `scripts/cloud_run_model_inference/main.py` (the serving application wired to the `_monitored` endpoint; the serving handler, null to 0.0, status 204, the raw message and response printed per payment, the `serving_predict` table); `vertex_ai/04_experimentation` (balancing before the split, the eight-configuration loop, threshold sweep and `argmax(tpr - fpr)`, the honesty note on AUC 1.0); `vertex_ai/05` training script (undersampling, log-loss on hard predictions); `vertex_ai/06` (the average-precision > 0.2 condition, 0.8/0.1/0.1 split). https://github.com/GoogleCloudPlatform/fraudfinder
+2. Google Cloud, *Introduction to Vertex AI Model Monitoring* (v1 documentation), accessed 10 November 2026 — skew and drift baselines, Jensen–Shannon divergence for numerical features and L-infinity distance for categorical ones, equal-width bins, default threshold. https://docs.cloud.google.com/vertex-ai/docs/model-monitoring/overview
+3. Google Cloud, *Online prediction logging* (Vertex AI documentation), accessed 10 November 2026 — the request-response table's columns (`endpoint`, `deployed_model_id`, `logging_time`, `request_id`, `request_payload`, `response_payload`), shared with Model Monitoring v1. https://docs.cloud.google.com/vertex-ai/docs/predictions/online-prediction-logging
+4. Google Cloud, *Vertex AI SDK for Python* (`google-cloud-aiplatform`), `google/cloud/aiplatform/models.py`, class `Prediction`, accessed 10 November 2026 — the fields `Endpoint.predict` returns: `deployed_model_id`, and in current releases `model_version_id` and `model_resource_name`. https://github.com/googleapis/python-aiplatform
+5. Y.-A. Le Borgne, W. Siblini, B. Lebichot, G. Bontempi, *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*, Université Libre de Bruxelles, 2022 — Ch. 4, "Introduction" to performance metrics (a classifier that labels every payment genuine has high accuracy); Ch. 5, "Validation strategies" (training, delay and test blocks forward in time). https://fraud-detection-handbook.github.io/fraud-detection-handbook/
+6. B. Baesens, V. Van Vlasselaer, W. Verbeke, *Fraud Analytics Using Descriptive, Predictive, and Social Network Techniques: A Guide to Data Science for Fraud Detection*, Wiley, 2015 — Ch. 6, "The Analytical Fraud Model Life Cycle", pp. 280–281 and Fig. 6.1 (testing: scoring time, missing and extreme inputs, dummy fraud cases; staging; retirement); "Backtesting Analytical Fraud Models" (stability index and its thresholds).
+7. W. J. Youden, "Index for Rating Diagnostic Tests," *Cancer* 3(1), 1950, pp. 32–35 — the index $\mathrm{TPR} - \mathrm{FPR}$.
+8. J. Lin, "Divergence Measures Based on the Shannon Entropy," *IEEE Transactions on Information Theory* 37(1), 1991, pp. 145–151 — the Jensen–Shannon divergence and its bound.
+9. Regulation (EU) 2024/1689 (Artificial Intelligence Act), *Official Journal* L, 12.7.2024 — Art. 13(3)(b)(ii) (level of accuracy and its metrics in the instructions for use), Art. 15(3) (declared accuracy metrics), Art. 72 (post-market monitoring plan), Annex IV point 2(g) (metrics used to measure accuracy, robustness and compliance, as well as potentially discriminatory impacts). https://eur-lex.europa.eu/eli/reg/2024/1689/oj
+</References>
